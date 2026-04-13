@@ -188,13 +188,25 @@ exports.createLead = async (req, res) => {
 };
 
 exports.updateLead = async (req, res) => {
-    const { phone_number, customer_name, first_message, language, address, city, state, status, assigned_to } = req.body;
+    const { 
+        phone_number, customer_name, first_message, language, address, city, state, 
+        status, assigned_to, score, next_followup_date, lost_reason, lost_notes 
+    } = req.body;
     try {
         await pool.query(
-            `UPDATE leads SET phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
-            address = ?, city = ?, state = ?, status = ?, assigned_to = ? WHERE lead_id = ?`,
-            [phone_number, customer_name, first_message, language, address, city, state, status, assigned_to || null, req.params.id]
+            `UPDATE leads SET 
+                phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
+                address = ?, city = ?, state = ?, status = ?, assigned_to = ?,
+                score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?
+            WHERE lead_id = ?`,
+            [
+                phone_number, customer_name, first_message, language, 
+                address, city, state, status, assigned_to || null,
+                score || 'cold', next_followup_date || null, lost_reason || null, lost_notes || null,
+                req.params.id
+            ]
         );
+
         await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)', 
             [req.params.id, req.user.id, `Lead details updated. Status: ${status}`]);
         res.json({ message: 'Lead updated successfully' });

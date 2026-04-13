@@ -58,10 +58,15 @@ CREATE TABLE leads (
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(100),
-    status ENUM('new', 'assigned', 'contacted', 'callback', 'followup', 'interested', 'not_interested', 'dealer', 'converted', 'lost') DEFAULT 'new',
+    status ENUM('new', 'assigned', 'contacted', 'callback', 'followup', 'interested', 'negotiation', 'advance_paid', 'converted', 'lost', 'not_interested', 'dealer') DEFAULT 'new',
+    score ENUM('hot', 'warm', 'cold') DEFAULT 'cold',
     assigned_to INT,
     source VARCHAR(50) DEFAULT 'whatsapp',
+    next_followup_date DATETIME NULL,
+    lost_reason VARCHAR(255) NULL,
+    lost_notes TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (assigned_to) REFERENCES users(user_id) ON DELETE SET NULL
 );

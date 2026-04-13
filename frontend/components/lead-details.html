@@ -1,0 +1,531 @@
+<div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.25rem;">
+    <select id="leadDetailStatusSelect" class="form-control-premium"
+        style="width: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 2rem;"></select>
+    <select id="leadDetailScoreSelect" class="form-control-premium"
+        style="width: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 0.5rem;"></select>
+    <span id="leadDetailLanguage" class="language-tag">Language</span>
+</div>
+</div>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; width: 100%;">
+    <!-- Left Side: Customer Name -->
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <h2 id="topCustomerNameDisplay" style="font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0;"></h2>
+    </div>
+
+    <!-- Right Side: Buttons -->
+    <div style="display: flex; gap: 0.75rem;">
+        <a id="whatsappBtn" href="#" target="_blank" class="login-btn btn-whatsapp"
+            style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-size: 0.875rem;">
+            <i class="fab fa-whatsapp"></i> WhatsApp
+        </a>
+        <button onclick="window.handleLeadConversionModal()" class="login-btn"
+            style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; background: #059669;">
+            <i class="fas fa-shopping-cart"></i> Convert to Order
+        </button>
+    </div>
+</div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="detail-grid">
+    <!-- Left Column: Information Cards -->
+    <div class="detail-main-col">
+        <!-- Farmer Information -->
+        <div id="farmerInfoSection" class="detail-section">
+            <div class="detail-section-title">
+                <div class="section-icon" style="background: #eff6ff; color: #2563eb;">
+                    <i class="fas fa-user"></i>
+                </div>
+                Farmer Information
+                <button onclick="toggleLeadEdit('farmerInfoSection')" class="edit-section-btn view-item">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </div>
+            <div class="info-display-grid">
+                <div class="info-item">
+                    <label>Farmer Name</label>
+                    <p id="leadDetailName" class="view-item">-</p>
+                    <input type="text" id="editName" class="edit-item form-control-premium" style="display:none">
+                </div>
+                <div class="info-item">
+                    <label>Phone Number</label>
+                    <p id="leadDetailPhone" class="view-item">-</p>
+                    <input type="text" id="editPhone" class="edit-item form-control-premium" style="display:none">
+                </div>
+                <div class="info-item">
+                    <label>Village / City</label>
+                    <p id="leadDetailVillage" class="view-item">-</p>
+                    <input type="text" id="editVillage" class="edit-item form-control-premium" style="display:none">
+                </div>
+                <div class="info-item">
+                    <label>State</label>
+                    <p id="leadDetailState" class="view-item">-</p>
+                    <select id="editState" class="edit-item form-control-premium" style="display:none">
+                        <option value="Karnataka">Karnataka</option>
+                        <option value="Tamilnad">Tamilnad</option>
+                        <option value="Kerala">Kerala</option>
+                        <option value="Maharastra">Maharastra</option>
+                        <option value="Andrapradesh">Andrapradesh</option>
+                        <option value="Telangana">Telangana</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="info-item">
+                    <label>Language</label>
+                    <p id="leadDetailLanguageInfo" class="view-item">-</p>
+                    <input type="text" id="editLanguage" class="edit-item form-control-premium" style="display:none">
+                </div>
+            </div>
+            <div class="edit-controls edit-item" style="display:none">
+                <button onclick="saveLeadSection('farmerInfoSection')" class="login-btn btn-sm">Save Changes</button>
+                <button onclick="toggleLeadEdit('farmerInfoSection')"
+                    class="login-btn btn-outline btn-sm">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Requirements -->
+        <div id="requirementSection" class="detail-section">
+            <div class="detail-section-title">
+                <div class="section-icon" style="background: #f0fdf4; color: #16a34a;">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                Crop & Requirement
+                <button onclick="toggleLeadEdit('requirementSection')" class="edit-section-btn view-item">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </div>
+            <div class="info-display-grid">
+                <div class="info-item">
+                    <label>Current Crop</label>
+                    <p id="leadDetailCrop" class="view-item">-</p>
+                    <input type="text" id="editCrop" class="edit-item form-control-premium" style="display:none">
+                </div>
+                <div class="info-item">
+                    <label>Acreage</label>
+                    <p id="leadDetailAcreage" class="view-item">-</p>
+                    <input type="text" id="editAcreage" class="edit-item form-control-premium" style="display:none">
+                </div>
+                <div class="info-item">
+                    <label>Interest In</label>
+                    <div id="leadDetailInterest" class="view-item"
+                        style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;">
+                        <!-- Badges injected here -->
+                    </div>
+                    <input type="text" id="editInterest" class="edit-item form-control-premium" style="display:none"
+                        placeholder="Comma separated products">
+                </div>
+            </div>
+            <div class="edit-controls edit-item" style="display:none">
+                <button onclick="saveLeadSection('requirementSection')" class="login-btn btn-sm">Save Changes</button>
+                <button onclick="toggleLeadEdit('requirementSection')"
+                    class="login-btn btn-outline btn-sm">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Sales & Follow-up (NEW SECTION for missing data) -->
+        <div id="salesSection" class="detail-section">
+            <div class="detail-section-title">
+                <div class="section-icon" style="background: #fff7ed; color: #ea580c;">
+                    <i class="fas fa-handshake"></i>
+                </div>
+                Sales & Lead Progress
+                <button onclick="toggleLeadEdit('salesSection')" class="edit-section-btn view-item">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </div>
+            <div class="info-display-grid">
+                <div class="info-item">
+                    <label>Sale Status</label>
+                    <p id="leadDetailSaleStatus" class="view-item">Not Started</p>
+                    <select id="editSaleStatus" class="edit-item form-control-premium" style="display:none">
+                        <option value="Ordered">Ordered</option>
+                        <option value="Hot/Very Interested">Hot/Very Interested</option>
+                        <option value="Mild/Later">Mild/Later</option>
+                        <option value="Cold/Not Interested">Cold/Not Interested</option>
+                        <option value="Old Purchased">Old Purchased</option>
+                        <option value="Dealer">Dealer</option>
+                    </select>
+                </div>
+                <div class="info-item">
+                    <label>Deal Amount</label>
+                    <p id="leadDetailAmount" class="view-item">0.00</p>
+                    <input type="number" id="editAmount" class="edit-item form-control-premium" style="display:none">
+                </div>
+                <div class="info-item">
+                    <label>Call Attempt</label>
+                    <p id="leadDetailAttempt" class="view-item">-</p>
+                    <select id="editAttempt" class="edit-item form-control-premium" style="display:none">
+                        <option value="1st attempt">1st Attempt</option>
+                        <option value="2nd attempt">2nd Attempt</option>
+                        <option value="3rd attempt">3rd Attempt</option>
+                    </select>
+                </div>
+                <div class="info-item">
+                    <label>Feedback</label>
+                    <p id="leadDetailFeedback" class="view-item">-</p>
+                    <input type="text" id="editFeedback" class="edit-item form-control-premium" style="display:none">
+                </div>
+            </div>
+            <div class="edit-controls edit-item" style="display:none">
+                <button onclick="saveLeadSection('salesSection')" class="login-btn btn-sm">Save Changes</button>
+                <button onclick="toggleLeadEdit('salesSection')" class="login-btn btn-outline btn-sm">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="detail-section">
+            <div class="detail-section-title">
+                <div class="section-icon" style="background: #f5f3ff; color: #7c3aed;">
+                    <i class="fas fa-history"></i>
+                </div>
+                Interaction History
+            </div>
+
+            <div id="timelineContainer" class="timeline-list">
+                <!-- Timeline entries injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Sidebar / Actions -->
+    <div class="detail-side-col">
+        <!-- Ownership Card -->
+        <div class="sidebar-info-card">
+            <h3
+                style="font-size: 0.75rem; text-transform: uppercase; color: #1d4ed8; letter-spacing: 0.05em; margin-bottom: 1rem; font-weight: 700;">
+                Ownership</h3>
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                <div id="assigneeAvatar"
+                    style="width: 48px; height: 48px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem;">
+                    ?
+                </div>
+                <div>
+                    <p id="leadDetailAssigned" style="font-weight: 600; color: var(--text-main); margin: 0;">Unassigned
+                    </p>
+                    <p style="font-size: 0.75rem; color: #60a5fa; margin: 0;">Current Owner</p>
+                </div>
+            </div>
+            <button onclick="changeAssigneeFromDetails()" class="login-btn btn-outline"
+                style="width: 100%; font-size: 0.875rem; margin-bottom: 0.5rem;">
+                Change Assignee
+            </button>
+            <button onclick="transferLead(window.currentViewingLeadId)" class="login-btn btn-outline"
+                style="width: 100%; font-size: 0.875rem; border-color: #dcfce7; color: #166534;">
+                <i class="fas fa-exchange-alt mr-2"></i> Transfer Lead
+            </button>
+        </div>
+
+        <!-- Next Action Card -->
+        <div class="detail-section" style="margin-top: 1.5rem;">
+            <h3
+                style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 1rem; font-weight: 700;">
+                Follow-up</h3>
+            <div
+                style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                <p id="leadDetailFollowupDate" style="font-weight: 600; color: var(--text-main); margin: 0;">-</p>
+                <p id="leadDetailFollowupAction"
+                    style="font-size: 0.8125rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">No pending action</p>
+            </div>
+            <button onclick="rescheduleCallFromDetails()" class="login-btn btn-outline"
+                style="width: 100%; border-color: #ffedd5; color: #9a3412; font-size: 0.875rem;">
+                <i class="fas fa-calendar-alt mr-2"></i> Reschedule Call
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Decision Engine Modal -->
+<div id="decisionEngineModal" class="modal"
+    style="position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center;">
+    <div class="modal-content premium-card"
+        style="width: 100%; max-width: 650px; background:white; border-radius: 1rem; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
+        <!-- Header -->
+        <div class="wizard-header"
+            style="background:var(--primary-color); color:white; padding: 1.5rem; text-align:center; position:relative;">
+            <h2 style="margin:0; font-weight:800; font-size:1.25rem;">CRM Order Conversion Wizard</h2>
+            <p style="margin:0.25rem 0 0 0; opacity:0.8; font-size:0.875rem;">Lead Decision Engine</p>
+            <button onclick="closeDecisionEngine()"
+                style="position:absolute; right:1.5rem; top:1.5rem; background:none; border:none; color:white; cursor:pointer; font-size:1.25rem;"><i
+                    class="fas fa-times"></i></button>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="wizard-steps"
+            style="display:flex; justify-content:space-between; padding: 1rem 2rem; background:#f8fafc; border-bottom: 1px solid var(--border-color); font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">
+            <span id="step1-ind" class="step-ind active" style="color:var(--primary-color);">1. Status</span>
+            <span id="step2-ind" class="step-ind">2. Customer</span>
+            <span id="step3-ind" class="step-ind">3. Product</span>
+            <span id="step4-ind" class="step-ind">4. Decision</span>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body" style="padding: 2rem; overflow-y:auto; flex-grow:1;">
+
+            <!-- STEP 1: COMMON START -->
+            <div id="wizard-step-1" class="wizard-step">
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Section 1: Call Status</h3>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="text" id="de-phone" class="form-control-premium" disabled readonly
+                        style="background:#f1f5f9; cursor:not-allowed; color:#475569;">
+                </div>
+                <div class="form-group">
+                    <label>Call Status *</label>
+                    <div id="de-call-status-wrapper" class="status-pill-grid">
+                        <button type="button" class="status-pill" data-value="Received">Received</button>
+                        <button type="button" class="status-pill" data-value="Not Received">Not Received</button>
+                        <button type="button" class="status-pill" data-value="Switched Off">Switched Off</button>
+                        <button type="button" class="status-pill" data-value="Busy">Busy</button>
+                        <button type="button" class="status-pill" data-value="Not Reachable">Not Reachable</button>
+                        <button type="button" class="status-pill" data-value="Not Interested">Not Interested</button>
+                        <button type="button" class="status-pill" data-value="Booked">Booked</button>
+                        <button type="button" class="status-pill" data-value="WhatsApp">WhatsApp</button>
+                    </div>
+                    <input type="hidden" id="de-call-status" value="">
+                </div>
+                <div style="text-align:right; margin-top:1.5rem;">
+                    <button onclick="deNextStep(2)" class="login-btn" style="width:auto; padding: 0.6rem 2rem;">Next <i
+                            class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+
+            <!-- STEP 2: CUSTOMER -->
+            <div id="wizard-step-2" class="wizard-step" style="display:none;">
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 2: Customer Details</h3>
+                <div class="form-group">
+                    <label>Farmer Name</label>
+                    <input type="text" id="de-customer-name" class="form-control-premium" placeholder="Enter name"
+                        style="color:#000;">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                    <div class="form-group">
+                        <label>Village / Taluk</label>
+                        <input type="text" id="de-village" class="form-control-premium" placeholder="Enter village"
+                            style="color:#000;">
+                    </div>
+                    <div class="form-group">
+                        <label>State</label>
+                        <select id="de-state" class="form-control-premium" style="color:#000;">
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Tamilnad">Tamilnad</option>
+                            <option value="Kerala">Kerala</option>
+                            <option value="Maharastra">Maharastra</option>
+                            <option value="Andrapradesh">Andrapradesh</option>
+                            <option value="Telangana">Telangana</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Added Language Field -->
+                <div class="form-group">
+                    <label>Lead Language</label>
+                    <select id="de-language" class="form-control-premium" style="color:#000;">
+                        <option value="EN">English</option>
+                        <option value="HI">Hindi / North</option>
+                        <option value="KA">Kannada / local</option>
+                        <option value="TN">Tamil</option>
+                        <option value="TE">Telugu</option>
+                        <option value="ML">Malayalam</option>
+                    </select>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
+                    <button onclick="dePrevStep(1)" class="login-btn btn-outline"
+                        style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
+                    <button onclick="deNextStep(3)" class="login-btn" style="width:auto; padding: 0.6rem 2rem;">Next <i
+                            class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+
+            <!-- STEP 3: PRODUCT -->
+            <div id="wizard-step-3" class="wizard-step" style="display:none;">
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 3: Product Selection</h3>
+                <div class="form-group">
+                    <label>Select Products (Multi-select)</label>
+                    <select id="de-products" class="form-control-premium" multiple style="height:120px; color:#000;">
+                        <!-- Will be populated dynamically or fallback to hardcoded if API fails -->
+                        <option value="Brush Cutter Machine" data-price="12000">Brush Cutter Machine</option>
+                        <option value="Trolley" data-price="8500">Trolley</option>
+                        <option value="Dumper" data-price="15000">Dumper</option>
+                        <option value="Accessories" data-price="2000">Accessories</option>
+                    </select>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Hold Ctrl (Windows) or
+                        Cmd (Mac) to select multiple.</p>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
+                    <button onclick="dePrevStep(2)" class="login-btn btn-outline"
+                        style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
+                    <button onclick="deNextStep(4)" class="login-btn" style="width:auto; padding: 0.6rem 2rem;">Next <i
+                            class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+
+            <!-- STEP 4: DECISION (Dynamic) -->
+            <div id="wizard-step-4" class="wizard-step" style="display:none;">
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 4: Sales Status & Decision
+                </h3>
+
+                <div id="de-sales-status-container" class="form-group">
+                    <label>Sales Status *</label>
+                    <select id="de-sales-status" class="form-control-premium" style="color:#000;">
+                        <option value="">-- Select Decision --</option>
+                        <option value="Ordered">Ordered (Hot)</option>
+                        <option value="Hot/Very Interested">Hot / Very Interested</option>
+                        <option value="Mild/Later">Mild / Later</option>
+                        <option value="Cold/Not Interested">Cold / Not Interested</option>
+                        <option value="Old Purchased">Old Purchased</option>
+                        <option value="Dealer">Dealer</option>
+                    </select>
+                </div>
+
+                <!-- DYNAMIC SUB-FORMS -->
+
+                <!-- 1A: ORDER FORM -->
+                <div id="de-form-order" class="dynamic-subform"
+                    style="display:none; background:#ecfdf5; padding:1.5rem; border-radius:0.75rem; border:1px solid #d1fae5; margin-top:1rem;">
+                    <h4 style="color:#065f46; margin-bottom:1rem;"><i class="fas fa-shopping-cart mr-2"></i> Order
+                        Configuration</h4>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.875rem;">
+                        <span style="font-weight:600;">Selected Products:</span>
+                        <span id="de-order-products-display">-</span>
+                    </div>
+                    <div class="form-group" style="margin-top:1rem;">
+                        <label>Total Amount (₹)</label>
+                        <input type="number" id="de-order-total" class="form-control-premium"
+                            style="background:white; color:#000;">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Discount (₹)</label>
+                            <input type="number" id="de-order-discount" class="form-control-premium" value="0"
+                                style="background:white; color:#000;">
+                        </div>
+                        <div class="form-group">
+                            <label>Final Amount (₹)</label>
+                            <input type="number" id="de-order-final" class="form-control-premium" readonly
+                                style="background:#f1f5f9; color:#000;">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Advance Amount (₹)</label>
+                            <input type="number" id="de-order-advance" class="form-control-premium" value="0"
+                                style="background:white; color:#000;">
+                        </div>
+                        <div class="form-group">
+                            <label>Due Amount (₹)</label>
+                            <input type="number" id="de-order-due" class="form-control-premium" readonly
+                                style="background:#f1f5f9; color:#ef4444; font-weight:700;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:1rem;">
+                        <label>Upload Payment Screenshot *</label>
+                        <input type="file" id="de-order-screenshot" class="form-control-premium" accept="image/*"
+                            style="background:white; color:#000;">
+                    </div>
+                </div>
+
+                <!-- 1B: FOLLOW-UP FORM -->
+                <div id="de-form-followup" class="dynamic-subform"
+                    style="display:none; background:#fffbeb; padding:1.5rem; border-radius:0.75rem; border:1px solid #fef3c7; margin-top:1rem;">
+                    <h4 style="color:#d97706; margin-bottom:1rem;"><i class="fas fa-calendar-alt mr-2"></i> Follow-up
+                        Details</h4>
+                    <div class="form-group">
+                        <label>Next Follow-up Date *</label>
+                        <input type="datetime-local" id="de-followup-date" class="form-control-premium"
+                            style="background:white; color:#000;">
+                    </div>
+                    <div class="form-group">
+                        <label>Follow-up Action</label>
+                        <select id="de-followup-action" class="form-control-premium"
+                            style="background:white; color:#000;">
+                            <option value="Call Again">Call Again</option>
+                            <option value="Send Video">Send Video</option>
+                            <option value="Send Price">Send Price</option>
+                            <option value="After Harvest">After Harvest</option>
+                            <option value="Discuss with Family">Discuss with Family</option>
+                            <option value="Koppa Visit">Koppa Visit</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="de-followup-notes" class="form-control-premium" rows="2"
+                            style="background:white; color:#000;"></textarea>
+                    </div>
+                </div>
+
+                <!-- 1C: REASON FORM (Cold / Not Interested) -->
+                <div id="de-form-reason" class="dynamic-subform"
+                    style="display:none; background:#f8fafc; padding:1.5rem; border-radius:0.75rem; border:1px solid #e2e8f0; margin-top:1rem;">
+                    <h4 style="color:#475569; margin-bottom:1rem;"><i class="fas fa-times-circle mr-2"></i> Lost Reason
+                    </h4>
+                    <div class="form-group">
+                        <label>Reason *</label>
+                        <select id="de-lost-reason" class="form-control-premium" style="background:white; color:#000;">
+                            <option value="High Price">High Price</option>
+                            <option value="Bought competitor">Bought competitor</option>
+                            <option value="Not required now">Not required now</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Notes</label>
+                        <textarea id="de-lost-notes" class="form-control-premium" rows="2"
+                            style="background:white; color:#000;"></textarea>
+                    </div>
+                </div>
+
+                <!-- 1D: FEEDBACK FORM (Old Purchased) -->
+                <div id="de-form-feedback" class="dynamic-subform"
+                    style="display:none; background:#eff6ff; padding:1.5rem; border-radius:0.75rem; border:1px solid #dbeafe; margin-top:1rem;">
+                    <h4 style="color:#2563eb; margin-bottom:1rem;"><i class="fas fa-comment-dots mr-2"></i> Customer
+                        Feedback</h4>
+                    <div class="form-group">
+                        <label>Satisfaction *</label>
+                        <select id="de-feedback-satisfaction" class="form-control-premium"
+                            style="background:white; color:#000;">
+                            <option value="Happy">Happy</option>
+                            <option value="Okay">Okay</option>
+                            <option value="Not Satisfied">Not Satisfied</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Feedback Details</label>
+                        <textarea id="de-feedback-notes" class="form-control-premium" rows="2"
+                            style="background:white; color:#000;"></textarea>
+                    </div>
+                </div>
+
+                <!-- NOT CONNECTED / WHATSAPP (Direct Follow-up mode) -->
+                <div id="de-form-notconnected" class="dynamic-subform"
+                    style="display:none; background:#f1f5f9; padding:1.5rem; border-radius:0.75rem; border:1px solid #cbd5e1; margin-top:1rem;">
+                    <h4 style="color:#334155; margin-bottom:1rem;"><i class="fas fa-phone-slash mr-2"></i> Connection
+                        Log</h4>
+                    <div class="form-group">
+                        <label>Call Attempt</label>
+                        <select id="de-nc-attempt" class="form-control-premium" style="background:white; color:#000;">
+                            <option value="1st Attempt">1st Attempt</option>
+                            <option value="2nd Attempt">2nd Attempt</option>
+                            <option value="3rd Attempt">3rd Attempt</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Next Call Date *</label>
+                        <input type="datetime-local" id="de-nc-date" class="form-control-premium"
+                            style="background:white; color:#000;">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
+                    <button onclick="dePrevStep(3)" id="de-btn-back-4" class="login-btn btn-outline"
+                        style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
+                    <button onclick="submitDecisionEngine()" id="de-submit-btn" class="login-btn"
+                        style="width:auto; padding: 0.6rem 2rem; background:#10b981;">Save & Convert <i
+                            class="fas fa-check ml-2"></i></button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

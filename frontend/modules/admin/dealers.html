@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dealers | Admin | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="topbar">
+            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="dealerSearch" oninput="filterDealers()" placeholder="Search dealers..."></div>
+            <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
+        </header>
+        <div class="content-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <div><h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Dealers</h1><p style="color:#64748b;font-size:0.875rem;">Manage all dealer accounts and their orders.</p></div>
+                <button class="btn-primary" onclick="openModal()" style="display:flex;align-items:center;gap:0.5rem;"><i class="fas fa-plus"></i> Add Dealer</button>
+            </div>
+            <div class="premium-card" style="overflow:hidden;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="background:#f8fafc;"><tr>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Firm Name</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Owner</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Phone</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">City</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Joined</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Actions</th>
+                    </tr></thead>
+                    <tbody id="dealerTableBody"><tr><td colspan="6" style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin"></i></td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<!-- Add/Edit Modal -->
+<div id="dealerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <div class="premium-card" style="width:500px;padding:2rem;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h2 style="font-size:1.25rem;font-weight:700;" id="modalTitle">Add Dealer</h2>
+            <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#64748b;">&times;</button>
+        </div>
+        <form id="dealerForm">
+            <input type="hidden" id="edit-id">
+            <div class="form-group" style="margin-bottom:1rem;">
+                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Firm Name *</label>
+                <input id="firm_name" required style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
+            </div>
+            <div class="form-group" style="margin-bottom:1rem;">
+                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Owner Name</label>
+                <input id="owner_name" style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
+            </div>
+            <div class="form-group" style="margin-bottom:1rem;">
+                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Phone *</label>
+                <input id="phone_number" required style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
+            </div>
+            <div class="form-group" style="margin-bottom:1.5rem;">
+                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">City</label>
+                <input id="city" style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
+            </div>
+            <button type="submit" class="btn-primary" style="width:100%;" id="saveBtn">Save Dealer</button>
+        </form>
+    </div>
+</div>
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="../../js/decision-engine.js"></script>
+<script src="js/dealers.js"></script>
+</body>
+</html>

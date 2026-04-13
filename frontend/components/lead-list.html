@@ -1,0 +1,320 @@
+<style>
+    .lead-table-container {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        border: 1px solid #f1f5f9;
+        overflow: hidden;
+    }
+
+    .lead-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .lead-table th {
+        background: #f8fafc;
+        padding: 1rem 1.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .lead-table td {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.875rem;
+        color: #1e293b;
+        vertical-align: middle;
+    }
+
+    .lead-table tr:hover {
+        background: #fdfdfd;
+    }
+
+    .lead-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .name-cell {
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .name-initial {
+        width: 2rem;
+        height: 2rem;
+        background: #f0fdf4;
+        color: #10b981;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .badge-state {
+        padding: 0.25rem 0.75rem;
+        background: #eff6ff;
+        color: #3b82f6;
+        border-radius: 2rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-score {
+        padding: 0.25rem 0.75rem;
+        border-radius: 2rem;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .badge-score-hot { background: #fee2e2; color: #dc2626; } /* Red */
+    .badge-score-warm { background: #ffedd5; color: #d97706; } /* Orange */
+    .badge-score-cold { background: #f1f5f9; color: #64748b; } /* Grey/Blue */
+
+    .language-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #64748b;
+    }
+
+    .btn-action {
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+        background: #f8fafc;
+        color: #10b981;
+        border-color: #10b981;
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 4rem;
+        color: #94a3b8;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem;
+        color: #64748b;
+    }
+
+    .badge-assigned {
+        padding: 0.25rem 0.6rem;
+        background: #f0fdf4;
+        color: #16a34a;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .badge-unassigned {
+        padding: 0.25rem 0.6rem;
+        background: #fff1f2;
+        color: #e11d48;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .lead-table-header {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+        gap: 1rem;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        background: #f8fafc;
+        padding: 0.4rem 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .filter-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .date-input {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.4rem;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8125rem;
+        color: #1e293b;
+        outline: none;
+        transition: all 0.2s;
+        background: white;
+    }
+
+    .date-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn-filter-secondary {
+        padding: 0.35rem 1rem;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.4rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-filter-secondary:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .btn-filter-secondary.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+
+    .empty-state-animation {
+        width: 200px;
+        height: auto;
+        margin: 0 auto 1.5rem;
+    }
+
+    .empty-state-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @keyframes search-float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-10px) rotate(2deg); }
+    }
+
+    @keyframes dash-scroll {
+        to { stroke-dashoffset: -20; }
+    }
+
+    @keyframes pulse-ring {
+        0% { transform: scale(0.95); opacity: 0.3; }
+        50% { transform: scale(1.1); opacity: 0.6; }
+        100% { transform: scale(0.95); opacity: 0.3; }
+    }
+
+    .animated-magnifier {
+        animation: search-float 3s ease-in-out infinite;
+        transform-origin: center;
+    }
+
+    .scanning-line {
+        stroke-dasharray: 4 4;
+        animation: dash-scroll 0.8s linear infinite;
+    }
+
+    .pulse-circle {
+        animation: pulse-ring 3s ease-in-out infinite;
+        transform-origin: center;
+    }
+</style>
+
+<div class="lead-table-container">
+    <div class="lead-table-header">
+        <div class="filter-group">
+            <span class="filter-label"><i class="fa-solid fa-filter"></i> STATUS</span>
+            <select id="leadStatusFilter" class="date-input">
+                <option value="all">All Statuses</option>
+                <option value="New">New</option>
+                <option value="Contacted">Contacted</option>
+                <option value="Follow-up Required">Follow-up Required</option>
+                <option value="Interested">Interested</option>
+                <option value="Negotiation">Negotiation</option>
+                <option value="Converted">Converted</option>
+                <option value="Lost">Lost</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <span class="filter-label"><i class="fa-solid fa-fire"></i> SCORE</span>
+            <select id="leadScoreFilter" class="date-input">
+                <option value="all">All Scores</option>
+                <option value="HOT">HOT</option>
+                <option value="WARM">WARM</option>
+                <option value="COLD">COLD</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <span class="filter-label"><i class="fa-solid fa-calendar-days"></i> DATE</span>
+            <input type="date" id="leadDateFilter" class="date-input">
+            <button id="btnFilterAll" class="btn-filter-secondary">ALL</button>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Bar -->
+    <div id="bulkActionsBar" style="display: none; padding: 0.75rem 1.5rem; background: #f0fdf4; border-bottom: 2px solid #bbf7d0; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span id="selectedCount" style="background: white; border: 1px solid #10b981; color: #059669; padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-weight: 800; font-size: 0.8rem;">0 Selected</span>
+            <div style="height: 1.5rem; width: 1px; background: #bbf7d0;"></div>
+            <button onclick="openBulkAssignModal()" class="btn-assign" style="background: #059669; color: white; border-radius: 8px; font-weight: 700;">
+                <i class="fas fa-user-plus"></i> Manual Assign to Staff
+            </button>
+        </div>
+        <button onclick="clearSelection()" style="background: none; border: none; color: #64748b; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Clear Selection</button>
+    </div>
+
+    <table class="lead-table" id="leadsTable">
+        <thead>
+            <tr>
+                <th style="width: 40px; padding-right: 0;"><input type="checkbox" id="selectAllLeads" class="form-checkbox"></th>
+                <th>Farmer Name</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>State</th>
+                <th>Language</th>
+                <th>Phone Number</th>
+                <th>Date Added</th>
+                <th>Assigned Staff</th>
+            </tr>
+        </thead>
+        <tbody id="leadsTableBody">
+            <tr id="leadsLoadingRow">
+                <td colspan="9" class="loading-state">
+                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                    <p>Loading leads...</p>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>

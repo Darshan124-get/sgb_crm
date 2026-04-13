@@ -1,0 +1,169 @@
+<div class="followup-dashboard fade-in">
+    <div class="page-header">
+        <div>
+            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">Follow-up System</h1>
+            <p style="color: var(--text-muted); font-size: 0.875rem;">Manage your active and overdue call reminders.</p>
+        </div>
+        <div class="header-actions">
+            <button class="action-btn" onclick="updateLeadStats(); initFollowupView();">
+                <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="followup-grid">
+        <!-- Overdue Section -->
+        <div class="followup-section overdue-section">
+            <div class="section-header overdue">
+                <i class="fa-solid fa-circle-exclamation"></i> Overdue Callbacks
+                <span class="count-badge" id="overdueCount">0</span>
+            </div>
+            <div class="section-body" id="overdueList">
+                <div class="empty-mini">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Today Section -->
+        <div class="followup-section today-section">
+            <div class="section-header today">
+                <i class="fa-solid fa-calendar-day"></i> Due Today
+                <span class="count-badge" id="todayFollowCount">0</span>
+            </div>
+            <div class="section-body" id="todayFollowList">
+                <div class="empty-mini">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Upcoming Section -->
+        <div class="followup-section upcoming-section">
+            <div class="section-header upcoming">
+                <i class="fa-solid fa-calendar-week"></i> Upcoming
+                <span class="count-badge" id="upcomingCount">0</span>
+            </div>
+            <div class="section-body" id="upcomingList">
+                <div class="empty-mini">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .followup-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    .followup-section {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        min-height: 400px;
+    }
+
+    .section-header {
+        padding: 1rem 1.25rem;
+        font-weight: 700;
+        font-size: 0.9375rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        border-bottom: 2px solid transparent;
+    }
+
+    .section-header.overdue { background: #fef2f2; color: #ef4444; border-color: #ef4444; }
+    .section-header.today { background: #f0fdf4; color: #10b981; border-color: #10b981; }
+    .section-header.upcoming { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
+
+    .count-badge {
+        margin-left: auto;
+        padding: 0.125rem 0.5rem;
+        border-radius: 2rem;
+        font-size: 0.75rem;
+        background: rgba(0,0,0,0.05);
+    }
+
+    .section-body {
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-height: calc(100vh - 300px);
+        overflow-y: auto;
+    }
+
+    .followup-card {
+        padding: 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid #f1f5f9;
+        background: #f8fafc;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .followup-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        background: white;
+    }
+
+    .card-top {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .card-name {
+        font-weight: 700;
+        color: var(--text-main);
+        font-size: 0.9375rem;
+    }
+
+    .card-date {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .card-meta {
+        font-size: 0.8125rem;
+        color: #64748b;
+        margin-bottom: 0.75rem;
+    }
+
+    .card-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-quick {
+        padding: 0.4rem 0.6rem;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .btn-quick.done { background: #f0fdf4; color: #10b981; border-color: #dcfce7; }
+    .btn-quick.reschedule { background: #fefce8; color: #ca8a04; border-color: #fef9c3; }
+    .btn-quick:hover { filter: brightness(0.95); }
+
+    .empty-mini {
+        text-align: center;
+        padding: 2rem;
+        color: #94a3b8;
+        font-size: 0.875rem;
+    }
+
+    /* Red highlight for Overdue cards */
+    .overdue-section .followup-card {
+        border-left: 4px solid #ef4444;
+    }
+</style>

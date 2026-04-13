@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="topbar">
+            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="shipSearch" oninput="filterOrders()" placeholder="Search orders..."></div>
+            <div class="profile-section"><span class="profile-name" id="profileName">Shipping</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
+        </header>
+        <div class="content-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <div>
+                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">🚚 Shipping Dashboard</h1>
+                    <p style="color:#64748b;font-size:0.875rem;">Billed/packed orders ready to ship. Add courier details to dispatch.</p>
+                </div>
+                <span id="shipCount" style="background:#10b98120;color:#059669;font-weight:700;padding:6px 16px;border-radius:20px;font-size:0.875rem;">0 Ready to Ship</span>
+            </div>
+
+            <div class="premium-card" style="overflow:hidden;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="background:#f8fafc;">
+                        <tr>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Order ID</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Dealer / Customer</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Phone</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Address</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Date</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shipTableBody">
+                        <tr><td colspan="6" style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin"></i> Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Ship Modal -->
+<div id="shipModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <div class="premium-card" style="width:480px;padding:2rem;">
+        <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:1.5rem;">🚚 Ship Order <span id="shipOrderLabel"></span></h2>
+        <form id="shipForm">
+            <input type="hidden" id="shipOrderId">
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Courier Name *</label>
+                <input id="courierName" required placeholder="e.g. DTDC, India Post" style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Tracking Number *</label>
+                <input id="trackingNumber" required placeholder="e.g. 123456789IN" style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;">
+            </div>
+            <div style="display:flex;gap:1rem;">
+                <button type="button" onclick="closeShipModal()" style="flex:1;padding:0.75rem;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-weight:600;">Cancel</button>
+                <button type="submit" style="flex:1;padding:0.75rem;background:#10b981;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Confirm & Ship</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="toast" style="position:fixed;bottom:1.5rem;right:1.5rem;color:white;padding:1rem 1.5rem;border-radius:10px;font-size:0.875rem;font-weight:600;display:none;z-index:9999;"></div>
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="../../js/decision-engine.js"></script>
+<script src="js/shipping.js"></script>
+</body>
+</html>

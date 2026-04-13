@@ -1,0 +1,338 @@
+<style>
+    .manual-wizard-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    .wizard-progress {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2.5rem;
+        position: relative;
+    }
+
+    .wizard-progress::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #e2e8f0;
+        z-index: 0;
+    }
+
+    .progress-step {
+        position: relative;
+        z-index: 1;
+        background: white;
+        padding: 0 10px;
+        text-align: center;
+    }
+
+    .step-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 8px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s;
+    }
+
+    .progress-step.active .step-icon {
+        background: var(--primary-color, #2563eb);
+        color: white;
+        border-color: var(--primary-color, #2563eb);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+
+    .progress-step.completed .step-icon {
+        background: #10b981;
+        color: white;
+        border-color: #10b981;
+    }
+
+    .step-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .progress-step.active .step-label {
+        color: #1e293b;
+    }
+
+    .manual-step-content {
+        display: none;
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    .manual-step-content.active {
+        display: block;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .form-card-premium {
+        background: white;
+        border-radius: 1.25rem;
+        padding: 2.5rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    }
+</style>
+
+<div class="manual-wizard-container">
+    <div class="wizard-progress">
+        <div class="progress-step active" id="mstep-1">
+            <div class="step-icon">1</div>
+            <div class="step-label">Call Status</div>
+        </div>
+        <div class="progress-step" id="mstep-2">
+            <div class="step-icon">2</div>
+            <div class="step-label">Profile</div>
+        </div>
+        <div class="progress-step" id="mstep-3">
+            <div class="step-icon">3</div>
+            <div class="step-label">Products</div>
+        </div>
+        <div class="progress-step" id="mstep-4">
+            <div class="step-icon">4</div>
+            <div class="step-label">Finalize</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Call Status -->
+    <div class="manual-step-content active" id="m-wizard-step-1">
+        <div class="form-card-premium">
+            <h3 class="form-section-title" style="margin-bottom: 2rem;"><i class="fas fa-phone"></i> Step 1: Contact &
+                Initial Status</h3>
+
+            <div class="form-group"
+                style="margin-bottom: 2.5rem; background: #fdfdfd; padding: 1.5rem; border-radius: 1rem; border: 1px solid #f1f5f9;">
+                <label style="color: #334155; font-size: 1rem; margin-bottom: 0.75rem;">Primary Mobile Number <span
+                        style="color:red">*</span></label>
+                <div style="position: relative;">
+                    <i class="fas fa-phone"
+                        style="position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                    <input type="tel" id="m-de-phone" class="form-control-premium"
+                        style="font-size: 1.5rem; font-weight: 700; height: auto; padding: 1.25rem 1.25rem 1.25rem 3.5rem; letter-spacing: 0.1em; color: #1e293b;"
+                        placeholder="XXXXX XXXXX">
+                </div>
+                <small style="display: block; margin-top: 0.5rem; color: #94a3b8;">Enter customer's 10-digit number
+                    without +91</small>
+            </div>
+
+            <div class="form-group">
+                <label style="color: #334155; font-weight: 700;">Call Status <span style="color:red">*</span></label>
+                <div class="selection-row" id="m-call-status-grid">
+                    <button type="button" class="status-pill" data-value="Received">Received</button>
+                    <button type="button" class="status-pill" data-value="Not Received">Not Received</button>
+                    <button type="button" class="status-pill" data-value="Switched Off">Switched Off</button>
+                    <button type="button" class="status-pill" data-value="Busy">Busy</button>
+                    <button type="button" class="status-pill" data-value="Not Reachable">Not Reachable</button>
+                    <button type="button" class="status-pill" data-value="Not Interested">Not Interested</button>
+                    <button type="button" class="status-pill" data-value="Booked">Booked</button>
+                    <button type="button" class="status-pill" data-value="WhatsApp">WhatsApp</button>
+                </div>
+                <input type="hidden" id="m-de-call-status">
+            </div>
+
+            <div style="margin-top: 3rem; display: flex; justify-content: flex-end;">
+                <button onclick="mDeNextStep(2)" class="login-btn" style="width: auto; padding: 0.8rem 3rem;">Next <i
+                        class="fas fa-arrow-right ml-2"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Customer Details -->
+    <div class="manual-step-content" id="m-wizard-step-2">
+        <div class="form-card-premium">
+            <h3 class="form-section-title"><i class="fas fa-user"></i> Step 2: Farmer Profile</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label style="color: #334155; font-weight: 700;">Farmer Name <span
+                            style="color:red">*</span></label>
+                    <div style="position: relative;">
+                        <i class="fas fa-user-tag"
+                            style="position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                        <input type="text" id="m-de-customer-name" class="form-control-premium"
+                            style="padding-left: 3.5rem; font-weight: 600;" placeholder="Enter Full Name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color: #334155; font-weight: 700;">Village / Taluk <span
+                            style="color:red">*</span></label>
+                    <div style="position: relative;">
+                        <i class="fas fa-location-dot"
+                            style="position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                        <input type="text" id="m-de-village" class="form-control-premium"
+                            style="padding-left: 3.5rem; font-weight: 600;" placeholder="e.g. Mandya / Maddur">
+                    </div>
+                </div>
+            </div>
+            <div class="form-grid" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label>State</label>
+                    <select id="m-de-state" class="form-control-premium">
+                        <option value="Karnataka">Karnataka</option>
+                        <option value="Tamilnad">Tamilnad</option>
+                        <option value="Kerala">Kerala</option>
+                        <option value="Maharastra">Maharastra</option>
+                        <option value="Andrapradesh">Andrapradesh</option>
+                        <option value="Telangana">Telangana</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Lead Language</label>
+                    <select id="m-de-language" class="form-control-premium">
+                        <option value="KA">Kannada</option>
+                        <option value="EN">English</option>
+                        <option value="HI">Hindi</option>
+                        <option value="TN">Tamil</option>
+                        <option value="TE">Telugu</option>
+                        <option value="ML">Malayalam</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem; display: flex; justify-content: space-between;">
+                <button onclick="mGoToStep(1)" class="login-btn btn-outline" style="width: auto;"><i
+                        class="fas fa-arrow-left mr-2"></i> Back</button>
+                <button onclick="mDeNextStep(3)" class="login-btn" style="width: auto; padding: 0.8rem 3rem;">Next <i
+                        class="fas fa-arrow-right ml-2"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Product Selection -->
+    <div class="manual-step-content" id="m-wizard-step-3">
+        <div class="form-card-premium">
+            <h3 class="form-section-title"><i class="fas fa-cubes"></i> Step 3: Interest & Requirements</h3>
+            <div class="form-group">
+                <label>Select Products (Multi-select)</label>
+                <select id="m-de-products" class="form-control-premium" multiple style="height: 180px;"></select>
+                <p class="text-xs text-slate-400 mt-2">Hold Ctrl/Cmd to select multiple products</p>
+            </div>
+
+            <div style="margin-top: 3rem; display: flex; justify-content: space-between;">
+                <button onclick="mGoToStep(2)" class="login-btn btn-outline" style="width: auto;"><i
+                        class="fas fa-arrow-left mr-2"></i> Back</button>
+                <button onclick="mDeNextStep(4)" class="login-btn" style="width: auto; padding: 0.8rem 3rem;">Next <i
+                        class="fas fa-arrow-right ml-2"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Finalize -->
+    <div class="manual-step-content" id="m-wizard-step-4">
+        <div class="form-card-premium">
+            <h3 class="form-section-title"><i class="fas fa-check-circle"></i> Step 4: Finalize Record</h3>
+
+            <!-- Connection log for not_connected -->
+            <div id="m-de-form-notconnected" class="hidden">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Callback Date</label>
+                        <input type="date" id="m-de-nc-date" class="form-control-premium">
+                    </div>
+                    <div class="form-group">
+                        <label>Attempt</label>
+                        <select id="m-de-nc-attempt" class="form-control-premium">
+                            <option value="1st">1st Attempt</option>
+                            <option value="2nd">2nd Attempt</option>
+                            <option value="3rd">3rd Attempt</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Standard Sales flow -->
+            <div id="m-de-sales-status-container">
+                <div class="form-group">
+                    <label>Sales Decision Status</label>
+                    <select id="m-de-sales-status" class="form-control-premium"
+                        onchange="mHandleSalesStatusChange(this.value)">
+                        <option value="Ordered">Ordered (Confirmed Sale)</option>
+                        <option value="Hot/Very Interested">Hot / Very Interested</option>
+                        <option value="Mild/Later">Mild / Later</option>
+                        <option value="Cold/Not Interested">Cold / Not Interested</option>
+                        <option value="Old Purchased">Old Purchased</option>
+                        <option value="Dealer">Dealer Inquiry</option>
+                    </select>
+                </div>
+
+                <!-- Conditional Subforms -->
+                <div id="m-de-form-order" class="hidden"
+                    style="margin-top: 1.5rem; padding: 1.5rem; background: #f8fafc; border-radius: 1rem; border: 1px dashed #cbd5e1;">
+                    <div class="form-group">
+                        <label>Advance Amount Paid (₹)</label>
+                        <input type="number" id="m-de-order-advance" class="form-control-premium" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Screenshot</label>
+                        <input type="file" id="m-de-payment-file" class="form-control-premium">
+                    </div>
+                    <div id="m-de-order-summary" class="mt-4 p-3 bg-white rounded border text-sm">
+                        Total Items: <span id="m-de-summary-count">0</span> | Total Value: ₹<span
+                            id="m-de-summary-total">0</span>
+                    </div>
+                </div>
+
+                <div id="m-de-form-followup" class="hidden" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label>Next Follow-up Date</label>
+                        <input type="date" id="m-de-followup-date" class="form-control-premium">
+                    </div>
+                </div>
+
+                <div id="m-de-form-lost" class="hidden" style="margin-top: 1.5rem;">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Reason</label><input type="text" id="m-de-lost-reason"
+                                class="form-control-premium" placeholder="Reason for rejection"></div>
+                        <div class="form-group"><label>Notes</label><input type="text" id="m-de-lost-notes"
+                                class="form-control-premium"></div>
+                    </div>
+                </div>
+
+                <!-- Feedback for Old Purchased -->
+                <div id="m-de-form-feedback" class="hidden" style="margin-top: 1.5rem;">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Satisfaction</label><input type="text"
+                                id="m-de-feedback-satisfaction" class="form-control-premium"
+                                placeholder="e.g. Happy with service"></div>
+                        <div class="form-group"><label>Feedback Notes</label><input type="text" id="m-de-feedback-notes"
+                                class="form-control-premium"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem; display: flex; justify-content: space-between;">
+                <button onclick="mGoToStep(3)" class="login-btn btn-outline" style="width: auto;"><i
+                        class="fas fa-arrow-left mr-2"></i> Back</button>
+                <button onclick="submitManualLeadWizard()" id="mSubmitBtn" class="login-btn"
+                    style="width: auto; padding: 0.8rem 3rem; background: #10b981;">Save Lead Record <i
+                        class="fas fa-cloud-arrow-up ml-2"></i></button>
+            </div>
+        </div>
+    </div>
+</div>

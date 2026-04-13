@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="topbar">
+            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="billSearch" oninput="filterOrders()" placeholder="Search packed orders..."></div>
+            <div class="profile-section"><span class="profile-name" id="profileName">Billing</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
+        </header>
+        <div class="content-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <div>
+                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">🧾 Billing Dashboard</h1>
+                    <p style="color:#64748b;font-size:0.875rem;">Packed orders awaiting invoicing. Generate invoice to move to shipping.</p>
+                </div>
+                <span id="billCount" style="background:#f59e0b20;color:#d97706;font-weight:700;padding:6px 16px;border-radius:20px;font-size:0.875rem;">0 Pending Bills</span>
+            </div>
+
+            <div class="premium-card" style="overflow:hidden;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="background:#f8fafc;">
+                        <tr>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Order ID</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Dealer / Customer</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Items</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Total Amount</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Advance Paid</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Balance Due</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="billingTableBody">
+                        <tr><td colspan="7" style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin"></i> Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<div id="toast" style="position:fixed;bottom:1.5rem;right:1.5rem;color:white;padding:1rem 1.5rem;border-radius:10px;font-size:0.875rem;font-weight:600;display:none;z-index:9999;"></div>
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="../../js/decision-engine.js"></script>
+<script src="js/billing.js"></script>
+</body>
+</html>

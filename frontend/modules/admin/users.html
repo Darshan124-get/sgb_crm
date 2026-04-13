@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users & Roles | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="topbar">
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="userSearch" placeholder="Search staff by name or email...">
+            </div>
+            <div class="profile-section">
+                <span class="profile-name" id="profileName">Administrator</span>
+                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+                <div>
+                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Users & Roles</h1>
+                    <p style="color:#64748b;font-size:0.875rem;">Manage team access, specific permissions, and performance metrics.</p>
+                </div>
+                <button class="login-btn" id="btnInvite" style="width:auto;padding:0.75rem 1.5rem;margin-top:0;">
+                    <i class="fas fa-user-plus" style="margin-right:0.5rem;"></i> Add Staff Member
+                </button>
+            </div>
+
+            <!-- Tabbed Navigation -->
+            <div class="tab-scroller" style="margin-bottom:2rem;border-bottom:1px solid #e2e8f0;display:flex;gap:2rem;">
+                <button class="tab-btn active" data-tab="all-users" style="background:none;border:none;padding:1rem 0;font-weight:600;color:#3b82f6;border-bottom:2px solid #3b82f6;cursor:pointer;">
+                    <i class="fas fa-users" style="margin-right:0.5rem;"></i> All Users
+                </button>
+                <button class="tab-btn" data-tab="roles" style="background:none;border:none;padding:1rem 0;font-weight:600;color:#64748b;cursor:pointer;">
+                    <i class="fas fa-shield-alt" style="margin-right:0.5rem;"></i> Roles & Permissions
+                </button>
+                <button class="tab-btn" data-tab="activity" style="background:none;border:none;padding:1rem 0;font-weight:600;color:#64748b;cursor:pointer;">
+                    <i class="fas fa-stream" style="margin-right:0.5rem;"></i> Activity Overview
+                </button>
+            </div>
+
+            <div id="tab-all-users" class="tab-content">
+                <div class="stats-grid" style="margin-bottom:2rem;grid-template-columns: repeat(4, 1fr);">
+                    <div class="stat-card premium-card" style="padding:1.25rem;">
+                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Total Staff</p>
+                        <p style="font-size:1.5rem;font-weight:800;" id="countTotal">0</p>
+                    </div>
+                    <div class="stat-card premium-card" style="padding:1.25rem;">
+                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Active Now</p>
+                        <p style="font-size:1.5rem;font-weight:800;color:#10b981;" id="countActive">0</p>
+                    </div>
+                    <div class="stat-card premium-card" style="padding:1.25rem;">
+                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Avg. Conversion</p>
+                        <p style="font-size:1.5rem;font-weight:800;color:#3b82f6;" id="avgConversion">0%</p>
+                    </div>
+                    <div class="stat-card premium-card" style="padding:1.25rem;">
+                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Top Performer</p>
+                        <p style="font-size:1rem;font-weight:700;" id="topPerformer">-</p>
+                    </div>
+                </div>
+
+                <div class="premium-card">
+                    <div id="usersTableContainer" style="overflow-x:auto;">
+                        <table class="data-table" style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="text-align:left;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">STAFF MEMBER</th>
+                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">ROLE / ACCESS</th>
+                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">LANGUAGES</th>
+                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">STATUS</th>
+                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">PERFORMANCE</th>
+                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr><td colspan="6" style="padding:4rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin fa-2x"></i></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-roles" class="tab-content" style="display:none;">
+                <div class="stats-grid" id="rolesList" style="grid-template-columns: repeat(2, 1fr);gap:1.5rem;">
+                    <!-- Roles will be populated here -->
+                    <div class="premium-card" style="padding:1.5rem;text-align:center;grid-column: span 2;color:#94a3b8;">
+                        <i class="fas fa-shield-alt fa-3x" style="margin-bottom:1rem;opacity:0.2;"></i>
+                        <p>Select a role to manage its permissions (Coming Soon)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-activity" class="tab-content" style="display:none;">
+                <div class="premium-card" style="padding:2rem;text-align:center;">
+                    <i class="fas fa-history fa-4x" style="margin-bottom:1rem;opacity:0.2;color:#64748b;"></i>
+                    <h3 style="color:#1e293b;">Team Activity Feed</h3>
+                    <p style="color:#64748b;">Real-time monitoring of user actions and security events will appear here.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Add/Edit User Modal -->
+<div id="userModal" class="modal-overlay">
+    <div class="premium-card" style="width:100%;max-width:550px;padding:3rem;background:white;position:relative;">
+        <div style="display:flex;gap:1.5rem;align-items:start;margin-bottom:2.5rem;">
+            <div style="width:50px;height:50px;border-radius:12px;background:#eff6ff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div>
+                <h2 id="modalTitle" style="font-size:1.5rem;font-weight:800;color:#1e293b;margin:0;">Add New Staff Member</h2>
+                <p style="color:#64748b;font-size:0.875rem;margin-top:4px;">Configure roles, access levels, and language pairs.</p>
+            </div>
+        </div>
+        
+        <form id="userForm">
+            <input type="hidden" id="editUserId">
+            <div class="form-group" style="margin-bottom:1.5rem;">
+                <label style="color:#1e293b;font-weight:700;">Full Name</label>
+                <div class="input-wrapper">
+                    <input type="text" id="userName" required placeholder="Full name of staff member" style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+                </div>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                <div class="form-group">
+                    <label style="color:#1e293b;font-weight:700;">Work Email</label>
+                    <div class="input-wrapper">
+                        <input type="email" id="userEmail" required placeholder="email@company.com" style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color:#1e293b;font-weight:700;">Phone Number</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="userPhone" placeholder="+91 ..." style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem;">
+                <div class="form-group">
+                    <label style="color:#1e293b;font-weight:700;">System Role</label>
+                    <div class="input-wrapper">
+                        <select id="userRole" required style="width:100%;padding:1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#1e293b;"></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color:#1e293b;font-weight:700;">Target Languages</label>
+                    <div class="input-wrapper">
+                        <select id="userLang" multiple required style="width:100%;padding:0.5rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;min-height:90px;color:#1e293b;">
+                            <option value="EN">English</option>
+                            <option value="HI">Hindi</option>
+                            <option value="KN">Kannada</option>
+                            <option value="TE">Telugu</option>
+                            <option value="TA">Tamil</option>
+                            <option value="MR">Marathi</option>
+                        </select>
+                    </div>
+                    <p style="font-size:0.65rem;color:#94a3b8;margin-top:6px;">Hold Ctrl to select multiple</p>
+                </div>
+            </div>
+
+            <div class="form-group" id="passGroup" style="margin-top:1.5rem;">
+                <label style="color:#1e293b;font-weight:700;">Initial Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="userPass" placeholder="Set temporary password" style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+                </div>
+            </div>
+
+            <div style="display:flex;gap:1rem;margin-top:3rem;">
+                <button type="button" class="login-btn" id="btnCancel" style="background:#f1f5f9;color:#64748b;margin-top:0;box-shadow:none;flex:1;">Cancel</button>
+                <button type="submit" class="login-btn" style="margin-top:0;flex:2;">Confirm & Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="../../js/decision-engine.js"></script>
+<script src="js/users.js"></script>
+</body>
+</html>

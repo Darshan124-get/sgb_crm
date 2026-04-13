@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders | Admin | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <header class="topbar">
+            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="orderSearch" placeholder="Search orders..."></div>
+            <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
+        </header>
+        <div class="content-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <div>
+                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Orders</h1>
+                    <p style="color:#64748b;font-size:0.875rem;">All dealer orders — manage status from draft to shipped.</p>
+                </div>
+                <div style="display:flex;gap:0.75rem;align-items:center;">
+                    <select id="statusFilter" onchange="fetchOrders()" style="padding:0.5rem 1rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#374151;">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="packed">Packed</option>
+                        <option value="billed">Billed</option>
+                        <option value="shipped">Shipped</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem;">
+                <div class="stat-card premium-card" style="padding:1rem 1.25rem;border-left:3px solid #64748b;">
+                    <p style="font-size:0.7rem;color:#64748b;font-weight:600;text-transform:uppercase;">Draft</p>
+                    <p style="font-size:1.5rem;font-weight:800;" id="countDraft">0</p>
+                </div>
+                <div class="stat-card premium-card" style="padding:1rem 1.25rem;border-left:3px solid #8b5cf6;">
+                    <p style="font-size:0.7rem;color:#64748b;font-weight:600;text-transform:uppercase;">Packed</p>
+                    <p style="font-size:1.5rem;font-weight:800;color:#8b5cf6;" id="countPacked">0</p>
+                </div>
+                <div class="stat-card premium-card" style="padding:1rem 1.25rem;border-left:3px solid #f59e0b;">
+                    <p style="font-size:0.7rem;color:#64748b;font-weight:600;text-transform:uppercase;">Billed</p>
+                    <p style="font-size:1.5rem;font-weight:800;color:#f59e0b;" id="countBilled">0</p>
+                </div>
+                <div class="stat-card premium-card" style="padding:1rem 1.25rem;border-left:3px solid #10b981;">
+                    <p style="font-size:0.7rem;color:#64748b;font-weight:600;text-transform:uppercase;">Shipped</p>
+                    <p style="font-size:1.5rem;font-weight:800;color:#10b981;" id="countShipped">0</p>
+                </div>
+            </div>
+
+            <!-- Orders Table -->
+            <div class="premium-card" style="overflow:hidden;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="background:#f8fafc;">
+                        <tr>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Order ID</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Dealer</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Items</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Amount</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Status</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Date</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        <tr><td colspan="7" style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin"></i> Loading orders...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="../../js/decision-engine.js"></script>
+<script src="js/orders.js"></script>
+</body>
+</html>

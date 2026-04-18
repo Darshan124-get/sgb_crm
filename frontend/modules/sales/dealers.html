@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,9 +15,23 @@
             <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search..."></div>
             <div class="profile-section"><span class="profile-name" id="profileName"></span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
         </header>
-        <div class="content-body" id="pageContent">
-            <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.5rem;">Dealers & Manual Leads</h1>
-            <p id="pageDesc" style="color:#64748b;margin-bottom:2rem;">Loading...</p>
+        <div class="content-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <div><h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Dealers</h1><p style="color:#64748b;font-size:0.875rem;">Browse dealer profiles and business history.</p></div>
+            </div>
+            <div class="premium-card" style="overflow:hidden;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="background:#f8fafc;"><tr>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Dealer Name</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Contact Person</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Phone</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Location</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Status</th>
+                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Action</th>
+                    </tr></thead>
+                    <tbody id="dealerTableBody"><tr><td colspan="6" style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin"></i></td></tr></tbody>
+                </table>
+            </div>
         </div>
     </main>
 </div>

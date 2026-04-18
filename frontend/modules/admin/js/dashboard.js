@@ -26,7 +26,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderPipeline(data.funnel);
         renderUrgentPanel(data.urgentTasks);
         initChart(data);
+
+        // ─── Low Stock Alerts ───
+        const stockRes = await fetch(`${API_URL}/inventory/low-stock`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const lowStock = await stockRes.json();
+        if (lowStock.length > 0) {
+            renderLowStockAlert(lowStock);
+        }
     } catch (e) { console.error('Dashboard load error:', e); }
+
+    function renderLowStockAlert(items) {
+        const contentBody = document.getElementById('contentBody');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'premium-card';
+        alertDiv.style.marginBottom = '2rem';
+        alertDiv.style.background = '#fef2f2';
+        alertDiv.style.border = '1px solid #fecaca';
+        alertDiv.style.padding = '1rem 1.5rem';
+        alertDiv.style.display = 'flex';
+        alertDiv.style.justifyContent = 'space-between';
+        alertDiv.style.alignItems = 'center';
+        
+        alertDiv.innerHTML = `
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="width:40px; height:40px; background:#fee2e2; color:#ef4444; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">
+                    <i class="fas fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h4 style="font-weight:700; color:#991b1b; margin:0; font-size:1rem;">Low Stock Warning</h4>
+                    <p style="font-size:0.8rem; color:#b91c1c; margin:0;">${items.length} products have reached minimum stock levels.</p>
+                </div>
+            </div>
+            <a href="inventory.html" class="btn" style="background:#ef4444; color:white; font-size:0.75rem; font-weight:700; text-decoration:none; padding:8px 16px;">Manage Inventory</a>
+        `;
+        contentBody.insertBefore(alertDiv, contentBody.children[1]); // Insert before stats grid
+    }
 
     function renderPipeline(funnel = []) {
         const el = document.getElementById('pipelineMiniView');

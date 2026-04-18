@@ -71,9 +71,18 @@ async function loadProductsForEngine(prefix = '') {
         if (response.ok) {
             const products = await response.json();
             if (products && products.length > 0) {
-                productSelect.innerHTML = products.map(p => `
-                    <option value="${p.name}" data-id="${p.product_id}" data-price="${p.price}">${p.name} (₹${p.price})</option>
-                `).join('');
+                productSelect.innerHTML = products.map(p => {
+                    const isOutOfStock = (p.current_stock === undefined) ? false : (p.current_stock <= 0);
+                    const stockLabel = isOutOfStock ? ' [Product Not Available]' : ` (₹${p.selling_price})`;
+                    return `
+                        <option value="${p.name}" 
+                                data-id="${p.product_id}" 
+                                data-price="${p.selling_price}" 
+                                ${isOutOfStock ? 'disabled' : ''}>
+                            ${p.name}${stockLabel}
+                        </option>
+                    `;
+                }).join('');
             }
         }
     } catch (err) {

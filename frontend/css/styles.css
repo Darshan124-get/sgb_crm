@@ -48,6 +48,21 @@ body {
     display: none !important;
 }
 
+/* Product Card Status Styles */
+.inactive-card {
+    opacity: 0.7;
+    filter: grayscale(0.5);
+}
+
+.out-of-stock-card {
+    border-color: #fecaca !important;
+}
+
+.out-of-stock-overlay {
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    z-index: 10;
+}
+
 .premium-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
@@ -703,7 +718,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    sticky: top;
+    position: sticky;
+    top: 0;
     background: #f1f5f9;
     border-radius: 1rem 1rem 0 0;
     z-index: 10;
@@ -757,6 +773,54 @@ body {
 
 .lead-card:active {
     cursor: grabbing;
+}
+
+/* Premium Form Components */
+.premium-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.form-control-premium {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    transition: all 0.2s;
+    background: #ffffff;
+    color: #1e293b;
+}
+
+.form-control-premium:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+.btn-action {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-action:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: #f0fdf4;
 }
 
 .lead-card.dragging {
@@ -826,9 +890,20 @@ body {
     border-radius: 0.4rem;
 }
 
-.fi-overdue { background: #fee2e2; color: #dc2626; }
-.fi-today { background: #fef9c3; color: #a16207; }
-.fi-upcoming { background: #dcfce7; color: #16a34a; }
+.fi-overdue {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.fi-today {
+    background: #fef9c3;
+    color: #a16207;
+}
+
+.fi-upcoming {
+    background: #dcfce7;
+    color: #16a34a;
+}
 
 .quick-actions {
     display: flex;
@@ -882,7 +957,8 @@ body {
     text-transform: uppercase;
 }
 
-.filter-item select, .filter-item input {
+.filter-item select,
+.filter-item input {
     padding: 0.5rem 0.75rem;
     border-radius: 0.5rem;
     border: 1px solid var(--border-color);
@@ -891,7 +967,8 @@ body {
     background: #f8fafc;
 }
 
-.filter-item select:focus, .filter-item input:focus {
+.filter-item select:focus,
+.filter-item input:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.1);
 }
@@ -1823,10 +1900,20 @@ body {
 .form-control-premium:focus {
     background: #fff;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.15);
+    box-shadow: 0 0 0 5px rgba(5, 150, 105, 0.15);
     color: #000000;
     /* Pure black on focus for extreme clarity */
     outline: none;
+}
+
+.premium-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
 }
 
 /* Premium Alert/Toast Notification System */

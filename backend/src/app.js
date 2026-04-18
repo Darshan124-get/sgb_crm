@@ -12,8 +12,32 @@ const logisticsRoutes = require('./routes/logistics.routes');
 const reportRoutes = require('./routes/report.routes');
 const searchRoutes = require('./routes/search.routes');
 const userRoutes = require('./routes/user.routes');
+const categoryRoutes = require('./routes/category.routes');
+const inventoryRoutes = require('./routes/inventory.routes');
 
 const app = express();
+
+// ─── Auto-Migration: Ensure LONGTEXT for images ───────────────
+(async () => {
+    const pool = require('./config/db');
+    try {
+        console.log('Checking database schema for image storage and dealers table...');
+        await pool.query('ALTER TABLE products MODIFY COLUMN image_url LONGTEXT');
+        await pool.query('ALTER TABLE lead_advance_payments MODIFY COLUMN screenshot_url LONGTEXT');
+        
+        // Ensure dealers table has new columns
+        try { await pool.query('ALTER TABLE dealers ADD COLUMN alternate_number VARCHAR(20) AFTER phone'); } catch(e) {}
+        try { await pool.query('ALTER TABLE dealers ADD COLUMN status ENUM("active", "inactive") DEFAULT "active" AFTER state'); } catch(e) {}
+        try { await pool.query('ALTER TABLE dealers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at'); } catch(e) {}
+        
+        // Ensure orders table has notes
+        try { await pool.query('ALTER TABLE orders ADD COLUMN notes TEXT AFTER order_status'); } catch(e) {}
+        
+        console.log('✅ Database schema verified for large image storage and dealers/orders tables.');
+    } catch (err) {
+        console.warn('⚠️ Auto-migration notice:', err.message);
+    }
+})();
 
 // Middleware
 app.use(cors());
@@ -40,6 +64,8 @@ app.use('/api/logistics', logisticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/inventory', inventoryRoutes);
 console.log('✅ Staff Management API: Mounted at /api/users');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)

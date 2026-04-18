@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,9 +16,124 @@
             <div class="profile-section"><span class="profile-name" id="profileName"></span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
         </header>
         <div class="content-body" id="pageContent">
-            <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.5rem;">Sales Pipeline</h1>
-            <p id="pageDesc" style="color:#64748b;margin-bottom:2rem;">Loading...</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div>
+                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.25rem;">My Pipeline</h1>
+                    <p style="color:#64748b;font-size:0.875rem;">Manage your assigned leads and track conversions.</p>
+                </div>
+                <div class="pipeline-actions">
+                    <button class="login-btn" style="margin-top:0; width:auto; padding:0.6rem 1.25rem;" onclick="location.reload()">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="pipeline-stats-cards">
+                <div class="pipeline-stat-card">
+                    <span class="pipeline-stat-label">Assigned Leads</span>
+                    <span class="pipeline-stat-value" id="stat-total-leads">0</span>
+                </div>
+                <div class="pipeline-stat-card">
+                    <span class="pipeline-stat-label">Hot Opportunities</span>
+                    <span class="pipeline-stat-value" id="stat-hot-leads" style="color: #e11d48;">0</span>
+                </div>
+                <div class="pipeline-stat-card">
+                    <span class="pipeline-stat-label">My Conv. Rate</span>
+                    <span class="pipeline-stat-value" id="stat-conv-rate">0%</span>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="pipeline-filter-bar">
+                <div class="filter-item">
+                    <label>Source</label>
+                    <select id="filter-source">
+                        <option value="">All Sources</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="manual">Manual</option>
+                        <option value="facebook">Facebook</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Priority</label>
+                    <select id="filter-score">
+                        <option value="">All Levels</option>
+                        <option value="hot">Hot</option>
+                        <option value="warm">Warm</option>
+                        <option value="cold">Cold</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Language</label>
+                    <select id="filter-lang">
+                        <option value="">All Languages</option>
+                        <option value="EN">English</option>
+                        <option value="HI">Hindi</option>
+                        <option value="KA">Kannada</option>
+                        <option value="TE">Telugu</option>
+                    </select>
+                </div>
+                <div class="filter-item" style="flex: 1; min-width: 200px;">
+                    <label>Search Lead</label>
+                    <input type="text" id="pipeline-search" placeholder="Customer name or phone...">
+                </div>
+            </div>
+
+            <!-- Kanban Board -->
+            <div class="pipeline-board" id="pipeline-board">
+                <div style="padding: 3rem; text-align: center; width: 100%; color: #64748b;">
+                    <i class="fas fa-circle-notch fa-spin fa-2x"></i>
+                    <p style="margin-top: 1rem; font-weight: 600;">Opening your board...</p>
+                </div>
+            </div>
         </div>
+
+        <!-- Decision Engine Modal -->
+        <div id="decisionEngineModal" class="modal" style="position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center;">
+            <div class="modal-content premium-card" style="width: 100%; max-width: 650px; background:white; border-radius: 1rem; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
+                <!-- Header -->
+                <div class="wizard-header" style="background:var(--primary-color); color:white; padding: 1.5rem; text-align:center; position:relative;">
+                    <h2 style="margin:0; font-weight:800; font-size:1.25rem;">Order Conversion Wizard</h2>
+                    <button onclick="document.getElementById('decisionEngineModal').classList.remove('active')" style="position:absolute; right:1.5rem; top:1.5rem; background:none; border:none; color:white; cursor:pointer;"><i class="fas fa-times"></i></button>
+                </div>
+                <!-- Body -->
+                <div class="modal-body" style="padding: 2rem; overflow-y:auto; flex-grow:1;">
+                    <div id="wizard-step-1" class="wizard-step">
+                        <h3>Call Status</h3>
+                        <div class="form-group"><label>Phone</label><input type="text" id="de-phone" class="form-control-premium" readonly></div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <div id="de-call-status-wrapper" class="status-pill-grid">
+                                <button type="button" class="status-pill" data-value="Received">Received</button>
+                                <button type="button" class="status-pill" data-value="Booked">Booked</button>
+                                <button type="button" class="status-pill" data-value="Not Interested">Not Interested</button>
+                            </div>
+                            <input type="hidden" id="de-call-status">
+                        </div>
+                        <button onclick="deNextStep(2)" class="login-btn">Next</button>
+                    </div>
+                    <!-- Simplified wizard for space - logic handles full view -->
+                    <div id="wizard-step-2" class="wizard-step" style="display:none;">
+                        <h3>Customer Information</h3>
+                        <div class="form-group"><label>Name</label><input type="text" id="de-customer-name" class="form-control-premium"></div>
+                        <button onclick="deNextStep(3)" class="login-btn">Next</button>
+                    </div>
+                    <div id="wizard-step-3" class="wizard-step" style="display:none;">
+                        <h3>Product & Decision</h3>
+                        <select id="de-products" class="form-control-premium" multiple style="height:100px;">
+                            <option value="Brush Cutter">Brush Cutter</option>
+                        </select>
+                        <select id="de-sales-status" class="form-control-premium" style="margin-top:1rem;">
+                            <option value="Ordered">Ordered</option>
+                            <option value="Hot/Very Interested">Hot/Very Interested</option>
+                        </select>
+                        <button onclick="submitDecisionEngine()" class="login-btn" style="margin-top:1rem;">Finalize</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 </div>
     <script src="../../js/config.js"></script>

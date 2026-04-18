@@ -399,6 +399,63 @@ async function viewLeadDetails(leadId) {
     }
 }
 
+async function fetchLeadOrderHistory(leadId) {
+    const container = document.getElementById('leadOrderHistoryContainer');
+    if (!container) return;
+
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`${API_URL}/orders?lead_id=${leadId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const orders = await res.json();
+            if (orders.length === 0) {
+                container.innerHTML = '<p style="padding:1.5rem; text-align:center; color:#94a3b8; font-size:0.875rem;">No previous orders found for this lead.</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="order-item-card" style="padding:1rem; border:1px solid #f1f5f9; border-radius:10px; margin-bottom:0.75rem; background:#fff;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div style="font-weight:700; color:#1e293b; font-size:0.875rem;">Order #${order.order_id}</div>
+                            <div style="font-size:0.75rem; color:#64748b;">${new Date(order.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; padding:0.2rem 0.6rem; border-radius:1rem; background:${getStatusBg(order.order_status)}; color:${getStatusColor(order.order_status)};">
+                            ${order.order_status}
+                        </span>
+                    </div>
+                    <div style="margin-top:0.75rem;">
+                        ${order.items.map(item => `
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.25rem;">
+                                <span style="color:#475569;">${item.product_name} x ${item.quantity}</span>
+                                <span style="font-weight:600;">₹${item.total}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.75rem; color:#64748b;">Total Value</span>
+                        <span style="font-weight:800; color:var(--primary-color);">₹${order.total_amount}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        container.innerHTML = '<p style="padding:1rem; color:#ef4444; font-size:0.8rem;">Failed to load order history.</p>';
+    }
+}
+
+function getStatusBg(status) {
+    const map = { 'draft': '#f1f5f9', 'pending': '#fef3c7', 'confirmed': '#dcfce7', 'shipped': '#dbeafe', 'delivered': '#dcfce7', 'cancelled': '#fee2e2' };
+    return map[status.toLowerCase()] || '#f1f5f9';
+}
+
+function getStatusColor(status) {
+    const map = { 'draft': '#475569', 'pending': '#d97706', 'confirmed': '#166534', 'shipped': '#1d4ed8', 'delivered': '#166534', 'cancelled': '#991b1b' };
+    return map[status.toLowerCase()] || '#475569';
+}
+
 async function populateLeadDetails(leadId) {
     const token = localStorage.getItem('token');
     try {
@@ -426,6 +483,9 @@ async function populateLeadDetails(leadId) {
                 const nameStr = lead.assigned_to_name || '?';
                 avatar.textContent = nameStr.charAt(0).toUpperCase();
             }
+
+            // Fetch Order History (Requirement #2)
+            fetchLeadOrderHistory(leadId);
         }
     } catch (err) { console.error('Lead detail error:', err); }
 }
@@ -560,6 +620,11 @@ window.showModal = function ({ title, content, hideFooter }) {
         modal = document.createElement('div');
         modal.id = 'globalModal';
         modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+
+    // Ensure internal structure exists
+    if (!modal.querySelector('.modal-content')) {
         modal.innerHTML = `
             <div class="modal-content premium-card" style="width: 100%; max-width: 600px; padding: 0; overflow: hidden; border: none;">
                 <div style="background: var(--primary-color, #2563eb); color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
@@ -572,11 +637,16 @@ window.showModal = function ({ title, content, hideFooter }) {
                 </div>
             </div>
         `;
-        document.body.appendChild(modal);
     }
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalBody').innerHTML = content;
-    document.getElementById('modalFooter').style.display = hideFooter ? 'none' : 'flex';
+
+    const titleEl = document.getElementById('modalTitle');
+    const bodyEl = document.getElementById('modalBody');
+    const footerEl = document.getElementById('modalFooter');
+
+    if (titleEl) titleEl.textContent = title;
+    if (bodyEl) bodyEl.innerHTML = content;
+    if (footerEl) footerEl.style.display = hideFooter ? 'none' : 'flex';
+
     modal.classList.add('active');
 };
 

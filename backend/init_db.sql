@@ -1,7 +1,7 @@
 CREATE DATABASE IF NOT EXISTS admin_db;
 USE admin_db;
 
--- DROP TABLES IN REVERSE ORDER OF DEPENDENCY
+-- 1. DROP TABLES IN REVERSE ORDER OF DEPENDENCY
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS chat_sessions;
@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS inventory_logs;
 DROP TABLE IF EXISTS inventory;
 DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS dealers;
 DROP TABLE IF EXISTS lead_advance_payments;
 DROP TABLE IF EXISTS lead_interest;
@@ -26,7 +27,7 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS roles;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 1️⃣ USERS & ROLES
+-- 2. USERS & ROLES
 CREATE TABLE roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
@@ -48,7 +49,7 @@ CREATE TABLE users (
     FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE SET NULL
 );
 
--- 2️⃣ LEADS (WHATSAPP CORE)
+-- 3. LEADS (WHATSAPP CORE)
 CREATE TABLE leads (
     lead_id INT AUTO_INCREMENT PRIMARY KEY,
     phone_number VARCHAR(20) NOT NULL UNIQUE,
@@ -66,7 +67,6 @@ CREATE TABLE leads (
     lost_reason VARCHAR(255) NULL,
     lost_notes TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (assigned_to) REFERENCES users(user_id) ON DELETE SET NULL
 );
@@ -103,6 +103,36 @@ CREATE TABLE lead_followups (
     FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
+CREATE TABLE categories (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    parent_id INT DEFAULT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES categories(category_id) ON DELETE SET NULL
+);
+
+CREATE TABLE products (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category_id INT,
+    description TEXT,
+    sku VARCHAR(50) UNIQUE NOT NULL,
+    unit VARCHAR(20) DEFAULT 'PCS',
+    selling_price DECIMAL(12, 2) DEFAULT 0.00,
+    dealer_price DECIMAL(12, 2) DEFAULT 0.00,
+    min_stock_alert INT DEFAULT 10,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    image_url TEXT,
+    discount_percentage DECIMAL(5, 2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE SET NULL,
+    INDEX (name),
+    INDEX (status)
+);
+
 CREATE TABLE lead_interest (
     interest_id INT AUTO_INCREMENT PRIMARY KEY,
     lead_id INT,
@@ -112,7 +142,8 @@ CREATE TABLE lead_interest (
     budget DECIMAL(10, 2),
     remarks TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE SET NULL
 );
 
 CREATE TABLE lead_advance_payments (
@@ -129,56 +160,46 @@ CREATE TABLE lead_advance_payments (
     FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
--- 3️⃣ DEALERS
 CREATE TABLE dealers (
     dealer_id INT AUTO_INCREMENT PRIMARY KEY,
     dealer_name VARCHAR(150) NOT NULL,
     contact_person VARCHAR(100),
-    phone VARCHAR(20),
+    phone VARCHAR(20) NOT NULL,
+    alternate_number VARCHAR(20),
     email VARCHAR(100),
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-
--- 4️⃣ PRODUCTS & INVENTORY
-CREATE TABLE products (
-    product_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    category VARCHAR(100),
-    description TEXT,
-    sku VARCHAR(50) UNIQUE,
-    unit VARCHAR(20),
-    selling_price DECIMAL(10, 2) DEFAULT 0,
-    dealer_price DECIMAL(10, 2) DEFAULT 0,
-    min_stock_alert INT DEFAULT 10,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE lead_interest ADD CONSTRAINT fk_lead_interest_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE SET NULL;
 
 CREATE TABLE inventory (
     inventory_id INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT UNIQUE,
+    product_id INT UNIQUE NOT NULL,
     current_stock INT DEFAULT 0,
     reserved_stock INT DEFAULT 0,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    INDEX (current_stock)
 );
 
 CREATE TABLE inventory_logs (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT,
-    type ENUM('in', 'out', 'adjustment') NOT NULL,
+    product_id INT NOT NULL,
+    type ENUM('in', 'out', 'adjustment', 'reserved', 'unreserved', 'opening_stock') NOT NULL,
     quantity INT NOT NULL,
     reference_type VARCHAR(50),
     reference_id INT,
+    user_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX (created_at),
+    INDEX (type)
 );
 
--- 5️⃣ ORDERS
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     order_source ENUM('lead', 'dealer') NOT NULL,
@@ -214,7 +235,6 @@ CREATE TABLE order_items (
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE SET NULL
 );
 
--- 6️⃣ BILLING SYSTEM (GST INVOICE)
 CREATE TABLE invoices (
     invoice_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
@@ -247,7 +267,6 @@ CREATE TABLE invoice_items (
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE SET NULL
 );
 
--- 7️⃣ PACKING MODULE
 CREATE TABLE packing (
     packing_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
@@ -259,7 +278,6 @@ CREATE TABLE packing (
     FOREIGN KEY (packed_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
--- 8️⃣ SHIPPING MODULE
 CREATE TABLE shipments (
     shipment_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
@@ -272,7 +290,6 @@ CREATE TABLE shipments (
     FOREIGN KEY (shipped_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
--- 9️⃣ WHATSAPP NOTIFICATIONS
 CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NULL,
@@ -286,7 +303,6 @@ CREATE TABLE notifications (
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE SET NULL
 );
 
--- 10️⃣ ADMIN CHAT
 CREATE TABLE chat_sessions (
     session_id INT AUTO_INCREMENT PRIMARY KEY,
     lead_id INT,
@@ -316,7 +332,7 @@ INSERT INTO roles (name, description) VALUES
 ('shipment', 'Shipping and tracking management')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
--- Insert default admin user: admin / password123
+-- Default admin user: admin / password123
 INSERT INTO users (name, phone, email, password_hash, role_id, language, status)
 SELECT 'Admin', '0000000000', 'admin@sgbagro.com', '$2a$10$xp5204oZU8a6eHFQFTsMUOJLFBSM3E2lkPO7NVb6PC/fn1PxiC0tK', role_id, 'EN', 'active'
 FROM roles WHERE name = 'admin'

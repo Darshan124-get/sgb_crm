@@ -1,29 +1,83 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice View | SGB Agro CRM</title>
+    <title>Invoice Viewer | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #10b981;
+            --primary-dark: #059669;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .invoice-v2-container {
+            background: white;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 4rem;
+            border-radius: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+        .invoice-v2-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, var(--primary-color), #6366f1);
+        }
+        .premium-btn-v2 {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
+        }
+        .premium-btn-v2:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(16, 185, 129, 0.4);
+        }
+        .invoice-item-row:hover {
+            background: #f8fafc !important;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+            .invoice-v2-container { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+                border-radius: 0 !important;
+            }
+            .invoice-v2-container::before { display: none; }
+        }
+    </style>
 </head>
-<body>
-<div class="dashboard-wrapper">
-    <div id="sidebar-container"></div>
-    <main class="main-content">
-        <header class="topbar">
-            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search..."></div>
-            <div class="profile-section"><span class="profile-name" id="profileName"></span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
-        </header>
-        <div class="content-body" id="pageContent">
-            <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.5rem;">Invoice View</h1>
-            <p id="pageDesc" style="color:#64748b;margin-bottom:2rem;">Loading...</p>
+<body style="background-color: #f1f5f9; min-height: 100vh; padding: 2rem 0;">
+
+    <div id="pageContent">
+        <!-- Dynamic Content from invoice-view.js -->
+        <div style="text-align:center; padding:5rem;">
+            <i class="fas fa-circle-notch fa-spin" style="font-size:3rem; color:var(--primary-color);"></i>
+            <p style="margin-top:1rem; color:#64748b; font-weight:600;">Loading secure invoice data...</p>
         </div>
-    </main>
-</div>
+    </div>
+
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
-<script src="../../js/decision-engine.js"></script>
-    <script src="js/billing.js"></script>
+    <script src="js/invoice-view.js"></script>
 </body>
 </html>

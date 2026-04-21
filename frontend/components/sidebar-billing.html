@@ -4,15 +4,45 @@
         <span>SGB Agro <span style="font-size:0.65rem;font-weight:500;color:#f59e0b;letter-spacing:0.05em;display:block;margin-top:-4px;">BILLING</span></span>
     </div>
     <nav class="nav-menu">
-        <div class="nav-group-title">Billing</div>
+        <div class="nav-group-title">BILLING OPERATIONS</div>
         <div class="nav-item">
-            <a href="billing.html" class="nav-link" id="nav-billing">
-                <i class="fas fa-file-invoice-dollar"></i> <span class="nav-label">Billing Dashboard</span>
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('dashboard')" id="side-dashboard">
+                <i class="fas fa-th-large"></i> <span class="nav-label">Dashboard</span>
             </a>
         </div>
         <div class="nav-item">
-            <a href="invoice.html" class="nav-link" id="nav-invoice">
-                <i class="fas fa-receipt"></i> <span class="nav-label">Invoices</span>
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('pending')" id="side-pending">
+                <i class="fas fa-hourglass-start"></i> <span class="nav-label">Pending Billing</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('in-review')" id="side-in-review">
+                <i class="fas fa-magnifying-glass-dollar"></i> <span class="nav-label">In Review</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('invoices')" id="side-invoices">
+                <i class="fas fa-file-invoice-dollar"></i> <span class="nav-label">Invoices</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('payments')" id="side-payments">
+                <i class="fas fa-receipt"></i> <span class="nav-label">Payments</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('reports')" id="side-reports">
+                <i class="fas fa-chart-line"></i> <span class="nav-label">Reports</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('customers')" id="side-customers">
+                <i class="fas fa-users"></i> <span class="nav-label">Customers</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="javascript:void(0)" class="nav-link" onclick="switchTab('settings')" id="side-settings">
+                <i class="fas fa-cog"></i> <span class="nav-label">Settings</span>
             </a>
         </div>
     </nav>

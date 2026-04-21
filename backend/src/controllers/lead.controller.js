@@ -72,11 +72,11 @@ exports.getLeadById = async (req, res) => {
 
     try {
         const [rows] = await pool.query(
-            'SELECT l.*, u.name as assigned_to_name FROM leads l LEFT JOIN users u ON l.assigned_to = u.user_id WHERE l.lead_id = ?', 
+            'SELECT l.*, u.name as assigned_to_name FROM leads l LEFT JOIN users u ON l.assigned_to = u.user_id WHERE l.lead_id = ?',
             [req.params.id]
         );
         if (rows.length === 0) return res.status(404).json({ message: 'Lead not found' });
-        
+
         const lead = rows[0];
 
         // 🛡️ SECURITY: Prevent Sales from viewing leads not assigned to them
@@ -89,13 +89,13 @@ exports.getLeadById = async (req, res) => {
         lead.interests = interests;
 
         const [followups] = await pool.query(
-            'SELECT * FROM lead_followups WHERE lead_id = ? AND status = "pending" ORDER BY followup_date ASC LIMIT 1', 
+            'SELECT * FROM lead_followups WHERE lead_id = ? AND status = "pending" ORDER BY followup_date ASC LIMIT 1',
             [req.params.id]
         );
         lead.next_followup = followups[0] || null;
 
         const [orderRows] = await pool.query(
-            'SELECT o.*, (SELECT GROUP_CONCAT(p.name SEPARATOR ", ") FROM order_items oi JOIN products p ON oi.product_id = p.product_id WHERE oi.order_id = o.order_id) as items_summary FROM orders o WHERE o.lead_id = ? ORDER BY o.created_at DESC LIMIT 1', 
+            'SELECT o.*, (SELECT GROUP_CONCAT(p.name SEPARATOR ", ") FROM order_items oi JOIN products p ON oi.product_id = p.product_id WHERE oi.order_id = o.order_id) as items_summary FROM orders o WHERE o.lead_id = ? ORDER BY o.created_at DESC LIMIT 1',
             [req.params.id]
         );
         lead.order = orderRows[0] || null;
@@ -132,10 +132,10 @@ exports.createLead = async (req, res) => {
         const [existing] = await connection.query('SELECT lead_id, assigned_to FROM leads WHERE phone_number = ?', [phone_number]);
         if (existing.length > 0) {
             await connection.rollback();
-            return res.status(400).json({ 
-                message: 'A lead with this phone number already exists.', 
+            return res.status(400).json({
+                message: 'A lead with this phone number already exists.',
                 lead_id: existing[0].lead_id,
-                duplicate: true 
+                duplicate: true
             });
         }
 
@@ -158,7 +158,7 @@ exports.createLead = async (req, res) => {
         if (salesStaff.length > 0) {
             assignedTo = salesStaff[0].user_id;
             status = 'assigned';
-            
+
             // Touch staff to ensure fair round-robin distribution
             await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [assignedTo]);
         }
@@ -188,27 +188,50 @@ exports.createLead = async (req, res) => {
 };
 
 exports.updateLead = async (req, res) => {
-    const { 
-        phone_number, customer_name, first_message, language, address, city, state, 
-        status, assigned_to, score, next_followup_date, lost_reason, lost_notes 
+    const {
+        phone_number, customer_name, first_message, language, address, city, state,
+        status, assigned_to, score, next_followup_date, lost_reason, lost_notes
     } = req.body;
     try {
-        await pool.query(
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        const [oldLead] = await connection.query('SELECT next_followup_date FROM leads WHERE lead_id = ?', [req.params.id]);
+        const oldFollowupDate = oldLead[0] ? oldLead[0].next_followup_date : null;
+
+        await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
                 address = ?, city = ?, state = ?, status = ?, assigned_to = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?
             WHERE lead_id = ?`,
             [
-                phone_number, customer_name, first_message, language, 
+                phone_number, customer_name, first_message, language,
                 address, city, state, status, assigned_to || null,
                 score || 'cold', next_followup_date || null, lost_reason || null, lost_notes || null,
                 req.params.id
             ]
         );
 
-        await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)', 
+        // Sync lead_followups if date changed
+        if (next_followup_date && next_followup_date !== oldFollowupDate) {
+            // Check if there's already a pending followup
+            const [existing] = await connection.query('SELECT followup_id FROM lead_followups WHERE lead_id = ? AND status = "pending"', [req.params.id]);
+            if (existing.length > 0) {
+                await connection.query('UPDATE lead_followups SET followup_date = ? WHERE followup_id = ?', [next_followup_date, existing[0].followup_id]);
+            } else {
+                await connection.query(
+                    'INSERT INTO lead_followups (lead_id, followup_date, status, remarks, created_by) VALUES (?, ?, "pending", ?, ?)',
+                    [req.params.id, next_followup_date, `Scheduled via Update (${status})`, req.user.id]
+                );
+            }
+        }
+
+        await connection.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
             [req.params.id, req.user.id, `Lead details updated. Status: ${status}`]);
+
+        await connection.commit();
+        connection.release();
         res.json({ message: 'Lead updated successfully' });
     } catch (err) {
         res.status(500).json({ message: 'Error updating lead: ' + err.message });
@@ -219,7 +242,7 @@ exports.assignLead = async (req, res) => {
     const { assigned_to } = req.body;
     try {
         await pool.query('UPDATE leads SET assigned_to = ?, status = "assigned" WHERE lead_id = ?', [assigned_to, req.params.id]);
-        await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)', 
+        await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
             [req.params.id, req.user.id, `Lead assigned to user ID ${assigned_to}`]);
         res.json({ message: 'Lead assigned successfully' });
     } catch (err) {
@@ -314,7 +337,7 @@ exports.getStats = async (req, res) => {
     try {
         let baseWhere = 'WHERE 1=1';
         let params = [];
-        
+
         if (userRole === 'sales') {
             baseWhere += ' AND assigned_to = ?';
             params.push(userId);
@@ -322,20 +345,20 @@ exports.getStats = async (req, res) => {
 
         const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, params);
         const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, params);
-        const [unassigned] = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE assigned_to IS NULL`); 
-        
+        const [unassigned] = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE assigned_to IS NULL`);
+
         // Grouped statuses
         const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("followup", "interested", "callback")`, params);
         const [converted] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "converted"`, params);
         const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, params);
         const [scheduled] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "callback"`, params);
         const [manual] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND source = "manual"`, params);
-        
-        res.json({ 
-            all: all[0].count, 
-            today: today[0].count, 
-            unassigned: userRole === 'sales' ? 0 : unassigned[0].count, 
-            followup: followup[0].count, 
+
+        res.json({
+            all: all[0].count,
+            today: today[0].count,
+            unassigned: userRole === 'sales' ? 0 : unassigned[0].count,
+            followup: followup[0].count,
             converted: converted[0].count,
             lost: lost[0].count,
             scheduled: scheduled[0].count,
@@ -366,7 +389,7 @@ exports.bulkAssign = async (req, res) => {
         // 2. Add System Note to each lead
         const [staffRows] = await connection.query('SELECT name FROM users WHERE user_id = ?', [staffId]);
         const staffName = staffRows[0] ? staffRows[0].name : 'Staff Member';
-        
+
         const noteValues = leadIds.map(id => [id, req.user.id, `System: Lead manually assigned to ${staffName}.`]);
         await connection.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES ?', [noteValues]);
 
@@ -420,7 +443,7 @@ exports.autoAssign = async (req, res) => {
                 // Touch staff to move them to back of round robin
                 await connection.query('UPDATE users SET updated_at = NOW() WHERE user_id = ?', [staff.user_id]);
                 // Note
-                await connection.query('INSERT INTO lead_notes (lead_id, note) VALUES (?, ?)', 
+                await connection.query('INSERT INTO lead_notes (lead_id, note) VALUES (?, ?)',
                     [leadId, `System: Lead auto-assigned to ${staff.name} based on ${lang} language.`]);
                 count++;
             }

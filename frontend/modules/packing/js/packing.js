@@ -17,7 +17,7 @@ async function fetchOrders() {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;"><i class="fas fa-circle-notch fa-spin"></i></td></tr>';
 
     try {
-        const res    = await fetch(`${ORDERS_API}?status=draft`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res    = await fetch(`${ORDERS_API}?status=billed`, { headers: { 'Authorization': `Bearer ${token}` } });
         allOrders    = await res.json();
         document.getElementById('pendingCount').textContent = `${allOrders.length} Pending`;
         renderOrders(allOrders);

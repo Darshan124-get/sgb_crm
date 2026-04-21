@@ -1,29 +1,157 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schedules & Follow-ups | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
+
 <body>
-<div class="dashboard-wrapper">
-    <div id="sidebar-container"></div>
-    <main class="main-content">
-        <header class="topbar">
-            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search..."></div>
-            <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
-        </header>
-        <div class="content-body" id="pageContent">
-            <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.5rem;">Schedules & Follow-ups</h1>
-            <p style="color:#64748b;margin-bottom:2rem;">Loading...</p>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        
+        <main class="main-content">
+            <header class="topbar">
+                <div class="top-page-info">
+                    <h1 class="page-title">Schedules & Follow-ups</h1>
+                    <p class="page-subtitle">Track and manage your team's upcoming customer interactions.</p>
+                </div>
+                <div class="profile-section">
+                    <div class="notif-bell"><i class="fa-regular fa-bell"></i><span class="pulse-dot"></span></div>
+                    <span class="profile-name" id="profileName">Administrator</span>
+                    <div class="avatar" id="assigneeAvatar">A</div>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- 📊 Analytics Panel -->
+                <div class="stats-grid">
+                    <div class="premium-card stat-card-alt glass-panel">
+                        <div class="stat-icon icon-today"><i class="fa-solid fa-calendar-day"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Today's Tasks</span>
+                            <h3 class="stat-value" id="stat-today">0</h3>
+                        </div>
+                    </div>
+                    <div class="premium-card stat-card-alt glass-panel">
+                        <div class="stat-icon icon-overdue"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Overdue</span>
+                            <h3 class="stat-value" id="stat-overdue" style="color: #ef4444;">0</h3>
+                        </div>
+                    </div>
+                    <div class="premium-card stat-card-alt glass-panel">
+                        <div class="stat-icon icon-upcoming"><i class="fa-solid fa-clock"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Upcoming</span>
+                            <h3 class="stat-value" id="stat-upcoming">0</h3>
+                        </div>
+                    </div>
+                    <div class="premium-card stat-card-alt glass-panel">
+                        <div class="stat-icon icon-completed"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Completed</span>
+                            <h3 class="stat-value" id="stat-completed" style="color: #10b981;">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🔍 Filter Bar -->
+                <div class="premium-card filter-container glass-panel">
+                    <div class="filter-group">
+                        <div class="filter-item">
+                            <label class="premium-label">Date Filter</label>
+                            <select id="filter-date" class="form-control-premium">
+                                <option value="today">Today</option>
+                                <option value="tomorrow">Tomorrow</option>
+                                <option value="week">This Week</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label class="premium-label">Lead Status</label>
+                            <select id="filter-status" class="form-control-premium">
+                                <option value="">All Statuses</option>
+                                <option value="new">New</option>
+                                <option value="followup">Follow-up</option>
+                                <option value="interested">Interested</option>
+                                <option value="converted">Converted</option>
+                            </select>
+                        </div>
+                        <div class="filter-item" id="staff-filter-wrapper">
+                            <label class="premium-label">Staff Filter</label>
+                            <select id="filter-staff" class="form-control-premium">
+                                <option value="">All Team Members</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="search-filter-wrapper">
+                        <label class="premium-label">Global Search</label>
+                        <div class="search-input-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="schedule-search" placeholder="Search by name, phone, or ID...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 📂 Tabs System -->
+                <div class="premium-tabs-wrapper">
+                    <div class="premium-tabs">
+                        <button class="p-tab active" data-tab="today">Today's Schedule</button>
+                        <button class="p-tab tab-overdue" data-tab="overdue">Overdue <span class="tab-count" id="count-overdue">0</span></button>
+                        <button class="p-tab" data-tab="upcoming">Upcoming Tasks</button>
+                        <button class="p-tab" data-tab="completed">Completed History</button>
+                    </div>
+                </div>
+
+                <!-- 📅 Data Table -->
+                <div class="premium-card table-container glass-panel">
+                    <table class="premium-table" id="scheduleTable">
+                        <thead>
+                            <tr>
+                                <th>Schedule Time</th>
+                                <th>Customer Details</th>
+                                <th>Lead Status</th>
+                                <th>Priority</th>
+                                <th>Assigned Staff</th>
+                                <th>Last Interaction</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTableBody">
+                            <tr>
+                                <td colspan="7" class="loading-state">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Loading schedule records...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- 🚩 Detail Drawer (Side Panel) -->
+        <div id="sideDrawer" class="side-drawer">
+            <div class="drawer-header">
+                <h3>Lead Deep-Dive</h3>
+                <button class="close-drawer" id="closeDrawer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="drawer-content" id="drawerContent">
+                <div class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading context...</div>
+            </div>
         </div>
-    </main>
-</div>
+        <div id="drawerOverlay" class="drawer-overlay"></div>
+    </div>
+
+    <!-- Scripts -->
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
-<script src="../../js/decision-engine.js"></script>
+    <script src="../../js/decision-engine.js"></script>
     <script src="js/schedule.js"></script>
 </body>
+
 </html>

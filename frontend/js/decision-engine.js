@@ -420,8 +420,9 @@ async function submitDecisionEngine() {
             });
 
             if (!orderRes.ok) {
-                const err = await orderRes.json();
-                throw new Error(err.message || 'Failed to create order');
+                const errDetail = await orderRes.json();
+                const errorMsg = errDetail.error ? `${errDetail.message}: ${errDetail.error}` : (errDetail.message || 'Failed to create order');
+                throw new Error(errorMsg);
             }
         }
 
@@ -464,18 +465,26 @@ async function submitDecisionEngine() {
         });
 
         // Update Lead Details (Name, city, state, status, language)
+        const updatePayload = {
+            customer_name: customerName,
+            city: village,
+            state: state,
+            status: finalStatus,
+            phone_number: phone,
+            language: document.getElementById('de-language').value,
+            first_message: document.getElementById('leadDetailAmount')?.textContent || '' // preserve
+        };
+
+        if (leadPath === 'not_connected') {
+            updatePayload.next_followup_date = document.getElementById('de-nc-date').value;
+        } else if (['Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
+            updatePayload.next_followup_date = document.getElementById('de-followup-date').value;
+        }
+
         await fetch(`${window.API_URL}/leads/${leadId}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                customer_name: customerName,
-                city: village,
-                state: state,
-                status: finalStatus,
-                phone_number: phone,
-                language: document.getElementById('de-language').value,
-                first_message: document.getElementById('leadDetailAmount')?.textContent || '' // preserve
-            })
+            body: JSON.stringify(updatePayload)
         });
 
         window.showAlert("Success", "Flow Saved Successfully!", "success");
@@ -660,18 +669,27 @@ async function submitManualLeadWizard() {
         else if (salesStatus === 'Dealer') finalLeadStatus = 'dealer';
 
         // 1. Create Lead
+        const createPayload = {
+            phone_number: phone,
+            customer_name: name,
+            city: village,
+            state: state,
+            language: lang,
+            status: finalLeadStatus,
+            source: 'manual'
+        };
+
+        if (mLeadPath === 'not_connected') {
+            createPayload.next_followup_date = document.getElementById('m-de-nc-date').value;
+        } else if (['Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
+            const fDate = document.getElementById('m-de-followup-date');
+            if (fDate) createPayload.next_followup_date = fDate.value;
+        }
+
         const leadRes = await fetch(`${window.API_URL}/leads`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                phone_number: phone,
-                customer_name: name,
-                city: village,
-                state: state,
-                language: lang,
-                status: finalLeadStatus,
-                source: 'manual'
-            })
+            body: JSON.stringify(createPayload)
         });
 
         if (!leadRes.ok) {

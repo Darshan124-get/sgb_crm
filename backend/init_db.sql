@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS admin_db;
-USE admin_db;
+CREATE DATABASE IF NOT EXISTS u581231108_SGB_CRM_test1;
+USE u581231108_SGB_CRM_test1;
 
 -- DROP TABLES IN REVERSE ORDER OF DEPENDENCY
 SET FOREIGN_KEY_CHECKS = 0;
@@ -63,6 +63,7 @@ CREATE TABLE leads (
     assigned_to INT,
     source VARCHAR(50) DEFAULT 'whatsapp',
     next_followup_date DATETIME NULL,
+    reminders_enabled BOOLEAN DEFAULT TRUE,
     lost_reason VARCHAR(255) NULL,
     lost_notes TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -174,8 +175,10 @@ CREATE TABLE inventory_logs (
     quantity INT NOT NULL,
     reference_type VARCHAR(50),
     reference_id INT,
+    created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- 5️⃣ ORDERS
@@ -189,7 +192,9 @@ CREATE TABLE orders (
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(100),
-    order_status ENUM('draft', 'billed', 'packed', 'shipped', 'delivered', 'cancelled') DEFAULT 'draft',
+    order_status ENUM('draft', 'in_review', 'billed', 'packed', 'shipped', 'delivered', 'cancelled') DEFAULT 'draft',
+    is_locked BOOLEAN DEFAULT FALSE,
+    locked_by INT,
     created_by INT,
     billing_done_by INT,
     total_amount DECIMAL(10, 2) DEFAULT 0,
@@ -199,6 +204,7 @@ CREATE TABLE orders (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE SET NULL,
     FOREIGN KEY (dealer_id) REFERENCES dealers(dealer_id) ON DELETE SET NULL,
+    FOREIGN KEY (locked_by) REFERENCES users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (billing_done_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
@@ -215,6 +221,14 @@ CREATE TABLE order_items (
 );
 
 -- 6️⃣ BILLING SYSTEM (GST INVOICE)
+CREATE TABLE settings (
+    setting_id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(50) NOT NULL UNIQUE,
+    setting_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE invoices (
     invoice_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
@@ -224,11 +238,15 @@ CREATE TABLE invoices (
     billing_address TEXT,
     gst_number VARCHAR(20),
     subtotal DECIMAL(10, 2) DEFAULT 0,
+    discount DECIMAL(10, 2) DEFAULT 0,
+    shipping_charges DECIMAL(10, 2) DEFAULT 0,
+    tax_type ENUM('CGST_SGST', 'IGST') DEFAULT 'CGST_SGST',
     cgst DECIMAL(10, 2) DEFAULT 0,
     sgst DECIMAL(10, 2) DEFAULT 0,
     igst DECIMAL(10, 2) DEFAULT 0,
     total_amount DECIMAL(10, 2) DEFAULT 0,
-    payment_status ENUM('pending', 'paid', 'partial') DEFAULT 'pending',
+    invoice_status ENUM('draft', 'finalized', 'cancelled') DEFAULT 'draft',
+    is_tax_overridden BOOLEAN DEFAULT FALSE,
     created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE SET NULL,
@@ -245,6 +263,35 @@ CREATE TABLE invoice_items (
     total DECIMAL(10, 2) NOT NULL,
     FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE SET NULL
+);
+
+CREATE TABLE payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT,
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_mode VARCHAR(50),
+    payment_type ENUM('advance', 'final', 'partial') DEFAULT 'partial',
+    payment_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending',
+    proof_url TEXT,
+    verified_by INT,
+    verified_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE TABLE invoice_logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NULL,
+    order_id INT NULL,
+    action VARCHAR(255) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    changed_by INT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id) ON DELETE SET NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE SET NULL,
+    FOREIGN KEY (changed_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- 7️⃣ PACKING MODULE
@@ -315,6 +362,15 @@ INSERT INTO roles (name, description) VALUES
 ('packing', 'Order packing module'),
 ('shipment', 'Shipping and tracking management')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
+
+-- Default Settings
+INSERT INTO settings (setting_key, setting_value) VALUES 
+('company_name', 'SGB Agro Industries'),
+('company_state', 'Maharashtra'),
+('company_gst_number', '27AAACS1234A1Z1'),
+('invoice_prefix', 'SGB'),
+('default_tax_mode', 'auto')
+ON DUPLICATE KEY UPDATE setting_key=setting_key;
 
 -- Insert default admin user: admin / password123
 INSERT INTO users (name, phone, email, password_hash, role_id, language, status)

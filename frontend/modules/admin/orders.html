@@ -19,9 +19,14 @@
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
                 <div>
                     <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Orders</h1>
-                    <p style="color:#64748b;font-size:0.875rem;">All dealer orders — manage status from draft to shipped.</p>
+                    <p style="color:#64748b;font-size:0.875rem;">All system orders — Leads & Dealer conversions.</p>
                 </div>
                 <div style="display:flex;gap:0.75rem;align-items:center;">
+                    <select id="sourceFilter" onchange="fetchOrders()" style="padding:0.5rem 1rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#374151;">
+                        <option value="">All Sources</option>
+                        <option value="lead">Lead Orders</option>
+                        <option value="dealer">Dealer Orders</option>
+                    </select>
                     <select id="statusFilter" onchange="fetchOrders()" style="padding:0.5rem 1rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#374151;">
                         <option value="">All Statuses</option>
                         <option value="draft">Draft</option>
@@ -58,7 +63,8 @@
                     <thead style="background:#f8fafc;">
                         <tr>
                             <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Order ID</th>
-                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Dealer</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Customer / Party</th>
+                            <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Source</th>
                             <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Items</th>
                             <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Amount</th>
                             <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Status</th>

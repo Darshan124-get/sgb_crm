@@ -71,7 +71,7 @@ function initSidebar(links) {
 
     links.forEach(link => {
         const href = link.getAttribute('href');
-        if (!href || href === '#' || href.startsWith('http')) return;
+        if (!href || href === '#' || href.startsWith('http') || href.startsWith('javascript:')) return;
 
         // Prepend ROOT_PATH to links that are not absolute
         if (!href.startsWith('/') && !href.includes('://')) {

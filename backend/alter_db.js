@@ -15,8 +15,20 @@ async function run() {
         // Add score column if not exists
         await pool.query(`
             ALTER TABLE leads 
-            ADD COLUMN IF NOT EXISTS score ENUM('HOT', 'WARM', 'COLD') DEFAULT 'COLD' AFTER status
-        `);
+            ADD COLUMN IF NOT EXISTS score ENUM('HOT', WARM, 'COLD') DEFAULT 'COLD' AFTER status
+        `).catch(e => console.log('Leads alter skipped or column exists'));
+
+        // Ensure orders table is ready for conversion
+        await pool.query(`
+            ALTER TABLE orders 
+            ADD COLUMN IF NOT EXISTS order_source ENUM('lead', 'dealer') DEFAULT 'dealer' AFTER order_id
+        `).catch(e => console.log('Orders source alter skipped'));
+
+        await pool.query(`
+            ALTER TABLE orders 
+            ADD COLUMN IF NOT EXISTS lead_id INT NULL AFTER order_source
+        `).catch(e => console.log('Orders lead_id alter skipped'));
+
         
         console.log('Database altered successfully.');
         process.exit(0);

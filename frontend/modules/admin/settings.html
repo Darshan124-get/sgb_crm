@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,23 +7,124 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body>
+<body style="background-color: #f8fafc;">
 <div class="dashboard-wrapper">
     <div id="sidebar-container"></div>
     <main class="main-content">
         <header class="topbar">
-            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search..."></div>
-            <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
+            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search parameters..."></div>
+            <div class="profile-section">
+                <div style="text-align:right">
+                    <div class="profile-name" id="profileName" style="font-weight:800; color:#1e293b;">Administrator</div>
+                    <div style="font-size:0.7rem; color:#64748b; font-weight:600; text-transform:uppercase;">System Root</div>
+                </div>
+                <div class="avatar" style="width:40px; height:40px; background:linear-gradient(135deg, #10b981, #059669); color:white; font-weight:700; box-shadow:0 4px 10px rgba(16,185,129,0.2);">A</div>
+            </div>
         </header>
-        <div class="content-body" id="pageContent">
-            <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.5rem;">Settings</h1>
-            <p style="color:#64748b;margin-bottom:2rem;">Loading...</p>
+
+        <div class="content-body" style="max-width: 1200px; margin: 0 auto; padding: 3rem 2.5rem;">
+            <div style="margin-bottom: 3rem;">
+                <h1 style="font-size:2.25rem; font-weight:900; color:#1e293b; letter-spacing:-0.03em; margin-bottom:0.5rem;">System Settings</h1>
+                <p style="color:#64748b; font-size:1.05rem; font-weight:500;">Manage your company's tax profiles, invoice numbering, and global preferences.</p>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:2.5rem; align-items: start;">
+                <!-- Section 1: Taxation -->
+                <div class="premium-card-v2">
+                    <div class="section-label"><i class="fas fa-percent"></i> Taxation & Regional Compliance</div>
+                    <h2 style="font-size:1.25rem; font-weight:800; color:#1e293b; margin-bottom:1.5rem;">GST Configuration</h2>
+                    
+                    <div class="input-premium-group">
+                        <label>Default GST Rate</label>
+                        <div style="position:relative;">
+                            <input type="number" id="s-gst-rate" placeholder="18">
+                            <span style="position:absolute; right:1.25rem; top:50%; transform:translateY(-50%); font-weight:700; color:#94a3b8;">%</span>
+                        </div>
+                    </div>
+
+                    <div class="input-premium-group">
+                        <label>Company Registered State</label>
+                        <select id="s-company-state">
+                            <option value="">Select State</option>
+                            <option value="Maharashtra">Maharashtra</option>
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Tamil Nadu">Tamil Nadu</option>
+                            <option value="Gujarat">Gujarat</option>
+                            <option value="Delhi">Delhi</option>
+                            <!-- More states can be added -->
+                        </select>
+                        <small style="display:block; margin-top:0.5rem; color:#64748b; font-size:0.75rem;">Used to automatically toggle between CGST/SGST and IGST.</small>
+                    </div>
+
+                    <label class="checkbox-premium-wrapper" style="margin-top:2rem;">
+                        <input type="checkbox" id="s-auto-tax">
+                        <div>
+                            <div style="font-weight:800; color:#1e293b; font-size:0.9rem;">Smart Tax Switching</div>
+                            <div style="font-size:0.75rem; color:#64748b; font-weight:500;">Automatically apply IGST for interstate orders.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Section 2: Invoicing -->
+                <div style="display:flex; flex-direction:column; gap:2.5rem;">
+                    <div class="premium-card-v2" style="background: linear-gradient(to bottom right, #ffffff, #f8fafc);">
+                        <div class="section-label"><i class="fas fa-file-invoice"></i> Billing Engine</div>
+                        <h2 style="font-size:1.25rem; font-weight:800; color:#1e293b; margin-bottom:1.5rem;">Invoice Numbering</h2>
+                        
+                        <div class="input-premium-group">
+                            <label>Invoice Prefix</label>
+                            <input type="text" id="s-invoice-prefix" placeholder="SGB">
+                        </div>
+
+                        <div class="input-premium-group">
+                            <label>Next Sequence Number</label>
+                            <input type="number" id="s-last-invoice" placeholder="001">
+                            <div style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem; padding:0.75rem; background:#f0f9ff; border-radius:0.5rem; border:1px solid #e0f2fe;">
+                                <i class="fas fa-info-circle" style="color:#0ea5e9;"></i>
+                                <span style="font-size:0.75rem; color:#0369a1; font-weight:600;">The next generated invoice will be marked as <strong id="preview-invoice">SGB-001</strong>.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content: flex-end;">
+                        <button id="saveBtn" class="premium-btn-v2" style="padding: 1rem 2.5rem; font-size: 1rem; width:100%; justify-content:center;">
+                            <i class="fas fa-save"></i> Save All Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 </div>
-    <script src="../../js/config.js"></script>
-    <script src="../../js/components.js"></script>
-<script src="../../js/decision-engine.js"></script>
-    <script src="js/settings.js"></script>
+<div id="toast" style="position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); color:white; padding:1rem 2rem; border-radius:1rem; font-size:0.95rem; font-weight:700; display:none; z-index:9999; box-shadow:0 20px 25px -5px rgba(0,0,0,0.2); animation: toastPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div>
+
+<style>
+@keyframes toastPop {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+</style>
+
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="js/settings.js"></script>
+<script>
+    // Live preview for invoice sequence
+    const prefixInput = document.getElementById('s-invoice-prefix');
+    const seqInput    = document.getElementById('s-last-invoice');
+    const previewEl   = document.getElementById('preview-invoice');
+
+    const updatePreview = () => {
+        const p = prefixInput.value || 'SGB';
+        const s = parseInt(seqInput.value || 0) + 1;
+        previewEl.textContent = `${p}-${String(s).padStart(3, '0')}`;
+    };
+
+    prefixInput.addEventListener('input', updatePreview);
+    seqInput.addEventListener('input', updatePreview);
+    
+    // Initial call after some delay to let data load
+    setTimeout(updatePreview, 1000);
+</script>
 </body>
 </html>

@@ -22,6 +22,10 @@ exports.getOrders = async (req, res) => {
             query += " AND o.order_status = ?";
             params.push(status);
         }
+        if (req.query.source) {
+            query += " AND o.order_source = ?";
+            params.push(req.query.source);
+        }
         query += " ORDER BY o.created_at DESC";
 
         const [rows] = await pool.query(query, params);
@@ -72,7 +76,23 @@ exports.convertLeadToOrder = async (req, res) => {
         );
         const orderId = orderResult.insertId;
         let totalAmount = 0;
+
         for (const item of items) {
+            // Reserve stock (holding items without immediate deduction from current_stock)
+            await connection.query(
+                `UPDATE inventory 
+                 SET reserved_stock = reserved_stock + ? 
+                 WHERE product_id = ?`,
+                [item.quantity, item.product_id]
+            );
+
+            // Create Inventory Log
+            await connection.query(
+                `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, reference_id, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [item.product_id, 'adjustment', item.quantity, 'reservation', orderId, req.user.id]
+            );
+
             const itemTotal = item.quantity * item.price;
             totalAmount += itemTotal;
             await connection.query(
@@ -89,7 +109,8 @@ exports.convertLeadToOrder = async (req, res) => {
         await connection.commit();
         res.status(201).json({ message: 'Order created successfully', orderId, leadStatus: 'converted' });
     } catch (err) {
-        await connection.rollback();
+        console.error('Error converting lead to order:', err);
+        if (connection) await connection.rollback();
         res.status(500).json({ message: 'Failed to create order', error: err.message });
     } finally {
         connection.release();
@@ -115,6 +136,21 @@ exports.createDealerOrder = async (req, res) => {
         const orderId = orderResult.insertId;
         let totalAmount = 0;
         for (const item of items) {
+            // Reserve stock (holding items without immediate deduction from current_stock)
+            await connection.query(
+                `UPDATE inventory 
+                 SET reserved_stock = reserved_stock + ? 
+                 WHERE product_id = ?`,
+                [item.quantity, item.product_id]
+            );
+
+            // Create Inventory Log
+            await connection.query(
+                `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, reference_id, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [item.product_id, 'adjustment', item.quantity, 'reservation', orderId, req.user.id]
+            );
+
             const itemTotal = item.quantity * item.price;
             totalAmount += itemTotal;
             await connection.query(
@@ -137,7 +173,7 @@ exports.createDealerOrder = async (req, res) => {
 
 exports.updateStatus = async (req, res) => {
     const { status } = req.body;
-    if (!['draft', 'billed', 'packed', 'shipped', 'delivered', 'cancelled'].includes(status)) {
+    if (!['draft', 'in_review', 'billed', 'packed', 'shipped', 'delivered', 'cancelled'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
     }
     try {

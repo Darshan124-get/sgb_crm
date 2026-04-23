@@ -25,9 +25,9 @@ exports.updateSettings = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Settings updated successfully' });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
         res.status(500).json({ message: 'Error updating settings' });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };

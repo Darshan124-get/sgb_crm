@@ -1,246 +1,311 @@
-<div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.25rem;">
-    <select id="leadDetailStatusSelect" class="form-control-premium"
-        style="width: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 2rem;"></select>
-    <select id="leadDetailScoreSelect" class="form-control-premium"
-        style="width: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 0.5rem;"></select>
-    <span id="leadDetailLanguage" class="language-tag">Language</span>
-</div>
-</div>
-</div>
-<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; width: 100%;">
-    <!-- Left Side: Customer Name -->
-    <div style="display: flex; align-items: center; gap: 1rem;">
-        <h2 id="topCustomerNameDisplay" style="font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0;"></h2>
-    </div>
+<div class="leads-detail-container">
+    <div class="leads-detail-header" style="padding-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9;">
+        <!-- Status & Score Badges (Selectable) -->
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div class="header-pill-select" style="background: #f0fdf4; color: #166534;">
+                <i class="fas fa-signal mr-1"></i>
+                <select id="leadDetailStatusSelect" onchange="updateLeadFromHeader()"
+                    style="background:transparent; border:none; color:inherit; font-weight:700; font-size:0.75rem; cursor:pointer;">
+                    <option value="new">New Lead</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="interested">Interested</option>
+                    <option value="followup">In Follow-up</option>
+                    <option value="callback">Callback Scheduled</option>
+                    <option value="converted">Converted / Ordered</option>
+                    <option value="not_interested">Not Interested</option>
+                    <option value="lost">Lost</option>
+                    <option value="dealer">Dealer Lead</option>
+                </select>
+            </div>
 
-    <!-- Right Side: Buttons -->
-    <div style="display: flex; gap: 0.75rem;">
-        <a id="whatsappBtn" href="#" target="_blank" class="login-btn btn-whatsapp"
-            style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-size: 0.875rem;">
-            <i class="fab fa-whatsapp"></i> WhatsApp
-        </a>
-        <button onclick="window.handleLeadConversionModal()" class="login-btn"
-            style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; background: #059669;">
-            <i class="fas fa-shopping-cart"></i> Convert to Order
-        </button>
-    </div>
-</div>
-</div>
+            <div class="header-pill-select" style="background: #fff7ed; color: #9a3412;">
+                <i class="fas fa-fire mr-1"></i>
+                <select id="leadDetailScoreSelect" onchange="updateLeadFromHeader()"
+                    style="background:transparent; border:none; color:inherit; font-weight:700; font-size:0.75rem; cursor:pointer;">
+                    <option value="hot">Hot</option>
+                    <option value="warm">Warm</option>
+                    <option value="cold">Cold</option>
+                </select>
+            </div>
 
-<!-- Main Content Grid -->
-<div class="detail-grid">
-    <!-- Left Column: Information Cards -->
-    <div class="detail-main-col">
-        <!-- Farmer Information -->
-        <div id="farmerInfoSection" class="detail-section">
-            <div class="detail-section-title">
-                <div class="section-icon" style="background: #eff6ff; color: #2563eb;">
-                    <i class="fas fa-user"></i>
-                </div>
-                Farmer Information
-                <button onclick="toggleLeadEdit('farmerInfoSection')" class="edit-section-btn view-item">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
-            </div>
-            <div class="info-display-grid">
-                <div class="info-item">
-                    <label>Farmer Name</label>
-                    <p id="leadDetailName" class="view-item">-</p>
-                    <input type="text" id="editName" class="edit-item form-control-premium" style="display:none">
-                </div>
-                <div class="info-item">
-                    <label>Phone Number</label>
-                    <p id="leadDetailPhone" class="view-item">-</p>
-                    <input type="text" id="editPhone" class="edit-item form-control-premium" style="display:none">
-                </div>
-                <div class="info-item">
-                    <label>Village / City</label>
-                    <p id="leadDetailVillage" class="view-item">-</p>
-                    <input type="text" id="editVillage" class="edit-item form-control-premium" style="display:none">
-                </div>
-                <div class="info-item">
-                    <label>State</label>
-                    <p id="leadDetailState" class="view-item">-</p>
-                    <select id="editState" class="edit-item form-control-premium" style="display:none">
-                        <option value="Karnataka">Karnataka</option>
-                        <option value="Tamilnad">Tamilnad</option>
-                        <option value="Kerala">Kerala</option>
-                        <option value="Maharastra">Maharastra</option>
-                        <option value="Andrapradesh">Andrapradesh</option>
-                        <option value="Telangana">Telangana</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                <div class="info-item">
-                    <label>Language</label>
-                    <p id="leadDetailLanguageInfo" class="view-item">-</p>
-                    <input type="text" id="editLanguage" class="edit-item form-control-premium" style="display:none">
-                </div>
-            </div>
-            <div class="edit-controls edit-item" style="display:none">
-                <button onclick="saveLeadSection('farmerInfoSection')" class="login-btn btn-sm">Save Changes</button>
-                <button onclick="toggleLeadEdit('farmerInfoSection')"
-                    class="login-btn btn-outline btn-sm">Cancel</button>
-            </div>
+            <span id="leadDetailLanguage" class="language-tag"
+                style="padding: 0.25rem 0.75rem; background: #e0f2fe; color: #0369a1; border-radius: 2rem; font-size: 0.75rem; font-weight:700;">HI</span>
         </div>
 
-        <!-- Requirements -->
-        <div id="requirementSection" class="detail-section">
-            <div class="detail-section-title">
-                <div class="section-icon" style="background: #f0fdf4; color: #16a34a;">
-                    <i class="fas fa-seedling"></i>
-                </div>
-                Crop & Requirement
-                <button onclick="toggleLeadEdit('requirementSection')" class="edit-section-btn view-item">
-                    <i class="fas fa-edit"></i> Edit
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <!-- Customer Name & Primary Info -->
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <h1 id="topCustomerNameDisplay"
+                    style="font-size: 1.75rem; font-weight: 800; color: #1e293b; margin: 0;"></h1>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="whatsappBtn" href="#" target="_blank" class="login-btn btn-whatsapp"
+                    style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-size: 0.875rem;">
+                    <i class="fab fa-whatsapp"></i> WhatsApp
+                </a>
+                <button onclick="window.handleLeadConversionModal()" class="login-btn"
+                    style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; background: #059669; border:none;">
+                    <i class="fas fa-shopping-cart"></i> Convert to Order
                 </button>
             </div>
-            <div class="info-display-grid">
-                <div class="info-item">
-                    <label>Current Crop</label>
-                    <p id="leadDetailCrop" class="view-item">-</p>
-                    <input type="text" id="editCrop" class="edit-item form-control-premium" style="display:none">
-                </div>
-                <div class="info-item">
-                    <label>Acreage</label>
-                    <p id="leadDetailAcreage" class="view-item">-</p>
-                    <input type="text" id="editAcreage" class="edit-item form-control-premium" style="display:none">
-                </div>
-                <div class="info-item">
-                    <label>Interest In</label>
-                    <div id="leadDetailInterest" class="view-item"
-                        style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;">
-                        <!-- Badges injected here -->
+        </div>
+    </div>
+    <input type="hidden" id="leadDetailAssignedId">
+
+    <!-- Main Content Grid -->
+    <div class="detail-grid">
+        <!-- Left Column: Information Cards -->
+        <div class="detail-main-col">
+            <!-- Farmer Information -->
+            <div id="farmerInfoSection" class="detail-section">
+                <div class="detail-section-title">
+                    <div class="section-icon" style="background: #eff6ff; color: #2563eb;">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <input type="text" id="editInterest" class="edit-item form-control-premium" style="display:none"
-                        placeholder="Comma separated products">
+                    Farmer Information
+                    <button onclick="toggleLeadEdit('farmerInfoSection')" class="edit-section-btn view-item">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                </div>
+                <div class="info-display-grid">
+                    <div class="info-item">
+                        <label>Farmer Name</label>
+                        <p id="leadDetailName" class="view-item">-</p>
+                        <input type="text" id="editName" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>Phone Number</label>
+                        <p id="leadDetailPhone" class="view-item">-</p>
+                        <input type="text" id="editPhone" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>Village / City</label>
+                        <p id="leadDetailVillage" class="view-item">-</p>
+                        <input type="text" id="editVillage" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>State</label>
+                        <p id="leadDetailState" class="view-item">-</p>
+                        <select id="editState" class="edit-item form-control-premium" style="display:none">
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Tamilnad">Tamilnad</option>
+                            <option value="Kerala">Kerala</option>
+                            <option value="Maharastra">Maharastra</option>
+                            <option value="Andrapradesh">Andrapradesh</option>
+                            <option value="Telangana">Telangana</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="info-item">
+                        <label>Language</label>
+                        <p id="leadDetailLanguageInfo" class="view-item">-</p>
+                        <select id="editLanguage" class="edit-item form-control-premium" style="display:none">
+                            <option value="KA">Kannada</option>
+                            <option value="TN">Tamil</option>
+                            <option value="TE">Telugu</option>
+                            <option value="ML">Malayalam</option>
+                            <option value="HI">Hindi</option>
+                            <option value="EN">English</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="edit-controls edit-item" style="display:none">
+                    <button onclick="saveLeadSection('farmerInfoSection')" class="login-btn btn-sm">Save
+                        Changes</button>
+                    <button onclick="toggleLeadEdit('farmerInfoSection')"
+                        class="login-btn btn-outline btn-sm">Cancel</button>
                 </div>
             </div>
-            <div class="edit-controls edit-item" style="display:none">
-                <button onclick="saveLeadSection('requirementSection')" class="login-btn btn-sm">Save Changes</button>
-                <button onclick="toggleLeadEdit('requirementSection')"
-                    class="login-btn btn-outline btn-sm">Cancel</button>
+
+            <!-- Requirements -->
+            <div id="requirementSection" class="detail-section">
+                <div class="detail-section-title">
+                    <div class="section-icon" style="background: #f0fdf4; color: #16a34a;">
+                        <i class="fas fa-seedling"></i>
+                    </div>
+                    Crop & Requirement
+                    <button onclick="toggleLeadEdit('requirementSection')" class="edit-section-btn view-item">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                </div>
+                <div class="info-display-grid">
+                    <div class="info-item">
+                        <label>Current Crop</label>
+                        <p id="leadDetailCrop" class="view-item">-</p>
+                        <input type="text" id="editCrop" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>Acreage</label>
+                        <p id="leadDetailAcreage" class="view-item">-</p>
+                        <input type="text" id="editAcreage" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>Interest In</label>
+                        <div id="leadDetailInterest" class="view-item"
+                            style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;">
+                            <!-- Badges injected here -->
+                        </div>
+                        <input type="text" id="editInterest" class="edit-item form-control-premium" style="display:none"
+                            placeholder="Comma separated products">
+                    </div>
+                </div>
+                <div class="edit-controls edit-item" style="display:none">
+                    <button onclick="saveLeadSection('requirementSection')" class="login-btn btn-sm">Save
+                        Changes</button>
+                    <button onclick="toggleLeadEdit('requirementSection')"
+                        class="login-btn btn-outline btn-sm">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Sales & Lead Progress -->
+            <div id="salesSection" class="detail-section">
+                <div class="detail-section-title">
+                    <div class="section-icon" style="background: #fff7ed; color: #ea580c;">
+                        <i class="fas fa-handshake"></i>
+                    </div>
+                    Sales & Lead Progress
+                    <button class="edit-section-btn view-item" style="opacity:0.5; cursor:not-allowed;" title="Update via Conversion Wizard">
+                        <i class="fas fa-lock"></i> Locked
+                    </button>
+                </div>
+                <div class="info-display-grid">
+                    <div class="info-item">
+                        <label>Sale Status</label>
+                        <p id="leadDetailSaleStatus" class="view-item"
+                            style="font-weight:700; color:var(--primary-color);">Not Started</p>
+                        <select id="editSaleStatus" class="edit-item form-control-premium" style="display:none">
+                            <option value="interested">Interested (Hot)</option>
+                            <option value="followup">In Follow-up</option>
+                            <option value="callback">Callback Scheduled</option>
+                            <option value="converted">Converted / Ordered</option>
+                            <option value="not_interested">Not Interested</option>
+                            <option value="lost">Lost</option>
+                            <option value="dealer">Dealer Lead</option>
+                        </select>
+                    </div>
+                    <!-- Order Specific Fields (Visible when converted) -->
+                    <div class="info-item order-only" style="display:none">
+                        <label>Products Ordered</label>
+                        <p id="leadDetailProducts" class="view-item" style="color:#166534; font-weight:600;">-</p>
+                    </div>
+                    <div class="info-item order-only" style="display:none">
+                        <label>Total Deal Amount</label>
+                        <p id="leadDetailAmount" class="view-item" style="font-weight:700;">₹0.00</p>
+                    </div>
+                    <div class="info-item order-only" style="display:none">
+                        <label>Advance Received</label>
+                        <p id="leadDetailAdvance" class="view-item" style="color:#16a34a; font-weight:600;">₹0.00</p>
+                    </div>
+                    <div class="info-item order-only" style="display:none">
+                        <label>Due Amount</label>
+                        <p id="leadDetailDue" class="view-item" style="color:#ef4444; font-weight:700;">₹0.00</p>
+                    </div>
+
+                    <!-- General Sales Fields -->
+                    <div class="info-item non-order-fields">
+                        <label>Last Feedback</label>
+                        <p id="leadDetailFeedback" class="view-item">-</p>
+                        <input type="text" id="editFeedback" class="edit-item form-control-premium"
+                            style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>Call Attempts</label>
+                        <p id="leadDetailAttempt" class="view-item">-</p>
+                        <!-- Not editable directly, usually systemic -->
+                    </div>
+                </div>
+                <div class="edit-controls edit-item" style="display:none">
+                    <button onclick="saveLeadSection('salesSection')" class="login-btn btn-sm">Save Changes</button>
+                    <button onclick="toggleLeadEdit('salesSection')"
+                        class="login-btn btn-outline btn-sm">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Purchase History Section -->
+            <div id="purchaseHistorySection" class="detail-section">
+                <div class="detail-section-title">
+                    <div class="section-icon" style="background: #fdf2f8; color: #db2777;">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    Customer Purchase History
+                </div>
+                <div id="purchaseHistoryContainer" class="history-list">
+                    <!-- Orders injected here -->
+                    <p class="text-muted text-center py-4">Checking for previous orders...</p>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="detail-section">
+                <div class="detail-section-title">
+                    <div class="section-icon" style="background: #f5f3ff; color: #7c3aed;">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    Interaction History
+                </div>
+
+                <div id="timelineContainer" class="timeline-list">
+                    <!-- Timeline entries injected here -->
+                </div>
             </div>
         </div>
 
-        <!-- Sales & Follow-up (NEW SECTION for missing data) -->
-        <div id="salesSection" class="detail-section">
-            <div class="detail-section-title">
-                <div class="section-icon" style="background: #fff7ed; color: #ea580c;">
-                    <i class="fas fa-handshake"></i>
+        <!-- Right Column: Sidebar / Actions -->
+        <div class="detail-side-col">
+            <!-- Ownership Card -->
+            <div class="sidebar-info-card">
+                <h3
+                    style="font-size: 0.75rem; text-transform: uppercase; color: #1d4ed8; letter-spacing: 0.05em; margin-bottom: 1rem; font-weight: 700;">
+                    Ownership</h3>
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div id="assigneeAvatar"
+                        style="width: 48px; height: 48px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem;">
+                        ?
+                    </div>
+                    <div>
+                        <p id="leadDetailAssigned" style="font-weight: 600; color: var(--text-main); margin: 0;">
+                            Unassigned
+                        </p>
+                        <p style="font-size: 0.75rem; color: #60a5fa; margin: 0;">Current Owner</p>
+                    </div>
                 </div>
-                Sales & Lead Progress
-                <button onclick="toggleLeadEdit('salesSection')" class="edit-section-btn view-item">
-                    <i class="fas fa-edit"></i> Edit
+                <button onclick="changeAssigneeFromDetails()" class="login-btn btn-outline"
+                    style="width: 100%; font-size: 0.875rem; margin-bottom: 0.5rem;">
+                    Change Assignee
+                </button>
+                <button onclick="transferLead(window.currentViewingLeadId)" class="login-btn btn-outline"
+                    style="width: 100%; font-size: 0.875rem; border-color: #dcfce7; color: #166534;">
+                    <i class="fas fa-exchange-alt mr-2"></i> Transfer Lead
                 </button>
             </div>
-            <div class="info-display-grid">
-                <div class="info-item">
-                    <label>Sale Status</label>
-                    <p id="leadDetailSaleStatus" class="view-item">Not Started</p>
-                    <select id="editSaleStatus" class="edit-item form-control-premium" style="display:none">
-                        <option value="Ordered">Ordered</option>
-                        <option value="Hot/Very Interested">Hot/Very Interested</option>
-                        <option value="Mild/Later">Mild/Later</option>
-                        <option value="Cold/Not Interested">Cold/Not Interested</option>
-                        <option value="Old Purchased">Old Purchased</option>
-                        <option value="Dealer">Dealer</option>
-                    </select>
-                </div>
-                <div class="info-item">
-                    <label>Deal Amount</label>
-                    <p id="leadDetailAmount" class="view-item">0.00</p>
-                    <input type="number" id="editAmount" class="edit-item form-control-premium" style="display:none">
-                </div>
-                <div class="info-item">
-                    <label>Call Attempt</label>
-                    <p id="leadDetailAttempt" class="view-item">-</p>
-                    <select id="editAttempt" class="edit-item form-control-premium" style="display:none">
-                        <option value="1st attempt">1st Attempt</option>
-                        <option value="2nd attempt">2nd Attempt</option>
-                        <option value="3rd attempt">3rd Attempt</option>
-                    </select>
-                </div>
-                <div class="info-item">
-                    <label>Feedback</label>
-                    <p id="leadDetailFeedback" class="view-item">-</p>
-                    <input type="text" id="editFeedback" class="edit-item form-control-premium" style="display:none">
-                </div>
-            </div>
-            <div class="edit-controls edit-item" style="display:none">
-                <button onclick="saveLeadSection('salesSection')" class="login-btn btn-sm">Save Changes</button>
-                <button onclick="toggleLeadEdit('salesSection')" class="login-btn btn-outline btn-sm">Cancel</button>
-            </div>
-        </div>
 
-        <!-- Timeline -->
-        <div class="detail-section">
-            <div class="detail-section-title">
-                <div class="section-icon" style="background: #f5f3ff; color: #7c3aed;">
-                    <i class="fas fa-history"></i>
-                </div>
-                Interaction History
-            </div>
-
-            <div id="timelineContainer" class="timeline-list">
-                <!-- Timeline entries injected here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Right Column: Sidebar / Actions -->
-    <div class="detail-side-col">
-        <!-- Ownership Card -->
-        <div class="sidebar-info-card">
-            <h3
-                style="font-size: 0.75rem; text-transform: uppercase; color: #1d4ed8; letter-spacing: 0.05em; margin-bottom: 1rem; font-weight: 700;">
-                Ownership</h3>
-            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
-                <div id="assigneeAvatar"
-                    style="width: 48px; height: 48px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem;">
-                    ?
-                </div>
-                <div>
-                    <p id="leadDetailAssigned" style="font-weight: 600; color: var(--text-main); margin: 0;">Unassigned
+            <!-- Next Action Card -->
+            <div class="detail-section" style="margin-top: 1.5rem;">
+                <h3
+                    style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 1rem; font-weight: 700;">
+                    Follow-up</h3>
+                <div
+                    style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                    <p id="leadDetailFollowupDate" style="font-weight: 600; color: var(--text-main); margin: 0;">-</p>
+                    <p id="leadDetailFollowupAction"
+                        style="font-size: 0.8125rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">No pending action
                     </p>
-                    <p style="font-size: 0.75rem; color: #60a5fa; margin: 0;">Current Owner</p>
                 </div>
+                <button onclick="rescheduleCallFromDetails()" class="login-btn btn-outline"
+                    style="width: 100%; border-color: #ffedd5; color: #9a3412; font-size: 0.875rem;">
+                    <i class="fas fa-calendar-alt mr-2"></i> Reschedule Call
+                </button>
             </div>
-            <button onclick="changeAssigneeFromDetails()" class="login-btn btn-outline"
-                style="width: 100%; font-size: 0.875rem; margin-bottom: 0.5rem;">
-                Change Assignee
-            </button>
-            <button onclick="transferLead(window.currentViewingLeadId)" class="login-btn btn-outline"
-                style="width: 100%; font-size: 0.875rem; border-color: #dcfce7; color: #166534;">
-                <i class="fas fa-exchange-alt mr-2"></i> Transfer Lead
-            </button>
-        </div>
-
-        <!-- Next Action Card -->
-        <div class="detail-section" style="margin-top: 1.5rem;">
-            <h3
-                style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 1rem; font-weight: 700;">
-                Follow-up</h3>
-            <div
-                style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-bottom: 1rem;">
-                <p id="leadDetailFollowupDate" style="font-weight: 600; color: var(--text-main); margin: 0;">-</p>
-                <p id="leadDetailFollowupAction"
-                    style="font-size: 0.8125rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">No pending action</p>
-            </div>
-            <button onclick="rescheduleCallFromDetails()" class="login-btn btn-outline"
-                style="width: 100%; border-color: #ffedd5; color: #9a3412; font-size: 0.875rem;">
-                <i class="fas fa-calendar-alt mr-2"></i> Reschedule Call
-            </button>
         </div>
     </div>
-</div>
 </div>
 
 <!-- Decision Engine Modal -->
-<div id="decisionEngineModal" class="modal"
-    style="position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center;">
-    <div class="modal-content premium-card"
-        style="width: 100%; max-width: 650px; background:white; border-radius: 1rem; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
+<div id="decisionEngineModal" class="modal">
+    <div class="modal-content premium-card">
         <!-- Header -->
         <div class="wizard-header"
             style="background:var(--primary-color); color:white; padding: 1.5rem; text-align:center; position:relative;">
@@ -345,10 +410,11 @@
                     <label>Select Products (Multi-select)</label>
                     <select id="de-products" class="form-control-premium" multiple style="height:120px; color:#000;">
                         <!-- Will be populated dynamically or fallback to hardcoded if API fails -->
-                        <option value="Brush Cutter Machine" data-price="12000">Brush Cutter Machine</option>
-                        <option value="Trolley" data-price="8500">Trolley</option>
-                        <option value="Dumper" data-price="15000">Dumper</option>
-                        <option value="Accessories" data-price="2000">Accessories</option>
+                        <option value="Brush Cutter Machine" data-id="1" data-price="12000">Brush Cutter Machine
+                        </option>
+                        <option value="Trolley" data-id="2" data-price="8500">Trolley</option>
+                        <option value="Dumper" data-id="3" data-price="15000">Dumper</option>
+                        <option value="Accessories" data-id="4" data-price="2000">Accessories</option>
                     </select>
                     <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Hold Ctrl (Windows) or
                         Cmd (Mac) to select multiple.</p>
@@ -370,12 +436,12 @@
                     <label>Sales Status *</label>
                     <select id="de-sales-status" class="form-control-premium" style="color:#000;">
                         <option value="">-- Select Decision --</option>
-                        <option value="Ordered">Ordered (Hot)</option>
-                        <option value="Hot/Very Interested">Hot / Very Interested</option>
-                        <option value="Mild/Later">Mild / Later</option>
-                        <option value="Cold/Not Interested">Cold / Not Interested</option>
-                        <option value="Old Purchased">Old Purchased</option>
-                        <option value="Dealer">Dealer</option>
+                        <option value="converted">Ordered (Hot)</option>
+                        <option value="interested">Hot / Very Interested</option>
+                        <option value="followup">Mild / Later</option>
+                        <option value="not_interested">Cold / Not Interested</option>
+                        <option value="lost">Old Purchased</option>
+                        <option value="dealer">Dealer</option>
                     </select>
                 </div>
 
@@ -528,4 +594,15 @@
 
         </div>
     </div>
+</div> <button onclick="dePrevStep(3)" class="login-btn btn-outline"
+    style="width:auto; padding: 0.75rem 1.5rem; border-radius:0.75rem;"><i class="fas fa-arrow-left mr-2"></i>
+    Back</button>
+<button onclick="submitDecisionEngine()" id="de-submit-btn" class="login-btn"
+    style="width:auto; padding: 0.75rem 2.5rem; background:#10b981; border-radius:0.75rem; font-weight:700;">SAVE ALL
+    CHANGES <i class="fas fa-check-circle ml-2"></i></button>
+</div>
+</div>
+
+</div>
+</div>
 </div>

@@ -407,30 +407,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         window.showModal({ title: 'Add New Product', content, hideFooter: true });
         
-        document.getElementById('productForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
-            
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${window.API_URL}/products`, {
-                    method: 'POST',
-                    headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                if (res.ok) {
-                    window.hideModal();
-                    refreshAll();
-                } else {
-                    const err = await res.json();
-                    alert('Error: ' + err.message);
+        const form = document.getElementById('productForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${window.API_URL}/products`, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    if (res.ok) {
+                        window.hideModal();
+                        window.showAlert("Success", "Product created successfully", "success");
+                        refreshAll();
+                    } else {
+                        const err = await res.json();
+                        window.showAlert("Error", err.message || "Failed to create product", "error");
+                    }
+                } catch (err) { 
+                    window.showAlert("Error", "Network connection failed", "error");
                 }
-            } catch (err) { alert('Network error'); }
-        };
+            });
+        }
     };
 
     window.openAddCategoryModal = () => {
@@ -460,24 +466,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
         window.showModal({ title: 'Manage Category', content, hideFooter: true });
         
-        document.getElementById('categoryForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
-            
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${window.API_URL}/categories`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                if (res.ok) {
-                    window.hideModal();
-                    refreshAll();
+        const form = document.getElementById('categoryForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${window.API_URL}/categories`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    if (res.ok) {
+                        window.hideModal();
+                        window.showAlert("Success", "Category saved successfully", "success");
+                        refreshAll();
+                    } else {
+                        const err = await res.json();
+                        window.showAlert("Error", err.message || "Failed to save category", "error");
+                    }
+                } catch (err) { 
+                    window.showAlert("Error", "Network connection failed", "error");
                 }
-            } catch (err) { alert('Error saving category'); }
-        };
+            });
+        }
     };
 
     window.openStockAdjustmentModal = (prodId, prodName) => {
@@ -516,32 +531,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
         window.showModal({ title: 'Stock Adjustment', content, hideFooter: true });
         
-        document.getElementById('adjustForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const type = document.getElementById('adjType').value;
-            let qty = parseInt(document.getElementById('adjQty').value);
-            const reason = document.getElementById('adjReason').value;
-            
-            // Adjust sign based on type if needed
-            if ((type === 'out' || type === 'adjustment') && qty > 0) {
-                // For 'out' and 'adjustment' we let the user enter positive numbers but send negative if they mean deduction
-                // Actually the backend just adds the value, so if user selects 'out' it should probably be negative.
+        const form = document.getElementById('adjustForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const type = document.getElementById('adjType').value;
+                let qty = parseInt(document.getElementById('adjQty').value);
+                const reason = document.getElementById('adjReason').value;
+                
                 if (type === 'out') qty = -Math.abs(qty);
-            }
 
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${window.API_URL}/inventory/adjust`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: prodId, type, quantity: qty, reason })
-                });
-                if (res.ok) {
-                    window.hideModal();
-                    refreshAll();
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${window.API_URL}/inventory/adjust`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ product_id: prodId, type, quantity: qty, reason })
+                    });
+                    if (res.ok) {
+                        window.hideModal();
+                        window.showAlert("Success", "Stock updated successfully", "success");
+                        refreshAll();
+                    } else {
+                        const err = await res.json();
+                        window.showAlert("Error", err.message || "Failed to update stock", "error");
+                    }
+                } catch (err) { 
+                    window.showAlert("Error", "Network connection failed", "error");
                 }
-            } catch (err) { alert('Error adjusting stock'); }
-        };
+            });
+        }
     };
 
     // ─── Helpers ───────────────────────────────────────────────

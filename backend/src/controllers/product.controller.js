@@ -62,7 +62,7 @@ exports.createProduct = async (req, res) => {
         // 3. Log initial stock if any
         if (opening_stock > 0) {
             await connection.query(
-                `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, user_id) 
+                `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, created_by) 
                  VALUES (?, ?, ?, ?, ?)`,
                 [productId, 'in', opening_stock, 'opening_stock', req.user.id]
             );
@@ -71,10 +71,10 @@ exports.createProduct = async (req, res) => {
         await connection.commit();
         res.status(201).json({ message: 'Product added successfully', product_id: productId, sku });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
         res.status(500).json({ message: 'Error adding product: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 

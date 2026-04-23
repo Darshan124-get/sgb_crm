@@ -31,7 +31,7 @@ async function getVerifiedBalance(connection, orderId) {
     return parseFloat(payments[0]?.total || 0) + leadTotal;
 }
 
-exports.getStats = async (req, res) => {
+const getStats = async (req, res) => {
     try {
         const [pending] = await pool.query("SELECT COUNT(*) as count FROM orders WHERE order_status IN ('draft', 'in_review')");
         const [billedToday] = await pool.query("SELECT COUNT(*) as count FROM invoices WHERE DATE(created_at) = CURRENT_DATE AND invoice_status = 'finalized'");
@@ -49,7 +49,7 @@ exports.getStats = async (req, res) => {
     }
 };
 
-exports.getPendingOrders = async (req, res) => {
+const getPendingOrders = async (req, res) => {
     try {
         const [rows] = await pool.query(`
             SELECT o.*, u.name as sales_person_name, l.source as lead_source,
@@ -68,7 +68,25 @@ exports.getPendingOrders = async (req, res) => {
     }
 };
 
-exports.getOrderForBilling = async (req, res) => {
+const getOrdersByStatus = async (req, res) => {
+    const { status } = req.query;
+    try {
+        const [rows] = await pool.query(`
+            SELECT o.*, u.name as sales_person_name, 
+                   (SELECT COUNT(*) FROM order_items WHERE order_id = o.order_id) as item_count,
+                   (SELECT SUM(amount) FROM payments WHERE order_id = o.order_id AND payment_status = "verified") as total_paid
+            FROM orders o
+            LEFT JOIN users u ON o.created_by = u.user_id
+            WHERE o.order_status = ?
+            ORDER BY o.created_at DESC
+        `, [status || 'draft']);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching orders: ' + err.message });
+    }
+};
+
+const getOrderForBilling = async (req, res) => {
     const { id } = req.params;
     try {
         const [orders] = await pool.query('SELECT * FROM orders WHERE order_id = ?', [id]);
@@ -83,7 +101,7 @@ exports.getOrderForBilling = async (req, res) => {
         `, [id]);
 
         const [payments] = await pool.query('SELECT * FROM payments WHERE order_id = ?', [id]);
-        
+
         // Fetch lead advances if order has lead_id
         let leadAdvances = [];
         if (orders[0].lead_id) {
@@ -115,7 +133,7 @@ exports.getOrderForBilling = async (req, res) => {
     }
 };
 
-exports.updateOrderItems = async (req, res) => {
+const updateOrderItems = async (req, res) => {
     const { id } = req.params;
     const { items, discount, shipping_charges } = req.body;
     const connection = await pool.getConnection();
@@ -131,9 +149,9 @@ exports.updateOrderItems = async (req, res) => {
         }
 
         const [oldItems] = await connection.query('SELECT * FROM order_items WHERE order_id = ?', [id]);
-        
+
         let newSubtotal = 0;
-        
+
         // 2. Process Items (Add/Update)
         for (const item of items) {
             const oldItem = oldItems.find(oi => oi.product_id === item.product_id);
@@ -145,7 +163,7 @@ exports.updateOrderItems = async (req, res) => {
                 if (qtyDiff !== 0) {
                     await connection.query('UPDATE inventory SET reserved_stock = reserved_stock + ? WHERE product_id = ?', [qtyDiff, item.product_id]);
                 }
-                
+
                 await logAudit(connection, {
                     order_id: id,
                     action: 'ITEM_UPDATE',
@@ -159,7 +177,7 @@ exports.updateOrderItems = async (req, res) => {
             newSubtotal += totalItemPrice;
 
             if (oldItem) {
-                await connection.query('UPDATE order_items SET quantity = ?, price = ?, total_price = ? WHERE order_item_id = ?', 
+                await connection.query('UPDATE order_items SET quantity = ?, price = ?, total_price = ? WHERE order_item_id = ?',
                     [item.quantity, item.price, totalItemPrice, oldItem.order_item_id]);
             } else {
                 await connection.query('INSERT INTO order_items (order_id, product_id, quantity, price, total_price) VALUES (?, ?, ?, ?, ?)',
@@ -172,7 +190,7 @@ exports.updateOrderItems = async (req, res) => {
             if (!items.find(i => i.product_id === oi.product_id)) {
                 await connection.query('UPDATE inventory SET reserved_stock = reserved_stock - ? WHERE product_id = ?', [oi.quantity, oi.product_id]);
                 await connection.query('DELETE FROM order_items WHERE order_item_id = ?', [oi.order_item_id]);
-                
+
                 await logAudit(connection, {
                     order_id: id,
                     action: 'ITEM_REMOVED',
@@ -191,14 +209,14 @@ exports.updateOrderItems = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Order structure updated successfully', newSubtotal: finalSubtotal });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
         res.status(500).json({ message: 'Error updating items: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
-exports.generateInvoice = async (req, res) => {
+const generateInvoice = async (req, res) => {
     const { id } = req.params;
     const { discount, shipping_charges, tax_type, is_tax_overridden, manual_tax, status = 'draft' } = req.body;
     const connection = await pool.getConnection();
@@ -211,7 +229,7 @@ exports.generateInvoice = async (req, res) => {
         const order = orders[0];
 
         if (order.order_status === 'billed') {
-             throw new Error('Order is already billed.');
+            throw new Error('Order is already billed.');
         }
 
         // 1. Precise Sequence Generation
@@ -221,7 +239,7 @@ exports.generateInvoice = async (req, res) => {
 
         // Check if draft invoice already exists for this order
         const [existingInvoices] = await connection.query('SELECT invoice_id, invoice_number, invoice_status FROM invoices WHERE order_id = ? AND invoice_status = "draft"', [id]);
-        
+
         let invoiceId;
         let invoiceNumber;
 
@@ -232,10 +250,10 @@ exports.generateInvoice = async (req, res) => {
             const prefix = settings.invoice_prefix || 'SGB';
             const year = new Date().getFullYear();
             const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-            
+
             let nextSeq = parseInt(settings.last_invoice_num || 0) + 1;
             invoiceNumber = `${prefix}/${year}/${month}/${nextSeq.toString().padStart(5, '0')}`;
-            
+
             await connection.query("UPDATE settings SET setting_value = ? WHERE setting_key = 'last_invoice_num'", [nextSeq.toString()]);
         }
 
@@ -282,8 +300,8 @@ exports.generateInvoice = async (req, res) => {
                     created_by = ?
                 WHERE invoice_id = ?
             `, [
-                order.customer_name, order.address, order.gst_number || '', 
-                subtotal, discount || 0, shipping_charges || 0, tax_type || 'CGST_SGST', 
+                order.customer_name, order.address, order.gst_number || '',
+                subtotal, discount || 0, shipping_charges || 0, tax_type || 'CGST_SGST',
                 cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0, req.user.id, invoiceId
             ]);
         } else {
@@ -294,8 +312,8 @@ exports.generateInvoice = async (req, res) => {
                     cgst, sgst, igst, total_amount, invoice_status, is_tax_overridden, created_by
                 ) VALUES (?, ?, CURRENT_DATE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-                id, invoiceNumber, order.customer_name, order.address, 
-                order.gst_number || '', subtotal, discount || 0, shipping_charges || 0, 
+                id, invoiceNumber, order.customer_name, order.address,
+                order.gst_number || '', subtotal, discount || 0, shipping_charges || 0,
                 tax_type || 'CGST_SGST', cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0, req.user.id
             ]);
             invoiceId = invResult.insertId;
@@ -337,20 +355,20 @@ exports.generateInvoice = async (req, res) => {
         }
 
         await connection.commit();
-        res.status(201).json({ 
-            message: status === 'finalized' ? 'Invoice generated and finalized' : 'Draft invoice updated and order locked', 
-            invoiceId, 
-            invoiceNumber 
+        res.status(201).json({
+            message: status === 'finalized' ? 'Invoice generated and finalized' : 'Draft invoice updated and order locked',
+            invoiceId,
+            invoiceNumber
         });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
         res.status(500).json({ message: 'Error generating invoice: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
-exports.finalizeInvoice = async (req, res) => {
+const finalizeInvoice = async (req, res) => {
     const { id } = req.params; // invoice_id
     const connection = await pool.getConnection();
 
@@ -363,7 +381,7 @@ exports.finalizeInvoice = async (req, res) => {
 
         // 1. Update Statuses
         await connection.query('UPDATE invoices SET invoice_status = "finalized" WHERE invoice_id = ?', [id]);
-        
+
         const invoiceTotal = parseFloat(invoices[0].total_amount);
         const verifiedTotal = await getVerifiedBalance(connection, invoices[0].order_id);
         const isFullyPaid = verifiedTotal >= invoiceTotal;
@@ -396,14 +414,14 @@ exports.finalizeInvoice = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Invoice finalized. Order is now ready for Packing.' });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
         res.status(500).json({ message: err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
-exports.getPayments = async (req, res) => {
+const getPayments = async (req, res) => {
     try {
         const { status } = req.query;
         let query = `
@@ -428,21 +446,21 @@ exports.getPayments = async (req, res) => {
     }
 };
 
-exports.addPayment = async (req, res) => {
+const addPayment = async (req, res) => {
     const { order_id, amount, mode, type, proof_url } = req.body;
     try {
         await pool.query(`
             INSERT INTO payments (order_id, amount, payment_mode, payment_type, proof_url, payment_status, created_at) 
             VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
         `, [order_id, amount, mode, type, proof_url]);
-        
+
         res.status(201).json({ message: 'Payment recorded and awaiting verification' });
     } catch (err) {
         res.status(500).json({ message: 'Error recording payment: ' + err.message });
     }
 };
 
-exports.verifyLeadAdvance = async (req, res) => {
+const verifyLeadAdvance = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // verified / rejected
     const verified = status === 'verified' ? 'yes' : 'no';
@@ -461,23 +479,26 @@ exports.verifyLeadAdvance = async (req, res) => {
         if (verified === 'yes') {
             // 2. Find associated order
             const [advances] = await connection.query('SELECT lead_id FROM lead_advance_payments WHERE advance_id = ?', [id]);
-            const leadId = advances[0].lead_id;
+            const leadId = advances[0]?.lead_id;
 
-            const [orders] = await connection.query('SELECT order_id FROM orders WHERE lead_id = ?', [leadId]);
-            if (orders.length > 0) {
-                const orderId = orders[0].order_id;
-                const [invoices] = await connection.query('SELECT * FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [orderId]);
+            if (leadId) {
+                const [orders] = await connection.query('SELECT order_id FROM orders WHERE lead_id = ?', [leadId]);
+                const orderId = orders[0]?.order_id;
+                
+                if (orderId) {
+                    const [invoices] = await connection.query('SELECT * FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [orderId]);
 
-                if (invoices.length > 0) {
-                    const verifiedTotal = await getVerifiedBalance(connection, orderId);
-                    const grandTotal = parseFloat(invoices[0].total_amount);
+                    if (invoices.length > 0) {
+                        const verifiedTotal = await getVerifiedBalance(connection, orderId);
+                        const grandTotal = parseFloat(invoices[0].total_amount);
 
-                    if (verifiedTotal >= grandTotal) {
-                        await connection.query(`
-                            UPDATE orders SET order_status = "billed", is_locked = 1, billing_done_by = ? 
-                            WHERE order_id = ?
-                        `, [req.user.id, orderId]);
-                        await connection.query('INSERT INTO packing (order_id, status) VALUES (?, "pending") ON DUPLICATE KEY UPDATE status="pending"', [orderId]);
+                        if (verifiedTotal >= grandTotal) {
+                            await connection.query(`
+                                UPDATE orders SET order_status = "billed", is_locked = 1, billing_done_by = ? 
+                                WHERE order_id = ?
+                            `, [req.user.id, orderId]);
+                            await connection.query('INSERT INTO packing (order_id, status) VALUES (?, "pending") ON DUPLICATE KEY UPDATE status="pending"', [orderId]);
+                        }
                     }
                 }
             }
@@ -486,14 +507,15 @@ exports.verifyLeadAdvance = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Lead advance status updated' });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
+        console.error('Verify Lead Advance Error:', err);
         res.status(500).json({ message: 'Error verifying lead advance: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
-exports.verifyPayment = async (req, res) => {
+const verifyPayment = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // verified / rejected
     if (!['verified', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
@@ -512,12 +534,13 @@ exports.verifyPayment = async (req, res) => {
         if (status === 'verified') {
             // 2. Get Order & Invoice Details
             const [pRecs] = await connection.query('SELECT order_id FROM payments WHERE payment_id = ?', [id]);
-            const orderId = pRecs[0].order_id;
+            const orderId = pRecs[0]?.order_id;
 
-            const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ? FOR UPDATE', [orderId]);
-            const [invoices] = await connection.query('SELECT * FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [orderId]);
+            if (orderId) {
+                const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ? FOR UPDATE', [orderId]);
+                const [invoices] = await connection.query('SELECT * FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [orderId]);
 
-            if (invoices.length > 0) {
+                if (invoices.length > 0) {
                 const verifiedTotal = await getVerifiedBalance(connection, orderId);
                 const grandTotal = parseFloat(invoices[0].total_amount);
 
@@ -539,6 +562,7 @@ exports.verifyPayment = async (req, res) => {
                         new_value: 'Billed/Packing',
                         changed_by: req.user.id
                     });
+                    }
                 }
             }
         }
@@ -546,14 +570,15 @@ exports.verifyPayment = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Payment status updated' });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
+        console.error('Verify Payment Error:', err);
         res.status(500).json({ message: 'Error verifying payment: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
-exports.getAllInvoices = async (req, res) => {
+const getAllInvoices = async (req, res) => {
     try {
         const [rows] = await pool.query(`
             SELECT i.*, o.customer_name as order_customer 
@@ -567,7 +592,7 @@ exports.getAllInvoices = async (req, res) => {
     }
 };
 
-exports.getInvoiceById = async (req, res) => {
+const getInvoiceById = async (req, res) => {
     const { id } = req.params;
     try {
         const [invoices] = await pool.query(`
@@ -578,7 +603,7 @@ exports.getInvoiceById = async (req, res) => {
         `, [id]);
 
         if (!invoices.length) return res.status(404).json({ message: 'Invoice not found' });
-        
+
         const [items] = await pool.query(`
             SELECT ii.*, p.name as product_name, p.sku 
             FROM invoice_items ii
@@ -592,7 +617,7 @@ exports.getInvoiceById = async (req, res) => {
     }
 };
 
-exports.getSettings = async (req, res) => {
+const getSettings = async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM settings');
         const settings = {};
@@ -603,7 +628,7 @@ exports.getSettings = async (req, res) => {
     }
 };
 
-exports.updateSettings = async (req, res) => {
+const updateSettings = async (req, res) => {
     const settings = req.body; // { key: value }
     try {
         for (const [key, value] of Object.entries(settings)) {
@@ -615,7 +640,7 @@ exports.updateSettings = async (req, res) => {
     }
 };
 
-exports.printInvoice = async (req, res) => {
+const printInvoice = async (req, res) => {
     const { id } = req.params;
     try {
         const [invoices] = await pool.query('SELECT * FROM invoices WHERE invoice_id = ?', [id]);
@@ -699,4 +724,23 @@ exports.printInvoice = async (req, res) => {
     } catch (err) {
         res.status(500).send('Error generating invoice print view');
     }
+};
+
+module.exports = {
+    getStats,
+    getPendingOrders,
+    getOrderForBilling,
+    updateOrderItems,
+    addPayment,
+    verifyPayment,
+    verifyLeadAdvance,
+    generateInvoice,
+    finalizeInvoice,
+    getAllInvoices,
+    getInvoiceById,
+    getSettings,
+    updateSettings,
+    getPayments,
+    printInvoice,
+    getOrdersByStatus
 };

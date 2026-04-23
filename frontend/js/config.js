@@ -5,7 +5,7 @@
 // ─── Backend URL ─────────────────────────────────────────────
 const BACKEND_PORT = 5000;
 const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
-window.BASE_URL = isLocal ? `http://localhost:${BACKEND_PORT}` : 'https://v3-sgb-backend.onrender.com';
+window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://v3-sgb-backend.onrender.com';
 window.API_URL = `${window.BASE_URL}/api`;
 
 // ─── Root Path Computation ───────────────────────────────────
@@ -91,6 +91,49 @@ window.doLogout = function () {
 
 // ─── Global Notification Helper ─────────────────────────────
 window.showAlert = function(title, message, type = 'info') {
-    // Falls back to native alert if no custom UI exists
-    alert(`${title}: ${message}`);
+    let overlay = document.querySelector('.alert-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'alert-overlay';
+        document.body.appendChild(overlay);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `alert-toast alert-${type}`;
+
+    const iconMap = {
+        success: 'fa-check-circle',
+        error: 'fa-circle-exclamation',
+        info: 'fa-circle-info'
+    };
+    const iconClass = iconMap[type] || 'fa-circle-info';
+
+    toast.innerHTML = `
+        <div class="alert-icon">
+            <i class="fa-solid ${iconClass}"></i>
+        </div>
+        <div class="alert-content">
+            <div class="alert-title">${title}</div>
+            <div class="alert-message">${message}</div>
+        </div>
+        <button class="alert-close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    `;
+
+    // Close button logic
+    toast.querySelector('.alert-close').addEventListener('click', () => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    });
+
+    overlay.appendChild(toast);
+
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 4000);
 };

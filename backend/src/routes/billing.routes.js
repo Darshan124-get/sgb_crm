@@ -6,6 +6,7 @@ const { authenticateToken, isAdmin } = require('../middleware/auth.middleware');
 // Dashboard & Lists
 router.get('/stats', authenticateToken, billingController.getStats);
 router.get('/pending', authenticateToken, billingController.getPendingOrders);
+router.get('/orders', authenticateToken, billingController.getOrdersByStatus);
 router.get('/invoices', authenticateToken, billingController.getAllInvoices);
 
 // Order specifics

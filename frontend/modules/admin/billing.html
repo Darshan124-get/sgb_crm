@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Management | Admin | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --billing-primary: #3b82f6;
+            --billing-success: #10b981;
+            --billing-warning: #f59e0b;
+            --billing-danger: #ef4444;
+        }
+
+        .main-content {
+            padding: 0.75rem;
+            background: #f8fafc;
+            min-height: 100vh;
+        }
+
+        /* Tabs Navigation */
+        .tabs-header {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            background: white;
+            padding: 0.4rem;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            position: sticky;
+            top: var(--topbar-height);
+            z-index: 100;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn.active {
+            background: #eff6ff;
+            color: var(--billing-primary);
+        }
+
+        .tab-btn i { font-size: 1.1rem; }
+
+        /* Stats Section */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover { transform: translateY(-3px); }
+
+        .stat-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .icon-pending { background: #fff7ed; color: #f59e0b; }
+        .icon-review  { background: #eef2ff; color: #6366f1; }
+        .icon-billed  { background: #ecfdf5; color: #10b981; }
+        .icon-revenue { background: #f0f9ff; color: #0ea5e9; }
+
+        .stat-info h4 { color: #64748b; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; margin: 0; }
+        .stat-info p { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0.25rem 0 0 0; }
+
+        /* Table Section */
+        .content-card {
+            background: white;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        }
+
+        .card-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h2 { font-size: 1.25rem; font-weight: 800; color: #1e293b; margin: 0; }
+
+        .billing-table { width: 100%; border-collapse: collapse; }
+        .billing-table th {
+            background: #f8fafc;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .billing-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.825rem;
+            color: #1e293b;
+            vertical-align: middle;
+        }
+
+        .status-badge {
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+        .status-draft { background: #f1f5f9; color: #64748b; }
+        .status-in-review { background: #fef3c7; color: #d97706; }
+        .status-billed { background: #dcfce7; color: #15803d; }
+        .status-cancelled { background: #fee2e2; color: #b91c1c; }
+
+        .action-btn {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #475569;
+        }
+        .action-btn:hover { background: #f8fafc; border-color: var(--billing-primary); color: var(--billing-primary); }
+
+        /* Workstation Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: #f1f5f9;
+            width: 98%;
+            max-width: 1100px;
+            max-height: 92vh;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            margin: auto;
+        }
+        .modal-header {
+            padding: 1.5rem 2rem;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body { 
+            flex: 1; 
+            overflow-y: auto; 
+            display: grid; 
+            grid-template-columns: 1fr 300px; 
+            gap: 0.75rem; 
+            padding: 0.75rem 0.75rem 2rem 0.75rem;
+            min-height: 0;
+            align-items: start;
+        }
+        
+        .work-section { 
+            background: white; 
+            border-radius: 8px; 
+            padding: 1rem; 
+            border: 1px solid #e2e8f0; 
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        }
+
+        .calc-sidebar { 
+            background: #1e293b; 
+            color: white; 
+            border-radius: 8px; 
+            padding: 1rem; 
+            display: flex; 
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .loader { width: 48px; height: 48px; border: 5px solid #e2e8f0; border-top-color: var(--billing-primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 2rem auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .section-tag {
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <div id="topbar-container"></div>
+
+            <div class="header-intro" style="margin-bottom: 2rem;">
+                <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; font-family: 'Outfit';">Billing Workstation</h1>
+                <p style="color: #64748b; font-weight: 500;">Centralized financial operations, invoice management, and payment verification.</p>
+            </div>
+
+            <div class="stats-grid" id="statsContainer">
+                <div class="stat-card">
+                    <div class="stat-icon icon-pending"><i class="fas fa-clock"></i></div>
+                    <div class="stat-info">
+                        <h4>Pending Billing</h4>
+                        <p id="statPending">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-review"><i class="fas fa-magnifying-glass-dollar"></i></div>
+                    <div class="stat-info">
+                        <h4>In Review</h4>
+                        <p id="statReview">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-billed"><i class="fas fa-file-invoice"></i></div>
+                    <div class="stat-info">
+                        <h4>Billed Today</h4>
+                        <p id="statBilled">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-revenue"><i class="fas fa-indian-rupee-sign"></i></div>
+                    <div class="stat-info">
+                        <h4>Revenue Today</h4>
+                        <p id="statRevenue">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('draft')">
+                    <i class="fas fa-inbox"></i> Pending Orders
+                </button>
+                <button class="tab-btn" onclick="switchTab('in-review')">
+                    <i class="fas fa-hourglass-half"></i> In Review
+                </button>
+                <button class="tab-btn" onclick="switchTab('billed')">
+                    <i class="fas fa-check-double"></i> Billed Orders
+                </button>
+                <button class="tab-btn" onclick="switchTab('cancelled')">
+                    <i class="fas fa-ban"></i> Cancelled
+                </button>
+            </nav>
+
+            <div class="content-card">
+                <div class="card-header">
+                    <h2 id="tableTitle">Orders Awaiting Billing</h2>
+                    <div class="controls">
+                        <input type="text" id="orderSearch" placeholder="Search customer or order #" style="padding: 0.6rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 10px; width: 300px;">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="billing-table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Date</th>
+                                <th>Customer Name</th>
+                                <th>Items</th>
+                                <th>Pay Status</th>
+                                <th>Total Value</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTableBody">
+                            <!-- Loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="tableLoader" style="display: none;">
+                    <div class="loader"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- WORKSTATION MODAL -->
+    <div id="billingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 40px; height: 40px; background: #eff6ff; color: #3b82f6; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800;">B</div>
+                    <h2 id="modalOrderTitle">Process Order Billing</h2>
+                </div>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" id="modalWorkstationBody">
+                <!-- Content Loaded via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/billing.js"></script>
+</body>
+</html>

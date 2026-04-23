@@ -1,5 +1,5 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
-    if (!window.requireAuth(['sales','admin'])) return;
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window.requireAuth(['sales', 'admin'])) return;
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const el = document.getElementById('profileName');
     if (el) el.textContent = user.name || 'User';

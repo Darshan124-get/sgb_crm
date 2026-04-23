@@ -39,7 +39,7 @@ exports.adjustStock = async (req, res) => {
 
         // 2. Log the change
         await connection.query(
-            `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, reference_id, user_id) 
+            `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, reference_id, created_by) 
              VALUES (?, ?, ?, ?, ?, ?)`,
             [product_id, type, quantity, 'manual', null, req.user.id]
         );
@@ -47,10 +47,10 @@ exports.adjustStock = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Stock adjusted successfully' });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) {}
         res.status(500).json({ message: 'Error adjusting stock: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
@@ -60,7 +60,7 @@ exports.getInventoryLogs = async (req, res) => {
             SELECT l.*, p.name as product_name, p.sku, u.name as user_name
             FROM inventory_logs l
             JOIN products p ON l.product_id = p.product_id
-            LEFT JOIN users u ON l.user_id = u.user_id
+            LEFT JOIN users u ON l.created_by = u.user_id
             ORDER BY l.created_at DESC
             LIMIT 500
         `;
@@ -90,7 +90,7 @@ exports.searchProducts = async (req, res) => {
     const { q } = req.query;
     try {
         const query = `
-            SELECT p.product_id, p.name, p.sku, p.price as default_price, 
+            SELECT p.product_id, p.name, p.sku, p.selling_price as default_price, 
                    i.current_stock, i.reserved_stock
             FROM products p
             JOIN inventory i ON p.product_id = i.product_id

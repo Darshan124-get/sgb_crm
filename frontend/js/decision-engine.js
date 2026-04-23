@@ -45,10 +45,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Handle multi-select change effectively for calculation
+    // Handle amount changes effectively for final/due calculation
     document.body.addEventListener('input', (e) => {
-        if (['de-order-discount', 'de-order-advance', 'm-de-order-advance'].includes(e.target.id)) {
-            calculateOrderAmounts(e.target.id.startsWith('m-') ? 'm-' : '');
+        const amountIds = [
+            'de-order-total', 'de-order-discount', 'de-order-advance',
+            'm-de-order-total', 'm-de-order-discount', 'm-de-order-advance'
+        ];
+        if (amountIds.includes(e.target.id)) {
+            const prefix = e.target.id.startsWith('m-') ? 'm-' : '';
+            updateFinalAndDue(prefix);
         }
     });
 });
@@ -71,8 +76,11 @@ async function loadProductsForEngine(prefix = '') {
         if (response.ok) {
             const products = await response.json();
             if (products && products.length > 0) {
+                // IMPORTANT: Using selling_price and name from DB schema
                 productSelect.innerHTML = products.map(p => `
-                    <option value="${p.name}" data-id="${p.product_id}" data-price="${p.price}">${p.name} (₹${p.price})</option>
+                    <option value="${p.name}" data-id="${p.product_id}" data-price="${p.selling_price || 0}">
+                        ${p.name} — ₹${p.selling_price || 0}
+                    </option>
                 `).join('');
             }
         }
@@ -94,41 +102,45 @@ function calculateOrderAmounts(prefix = '') {
         selectedNames.push(option.value);
     });
 
-    // Update product display list (if exists)
+    // Update product display list
     const displayEl = document.getElementById(prefix + 'de-order-products-display');
     if (displayEl) {
         displayEl.textContent = selectedNames.length > 0 ? selectedNames.join(', ') : 'None';
     }
 
-    // Update summary labels (Manual Wizard)
-    const summaryTotalEl = document.getElementById(prefix + 'de-summary-total');
-    const summaryCountEl = document.getElementById(prefix + 'de-summary-count');
-    if (summaryTotalEl) summaryTotalEl.textContent = total.toLocaleString();
-    if (summaryCountEl) summaryCountEl.textContent = productSelect.selectedOptions.length;
-
-    // Update form inputs (Main Modal)
+    // Auto-update Total Amount in Step 4
     const totalInput = document.getElementById(prefix + 'de-order-total');
     if (totalInput) {
-        if (total === 0 && totalInput.value && totalInput.value !== '0') {
-            total = parseFloat(totalInput.value) || 0;
-        } else {
-            totalInput.value = total;
+        // We auto-load the total, but avoid overwriting if it's already set and total is 0 
+        // (to handle manual modifications that might have happened)
+        if (total > 0 || !totalInput.value) {
+            totalInput.value = Math.round(total);
         }
     }
 
-    const discountEl = document.getElementById(prefix + 'de-order-discount');
-    const discount = discountEl ? (parseFloat(discountEl.value) || 0) : 0;
+    updateFinalAndDue(prefix);
+}
 
-    const finalAmount = total - discount;
+function updateFinalAndDue(prefix = '') {
+    const totalInput = document.getElementById(prefix + 'de-order-total');
+    const discountInput = document.getElementById(prefix + 'de-order-discount');
     const finalInput = document.getElementById(prefix + 'de-order-final');
-    if (finalInput) finalInput.value = finalAmount;
-
-    const advanceEl = document.getElementById(prefix + 'de-order-advance');
-    const advance = advanceEl ? (parseFloat(advanceEl.value) || 0) : 0;
-
-    const due = finalAmount - advance;
+    const advanceInput = document.getElementById(prefix + 'de-order-advance');
     const dueInput = document.getElementById(prefix + 'de-order-due');
-    if (dueInput) dueInput.value = due;
+
+    const total = parseFloat(totalInput?.value) || 0;
+    const discount = parseFloat(discountInput?.value) || 0;
+    const advance = parseFloat(advanceInput?.value) || 0;
+
+    const final = Math.max(0, total - discount);
+    const due = Math.max(0, final - advance);
+
+    if (finalInput) finalInput.value = Math.round(final);
+    if (dueInput) {
+        dueInput.value = Math.round(due);
+        // Visual feedback for due amount
+        dueInput.style.color = due > 0 ? '#ef4444' : '#10b981';
+    }
 }
 
 
@@ -140,7 +152,7 @@ window.handleLeadConversionModal = function () {
     console.log("[DecisionEngine] handleLeadConversionModal activated...");
     const modal = document.getElementById('decisionEngineModal');
     if (!modal) {
-        alert("System Error: Conversion modal container not found. Please refresh (Ctrl+F5).");
+        window.showAlert("System Error", "Conversion modal container not found. Please refresh (Ctrl+F5).", "error");
         return;
     }
 
@@ -182,12 +194,16 @@ window.handleLeadConversionModal = function () {
 
     // 4. Show Modal
     modal.classList.add('active');
-    console.log("Modal activated via class.");
+    document.body.classList.add('modal-open');
+    console.log("Modal activated.");
 }
 
 function closeDecisionEngine() {
     const modal = document.getElementById('decisionEngineModal');
-    if (modal) modal.classList.remove('active');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+    }
 }
 
 // ─── Core Logic ───────────────────────────────────────────────
@@ -222,17 +238,17 @@ function hideAllSubforms() {
 function handleSalesStatusChange(status) {
     hideAllSubforms();
 
-    if (status === 'Ordered') {
+    if (status === 'converted' || status === 'Ordered') {
         document.getElementById('de-form-order').style.display = 'block';
         document.getElementById('de-order-screenshot').setAttribute('required', 'true');
         calculateOrderAmounts(); // Fresh calculation
-    } else if (status === 'Hot/Very Interested' || status === 'Mild/Later' || status === 'Dealer') {
+    } else if (status === 'interested' || status === 'followup' || status === 'dealer' || status === 'Hot/Very Interested' || status === 'Mild/Later' || status === 'Dealer') {
         document.getElementById('de-form-followup').style.display = 'block';
         document.getElementById('de-followup-date').setAttribute('required', 'true');
-    } else if (status === 'Cold/Not Interested') {
+    } else if (status === 'not_interested' || status === 'Cold/Not Interested') {
         document.getElementById('de-form-reason').style.display = 'block';
         document.getElementById('de-lost-reason').setAttribute('required', 'true');
-    } else if (status === 'Old Purchased') {
+    } else if (status === 'lost' || status === 'Old Purchased') {
         document.getElementById('de-form-feedback').style.display = 'block';
         document.getElementById('de-feedback-satisfaction').setAttribute('required', 'true');
     }
@@ -245,7 +261,7 @@ function deNextStep(targetStep) {
 
     if (currentStep === 1) {
         if (!callStatus) {
-            alert('Please select a Call Status');
+            window.showAlert("Selection Required", "Please select a Call Status", "info");
             return;
         }
 
@@ -308,6 +324,14 @@ function goToStep(step) {
     }
 
     currentStep = step;
+
+    // Fix: If we reach Step 4 and it's an Order path, ensure amounts are calculated
+    if (step === 4) {
+        const salesStatus = document.getElementById('de-sales-status').value;
+        if (salesStatus === 'Ordered') {
+            calculateOrderAmounts();
+        }
+    }
 }
 
 function resetDecisionEngine() {
@@ -398,25 +422,36 @@ async function submitDecisionEngine() {
         if (salesStatus === 'Ordered' && leadPath !== 'not_connected') {
             const selectedOptions = Array.from(document.getElementById('de-products').selectedOptions);
             const items = selectedOptions.map(opt => ({
-                product_id: opt.getAttribute('data-id'),
+                product_id: parseInt(opt.getAttribute('data-id')) || 0,
                 quantity: 1,
                 price: parseFloat(opt.getAttribute('data-price')) || 0
             }));
 
-            const orderPayload = {
-                lead_id: leadId,
-                customer_name: customerName,
-                phone: phone,
-                city: village,
-                state: state,
-                advance_amount: parseFloat(document.getElementById('de-order-advance').value) || 0,
-                items: items
-            };
+            // Frontend Validation
+            if (!leadId || leadId === 'undefined') return window.showAlert("Error", "Lead ID is missing. Please refresh.", "error");
+            if (!customerName || customerName === '-') return window.showAlert("Required Field", "Customer Name is required for order conversion.", "error");
+            if (!phone || phone === '-') return window.showAlert("Required Field", "Phone Number is required for order conversion.", "error");
+            if (items.length === 0) return window.showAlert("Selection Error", "Please select at least one product in Step 3.", "error");
+
+            const formData = new FormData();
+            formData.append('lead_id', leadId);
+            formData.append('customer_name', customerName);
+            formData.append('phone', phone);
+            formData.append('city', village);
+            formData.append('state', state);
+            formData.append('total_amount', document.getElementById('de-order-total').value);
+            formData.append('advance_amount', document.getElementById('de-order-advance').value);
+            formData.append('items', JSON.stringify(items));
+
+            const fileInput = document.getElementById('de-order-screenshot');
+            if (fileInput.files[0]) {
+                formData.append('screenshot', fileInput.files[0]);
+            }
 
             const orderRes = await fetch(`${window.API_URL}/orders/convert`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(orderPayload)
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
             });
 
             if (!orderRes.ok) {
@@ -434,44 +469,53 @@ async function submitDecisionEngine() {
             const ncDate = document.getElementById('de-nc-date').value;
             const attempt = document.getElementById('de-nc-attempt').value;
             summaryNote += `Attempt: ${attempt}. Callback scheduled for: ${ncDate}.`;
-            finalStatus = 'callback'; // This might need backend support, or use 'assigned'
+            finalStatus = 'callback';
         } else {
             summaryNote += `Decision: ${salesStatus}. `;
-            if (salesStatus === 'Hot/Very Interested') {
+            if (salesStatus === 'interested' || salesStatus === 'Hot/Very Interested') {
                 finalStatus = 'interested';
                 summaryNote += `Hot lead. Next Followup: ${document.getElementById('de-followup-date').value}`;
-            } else if (salesStatus === 'Mild/Later') {
+            } else if (salesStatus === 'followup' || salesStatus === 'Mild/Later') {
                 finalStatus = 'followup';
                 summaryNote += `Next Followup: ${document.getElementById('de-followup-date').value}`;
-            } else if (salesStatus === 'Cold/Not Interested') {
+            } else if (salesStatus === 'not_interested' || salesStatus === 'Cold/Not Interested') {
                 finalStatus = 'not_interested';
                 summaryNote += `Reason: ${document.getElementById('de-lost-reason').value}. Notes: ${document.getElementById('de-lost-notes').value}`;
-            } else if (salesStatus === 'Ordered') {
+            } else if (salesStatus === 'converted' || salesStatus === 'Ordered') {
                 finalStatus = 'converted';
-            } else if (salesStatus === 'Old Purchased') {
+            } else if (salesStatus === 'lost' || salesStatus === 'Old Purchased') {
                 finalStatus = 'lost';
                 summaryNote += `Satisfaction: ${document.getElementById('de-feedback-satisfaction').value}. Feedback: ${document.getElementById('de-feedback-notes').value}`;
-            } else if (salesStatus === 'Dealer') {
+            } else if (salesStatus === 'dealer' || salesStatus === 'Dealer') {
                 finalStatus = 'dealer';
                 summaryNote += `Mapped to Dealer inquiry. Next Followup: ${document.getElementById('de-followup-date').value}`;
             }
         }
 
         // Add Note
-        await fetch(`${window.API_URL}/leads/${leadId}/notes`, {
+        const noteRes = await fetch(`${window.API_URL}/leads/${leadId}/notes`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ note: summaryNote })
         });
+        if (!noteRes.ok) throw new Error('Failed to save interaction note');
 
         // Update Lead Details (Name, city, state, status, language)
+        // Auto-assign score based on finalStatus
+        let finalScore = 'cold';
+        if (finalStatus === 'converted' || finalStatus === 'interested') finalScore = 'hot';
+        else if (finalStatus === 'followup' || finalStatus === 'callback' || finalStatus === 'dealer') finalScore = 'warm';
+        else if (finalStatus === 'not_interested' || finalStatus === 'lost') finalScore = 'cold';
+
         const updatePayload = {
             customer_name: customerName,
             city: village,
             state: state,
             status: finalStatus,
+            score: finalScore,
             phone_number: phone,
             language: document.getElementById('de-language').value,
+            assigned_to: document.getElementById('leadDetailAssignedId')?.value,
             first_message: document.getElementById('leadDetailAmount')?.textContent || '' // preserve
         };
 
@@ -480,24 +524,83 @@ async function submitDecisionEngine() {
         } else if (['Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
             updatePayload.next_followup_date = document.getElementById('de-followup-date').value;
         }
-
-        await fetch(`${window.API_URL}/leads/${leadId}`, {
+        const updateRes = await fetch(`${window.API_URL}/leads/${leadId}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(updatePayload)
         });
+        if (!updateRes.ok) throw new Error('Failed to update lead status');
 
-        window.showAlert("Success", "Flow Saved Successfully!", "success");
-        closeDecisionEngine();
+        // 🔥 ACTUALLY CREATE THE ORDER 🔥
+        if (finalStatus === 'converted') {
+            // Helper to clean currency strings (e.g., "₹ 5,000" -> 5000)
+            const cleanNum = (id) => {
+                const el = document.getElementById(id);
+                if (!el) return 0;
+                const val = el.value || el.textContent || "0";
+                return parseFloat(val.replace(/[^0-9.-]/g, '')) || 0;
+            };
 
+            // Unified amount collection (Checks both possible IDs)
+            const totalAmt = cleanNum('de-order-total') || cleanNum('de-order-final') || cleanNum('de-final-amount');
+            const advAmt = cleanNum('de-order-advance') || cleanNum('de-advance-amount');
+
+            // Collect items from Step 3
+            const selectedOptions = Array.from(document.getElementById('de-products')?.selectedOptions || []);
+            const items = selectedOptions.map(opt => {
+                const id = opt.value || opt.getAttribute('data-id');
+                const price = parseFloat(opt.getAttribute('data-price')) || 0;
+                return {
+                    product_id: parseInt(id) || id, // Store ID or Code
+                    quantity: 1,
+                    price: price
+                };
+            });
+
+            const orderPayload = {
+                lead_id: leadId,
+                customer_name: customerName,
+                phone: phone,
+                address: village,
+                city: village,
+                state: state,
+                total_amount: totalAmt, 
+                advance_amount: advAmt,
+                items: items
+            };
+
+            const orderRes = await fetch(`${window.API_URL}/orders/convert`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(orderPayload)
+            });
+
+            if (!orderRes.ok) {
+                const errData = await orderRes.json();
+                throw new Error("ORDER SAVE FAILED: " + (errData.error || errData.message));
+            }
+            
+            const oData = await orderRes.json();
+            window.showAlert("Success", "ORDER #" + oData.orderId + " SAVED WITH ₹" + totalAmt + "!", "success");
+        } else {
+            window.showAlert("Success", "Interaction Saved Successfully!", "success");
+        }
+
+        // Refresh the underlying Lead Details UI
         if (typeof populateLeadDetails === 'function') {
             populateLeadDetails(leadId);
+        } else if (typeof window.populateLeadDetails === 'function') {
+            window.populateLeadDetails(leadId);
         }
 
-        // Refresh list if we are on dashboard
+        // Refresh Lead List/Dashboard if function exists
         if (typeof initLeadList === 'function') {
-            initLeadList();
+            initLeadList(window.currentFilters || {});
+        } else if (typeof window.initLeadList === 'function') {
+            window.initLeadList(window.currentFilters || {});
         }
+
+        closeDecisionEngine();
 
     } catch (err) {
         console.error(err);
@@ -636,6 +739,15 @@ function mGoToStep(step) {
     if (targetInd) targetInd.classList.add('active');
 
     mCurrentStep = step;
+
+    // Auto-calculate for manual wizard
+    if (step === 4) {
+        const salesStatus = document.getElementById('m-de-sales-status')?.value;
+        if (salesStatus === 'Ordered') {
+            calculateOrderAmounts('m-');
+        }
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -724,20 +836,20 @@ async function submitManualLeadWizard() {
                 price: parseFloat(opt.getAttribute('data-price')) || 0
             }));
 
-            const orderPayload = {
-                lead_id: leadId,
-                customer_name: name,
-                phone: phone,
-                city: village,
-                state: state,
-                advance_amount: parseFloat(document.getElementById('m-de-order-advance').value) || 0,
-                items: items
-            };
+            const formData = new FormData();
+            formData.append('lead_id', leadId);
+            formData.append('customer_name', name);
+            formData.append('phone', phone);
+            formData.append('city', village);
+            formData.append('state', state);
+            formData.append('total_amount', document.getElementById('m-de-order-total').value);
+            formData.append('advance_amount', document.getElementById('m-de-order-advance').value);
+            formData.append('items', JSON.stringify(items));
 
             const orderRes = await fetch(`${window.API_URL}/orders/convert`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(orderPayload)
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
             });
 
             if (!orderRes.ok) throw new Error('Order creation failed but lead was saved');

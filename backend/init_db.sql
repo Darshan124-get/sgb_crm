@@ -144,17 +144,30 @@ CREATE TABLE dealers (
 );
 
 -- 4️⃣ PRODUCTS & INVENTORY
+CREATE TABLE categories (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    parent_id INT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES categories(category_id) ON DELETE SET NULL
+);
+
 CREATE TABLE products (
     product_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    category VARCHAR(100),
+    category_id INT,
     description TEXT,
     sku VARCHAR(50) UNIQUE,
     unit VARCHAR(20),
     selling_price DECIMAL(10, 2) DEFAULT 0,
     dealer_price DECIMAL(10, 2) DEFAULT 0,
+    discount_percentage DECIMAL(5, 2) DEFAULT 0,
     min_stock_alert INT DEFAULT 10,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    image_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE SET NULL
 );
 
 ALTER TABLE lead_interest ADD CONSTRAINT fk_lead_interest_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE SET NULL;

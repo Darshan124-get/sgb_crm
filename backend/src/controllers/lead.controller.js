@@ -94,11 +94,20 @@ exports.getLeadById = async (req, res) => {
         );
         lead.next_followup = followups[0] || null;
 
-        const [orderRows] = await pool.query(
-            'SELECT o.*, (SELECT GROUP_CONCAT(p.name SEPARATOR ", ") FROM order_items oi JOIN products p ON oi.product_id = p.product_id WHERE oi.order_id = o.order_id) as items_summary FROM orders o WHERE o.lead_id = ? ORDER BY o.created_at DESC LIMIT 1',
-            [req.params.id]
+        // Fetch ALL orders for this customer (via phone) for history
+        const [allOrders] = await pool.query(
+            `SELECT o.*, 
+                (SELECT GROUP_CONCAT(p.name SEPARATOR ", ") 
+                 FROM order_items oi 
+                 JOIN products p ON oi.product_id = p.product_id 
+                 WHERE oi.order_id = o.order_id) as items_summary 
+             FROM orders o 
+             WHERE o.phone = ? 
+             ORDER BY o.created_at DESC`,
+            [lead.phone_number]
         );
-        lead.order = orderRows[0] || null;
+        lead.order = allOrders[0] || null; // Most recent for top summary
+        lead.order_history = allOrders; // Full list for history section
 
         // Fetch recent feedback (last note that isn't an 'attempt' or automated)
         const [feedbackRows] = await pool.query(
@@ -117,7 +126,7 @@ exports.getLeadById = async (req, res) => {
         res.json(lead);
     } catch (err) {
         console.error('getLeadById Error:', err);
-        res.status(500).json({ message: 'Database error' });
+        res.status(500).json({ message: 'Database error: ' + err.message, stack: err.stack });
     }
 };
 
@@ -180,35 +189,43 @@ exports.createLead = async (req, res) => {
         await connection.commit();
         res.status(201).json({ message: 'Lead created successfully', lead_id: leadId, assignedTo });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) { }
         res.status(500).json({ message: 'Error creating lead: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
 exports.updateLead = async (req, res) => {
     const {
         phone_number, customer_name, first_message, language, address, city, state,
-        status, assigned_to, score, next_followup_date, lost_reason, lost_notes
+        status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
+        current_crop, acreage
     } = req.body;
+
+    let connection;
     try {
-        const connection = await pool.getConnection();
+        connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        const [oldLead] = await connection.query('SELECT next_followup_date FROM leads WHERE lead_id = ?', [req.params.id]);
+        const [oldLead] = await connection.query('SELECT assigned_to, next_followup_date FROM leads WHERE lead_id = ?', [req.params.id]);
+        const oldAssignedTo = oldLead[0] ? oldLead[0].assigned_to : null;
         const oldFollowupDate = oldLead[0] ? oldLead[0].next_followup_date : null;
+
+        const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : oldAssignedTo;
 
         await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
                 address = ?, city = ?, state = ?, status = ?, assigned_to = ?,
-                score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?
+                score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
+                current_crop = ?, acreage = ?
             WHERE lead_id = ?`,
             [
                 phone_number, customer_name, first_message, language,
-                address, city, state, status, assigned_to || null,
+                address, city, state, status, finalAssignedTo,
                 score || 'cold', next_followup_date || null, lost_reason || null, lost_notes || null,
+                current_crop || null, acreage || null,
                 req.params.id
             ]
         );
@@ -231,10 +248,12 @@ exports.updateLead = async (req, res) => {
             [req.params.id, req.user.id, `Lead details updated. Status: ${status}`]);
 
         await connection.commit();
-        connection.release();
         res.json({ message: 'Lead updated successfully' });
     } catch (err) {
+        if (connection) await connection.rollback();
         res.status(500).json({ message: 'Error updating lead: ' + err.message });
+    } finally {
+        if (connection) connection.release();
     }
 };
 
@@ -323,10 +342,10 @@ exports.transferLead = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Lead transferred successfully', target_user: targetUser.name });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) { }
         res.status(500).json({ message: 'Transfer error: ' + err.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
@@ -396,11 +415,11 @@ exports.bulkAssign = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Bulk assignment complete', count: result.affectedRows });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('bulkAssign Error:', err);
         res.status(500).json({ message: 'Database error' });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
@@ -452,10 +471,10 @@ exports.autoAssign = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Auto-assignment complete', count });
     } catch (err) {
-        await connection.rollback();
+        try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('autoAssign Error:', err);
         res.status(500).json({ message: 'Database error' });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };

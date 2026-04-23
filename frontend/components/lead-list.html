@@ -2,7 +2,7 @@
     .lead-table-container {
         background: white;
         border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         border: 1px solid #f1f5f9;
         overflow: hidden;
     }
@@ -77,15 +77,40 @@
         font-weight: 800;
         text-transform: uppercase;
     }
-    .badge-score-hot { background: #fee2e2; color: #dc2626; } /* Red */
-    .badge-score-warm { background: #ffedd5; color: #d97706; } /* Orange */
-    .badge-score-cold { background: #f1f5f9; color: #64748b; } /* Grey/Blue */
+
+    .badge-score-hot {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    /* Red */
+    .badge-score-warm {
+        background: #ffedd5;
+        color: #d97706;
+    }
+
+    /* Orange */
+    .badge-score-cold {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    /* Grey/Blue */
 
     .language-tag {
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
         color: #64748b;
+    }
+
+    .msg-trunk {
+        max-width: 150px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #64748b;
+        font-size: 0.75rem;
     }
 
     .btn-action {
@@ -139,6 +164,7 @@
         align-items: center;
         gap: 0.3rem;
     }
+
     .lead-table-header {
         display: flex;
         justify-content: flex-end;
@@ -221,18 +247,38 @@
     }
 
     @keyframes search-float {
-        0%, 100% { transform: translateY(0) rotate(0deg); }
-        50% { transform: translateY(-10px) rotate(2deg); }
+
+        0%,
+        100% {
+            transform: translateY(0) rotate(0deg);
+        }
+
+        50% {
+            transform: translateY(-10px) rotate(2deg);
+        }
     }
 
     @keyframes dash-scroll {
-        to { stroke-dashoffset: -20; }
+        to {
+            stroke-dashoffset: -20;
+        }
     }
 
     @keyframes pulse-ring {
-        0% { transform: scale(0.95); opacity: 0.3; }
-        50% { transform: scale(1.1); opacity: 0.6; }
-        100% { transform: scale(0.95); opacity: 0.3; }
+        0% {
+            transform: scale(0.95);
+            opacity: 0.3;
+        }
+
+        50% {
+            transform: scale(1.1);
+            opacity: 0.6;
+        }
+
+        100% {
+            transform: scale(0.95);
+            opacity: 0.3;
+        }
     }
 
     .animated-magnifier {
@@ -283,34 +329,42 @@
     </div>
 
     <!-- Bulk Actions Bar -->
-    <div id="bulkActionsBar" style="display: none; padding: 0.75rem 1.5rem; background: #f0fdf4; border-bottom: 2px solid #bbf7d0; align-items: center; justify-content: space-between;">
+    <div id="bulkActionsBar"
+        style="display: none; padding: 0.75rem 1.5rem; background: #f0fdf4; border-bottom: 2px solid #bbf7d0; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 1rem;">
-            <span id="selectedCount" style="background: white; border: 1px solid #10b981; color: #059669; padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-weight: 800; font-size: 0.8rem;">0 Selected</span>
+            <span id="selectedCount"
+                style="background: white; border: 1px solid #10b981; color: #059669; padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-weight: 800; font-size: 0.8rem;">0
+                Selected</span>
             <div style="height: 1.5rem; width: 1px; background: #bbf7d0;"></div>
-            <button onclick="openBulkAssignModal()" class="btn-assign" style="background: #059669; color: white; border-radius: 8px; font-weight: 700;">
+            <button onclick="openBulkAssignModal()" class="btn-assign"
+                style="background: #059669; color: white; border-radius: 8px; font-weight: 700;">
                 <i class="fas fa-user-plus"></i> Manual Assign to Staff
             </button>
         </div>
-        <button onclick="clearSelection()" style="background: none; border: none; color: #64748b; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Clear Selection</button>
+        <button onclick="clearSelection()"
+            style="background: none; border: none; color: #64748b; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Clear
+            Selection</button>
     </div>
 
     <table class="lead-table" id="leadsTable">
         <thead>
             <tr>
-                <th style="width: 40px; padding-right: 0;"><input type="checkbox" id="selectAllLeads" class="form-checkbox"></th>
+                <th style="width: 40px; padding-right: 0;"><input type="checkbox" id="selectAllLeads"
+                        class="form-checkbox"></th>
                 <th>Farmer Name</th>
                 <th>Status</th>
                 <th>Score</th>
                 <th>State</th>
                 <th>Language</th>
                 <th>Phone Number</th>
+                <th>Message</th>
                 <th>Date Added</th>
                 <th>Assigned Staff</th>
             </tr>
         </thead>
         <tbody id="leadsTableBody">
             <tr id="leadsLoadingRow">
-                <td colspan="9" class="loading-state">
+                <td colspan="10" class="loading-state">
                     <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                     <p>Loading leads...</p>
                 </td>

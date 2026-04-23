@@ -44,10 +44,10 @@ exports.packOrder = async (req, res) => {
             await connection.commit();
             res.status(201).json({ message: 'Order marked as packed and stock deducted' });
         } catch (innerErr) {
-            await connection.rollback();
+            try { if (connection) await connection.rollback(); } catch (re) {}
             throw innerErr;
         } finally {
-            connection.release();
+            if (connection) connection.release();
         }
     } catch (err) {
         console.error('Packing Error:', err);

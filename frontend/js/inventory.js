@@ -151,11 +151,11 @@ async function handleFormSubmit(e) {
         });
 
         if (response.ok) {
-            alert(id ? 'Product updated!' : 'Product added!');
+            window.showAlert("Success", id ? 'Product updated!' : 'Product added!', "success");
             closeModal();
             fetchProducts();
         } else {
-            alert('Failed to save product');
+            window.showAlert("Error", 'Failed to save product', "error");
         }
     } catch (err) {
         console.error('Save error:', err);

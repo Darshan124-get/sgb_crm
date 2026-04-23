@@ -72,7 +72,7 @@ async function loadOrders(status) {
 
         tbody.innerHTML = orders.map(o => `
             <tr>
-                <td style="font-weight: 800; color: #3b82f6;">#ORD-${o.order_id}</td>
+                <td style="font-weight: 800; color: #3b82f6;">${window.formatOrderId(o.order_id, o.created_at)}</td>
                 <td style="color: #64748b;">${new Date(o.created_at).toLocaleDateString()}</td>
                 <td style="font-weight: 700;">${o.customer_name}</td>
                 <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 600;">${o.item_count || 0} Items</span></td>
@@ -113,7 +113,7 @@ async function openWorkstation(orderId) {
     
     modal.style.display = 'flex';
     container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 5rem;"><div class="loader"></div></div>';
-    document.getElementById('modalOrderTitle').innerText = `Order #ORD-${orderId}`;
+    document.getElementById('modalOrderTitle').innerText = `Order ${window.formatOrderId(orderId, currentOrder ? currentOrder.created_at : null)}`;
 
     try {
         const res = await fetch(`${window.API_URL}/billing/orders/${orderId}`, {
@@ -145,7 +145,7 @@ function renderWorkstation() {
                     </div>
                     <div style="text-align: right;">
                         <p style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Reference Code</p>
-                        <p style="font-weight: 800; font-size: 1.1rem; color: #1e293b;">${o.order_code || `ORD-${o.order_id}`}</p>
+                        <p style="font-weight: 800; font-size: 1.1rem; color: #1e293b;">${o.order_code || window.formatOrderId(o.order_id, o.created_at)}</p>
                         <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.5rem;">Status: <span class="status-badge status-${o.status}">${o.status}</span></p>
                     </div>
                 </div>

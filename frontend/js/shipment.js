@@ -39,7 +39,7 @@ function renderOrders(orders) {
 
     tableBody.innerHTML = orders.map(order => `
         <tr>
-            <td class="order-id">#ORD-${order.order_id}</td>
+            <td class="order-id">${window.formatOrderId(order.order_id, order.created_at)}</td>
             <td><strong>${order.customer_name}</strong></td>
             <td>${order.phone || 'N/A'}</td>
 
@@ -86,7 +86,8 @@ shipForm.addEventListener('submit', async (e) => {
         });
 
         if (response.ok) {
-            showToast(`Order #${order_id} has been successfully shipped!`, 'success');
+            const order = packedOrders.find(o => o.order_id == order_id);
+            showToast(`Order ${window.formatOrderId(order_id, order ? order.created_at : null)} has been successfully shipped!`, 'success');
             shipModal.style.display = 'none';
             shipForm.reset();
             fetchPackedOrders(); // Refresh list

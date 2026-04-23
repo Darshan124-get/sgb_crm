@@ -589,7 +589,7 @@ async function loadInvoices() {
         tbody.innerHTML = invoices.map(inv => `
             <tr>
                 <td style="font-weight: 800; color: var(--billing-primary);">${inv.invoice_number}</td>
-                <td>#ORD-${inv.order_id}</td>
+                <td>${window.formatOrderId(inv.order_id, inv.created_at)}</td>
                 <td style="font-weight: 600;">${inv.order_customer}</td>
                 <td>${new Date(inv.created_at).toLocaleDateString()}</td>
                 <td style="font-weight: 700;">₹${parseFloat(inv.total_amount).toLocaleString()}</td>
@@ -643,7 +643,7 @@ async function loadPayments(status = 'pending') {
             <tr>
                 <td>${new Date(p.created_at).toLocaleDateString()}</td>
                 <td style="font-weight: 600;">${p.customer_name}</td>
-                <td>#ORD-${p.order_id}</td>
+                <td>${window.formatOrderId(p.order_id, p.created_at)}</td>
                 <td style="font-weight: 700;">₹${parseFloat(p.amount).toLocaleString()}</td>
                 <td><span style="font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">${p.payment_mode.toUpperCase()}</span></td>
                 <td><span class="status-badge status-${p.payment_status}">${p.payment_status}</span></td>
@@ -906,7 +906,7 @@ function applyPendingFilters() {
 
     tbody.innerHTML = filtered.map(order => `
         <tr>
-            <td style="font-weight: 700;">#ORD-${order.order_id}</td>
+            <td style="font-weight: 700;">${window.formatOrderId(order.order_id, order.created_at)}</td>
             <td style="font-weight: 600;">${order.customer_name}</td>
             <td>${order.phone}</td>
             <td>${order.sales_person_name || 'Staff'}</td>
@@ -955,7 +955,7 @@ async function loadInReviewOrders() {
 
         tbody.innerHTML = inReview.map(order => `
             <tr>
-                <td style="font-weight: 700;">#ORD-${order.order_id}</td>
+                <td style="font-weight: 700;">${window.formatOrderId(order.order_id, order.created_at)}</td>
                 <td>
                     <div style="font-weight: 600;">${order.customer_name}</div>
                 </td>

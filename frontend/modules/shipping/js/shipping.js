@@ -36,7 +36,7 @@ function renderOrders(orders) {
     }
     tbody.innerHTML = orders.map(o => `
         <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:1rem 1.25rem;font-weight:700;color:#1e293b;">#ORD-${o.order_id}</td>
+            <td style="padding:1rem 1.25rem;font-weight:700;color:#1e293b;">${window.formatOrderId(o.order_id, o.created_at)}</td>
             <td style="padding:1rem 1.25rem;font-weight:600;">${o.customer_name || o.firm_name || '—'}</td>
             <td style="padding:1rem 1.25rem;font-size:0.875rem;color:#64748b;">${o.phone || '—'}</td>
             <td style="padding:1rem 1.25rem;font-size:0.8rem;color:#64748b;max-width:200px;">${o.address || o.city || '—'}</td>
@@ -60,7 +60,8 @@ function filterOrders() {
 
 function openShipModal(orderId) {
     document.getElementById('shipOrderId').value = orderId;
-    document.getElementById('shipOrderLabel').textContent = `#ORD-${orderId}`;
+    const order = allOrders.find(ord => ord.order_id == orderId);
+    document.getElementById('shipOrderLabel').textContent = window.formatOrderId(orderId, order ? order.created_at : null);
     document.getElementById('shipModal').style.display = 'flex';
 }
 
@@ -89,7 +90,8 @@ async function handleShip(e) {
         });
 
         if (res.ok) {
-            showToast(`Order #${orderId} shipped via ${courier}! ✅`);
+            const order = allOrders.find(ord => ord.order_id == orderId);
+            showToast(`Order ${window.formatOrderId(orderId, order ? order.created_at : null)} shipped via ${courier}! ✅`);
             closeShipModal();
             fetchOrders();
         } else {

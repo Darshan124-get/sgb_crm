@@ -79,7 +79,7 @@ function renderInvoice(inv) {
                     <div style="display:flex; flex-direction:column; gap:0.5rem;">
                         <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
                             <span style="color:#64748b; font-weight:600;">Reference ID</span>
-                            <span style="font-weight:800; color:#1e293b;">#ORD-${inv.order_id}</span>
+                            <span style="font-weight:800; color:#1e293b;">${window.formatOrderId(inv.order_id, inv.created_at)}</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
                             <span style="color:#64748b; font-weight:600;">Payment Status</span>

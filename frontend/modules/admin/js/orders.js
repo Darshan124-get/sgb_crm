@@ -65,7 +65,7 @@ async function fetchOrders() {
 
         tbody.innerHTML = orders.map(o => `
             <tr onclick="event.target.tagName !== 'A' && openOrderDrawer(${o.order_id})" style="border-bottom:1px solid #f1f5f9; cursor:pointer;" class="order-row">
-                <td style="padding:1rem 1.25rem;font-weight:700;color:#1e293b;">#ORD-${o.order_id}</td>
+                <td style="padding:1rem 1.25rem;font-weight:700;color:#1e293b;">${window.formatOrderId(o.order_id, o.created_at)}</td>
                 <td style="padding:1rem 1.25rem;">
                     <div style="font-weight:600;color:#1e293b;">${o.customer_name || '—'}</div>
                     <div style="font-size:0.75rem;color:#64748b;">${o.phone || '—'}</div>
@@ -110,7 +110,7 @@ function openOrderDrawer(orderId) {
     const overlay = document.getElementById('drawerOverlay');
     const content = document.getElementById('drawerContent');
 
-    document.getElementById('drawerOrderId').textContent = `Order #ORD-${order.order_id}`;
+    document.getElementById('drawerOrderId').textContent = `Order ${window.formatOrderId(order.order_id, order.created_at)}`;
     
     const sourceHtml = `
         <span style="padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;

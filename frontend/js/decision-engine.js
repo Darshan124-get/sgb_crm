@@ -581,7 +581,8 @@ async function submitDecisionEngine() {
             }
             
             const oData = await orderRes.json();
-            window.showAlert("Success", "ORDER #" + oData.orderId + " SAVED WITH ₹" + totalAmt + "!", "success");
+            const formattedId = window.formatOrderId(oData.orderId);
+            window.showAlert("Success", "ORDER " + formattedId + " SAVED WITH ₹" + totalAmt + "!", "success");
         } else {
             window.showAlert("Success", "Interaction Saved Successfully!", "success");
         }

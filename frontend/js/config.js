@@ -5,7 +5,11 @@
 // ─── Backend URL ─────────────────────────────────────────────
 const BACKEND_PORT = 5000;
 const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
-window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://v3-sgb-backend.onrender.com';
+// window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
+// Set this to true if you want to use the local backend (localhost:5000)
+const USE_LOCAL_BACKEND = false; 
+
+window.BASE_URL = USE_LOCAL_BACKEND ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 window.API_URL = `${window.BASE_URL}/api`;
 
 // ─── Root Path Computation ───────────────────────────────────
@@ -136,4 +140,14 @@ window.showAlert = function(title, message, type = 'info') {
             setTimeout(() => toast.remove(), 300);
         }
     }, 4000);
+};
+
+// ─── Order ID Formatter ──────────────────────────────────────
+window.formatOrderId = function(id, dateStr) {
+    if (!id) return 'N/A';
+    const d = dateStr ? new Date(dateStr) : new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `#SGB-${year}-${month}-${day}-${id}`;
 };

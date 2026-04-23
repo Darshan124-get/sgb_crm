@@ -37,7 +37,7 @@ function renderOrders(orders) {
 
     tableBody.innerHTML = orders.map(order => `
         <tr>
-            <td class="order-id">#ORD-${order.order_id}</td>
+            <td class="order-id">${window.formatOrderId(order.order_id, order.created_at)}</td>
             <td><strong>${order.customer_name}</strong></td>
             <td>${order.phone || 'N/A'}</td>
 
@@ -65,7 +65,8 @@ function renderItemList(items) {
 
 // Mark Order as Packed
 async function markAsPacked(orderId) {
-    if (!confirm(`Are you sure you want to mark Order #${orderId} as packed?`)) return;
+    const order = pendingOrders.find(o => o.order_id == orderId);
+    if (!confirm(`Are you sure you want to mark Order ${window.formatOrderId(orderId, order ? order.created_at : null)} as packed?`)) return;
 
     try {
         const token = localStorage.getItem('token');
@@ -83,7 +84,8 @@ async function markAsPacked(orderId) {
         });
 
         if (response.ok) {
-            showToast(`Order #${orderId} marked as successfully packed!`, 'success');
+            const order = pendingOrders.find(o => o.order_id == orderId);
+            showToast(`Order ${window.formatOrderId(orderId, order ? order.created_at : null)} marked as successfully packed!`, 'success');
             fetchPendingOrders(); // Refresh list
         } else {
             const data = await response.json();

@@ -520,7 +520,7 @@ async function populateLeadDetails(leadId) {
                                     <span class="badge" style="background: ${order.order_status === 'delivered' ? '#dcfce7' : '#fef9c3'}; color: ${order.order_status === 'delivered' ? '#166534' : '#854d0e'}; font-size: 0.65rem;">${(order.order_status || 'Draft').toUpperCase()}</span>
                                 </div>
                                 <div style="font-size: 0.75rem; color: #64748b;">
-                                     <i class="far fa-calendar-alt"></i> ${new Date(order.created_at).toLocaleDateString()} &bull; Order ID: #${order.order_id}
+                                     <i class="far fa-calendar-alt"></i> ${new Date(order.created_at).toLocaleDateString()} &bull; Order ID: ${window.formatOrderId(order.order_id, order.created_at)}
                                 </div>
                             </div>
                             <div style="text-align: right;">

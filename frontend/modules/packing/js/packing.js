@@ -34,7 +34,7 @@ function renderOrders(orders) {
     }
     tbody.innerHTML = orders.map(o => `
         <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:1rem 1.25rem;font-weight:700;color:#1e293b;">#ORD-${o.order_id}</td>
+            <td style="padding:1rem 1.25rem;font-weight:700;color:#1e293b;">${window.formatOrderId(o.order_id, o.created_at)}</td>
             <td style="padding:1rem 1.25rem;font-weight:600;">${o.customer_name || o.firm_name || '—'}</td>
             <td style="padding:1rem 1.25rem;font-size:0.875rem;color:#64748b;">${o.phone || '—'}</td>
             <td style="padding:1rem 1.25rem;">
@@ -61,7 +61,8 @@ function filterOrders() {
 }
 
 async function markAsPacked(orderId) {
-    if (!confirm(`Mark Order #${orderId} as packed?`)) return;
+    const order = allOrders.find(ord => ord.order_id == orderId);
+    if (!confirm(`Mark Order ${window.formatOrderId(orderId, order ? order.created_at : null)} as packed?`)) return;
     const token = localStorage.getItem('token');
     try {
         const res = await fetch(`${LOGISTICS_API}/packing`, {
@@ -69,7 +70,11 @@ async function markAsPacked(orderId) {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: orderId, remarks: 'Packed' })
         });
-        if (res.ok) { showToast(`Order #${orderId} packed successfully! ✅`); fetchOrders(); }
+        if (res.ok) { 
+            const order = allOrders.find(ord => ord.order_id == orderId);
+            showToast(`Order ${window.formatOrderId(orderId, order ? order.created_at : null)} packed successfully! ✅`); 
+            fetchOrders(); 
+        }
         else { const d = await res.json(); showToast(`Error: ${d.message}`, true); }
     } catch(e) { showToast('Server error.', true); }
 }

@@ -11,6 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event listeners for filters
     document.getElementById('statusFilter')?.addEventListener('change', fetchOrders);
     document.getElementById('sourceFilter')?.addEventListener('change', fetchOrders);
+    document.getElementById('dateFilter')?.addEventListener('change', fetchOrders);
+
+    // Search with debounce
+    let searchTimeout;
+    document.getElementById('orderSearch')?.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(fetchOrders, 500);
+    });
     
     // Drawer listeners
     document.getElementById('closeDrawer')?.addEventListener('click', closeSideDrawer);
@@ -21,6 +29,8 @@ async function fetchOrders() {
     const token  = localStorage.getItem('token');
     const status = document.getElementById('statusFilter')?.value || '';
     const source = document.getElementById('sourceFilter')?.value || '';
+    const search = document.getElementById('orderSearch')?.value || '';
+    const date   = document.getElementById('dateFilter')?.value || '';
     const tbody  = document.getElementById('ordersTableBody');
     tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;"><i class="fas fa-circle-notch fa-spin"></i></td></tr>';
 
@@ -29,16 +39,13 @@ async function fetchOrders() {
         const params = new URLSearchParams();
         if (status) params.append('status', status);
         if (source) params.append('source', source);
+        if (search) params.append('search', search);
+        if (date) params.append('date', date);
         
         if (params.toString()) url += `?${params.toString()}`;
 
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         let orders = await res.json();
-
-        // Client-side source filtering if backend doesn't support it yet
-        if (source) {
-            orders = orders.filter(o => o.order_source === source);
-        }
 
         currentOrders = orders; // Save globally for drawer
 
@@ -204,7 +211,7 @@ async function updateOrderStatus(orderId, newStatus) {
     const token = localStorage.getItem('token');
     try {
         const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
-            method: 'PUT',
+            method: 'PATCH',
             headers: { 
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'

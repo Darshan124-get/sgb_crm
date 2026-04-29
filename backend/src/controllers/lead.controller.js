@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 
 exports.getLeads = async (req, res) => {
-    const { status, language, assigned_to, is_today, is_unassigned, source } = req.query;
+    const { status, language, assigned_to, is_today, is_unassigned, source, search } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'sales';
     const userId = req.user ? req.user.id : null;
 
@@ -48,6 +48,12 @@ exports.getLeads = async (req, res) => {
         if (source) {
             query += ' AND l.source = ?';
             params.push(source);
+        }
+        
+        if (search) {
+            query += ' AND (l.customer_name LIKE ? OR l.phone_number LIKE ? OR l.first_message LIKE ?)';
+            const searchVal = `%${search}%`;
+            params.push(searchVal, searchVal, searchVal);
         }
 
         if (is_today === 'true') {

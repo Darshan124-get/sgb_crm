@@ -90,7 +90,7 @@ exports.searchProducts = async (req, res) => {
     const { q } = req.query;
     try {
         const query = `
-            SELECT p.product_id, p.name, p.sku, p.selling_price as default_price, 
+            SELECT p.product_id, p.name, p.sku, p.hsn_code, p.selling_price as default_price, 
                    i.current_stock, i.reserved_stock
             FROM products p
             JOIN inventory i ON p.product_id = i.product_id

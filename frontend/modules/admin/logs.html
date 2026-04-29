@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,8 +16,40 @@
             <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
         </header>
         <div class="content-body" id="pageContent">
-            <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.5rem;">System Logs</h1>
-            <p style="color:#64748b;margin-bottom:2rem;">Loading...</p>
+            <div class="page-header">
+                <div class="header-left">
+                    <h1 class="page-title">System Logs</h1>
+                    <p class="page-subtitle">Complete audit trail of system activities</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="btnRefreshLogs">
+                        <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="data-card">
+                <div class="table-container">
+                    <table class="data-table" id="logsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 180px;">Timestamp</th>
+                                <th style="width: 150px;">User</th>
+                                <th style="width: 120px;">Module</th>
+                                <th style="width: 200px;">Action</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <tr>
+                                <td colspan="5" class="loading-state">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Loading system logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </main>
 </div>

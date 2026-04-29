@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { logActivity } = require('../utils/logger');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
@@ -36,6 +37,9 @@ exports.login = async (req, res) => {
             JWT_SECRET, 
             { expiresIn: '8h' }
         );
+        
+        // Log the login activity
+        await logActivity(user.user_id, 'Auth', 'User Login', `Logged in from IP: ${req.ip || 'Unknown'}`, req.ip);
         
         res.json({ 
             token, 

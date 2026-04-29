@@ -360,6 +360,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <label class="premium-label">SKU (Auto-generated if empty)</label>
                     <input type="text" name="sku" class="form-control-premium" placeholder="Leave empty for auto">
                 </div>
+                <div>
+                    <label class="premium-label">HSN/SAC Code</label>
+                    <input type="text" name="hsn_code" class="form-control-premium" placeholder="e.g. 8424">
+                </div>
 
                 <div style="grid-column:1 / -1;">
                     <label class="premium-label">Description</label>
@@ -598,6 +602,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div>
                     <label class="premium-label">SKU</label>
                     <input type="text" name="sku" class="form-control-premium" value="${p.sku || ''}">
+                </div>
+                <div>
+                    <label class="premium-label">HSN/SAC Code</label>
+                    <input type="text" name="hsn_code" class="form-control-premium" value="${p.hsn_code || ''}">
                 </div>
 
                 <div style="grid-column:1 / -1;">

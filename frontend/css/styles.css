@@ -2788,3 +2788,26 @@ body.modal-open {
         transform: translateY(0) scale(1);
     }
 }
+
+/* ============================================================ */
+/* ⚡ UTILITY CLASSES & BADGE PILLS */
+/* ============================================================ */
+
+.badge-pill {
+    padding: 0.3rem 0.8rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+.pill-blue   { background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; }
+.pill-orange { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; }
+.pill-green  { background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; }
+.pill-purple { background: #fdf4ff; color: #a21caf; border: 1px solid #fae8ff; }
+.pill-gray   { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+.pill-red    { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; }
+.pill-indigo { background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; }

@@ -28,7 +28,7 @@ exports.createProduct = async (req, res) => {
     const { 
         name, category_id, description, unit, selling_price, 
         dealer_price, min_stock_alert, status, image_url, 
-        discount_percentage, opening_stock 
+        discount_percentage, opening_stock, hsn_code 
     } = req.body;
 
     const sku = req.body.sku || generateSKU(name);
@@ -42,12 +42,12 @@ exports.createProduct = async (req, res) => {
             `INSERT INTO products (
                 name, category_id, description, sku, unit, 
                 selling_price, dealer_price, min_stock_alert, 
-                status, image_url, discount_percentage
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                status, image_url, discount_percentage, hsn_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 name, category_id || null, description, sku, unit, 
                 selling_price || 0, dealer_price || 0, min_stock_alert || 10,
-                status || 'active', image_url || null, discount_percentage || 0
+                status || 'active', image_url || null, discount_percentage || 0, hsn_code || ''
             ]
         );
 
@@ -81,7 +81,7 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     const { 
         name, category_id, description, sku, unit, selling_price, 
-        dealer_price, min_stock_alert, status, image_url, discount_percentage 
+        dealer_price, min_stock_alert, status, image_url, discount_percentage, hsn_code 
     } = req.body;
 
     try {
@@ -89,12 +89,12 @@ exports.updateProduct = async (req, res) => {
             `UPDATE products SET 
                 name = ?, category_id = ?, description = ?, sku = ?, unit = ?, 
                 selling_price = ?, dealer_price = ?, min_stock_alert = ?, 
-                status = ?, image_url = ?, discount_percentage = ? 
+                status = ?, image_url = ?, discount_percentage = ?, hsn_code = ? 
              WHERE product_id = ?`,
             [
                 name, category_id || null, description, sku, unit, 
                 selling_price, dealer_price, min_stock_alert, 
-                status, image_url, discount_percentage, req.params.id
+                status, image_url, discount_percentage, hsn_code, req.params.id
             ]
         );
         res.json({ message: 'Product updated successfully' });

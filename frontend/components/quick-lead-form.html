@@ -1,0 +1,62 @@
+<div class="form-card-premium" style="max-width: 500px; margin: 0 auto; padding: 1.5rem;">
+    <h3 class="form-section-title" style="margin-bottom: 1.5rem;">
+        <i class="fas fa-user-plus"></i> New Lead Entry
+    </h3>
+
+    <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label style="color: #334155; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.5rem; display: block;">
+            Phone Number <span style="color:red">*</span>
+        </label>
+        <div style="position: relative;">
+            <i class="fas fa-phone" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+            <input type="tel" id="q-phone" class="form-control-premium" 
+                   style="padding-left: 2.75rem; font-weight: 600;" 
+                   placeholder="10-digit number">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label style="color: #334155; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.5rem; display: block;">
+            Farmer Name
+        </label>
+        <div style="position: relative;">
+            <i class="fas fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+            <input type="text" id="q-name" class="form-control-premium" 
+                   style="padding-left: 2.75rem; font-weight: 600;" 
+                   placeholder="Full Name">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label style="color: #334155; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.5rem; display: block;">
+            Village
+        </label>
+        <div style="position: relative;">
+            <i class="fas fa-home" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+            <input type="text" id="q-village" class="form-control-premium" 
+                   style="padding-left: 2.75rem; font-weight: 600;" 
+                   placeholder="Village / Taluk">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 2rem;">
+        <label style="color: #334155; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.5rem; display: block;">
+            District
+        </label>
+        <div style="position: relative;">
+            <i class="fas fa-map-marker-alt" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+            <input type="text" id="q-district" class="form-control-premium" 
+                   style="padding-left: 2.75rem; font-weight: 600;" 
+                   placeholder="District Name">
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 1rem;">
+        <button id="q-submit-btn" onclick="submitQuickLead()" class="login-btn" style="flex: 2; height: 48px; background: #10b981;">
+            <i class="fas fa-save mr-2"></i> Save Lead
+        </button>
+        <button onclick="window.hideModal()" class="btn btn-outline" style="flex: 1; height: 48px;">
+            Cancel
+        </button>
+    </div>
+</div>

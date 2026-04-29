@@ -17,6 +17,7 @@ const inventoryRoutes = require('./routes/inventory.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const billingRoutes = require('./routes/billing.routes');
 const scheduleRoutes = require('./routes/schedule.routes');
+const logRoutes = require('./routes/log.routes');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/logs', logRoutes);
 console.log('✅ Staff Management API: Mounted at /api/users');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)

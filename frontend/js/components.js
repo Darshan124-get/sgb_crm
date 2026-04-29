@@ -176,12 +176,64 @@ function initLeadNav() {
 async function initLeadList(filters = {}) {
     const tbody = document.getElementById('leadsTableBody');
     if (!tbody) return;
+    
+    // ─── Filter Setup ───
+    const searchInput = document.getElementById('leadSearch');
+    if (searchInput && !searchInput.dataset.listenerSet) {
+        searchInput.dataset.listenerSet = 'true';
+        searchInput.oninput = window.debounce(() => {
+            if (searchInput.value.trim().length > 0) {
+                const allTab = document.querySelector('.nav-tab[data-filter="all"]');
+                if (allTab && !allTab.classList.contains('active')) {
+                    allTab.click();
+                    return;
+                }
+            }
+            initLeadList(window.currentBaseFilters);
+        }, 500);
+    }
+
+    const statusF = document.getElementById('leadStatusFilter');
+    const scoreF  = document.getElementById('leadScoreFilter');
+    const dateF   = document.getElementById('leadDateFilter');
+    const btnAll  = document.getElementById('btnFilterAll');
+
+    if (statusF && !statusF.dataset.listenerSet) {
+        statusF.dataset.listenerSet = 'true';
+        statusF.onchange = () => initLeadList(window.currentBaseFilters);
+    }
+    if (scoreF && !scoreF.dataset.listenerSet) {
+        scoreF.dataset.listenerSet = 'true';
+        scoreF.onchange = () => initLeadList(window.currentBaseFilters);
+    }
+    if (dateF && !dateF.dataset.listenerSet) {
+        dateF.dataset.listenerSet = 'true';
+        dateF.onchange = () => initLeadList(window.currentBaseFilters);
+    }
+    if (btnAll && !btnAll.dataset.listenerSet) {
+        btnAll.dataset.listenerSet = 'true';
+        btnAll.onclick = () => {
+            if (statusF) statusF.value = 'all';
+            if (scoreF)  scoreF.value = 'all';
+            if (dateF)   dateF.value = '';
+            initLeadList(window.currentBaseFilters);
+        };
+    }
+
     tbody.innerHTML = '<tr><td colspan="10" class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading leads...</td></tr>';
 
-    window.currentFilters = { ...filters };
+    window.currentBaseFilters = filters; // Original context (e.g. {assigned_to: NULL})
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
+    
+    // Start with base filters
     Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+
+    // Overlay with dynamic UI filters
+    if (statusF && statusF.value !== 'all') params.set('status', statusF.value);
+    if (scoreF && scoreF.value !== 'all') params.set('score', scoreF.value);
+    if (dateF && dateF.value) params.set('date', dateF.value);
+    if (searchInput && searchInput.value) params.set('search', searchInput.value);
 
     try {
         const response = await fetch(`${API_URL}/leads?${params.toString()}`, {
@@ -977,11 +1029,64 @@ window.hideModal = function () {
 
 window.openAddLeadModal = async function () {
     try {
-        const res = await fetch(`${window.ROOT_PATH}components/manual-lead-form.html`);
+        const res = await fetch(`${window.ROOT_PATH}components/quick-lead-form.html`);
         const text = await res.text();
-        window.showModal({ title: 'Create New Lead', content: text, hideFooter: true });
-        if (typeof initManualLeadForm === 'function') initManualLeadForm();
+        window.showModal({ title: 'Quick Lead Entry', content: text, hideFooter: true });
     } catch (err) { console.error('Add lead modal error:', err); }
+};
+
+window.submitQuickLead = async function() {
+    const phone = document.getElementById('q-phone').value.trim();
+    const name = document.getElementById('q-name').value.trim();
+    const village = document.getElementById('q-village').value.trim();
+    const district = document.getElementById('q-district').value.trim();
+    const submitBtn = document.getElementById('q-submit-btn');
+
+    if (!phone || phone.length < 10) {
+        return window.showAlert("Validation", "Please enter a valid 10-digit phone number", "error");
+    }
+
+    const originalHtml = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving...';
+    submitBtn.disabled = true;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${window.API_URL}/leads`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                phone_number: phone,
+                customer_name: name,
+                city: village,
+                address: district, // Map district to address field
+                source: 'manual',
+                language: 'EN' // Default
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            window.hideModal();
+            window.showAlert("Success", "Lead created successfully!", "success");
+            // Refresh lead list if function exists
+            if (typeof window.initLeadList === 'function') {
+                window.initLeadList(window.currentBaseFilters || {});
+            }
+        } else {
+            window.showAlert("Error", result.message || "Failed to create lead", "error");
+        }
+    } catch (err) {
+        console.error('Submit lead error:', err);
+        window.showAlert("Connection Error", "Failed to connect to server", "error");
+    } finally {
+        submitBtn.innerHTML = originalHtml;
+        submitBtn.disabled = false;
+    }
 };
 
 function initGlobalSearch() {

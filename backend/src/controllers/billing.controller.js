@@ -93,7 +93,7 @@ const getOrderForBilling = async (req, res) => {
         if (!orders.length) return res.status(404).json({ message: 'Order not found' });
 
         const [items] = await pool.query(`
-            SELECT oi.*, p.name as product_name, p.sku, i.current_stock, i.reserved_stock
+            SELECT oi.*, p.name as product_name, p.sku, p.hsn_code, i.current_stock, i.reserved_stock
             FROM order_items oi
             JOIN products p ON oi.product_id = p.product_id
             JOIN inventory i ON p.product_id = i.product_id
@@ -218,7 +218,10 @@ const updateOrderItems = async (req, res) => {
 
 const generateInvoice = async (req, res) => {
     const { id } = req.params;
-    const { discount, shipping_charges, tax_type, is_tax_overridden, manual_tax, status = 'draft' } = req.body;
+    const { 
+        discount, shipping_charges, tax_type, status = 'draft', is_tax_overridden, manual_tax,
+        delivery_note, dispatch_through, destination, payment_terms 
+    } = req.body;
     const connection = await pool.getConnection();
 
     try {
@@ -237,6 +240,12 @@ const generateInvoice = async (req, res) => {
         const settings = {};
         settingsRows.forEach(r => settings[r.setting_key] = r.setting_value);
 
+        // Check if a finalized invoice already exists for this order
+        const [existingFinalized] = await connection.query('SELECT invoice_id FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [id]);
+        if (existingFinalized.length > 0) {
+            throw new Error('A finalized invoice already exists for this order.');
+        }
+
         // Check if draft invoice already exists for this order
         const [existingInvoices] = await connection.query('SELECT invoice_id, invoice_number, invoice_status FROM invoices WHERE order_id = ? AND invoice_status = "draft"', [id]);
 
@@ -249,10 +258,11 @@ const generateInvoice = async (req, res) => {
         } else {
             const prefix = settings.invoice_prefix || 'SGB';
             const year = new Date().getFullYear();
-            const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+            const month = new Date().getMonth() + 1;
+            const finYear = month >= 4 ? `${year}-${(year + 1).toString().slice(-2)}` : `${year - 1}-${year.toString().slice(-2)}`;
 
             let nextSeq = parseInt(settings.last_invoice_num || 0) + 1;
-            invoiceNumber = `${prefix}/${year}/${month}/${nextSeq.toString().padStart(5, '0')}`;
+            invoiceNumber = `${nextSeq.toString().padStart(4, '0')}/${finYear}`;
 
             await connection.query("UPDATE settings SET setting_value = ? WHERE setting_key = 'last_invoice_num'", [nextSeq.toString()]);
         }
@@ -266,9 +276,9 @@ const generateInvoice = async (req, res) => {
             sgst = parseFloat(manual_tax?.sgst || 0);
             igst = parseFloat(manual_tax?.igst || 0);
         } else {
-            const companyState = (settings.company_state || 'Maharashtra').toLowerCase();
+            const companyState = (settings.company_state || 'Karnataka').toLowerCase();
             const customerState = (order.state || '').toLowerCase();
-            const gstRate = parseFloat(settings.gst_rate || 18);
+            const gstRate = parseFloat(settings.gst_rate || 5); // Default to 5% for SGB Dumper
 
             if (companyState === customerState) {
                 cgst = subtotal * (gstRate / 200);
@@ -297,61 +307,73 @@ const generateInvoice = async (req, res) => {
                     total_amount = ?, 
                     invoice_status = ?, 
                     is_tax_overridden = ?,
+                    delivery_note = ?,
+                    dispatch_through = ?,
+                    destination = ?,
+                    payment_terms = ?,
                     created_by = ?
                 WHERE invoice_id = ?
             `, [
                 order.customer_name, order.address, order.gst_number || '',
                 subtotal, discount || 0, shipping_charges || 0, tax_type || 'CGST_SGST',
-                cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0, req.user.id, invoiceId
+                cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0, 
+                delivery_note || '', dispatch_through || '', destination || '', payment_terms || '',
+                req.user.id, invoiceId
             ]);
         } else {
             const [invResult] = await connection.query(`
                 INSERT INTO invoices (
                     order_id, invoice_number, invoice_date, billing_name, billing_address, 
                     gst_number, subtotal, discount, shipping_charges, tax_type, 
-                    cgst, sgst, igst, total_amount, invoice_status, is_tax_overridden, created_by
-                ) VALUES (?, ?, CURRENT_DATE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    cgst, sgst, igst, total_amount, invoice_status, is_tax_overridden, 
+                    delivery_note, dispatch_through, destination, payment_terms, created_by
+                ) VALUES (?, ?, CURRENT_DATE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 id, invoiceNumber, order.customer_name, order.address,
                 order.gst_number || '', subtotal, discount || 0, shipping_charges || 0,
-                tax_type || 'CGST_SGST', cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0, req.user.id
+                tax_type || 'CGST_SGST', cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0,
+                delivery_note || '', dispatch_through || '', destination || '', payment_terms || '', req.user.id
             ]);
             invoiceId = invResult.insertId;
         }
 
         // 4. Preserve Item Snapshot
         await connection.query('DELETE FROM invoice_items WHERE invoice_id = ?', [invoiceId]);
-        const [items] = await connection.query('SELECT * FROM order_items WHERE order_id = ?', [id]);
+        const [items] = await connection.query(`
+            SELECT oi.*, p.hsn_code 
+            FROM order_items oi
+            LEFT JOIN products p ON oi.product_id = p.product_id
+            WHERE oi.order_id = ?
+        `, [id]);
+
         for (const item of items) {
             await connection.query(
-                'INSERT INTO invoice_items (invoice_id, product_id, quantity, price, total) VALUES (?, ?, ?, ?, ?)',
-                [invoiceId, item.product_id, item.quantity, item.price, item.total_price]
+                'INSERT INTO invoice_items (invoice_id, product_id, hsn_code, quantity, price, total) VALUES (?, ?, ?, ?, ?, ?)',
+                [invoiceId, item.product_id, item.hsn_code || '', item.quantity, item.price, item.total_price]
             );
         }
+
 
         // 5. Finalize Action if requested
         if (status === 'finalized') {
             const verifiedTotal = await getVerifiedBalance(connection, id);
             const isFullyPaid = verifiedTotal >= grandTotal;
 
-            if (isFullyPaid) {
-                await connection.query('UPDATE orders SET order_status = "billed", is_locked = 1, billing_done_by = ? WHERE order_id = ?', [req.user.id, id]);
-                await connection.query('INSERT INTO packing (order_id, status) VALUES (?, "pending") ON DUPLICATE KEY UPDATE status="pending"', [id]);
-            } else {
-                // If not fully paid, set status to in_review and lock it, but don't move to packing
-                await connection.query('UPDATE orders SET order_status = "in_review", is_locked = 1, billing_done_by = ? WHERE order_id = ?', [req.user.id, id]);
-            }
+            // Always move to packing regardless of payment status as per user request
+            await connection.query('UPDATE orders SET order_status = "billed", is_locked = 1, billing_done_by = ? WHERE order_id = ?', [req.user.id, id]);
+            await connection.query('INSERT INTO packing (order_id, status) VALUES (?, "pending") ON DUPLICATE KEY UPDATE status="pending"', [id]);
 
             await logAudit(connection, {
                 invoice_id: invoiceId,
                 order_id: id,
-                action: isFullyPaid ? 'INVOICE_GENERATED_FINAL' : 'INVOICE_GENERATED_PARTIAL_PAYMENT',
+                action: 'INVOICE_GENERATED_FINAL',
                 old_value: 'N/A',
-                new_value: isFullyPaid ? 'Billed/Packing' : 'Awaiting Payment',
+                new_value: isFullyPaid ? 'Billed/Packing (Paid)' : 'Billed/Packing (Credit)',
                 changed_by: req.user.id
             });
-        } else {
-            await connection.query('UPDATE orders SET is_locked = 1, locked_by = ?, order_status = "in_review" WHERE order_id = ?', [req.user.id, id]);
+        }
+ else {
+            await connection.query('UPDATE orders SET order_status = "in_review" WHERE order_id = ?', [id]);
         }
 
         await connection.commit();
@@ -595,8 +617,16 @@ const getAllInvoices = async (req, res) => {
 const getInvoiceById = async (req, res) => {
     const { id } = req.params;
     try {
+        // 1. Fetch Settings
+        const [rows] = await pool.query('SELECT * FROM settings');
+        const settings = {};
+        rows.forEach(r => settings[r.setting_key] = r.setting_value);
+
+        // 2. Fetch Invoice & Order Details
         const [invoices] = await pool.query(`
-            SELECT i.*, o.customer_name, o.phone, o.address, o.city, o.state 
+            SELECT i.*, o.customer_name, o.phone, o.address, o.city, o.state, o.pincode,
+                   o.shipping_name, o.shipping_address, o.shipping_city, o.shipping_state, o.shipping_pincode,
+                   o.created_at as order_date
             FROM invoices i
             JOIN orders o ON i.order_id = o.order_id
             WHERE i.invoice_id = ?
@@ -604,18 +634,29 @@ const getInvoiceById = async (req, res) => {
 
         if (!invoices.length) return res.status(404).json({ message: 'Invoice not found' });
 
+        // 3. Fetch Items with HSN
         const [items] = await pool.query(`
-            SELECT ii.*, p.name as product_name, p.sku 
+            SELECT ii.*, p.name as product_name, p.sku, p.unit
             FROM invoice_items ii
-            JOIN products p ON ii.product_id = p.product_id
+            LEFT JOIN products p ON ii.product_id = p.product_id
             WHERE ii.invoice_id = ?
         `, [id]);
 
-        res.json({ ...invoices[0], items });
+        const invoice = invoices[0];
+        const amountInWords = numberToWords(invoice.total_amount);
+
+        res.json({ 
+            ...invoice, 
+            items, 
+            settings,
+            amount_in_words: amountInWords
+        });
     } catch (err) {
+        console.error('getInvoiceById Error:', err);
         res.status(500).json({ message: 'Error fetching invoice: ' + err.message });
     }
 };
+
 
 const getSettings = async (req, res) => {
     try {
@@ -724,6 +765,28 @@ const printInvoice = async (req, res) => {
     } catch (err) {
         res.status(500).send('Error generating invoice print view');
     }
+};
+
+const numberToWords = (num) => {
+    const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const format = (n) => {
+        if (n < 20) return a[n];
+        if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+        if (n < 1000) return a[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + format(n % 100) : '');
+        if (n < 100000) return format(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + format(n % 1000) : '');
+        if (n < 10000000) return format(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + format(n % 100000) : '');
+        return format(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + format(n % 10000000) : '');
+    };
+
+    const [whole, decimal] = num.toString().split('.');
+    let res = format(parseInt(whole)) + ' Only';
+    
+    if (decimal && parseInt(decimal.padEnd(2, '0')) > 0) {
+        res = format(parseInt(whole)) + ' and ' + format(parseInt(decimal.padEnd(2, '0'))) + ' Paise Only';
+    }
+    return 'INR ' + res;
 };
 
 module.exports = {

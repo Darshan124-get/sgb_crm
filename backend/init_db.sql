@@ -159,6 +159,7 @@ CREATE TABLE products (
     category_id INT,
     description TEXT,
     sku VARCHAR(50) UNIQUE,
+    hsn_code VARCHAR(20),
     unit VARCHAR(20),
     selling_price DECIMAL(10, 2) DEFAULT 0,
     dealer_price DECIMAL(10, 2) DEFAULT 0,
@@ -270,6 +271,7 @@ CREATE TABLE invoice_items (
     invoice_item_id INT AUTO_INCREMENT PRIMARY KEY,
     invoice_id INT,
     product_id INT,
+    hsn_code VARCHAR(20),
     quantity INT NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
     gst_percentage DECIMAL(5, 2) DEFAULT 0,
@@ -378,12 +380,21 @@ ON DUPLICATE KEY UPDATE name=VALUES(name);
 
 -- Default Settings
 INSERT INTO settings (setting_key, setting_value) VALUES 
-('company_name', 'SGB Agro Industries'),
-('company_state', 'Maharashtra'),
-('company_gst_number', '27AAACS1234A1Z1'),
+('company_name', 'SRI GOWRI BHARGAV PRIVATE LIMITED'),
+('company_address', 'LOWERPET, MAIN ROAD KOPPA, Karnataka - 577126, India'),
+('company_state', 'Karnataka'),
+('company_state_code', '29'),
+('company_gst_number', '29ABDCS5673G1ZY'),
+('company_contact', '8277009667'),
+('company_email', 'sgb.koppa@gmail.com'),
+('bank_name', 'State Bank of India 3872'),
+('bank_account_no', '39343293872'),
+('bank_ifsc', 'Koppa & SBIN0015059'),
 ('invoice_prefix', 'SGB'),
-('default_tax_mode', 'auto')
+('default_tax_mode', 'auto'),
+('gst_rate', '5')
 ON DUPLICATE KEY UPDATE setting_key=setting_key;
+
 
 -- Insert default admin user: admin / password123
 INSERT INTO users (name, phone, email, password_hash, role_id, language, status)

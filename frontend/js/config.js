@@ -151,3 +151,11 @@ window.formatOrderId = function(id, dateStr) {
     const day = String(d.getDate()).padStart(2, '0');
     return `#SGB-${year}-${month}-${day}-${id}`;
 };
+
+window.debounce = function(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+};

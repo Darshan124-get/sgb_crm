@@ -15,7 +15,7 @@
         <div id="sidebar-container"></div>
         <main class="main-content">
             <header class="topbar">
-                <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text"
+                <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="leadSearch"
                         placeholder="Search leads..."></div>
                 <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span>
                     <div class="avatar"><i class="fa-solid fa-user"></i></div>
@@ -28,13 +28,9 @@
                         <p style="color:#64748b;font-size:0.875rem;">All team leads — assign, filter, track and manage.
                         </p>
                     </div>
-                    <!-- <button class="btn-add-lead" onclick="openAddLeadModal()">
-                    <i class="fas fa-plus"></i> Add Lead
-                </button> -->
-                    <div
-                        style="background: #f1f5f9; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.75rem; color: #64748b; font-weight: 600;">
-                        <i class="fas fa-lock mr-1"></i> New Lead Creation Disabled
-                    </div>
+                    <button class="btn-add-lead" onclick="openAddLeadModal()">
+                        <i class="fas fa-plus"></i> Add Lead
+                    </button>
                 </div>
 
                 <!-- Lead Nav Tabs -->

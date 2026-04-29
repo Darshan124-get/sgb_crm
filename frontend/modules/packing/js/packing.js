@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 const API = window.API_URL;
-const ORDERS_API    = `${API}/orders`;
+const ORDERS_API = `${API}/orders`;
 const LOGISTICS_API = `${API}/logistics`;
 
 let allOrders = [];
@@ -17,11 +17,11 @@ async function fetchOrders() {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;"><i class="fas fa-circle-notch fa-spin"></i></td></tr>';
 
     try {
-        const res    = await fetch(`${ORDERS_API}?status=billed`, { headers: { 'Authorization': `Bearer ${token}` } });
-        allOrders    = await res.json();
+        const res = await fetch(`${ORDERS_API}?status=billed`, { headers: { 'Authorization': `Bearer ${token}` } });
+        allOrders = await res.json();
         document.getElementById('pendingCount').textContent = `${allOrders.length} Pending`;
         renderOrders(allOrders);
-    } catch(e) {
+    } catch (e) {
         tbody.innerHTML = '<tr><td colspan="6" style="padding:3rem;text-align:center;color:#ef4444;">Failed to load orders.</td></tr>';
     }
 }
@@ -39,7 +39,7 @@ function renderOrders(orders) {
             <td style="padding:1rem 1.25rem;font-size:0.875rem;color:#64748b;">${o.phone || '—'}</td>
             <td style="padding:1rem 1.25rem;">
                 <div style="display:flex;flex-wrap:wrap;gap:4px;">
-                    ${(o.items||[]).map(i=>`<span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#374151;">${i.product_name} ×${i.quantity}</span>`).join('')}
+                    ${(o.items || []).map(i => `<span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:0.75rem;color:#374151;">${i.product_name} ×${i.quantity}</span>`).join('')}
                 </div>
             </td>
             <td style="padding:1rem 1.25rem;font-size:0.8rem;color:#64748b;">${new Date(o.created_at).toLocaleDateString('en-IN')}</td>
@@ -54,8 +54,8 @@ function renderOrders(orders) {
 function filterOrders() {
     const q = document.getElementById('orderSearch').value.toLowerCase();
     renderOrders(allOrders.filter(o =>
-        (o.customer_name||'').toLowerCase().includes(q) ||
-        (o.firm_name||'').toLowerCase().includes(q) ||
+        (o.customer_name || '').toLowerCase().includes(q) ||
+        (o.firm_name || '').toLowerCase().includes(q) ||
         String(o.order_id).includes(q)
     ));
 }
@@ -70,16 +70,16 @@ async function markAsPacked(orderId) {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: orderId, remarks: 'Packed' })
         });
-        if (res.ok) { 
+        if (res.ok) {
             const order = allOrders.find(ord => ord.order_id == orderId);
-            showToast(`Order ${window.formatOrderId(orderId, order ? order.created_at : null)} packed successfully! ✅`); 
-            fetchOrders(); 
+            showToast(`Order ${window.formatOrderId(orderId, order ? order.created_at : null)} packed successfully! ✅`);
+            fetchOrders();
         }
         else { const d = await res.json(); showToast(`Error: ${d.message}`, true); }
-    } catch(e) { showToast('Server error.', true); }
+    } catch (e) { showToast('Server error.', true); }
 }
 
-function showToast(msg, isError=false) {
+function showToast(msg, isError = false) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.background = isError ? '#ef4444' : '#1e293b';

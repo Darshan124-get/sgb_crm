@@ -52,6 +52,31 @@ function renderWorkstation() {
                     </div>
                 </div>
 
+                <!-- SECTION 1.5: SHIPPING & EXTRA DETAILS -->
+                <div class="work-section">
+                    <h4 style="margin-bottom: 1.25rem; font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
+                        <i class="fas fa-truck-fast" style="margin-right: 0.5rem;"></i> SECTION 1.5: SHIPPING & EXTRA DETAILS
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Delivery Note</label>
+                            <input type="text" id="deliveryNoteInput" class="form-input" style="height: 38px;" value="${data.delivery_note || ''}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Dispatched Through</label>
+                            <input type="text" id="dispatchThroughInput" class="form-input" style="height: 38px;" value="${data.dispatch_through || ''}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Destination</label>
+                            <input type="text" id="destinationInput" class="form-input" style="height: 38px;" value="${data.destination || ''}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Payment Terms</label>
+                            <input type="text" id="paymentTermsInput" class="form-input" style="height: 38px;" value="${data.payment_terms || ''}">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- SECTION 2 & 3: ORDER DETAILS & PRODUCT EDITING -->
                 <div class="work-section">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
@@ -68,6 +93,7 @@ function renderWorkstation() {
                         <thead>
                             <tr>
                                 <th>Product Specification</th>
+                                <th style="width: 100px;">HSN/SAC</th>
                                 <th style="width: 130px;">Unit Price</th>
                                 <th style="width: 90px; text-align: center;">Qty</th>
                                 <th style="width: 130px; text-align: right;">Total</th>
@@ -80,6 +106,9 @@ function renderWorkstation() {
                                     <td>
                                         <div style="font-weight: 700; color: #1e293b;">${item.product_name}</div>
                                         <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; margin-top: 0.25rem;">SKU: ${item.sku} | Stock: <span style="color: ${item.available_stock > 5 ? '#10b981' : '#ef4444'}">${item.available_stock || 0}</span></div>
+                                    </td>
+                                    <td style="font-size: 0.8rem; color: #64748b; font-weight: 700;">
+                                        ${item.hsn_code || 'N/A'}
                                     </td>
                                     <td>
                                         <div style="position: relative;">
@@ -208,6 +237,11 @@ function renderWorkstation() {
                     <input type="number" id="shippingInput" class="form-input" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.15); height: 48px; font-size: 1.1rem; font-weight: 700;" value="${currentOrder.shipping_charges || 0}" onchange="recalculateAll()">
                 </div>
 
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">Extra Charges (₹)</label>
+                    <input type="number" id="extraChargesInput" class="form-input" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.15); height: 48px; font-size: 1.1rem; font-weight: 700;" value="${currentOrder.extra_charges || 0}" onchange="recalculateAll()">
+                </div>
+
                 <div id="taxDetails" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
                     <!-- Tax rows inject here -->
                 </div>
@@ -258,11 +292,13 @@ function recalculateAll() {
     const subtotal = calculateItemsSubtotal();
     const discount = parseFloat(document.getElementById('discountInput').value || 0);
     const shipping = parseFloat(document.getElementById('shippingInput').value || 0);
+    const extra = parseFloat(document.getElementById('extraChargesInput').value || 0);
     
     // Tax Logic
-    const companyState = "Maharashtra"; // Should come from a global config ideally
+    const companyState = "Karnataka"; 
+// Should come from a global config ideally
     const taxRate = 18;
-    const taxableAmount = subtotal - discount + shipping;
+    const taxableAmount = subtotal - discount + shipping + extra;
     
     let taxHtml = '';
     let grandTotal = taxableAmount;
@@ -451,6 +487,7 @@ function addItemToOrder(p) {
         product_name: p.name,
         sku: p.sku,
         price: p.default_price,
+        hsn_code: p.hsn_code,
         quantity: 1,
         available_stock: p.current_stock - p.reserved_stock
     });
@@ -471,7 +508,7 @@ function removeItem(index) {
 }
 
 /** Persistence Actions **/
-async function saveOrderDraft() {
+async function saveOrderDraft(options = { silent: false }) {
     try {
         // 1. Save core order info (items, discount, shipping)
         const orderRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
@@ -502,18 +539,22 @@ async function saveOrderDraft() {
             body: JSON.stringify({
                 discount: currentOrder.discount,
                 shipping_charges: currentOrder.shipping_charges,
-                tax_type: currentOrder.state === 'Maharashtra' ? 'CGST_SGST' : 'IGST',
-                status: 'draft'
+                tax_type: currentOrder.state === 'Karnataka' ? 'CGST_SGST' : 'IGST',
+                status: 'draft',
+                delivery_note: document.getElementById('deliveryNoteInput')?.value || '',
+                dispatch_through: document.getElementById('dispatchThroughInput')?.value || '',
+                destination: document.getElementById('destinationInput')?.value || '',
+                payment_terms: document.getElementById('paymentTermsInput')?.value || ''
             })
         });
 
         if (invRes.ok) {
-            alert('Draft Saved Successfully (Order & Invoice Draft updated).');
-            if (currentTab === 'pending') loadPendingOrders();
-            else if (currentTab === 'in-review') loadInReviewOrders();
+            if (!options.silent) alert('Draft Saved Successfully.');
+            if (currentTab === 'pending') await loadPendingOrders();
+            else if (currentTab === 'in-review') await loadInReviewOrders();
         } else {
             const err = await invRes.json();
-            alert('Order saved, but invoice draft failed: ' + err.message);
+            if (!options.silent) alert('Order saved, but invoice draft failed: ' + err.message);
         }
     } catch (err) {
         alert(err.message || 'Failed to save draft');
@@ -543,11 +584,11 @@ async function verifyPayment(paymentId, status) {
 }
 
 async function generateFinalInvoice() {
-    if (!confirm('This will lock the order and generate a FINAL invoice. Continue?')) return;
+    // Single click process: No redundant confirm unless absolutely critical
     
     try {
-        // First save the latest changes as a draft to be safe
-        await saveOrderDraft();
+        // First save the latest changes as a draft silently
+        await saveOrderDraft({ silent: true });
 
         const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/invoice`, {
             method: 'POST',
@@ -558,15 +599,23 @@ async function generateFinalInvoice() {
             body: JSON.stringify({
                 discount: currentOrder.discount,
                 shipping_charges: currentOrder.shipping_charges,
-                tax_type: currentOrder.state === 'Maharashtra' ? 'CGST_SGST' : 'IGST',
-                status: 'finalized'
+                tax_type: currentOrder.state === 'Karnataka' ? 'CGST_SGST' : 'IGST',
+                status: 'finalized',
+                delivery_note: document.getElementById('deliveryNoteInput')?.value || '',
+                dispatch_through: document.getElementById('dispatchThroughInput')?.value || '',
+                destination: document.getElementById('destinationInput')?.value || '',
+                payment_terms: document.getElementById('paymentTermsInput')?.value || ''
             })
         });
         
         if (res.ok) {
-            alert('Invoice Generated & Finalized. Moving to Shipping...');
+            const invData = await res.json();
+            // Open invoice in new tab immediately
+            window.open(`invoice.html?id=${invData.invoiceId}`, '_blank');
+            
             closeModal();
             switchTab('invoices');
+            loadInvoices();
         } else {
             const err = await res.json();
             alert(err.message);
@@ -859,22 +908,18 @@ let allPendingOrders = [];
 
 async function loadPendingOrders() {
     const tbody = document.getElementById('pendingOrdersBody');
-    if (!allPendingOrders.length) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
-    }
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
 
     try {
-        if (!allPendingOrders.length) {
-            const res = await fetch(`${BILLING_API_URL}/pending`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
-            allPendingOrders = await res.json();
-            
-            // Wire up filters once
-            document.querySelectorAll('.filter-input-v2').forEach(input => {
-                input.onchange = () => applyPendingFilters();
-            });
-        }
+        const res = await fetch(`${BILLING_API_URL}/pending`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        allPendingOrders = await res.json();
+        
+        // Wire up filters once
+        document.querySelectorAll('.filter-input-v2').forEach(input => {
+            input.onchange = () => applyPendingFilters();
+        });
         
         applyPendingFilters();
     } catch (err) {

@@ -1,8 +1,9 @@
 const pool = require('../config/db');
 
 exports.getOrders = async (req, res) => {
+    const { status, source, search, date } = req.query;
     try {
-        const [rows] = await pool.query(`
+        let query = `
             SELECT 
                 o.*, 
                 p.name as product_name, 
@@ -12,8 +13,35 @@ exports.getOrders = async (req, res) => {
             FROM orders o
             LEFT JOIN order_items oi ON o.order_id = oi.order_id
             LEFT JOIN products p ON oi.product_id = p.product_id
-            ORDER BY o.order_id DESC
-        `);
+        `;
+        const conditions = [];
+        const params = [];
+
+        if (status) {
+            conditions.push("o.order_status = ?");
+            params.push(status);
+        }
+        if (source) {
+            conditions.push("o.order_source = ?");
+            params.push(source);
+        }
+        if (date) {
+            conditions.push("DATE(o.created_at) = ?");
+            params.push(date);
+        }
+        if (search) {
+            conditions.push("(o.customer_name LIKE ? OR o.phone LIKE ? OR CAST(o.order_id AS CHAR) LIKE ?)");
+            const searchVal = `%${search}%`;
+            params.push(searchVal, searchVal, searchVal);
+        }
+
+        if (conditions.length > 0) {
+            query += " WHERE " + conditions.join(" AND ");
+        }
+
+        query += " ORDER BY o.order_id DESC";
+
+        const [rows] = await pool.query(query, params);
         
         const ordersMap = {};
         rows.forEach(row => {
@@ -41,7 +69,7 @@ exports.convertLeadToOrder = async (req, res) => {
         let { lead_id, customer_name, phone, address, city, state, total_amount, advance_amount, items } = req.body;
 
         const [resOrder] = await pool.query(
-            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, city, state, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'billed', 1)",
+            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, city, state, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 1)",
             [lead_id, customer_name, phone, address || '', city || '', state || '', total_amount || 0, advance_amount || 0, (total_amount - advance_amount) || 0]
         );
         const orderId = resOrder.insertId;
@@ -82,4 +110,13 @@ exports.convertLeadToOrder = async (req, res) => {
 
 exports.createDealerOrder = async (req, res) => { res.json({ msg: 'ok' }); };
 exports.getStats = async (req, res) => { res.json({ total: 0 }); };
-exports.updateStatus = async (req, res) => { res.json({ msg: 'ok' }); };
+exports.updateStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    try {
+        await pool.query("UPDATE orders SET order_status = ? WHERE order_id = ?", [status, id]);
+        res.json({ success: true, message: 'Order status updated successfully' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};

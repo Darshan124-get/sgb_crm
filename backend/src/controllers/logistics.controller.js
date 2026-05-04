@@ -75,3 +75,83 @@ exports.shipOrder = async (req, res) => {
         res.status(500).json({ message: 'Failed to record shipment' });
     }
 };
+
+exports.getDashboardStats = async (req, res) => {
+    const { range = '7days' } = req.query;
+    try {
+        // 1. Basic KPIs (Always show overall/today)
+        const [pending] = await pool.query("SELECT COUNT(*) as count FROM orders WHERE order_status = 'packed'");
+        const [todayShipped] = await pool.query("SELECT COUNT(*) as count FROM shipments WHERE DATE(shipped_at) = CURRENT_DATE");
+        const [inTransit] = await pool.query("SELECT COUNT(*) as count FROM shipments WHERE status IN ('shipped', 'in_transit')");
+
+        // 2. Dispatch Trends based on range
+        let trendsQuery = "";
+        if (range === 'today') {
+            trendsQuery = `
+                SELECT 
+                    HOUR(shipped_at) as label,
+                    COUNT(*) as count
+                FROM shipments 
+                WHERE DATE(shipped_at) = CURRENT_DATE
+                GROUP BY label
+                ORDER BY label ASC
+            `;
+        } else {
+            trendsQuery = `
+                SELECT 
+                    DATE_FORMAT(shipped_at, '%a') as label,
+                    COUNT(*) as count
+                FROM shipments 
+                WHERE shipped_at >= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY)
+                GROUP BY DATE(shipped_at), label
+                ORDER BY DATE(shipped_at) ASC
+            `;
+        }
+        const [trends] = await pool.query(trendsQuery);
+
+        // Map hourly labels for 'today' (e.g. 0 -> '12 AM', 9 -> '9 AM')
+        const processedTrends = trends.map(t => {
+            if (range === 'today') {
+                const hour = parseInt(t.label);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour % 12 || 12;
+                return { label: `${displayHour} ${ampm}`, count: t.count };
+            }
+            return { label: t.label, count: t.count };
+        });
+
+        // 3. Carrier Load Distribution
+        const [carriers] = await pool.query(`
+            SELECT courier_name as label, COUNT(*) as value
+            FROM shipments 
+            GROUP BY courier_name
+        `);
+
+        res.json({
+            pendingCount: pending[0].count,
+            todayCount: todayShipped[0].count,
+            transitCount: inTransit[0].count,
+            trends: processedTrends,
+            carriers: carriers
+        });
+    } catch (err) {
+        console.error('Stats Error:', err);
+        res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+    }
+};
+
+exports.getShippingOrders = async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT o.*, s.courier_name, s.tracking_id, s.shipped_at, s.status as shipment_status
+            FROM orders o
+            LEFT JOIN shipments s ON o.order_id = s.order_id
+            WHERE o.order_status IN ('packed', 'shipped', 'delivered')
+            ORDER BY o.updated_at DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        console.error('Fetch Shipping Orders Error:', err);
+        res.status(500).json({ error: 'Failed to fetch shipping orders' });
+    }
+};

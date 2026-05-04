@@ -112,11 +112,11 @@
         </div>
         <div class="progress-step" id="mstep-3">
             <div class="step-icon">3</div>
-            <div class="step-label">Products</div>
+            <div class="step-label">Decision</div>
         </div>
         <div class="progress-step" id="mstep-4">
             <div class="step-icon">4</div>
-            <div class="step-label">Finalize</div>
+            <div class="step-label">Product</div>
         </div>
     </div>
 
@@ -191,6 +191,16 @@
             </div>
             <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group">
+                    <label style="color: #334155; font-weight: 700;">District</label>
+                    <input type="text" id="m-de-district" class="form-control-premium" placeholder="Enter District">
+                </div>
+                <div class="form-group">
+                    <label style="color: #334155; font-weight: 700;">Pincode</label>
+                    <input type="text" id="m-de-pincode" class="form-control-premium" placeholder="6-digit Pincode">
+                </div>
+            </div>
+            <div class="form-grid" style="margin-top: 1rem;">
+                <div class="form-group">
                     <label>State</label>
                     <select id="m-de-state" class="form-control-premium">
                         <option value="Karnataka">Karnataka</option>
@@ -224,29 +234,10 @@
         </div>
     </div>
 
-    <!-- Step 3: Product Selection -->
+    <!-- Step 3: Finalize / Decision -->
     <div class="manual-step-content" id="m-wizard-step-3">
         <div class="form-card-premium">
-            <h3 class="form-section-title"><i class="fas fa-cubes"></i> Step 3: Interest & Requirements</h3>
-            <div class="form-group">
-                <label>Select Products (Multi-select)</label>
-                <select id="m-de-products" class="form-control-premium" multiple style="height: 180px;"></select>
-                <p class="text-xs text-slate-400 mt-2">Hold Ctrl/Cmd to select multiple products</p>
-            </div>
-
-            <div style="margin-top: 3rem; display: flex; justify-content: space-between;">
-                <button onclick="mGoToStep(2)" class="login-btn btn-outline" style="width: auto;"><i
-                        class="fas fa-arrow-left mr-2"></i> Back</button>
-                <button onclick="mDeNextStep(4)" class="login-btn" style="width: auto; padding: 0.8rem 3rem;">Next <i
-                        class="fas fa-arrow-right ml-2"></i></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Step 4: Finalize -->
-    <div class="manual-step-content" id="m-wizard-step-4">
-        <div class="form-card-premium">
-            <h3 class="form-section-title"><i class="fas fa-check-circle"></i> Step 4: Finalize Record</h3>
+            <h3 class="form-section-title"><i class="fas fa-check-circle"></i> Step 3: Decision & Status</h3>
 
             <!-- Connection log for not_connected -->
             <div id="m-de-form-notconnected" class="hidden">
@@ -281,23 +272,7 @@
                     </select>
                 </div>
 
-                <!-- Conditional Subforms -->
-                <div id="m-de-form-order" class="hidden"
-                    style="margin-top: 1.5rem; padding: 1.5rem; background: #f8fafc; border-radius: 1rem; border: 1px dashed #cbd5e1;">
-                    <div class="form-group">
-                        <label>Advance Amount Paid (₹)</label>
-                        <input type="number" id="m-de-order-advance" class="form-control-premium" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Payment Screenshot</label>
-                        <input type="file" id="m-de-payment-file" class="form-control-premium">
-                    </div>
-                    <div id="m-de-order-summary" class="mt-4 p-3 bg-white rounded border text-sm">
-                        Total Items: <span id="m-de-summary-count">0</span> | Total Value: ₹<span
-                            id="m-de-summary-total">0</span>
-                    </div>
-                </div>
-
+                <!-- Conditional Subforms (Non-Order) -->
                 <div id="m-de-form-followup" class="hidden" style="margin-top: 1.5rem;">
                     <div class="form-group">
                         <label>Next Follow-up Date</label>
@@ -314,7 +289,6 @@
                     </div>
                 </div>
 
-                <!-- Feedback for Old Purchased -->
                 <div id="m-de-form-feedback" class="hidden" style="margin-top: 1.5rem;">
                     <div class="form-grid">
                         <div class="form-group"><label>Satisfaction</label><input type="text"
@@ -323,6 +297,58 @@
                         <div class="form-group"><label>Feedback Notes</label><input type="text" id="m-de-feedback-notes"
                                 class="form-control-premium"></div>
                     </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem; display: flex; justify-content: space-between;">
+                <button onclick="mGoToStep(2)" class="login-btn btn-outline" style="width: auto;"><i
+                        class="fas fa-arrow-left mr-2"></i> Back</button>
+                <button onclick="mDeNextStep(4)" class="login-btn" id="m-de-next-3" style="width: auto; padding: 0.8rem 3rem;">Next <i
+                        class="fas fa-arrow-right ml-2"></i></button>
+                <button onclick="submitManualLeadWizard()" id="m-de-save-3" class="login-btn"
+                    style="display:none; width: auto; padding: 0.8rem 3rem; background: #10b981;">Save Lead <i
+                        class="fas fa-check ml-2"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Product Selection & Order Finalization -->
+    <div class="manual-step-content" id="m-wizard-step-4">
+        <div class="form-card-premium">
+            <h3 class="form-section-title"><i class="fas fa-cubes"></i> Step 4: Product Selection</h3>
+            <div class="form-group">
+                <label>Select Products (Multi-select)</label>
+                <select id="m-de-products" class="form-control-premium" multiple style="height: 180px;"></select>
+                <p class="text-xs text-slate-400 mt-2">Hold Ctrl/Cmd to select multiple products</p>
+            </div>
+
+            <!-- Conditional Subform (Order details moved here) -->
+            <div id="m-de-form-order" class="hidden"
+                style="margin-top: 1.5rem; padding: 1.5rem; background: #f8fafc; border-radius: 1rem; border: 1px dashed #cbd5e1;">
+                <div class="form-group">
+                    <label>Advance Amount Paid (₹)</label>
+                    <input type="number" id="m-de-order-advance" class="form-control-premium" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Delivery Type *</label>
+                    <select id="m-de-delivery-type" class="form-control-premium" onchange="toggleOtherDelivery(this.value, 'm-de-delivery-other-wrapper')">
+                        <option value="Post office COD">Post office COD</option>
+                        <option value="VRL COD">VRL COD</option>
+                        <option value="third party">third party</option>
+                        <option value="other">other</option>
+                    </select>
+                </div>
+                <div id="m-de-delivery-other-wrapper" class="form-group hidden">
+                    <label>Specify Delivery Type *</label>
+                    <input type="text" id="m-de-delivery-other" class="form-control-premium" placeholder="Enter delivery type">
+                </div>
+                <div class="form-group">
+                    <label>Payment Screenshot</label>
+                    <input type="file" id="m-de-payment-file" class="form-control-premium">
+                </div>
+                <div id="m-de-order-summary" class="mt-4 p-3 bg-white rounded border text-sm">
+                    Total Items: <span id="m-de-summary-count">0</span> | Total Value: ₹<span
+                        id="m-de-summary-total">0</span>
                 </div>
             </div>
 

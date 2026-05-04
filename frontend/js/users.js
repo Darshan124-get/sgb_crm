@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { role_id: 2, name: 'Sales' },
         { role_id: 3, name: 'Billing' },
         { role_id: 4, name: 'Packaging' },
-        { role_id: 5, name: 'Shipment' }
+        { role_id: 5, name: 'Shipping' }
     ];
 
     // 1. Initial Load

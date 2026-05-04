@@ -89,7 +89,12 @@ const getOrdersByStatus = async (req, res) => {
 const getOrderForBilling = async (req, res) => {
     const { id } = req.params;
     try {
-        const [orders] = await pool.query('SELECT * FROM orders WHERE order_id = ?', [id]);
+        const [orders] = await pool.query(`
+            SELECT o.*, l.delivery_type as lead_delivery_type 
+            FROM orders o 
+            LEFT JOIN leads l ON o.lead_id = l.lead_id 
+            WHERE o.order_id = ?
+        `, [id]);
         if (!orders.length) return res.status(404).json({ message: 'Order not found' });
 
         const [items] = await pool.query(`

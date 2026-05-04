@@ -63,6 +63,18 @@ let leadPath = 'normal'; // 'normal', 'quick_order', 'not_connected'
 
 // ─── Shared Helpers ───────────────────────────────────────────
 
+function toggleOtherDelivery(val, wrapperId) {
+    const wrapper = document.getElementById(wrapperId);
+    if (wrapper) {
+        wrapper.style.display = (val === 'other') ? 'block' : 'none';
+        if (wrapper.classList.contains('hidden')) {
+            if (val === 'other') wrapper.classList.remove('hidden');
+            else wrapper.classList.add('hidden');
+        }
+    }
+}
+
+
 async function loadProductsForEngine(prefix = '') {
     const productSelect = document.getElementById(prefix + 'de-products');
     if (!productSelect) return;
@@ -163,12 +175,16 @@ window.handleLeadConversionModal = function () {
     const leadPhone = document.getElementById('leadDetailPhone')?.textContent || '';
     const leadName = document.getElementById('leadDetailName')?.textContent || '';
     const leadVillage = document.getElementById('leadDetailVillage')?.textContent || '';
+    const leadDistrict = document.getElementById('leadDetailDistrict')?.textContent || '';
+    const leadPincode = document.getElementById('leadDetailPincode')?.textContent || '';
     const leadState = document.getElementById('leadDetailState')?.textContent || '';
     const leadLanguage = document.getElementById('leadDetailLanguage')?.textContent || 'EN';
 
     const phoneInput = document.getElementById('de-phone');
     const nameInput = document.getElementById('de-customer-name');
     const villageInput = document.getElementById('de-village');
+    const districtInput = document.getElementById('de-district');
+    const pincodeInput = document.getElementById('de-pincode');
     const stateInput = document.getElementById('de-state');
     const langInput = document.getElementById('de-language');
 
@@ -177,6 +193,14 @@ window.handleLeadConversionModal = function () {
 
     if (villageInput && leadVillage && leadVillage !== '-') {
         villageInput.value = leadVillage;
+    }
+
+    if (districtInput && leadDistrict && leadDistrict !== '-') {
+        districtInput.value = leadDistrict;
+    }
+
+    if (pincodeInput && leadPincode && leadPincode !== '-') {
+        pincodeInput.value = leadPincode;
     }
 
     if (stateInput && leadState && leadState !== '-') {
@@ -238,19 +262,43 @@ function hideAllSubforms() {
 function handleSalesStatusChange(status) {
     hideAllSubforms();
 
+    const nextBtn = document.getElementById('de-next-3');
+    const saveBtn = document.getElementById('de-save-3');
+
     if (status === 'converted' || status === 'Ordered') {
+        // If ordered, we MUST go to step 4 (Product Selection)
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (saveBtn) saveBtn.style.display = 'none';
+        
+        // Show the order form in STEP 4 (it will be visible when we go there)
         document.getElementById('de-form-order').style.display = 'block';
         document.getElementById('de-order-screenshot').setAttribute('required', 'true');
         calculateOrderAmounts(); // Fresh calculation
     } else if (status === 'interested' || status === 'followup' || status === 'dealer' || status === 'Hot/Very Interested' || status === 'Mild/Later' || status === 'Dealer') {
+        // For interest/followup, we can go to step 4 to pick products OR just save
+        // Let's allow going to step 4 to pick what they are interested in
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (saveBtn) saveBtn.style.display = 'block'; // Allow direct save too
+        
         document.getElementById('de-form-followup').style.display = 'block';
         document.getElementById('de-followup-date').setAttribute('required', 'true');
     } else if (status === 'not_interested' || status === 'Cold/Not Interested') {
+        // Just save
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
+        
         document.getElementById('de-form-reason').style.display = 'block';
         document.getElementById('de-lost-reason').setAttribute('required', 'true');
     } else if (status === 'lost' || status === 'Old Purchased') {
+        // Just save
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
+        
         document.getElementById('de-form-feedback').style.display = 'block';
         document.getElementById('de-feedback-satisfaction').setAttribute('required', 'true');
+    } else {
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (saveBtn) saveBtn.style.display = 'none';
     }
 }
 
@@ -267,25 +315,32 @@ function deNextStep(targetStep) {
 
         // Routing logic based on Call Status
         if (leadPath === 'quick_order') {
-            // Booked -> Skip to Order
+            // Booked -> Skip to Decision
             hideAllSubforms();
-            targetStep = 4;
+            targetStep = 3;
             document.getElementById('de-sales-status-container').style.display = 'block';
             document.getElementById('de-sales-status').value = 'Ordered';
             handleSalesStatusChange('Ordered');
         } else if (leadPath === 'not_connected') {
             // Not connected -> Skip to Form directly
             hideAllSubforms();
-            targetStep = 4;
+            targetStep = 3; // Decision step now houses the not connected log
             // Hide standard sales status, show not connected log immediately
             document.getElementById('de-sales-status-container').style.display = 'none';
             document.getElementById('de-form-notconnected').style.display = 'block';
             document.getElementById('de-nc-date').setAttribute('required', 'true');
+            // In not_connected path, Step 3 should show Save button
+            if (document.getElementById('de-next-3')) document.getElementById('de-next-3').style.display = 'none';
+            if (document.getElementById('de-save-3')) document.getElementById('de-save-3').style.display = 'block';
         } else {
             // Normal flow -> go to Step 2
             targetStep = 2;
             document.getElementById('de-sales-status-container').style.display = 'block';
         }
+    } else if (currentStep === 2) {
+        targetStep = 3;
+    } else if (currentStep === 3) {
+        targetStep = 4;
     }
 
     goToStep(targetStep);
@@ -293,12 +348,14 @@ function deNextStep(targetStep) {
 
 function dePrevStep(targetStep) {
     // Reverse routing logic
-    if (currentStep === 4) {
+    if (currentStep === 3) {
         if (leadPath === 'quick_order' || leadPath === 'not_connected') {
-            targetStep = 1; // Go back to start
+            targetStep = 1;
         } else {
-            targetStep = 3;
+            targetStep = 2;
         }
+    } else if (currentStep === 4) {
+        targetStep = 3;
     }
 
     goToStep(targetStep);
@@ -347,6 +404,8 @@ function resetDecisionEngine() {
     // Clear Customer Details
     document.getElementById('de-customer-name').value = '';
     document.getElementById('de-village').value = '';
+    document.getElementById('de-district').value = '';
+    document.getElementById('de-pincode').value = '';
     document.getElementById('de-state').value = 'Karnataka'; // default
 
     // Clear product selections
@@ -362,8 +421,16 @@ function resetDecisionEngine() {
     document.getElementById('de-order-final').value = 0;
     document.getElementById('de-order-due').value = 0;
 
+    // Reset Delivery Type
+    if (document.getElementById('de-delivery-type')) document.getElementById('de-delivery-type').value = 'Post office COD';
+    if (document.getElementById('de-delivery-other')) document.getElementById('de-delivery-other').value = '';
+    if (document.getElementById('de-delivery-other-wrapper')) document.getElementById('de-delivery-other-wrapper').style.display = 'none';
+
     document.getElementById('de-sales-status-container').style.display = 'block';
     document.getElementById('de-sales-status').value = '';
+
+    if (document.getElementById('de-next-3')) document.getElementById('de-next-3').style.display = 'block';
+    if (document.getElementById('de-save-3')) document.getElementById('de-save-3').style.display = 'none';
 
     handleSalesStatusChange('');
     goToStep(1);
@@ -416,6 +483,8 @@ async function submitDecisionEngine() {
         const customerName = document.getElementById('de-customer-name').value;
         const phone = document.getElementById('de-phone').value;
         const village = document.getElementById('de-village').value;
+        const district = document.getElementById('de-district').value;
+        const pincode = document.getElementById('de-pincode').value;
         const state = document.getElementById('de-state').value;
 
         // 1. Process Order if status is Ordered
@@ -434,11 +503,17 @@ async function submitDecisionEngine() {
             if (items.length === 0) return window.showAlert("Selection Error", "Please select at least one product in Step 3.", "error");
 
             const formData = new FormData();
+            const deliveryTypeVal = document.getElementById('de-delivery-type').value;
+            const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('de-delivery-other').value : deliveryTypeVal;
+
             formData.append('lead_id', leadId);
             formData.append('customer_name', customerName);
             formData.append('phone', phone);
             formData.append('city', village);
+            formData.append('district', district);
+            formData.append('pincode', pincode);
             formData.append('state', state);
+            formData.append('delivery_type', deliveryType);
             formData.append('total_amount', document.getElementById('de-order-total').value);
             formData.append('advance_amount', document.getElementById('de-order-advance').value);
             formData.append('items', JSON.stringify(items));
@@ -510,6 +585,8 @@ async function submitDecisionEngine() {
         const updatePayload = {
             customer_name: customerName,
             city: village,
+            district: district,
+            pincode: pincode,
             state: state,
             status: finalStatus,
             score: finalScore,
@@ -557,13 +634,19 @@ async function submitDecisionEngine() {
                 };
             });
 
+            const deliveryTypeVal = document.getElementById('de-delivery-type').value;
+            const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('de-delivery-other').value : deliveryTypeVal;
+
             const orderPayload = {
                 lead_id: leadId,
                 customer_name: customerName,
                 phone: phone,
                 address: village,
                 city: village,
+                district: district,
+                pincode: pincode,
                 state: state,
+                delivery_type: deliveryType,
                 total_amount: totalAmt, 
                 advance_amount: advAmt,
                 items: items
@@ -637,6 +720,11 @@ function initManualLeadForm() {
 
     mGoToStep(1);
     mHideAllSubforms();
+
+    // Reset Delivery Type
+    if (document.getElementById('m-de-delivery-type')) document.getElementById('m-de-delivery-type').value = 'Post office COD';
+    if (document.getElementById('m-de-delivery-other')) document.getElementById('m-de-delivery-other').value = '';
+    if (document.getElementById('m-de-delivery-other-wrapper')) document.getElementById('m-de-delivery-other-wrapper').classList.add('hidden');
 }
 
 function mHandleCallStatusChange(status) {
@@ -664,19 +752,33 @@ function mHandleSalesStatusChange(status) {
         if (el) el.classList.add('hidden');
     });
 
+    const nextBtn = document.getElementById('m-de-next-3');
+    const saveBtn = document.getElementById('m-de-save-3');
+
     if (status === 'Ordered') {
         const orderForm = document.getElementById('m-de-form-order');
         if (orderForm) orderForm.classList.remove('hidden');
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (saveBtn) saveBtn.style.display = 'none';
         calculateOrderAmounts('m-');
     } else if (['Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(status)) {
         const followupForm = document.getElementById('m-de-form-followup');
         if (followupForm) followupForm.classList.remove('hidden');
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (saveBtn) saveBtn.style.display = 'block';
     } else if (status === 'Cold/Not Interested') {
         const lostForm = document.getElementById('m-de-form-lost');
         if (lostForm) lostForm.classList.remove('hidden');
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
     } else if (status === 'Old Purchased') {
         const feedbackForm = document.getElementById('m-de-form-feedback');
         if (feedbackForm) feedbackForm.classList.remove('hidden');
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
+    } else {
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (saveBtn) saveBtn.style.display = 'none';
     }
 }
 
@@ -696,12 +798,16 @@ function mDeNextStep(targetStep) {
                 salesStatusInput.value = 'Ordered';
                 mHandleSalesStatusChange('Ordered');
             }
-            targetStep = 4;
+            targetStep = 3; // Decision
         } else if (mLeadPath === 'not_connected') {
             mHideAllSubforms();
             const ncForm = document.getElementById('m-de-form-notconnected');
             if (ncForm) ncForm.classList.remove('hidden');
-            targetStep = 4;
+            
+            if (document.getElementById('m-de-next-3')) document.getElementById('m-de-next-3').style.display = 'none';
+            if (document.getElementById('m-de-save-3')) document.getElementById('m-de-save-3').style.display = 'block';
+            
+            targetStep = 3; // Decision (Not Connected)
         } else {
             targetStep = 2;
         }
@@ -709,14 +815,8 @@ function mDeNextStep(targetStep) {
         targetStep = 3;
     } else if (mCurrentStep === 3) {
         targetStep = 4;
-        mHideAllSubforms();
-        const statusContainer = document.getElementById('m-de-sales-status-container');
-        if (statusContainer) {
-            statusContainer.classList.remove('hidden');
-            // Trigger initial subform visibility for the default 'Ordered' status
-            const defaultStatus = document.getElementById('m-de-sales-status').value;
-            mHandleSalesStatusChange(defaultStatus);
-        }
+        // In Step 4 (Products), we should always show the save button at the end
+        // If it was an order, the m-de-form-order will be visible because mHandleSalesStatusChange was called
     }
     mGoToStep(targetStep);
 }
@@ -768,6 +868,8 @@ async function submitManualLeadWizard() {
         const phone = document.getElementById('m-de-phone').value;
         const name = document.getElementById('m-de-customer-name').value;
         const village = document.getElementById('m-de-village').value;
+        const district = document.getElementById('m-de-district').value;
+        const pincode = document.getElementById('m-de-pincode').value;
         const state = document.getElementById('m-de-state').value;
         const lang = document.getElementById('m-de-language').value;
         const callStatus = document.getElementById('m-de-call-status').value;
@@ -786,10 +888,14 @@ async function submitManualLeadWizard() {
             phone_number: phone,
             customer_name: name,
             city: village,
+            district: district,
+            pincode: pincode,
             state: state,
             language: lang,
             status: finalLeadStatus,
-            source: 'manual'
+            source: 'manual',
+            delivery_type: (document.getElementById('m-de-sales-status').value === 'Ordered') ? 
+                (document.getElementById('m-de-delivery-type').value === 'other' ? document.getElementById('m-de-delivery-other').value : document.getElementById('m-de-delivery-type').value) : null
         };
 
         if (mLeadPath === 'not_connected') {
@@ -837,12 +943,18 @@ async function submitManualLeadWizard() {
                 price: parseFloat(opt.getAttribute('data-price')) || 0
             }));
 
+            const deliveryTypeVal = document.getElementById('m-de-delivery-type').value;
+            const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('m-de-delivery-other').value : deliveryTypeVal;
+
             const formData = new FormData();
             formData.append('lead_id', leadId);
             formData.append('customer_name', name);
             formData.append('phone', phone);
             formData.append('city', village);
+            formData.append('district', district);
+            formData.append('pincode', pincode);
             formData.append('state', state);
+            formData.append('delivery_type', deliveryType);
             formData.append('total_amount', document.getElementById('m-de-order-total').value);
             formData.append('advance_amount', document.getElementById('m-de-order-advance').value);
             formData.append('items', JSON.stringify(items));

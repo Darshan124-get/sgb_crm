@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'sales': ['Lead Pipeline', 'Customer Database', 'Order Management', 'Follow-up Reminders'],
             'billing': ['GST Invoicing', 'Payment Tracking', 'Inventory Valuation', 'Tax Reports'],
             'packing': ['Quality Check', 'Barcode Generation', 'Stock Fulfillment', 'Manifesting'],
-            'shipment': ['Courier Integration', 'Live Tracking', 'RTO Management', 'Zone Mapping']
+            'shipping': ['Courier Integration', 'Live Tracking', 'RTO Management', 'Zone Mapping']
         };
         const rolesList = document.getElementById('rolesList');
         rolesList.innerHTML = rolesData.map(r => `

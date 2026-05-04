@@ -24,15 +24,15 @@ window.API_URL = `${window.BASE_URL}/api`;
         if (index !== -1) {
             const subPath = path.substring(index + 1);
             const segments = subPath.split('/').filter(Boolean);
-            const depth = segments.length - 1; // -1 because the last segment is the filename/page
-            window.ROOT_PATH = '../'.repeat(Math.max(0, depth));
+            const depth = segments.length - 1;
+            window.ROOT_PATH = '../'.repeat(Math.max(0, depth)) || './';
             rootFound = true;
             break;
         }
     }
 
     if (!rootFound) {
-        window.ROOT_PATH = '';
+        window.ROOT_PATH = './';
     }
     console.log('Computed ROOT_PATH:', window.ROOT_PATH, 'for path:', path);
 })();
@@ -42,8 +42,9 @@ window.ROLE_REDIRECTS = {
     admin:    'modules/admin/dashboard.html',
     sales:    'modules/sales/dashboard.html',
     billing:  'modules/billing/billing.html',
-    packing:  'modules/packing/packing.html',
-    shipping: 'modules/shipping/shipping.html'
+    packing:  'modules/packing/dashboard.html',
+    shipping: 'modules/shipping/dashboard.html',
+    shipment: 'modules/shipping/dashboard.html'
 };
 
 // ─── Get Current User ────────────────────────────────────────

@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             sales: 'sidebar-sales.html',
             billing: 'sidebar-billing.html',
             packing: 'sidebar-packing.html',
-            shipping: 'sidebar-shipping.html'
+            shipping: 'sidebar-shipping.html',
+            shipment: 'sidebar-shipping.html'
         };
 
         const sidebarFile = sidebarMap[role] || 'sidebar-sales.html'; // Default to sales if unknown
@@ -73,9 +74,20 @@ function initSidebar(links) {
         const href = link.getAttribute('href');
         if (!href || href === '#' || href.startsWith('http') || href.startsWith('javascript:')) return;
 
-        // Prepend ROOT_PATH to links that are not absolute
-        if (!href.startsWith('/') && !href.includes('://')) {
-            link.href = `${window.ROOT_PATH}${href}`;
+        // ── Smart Path Resolution ──
+        // Resolve the link relative to the frontend root (ROOT_PATH)
+        try {
+            // Create a base URL pointing to the frontend root
+            const rootUrl = new URL(window.ROOT_PATH, window.location.href).href;
+            // Resolve the href against that root
+            const resolvedUrl = new URL(href, rootUrl).href;
+            link.href = resolvedUrl;
+        } catch (e) {
+            console.error('Path resolution failed for:', href, e);
+            // Fallback to simple concatenation if URL API fails
+            if (!href.startsWith('/') && !href.startsWith('.') && !href.includes('://')) {
+                link.href = `${window.ROOT_PATH}${href}`;
+            }
         }
 
         // Highlight active link
@@ -469,12 +481,15 @@ async function populateLeadDetails(leadId) {
                 leadDetailPhone: lead.phone_number,
                 leadDetailVillage: lead.city,
                 leadDetailState: lead.state,
+                leadDetailDistrict: lead.district || '-',
+                leadDetailPincode: lead.pincode || '-',
                 leadDetailLanguage: lead.language || 'EN',
                 leadDetailLanguageInfo: lead.language || 'English',
                 leadDetailAssigned: lead.assigned_to_name || 'Unassigned',
                 leadDetailAssignedId: lead.assigned_to || '',
                 topCustomerNameDisplay: lead.customer_name,
                 leadDetailSaleStatus: lead.status || 'New',
+                leadDetailStatusSelect: lead.status || 'new',
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailScoreSelect: lead.score || 'cold',
                 leadDetailCrop: lead.current_crop || '-',
@@ -484,9 +499,12 @@ async function populateLeadDetails(leadId) {
 
                 // Edit Inputs mapping
                 editName: lead.customer_name,
+                phone_number: lead.phone_number,
                 editPhone: lead.phone_number,
                 editVillage: lead.city,
                 editState: lead.state,
+                editDistrict: lead.district,
+                editPincode: lead.pincode,
                 editLanguage: lead.language || 'EN',
                 editCrop: lead.current_crop,
                 editAcreage: lead.acreage,
@@ -679,6 +697,8 @@ window.saveLeadSection = async function (sectionId) {
         payload.phone_number = document.getElementById('editPhone').value;
         payload.city = document.getElementById('editVillage').value;
         payload.state = document.getElementById('editState').value;
+        payload.district = document.getElementById('editDistrict').value;
+        payload.pincode = document.getElementById('editPincode').value;
         payload.language = document.getElementById('editLanguage').value;
     } else if (sectionId === 'requirementSection') {
         payload.current_crop = document.getElementById('editCrop').value;
@@ -1040,6 +1060,7 @@ window.submitQuickLead = async function() {
     const name = document.getElementById('q-name').value.trim();
     const village = document.getElementById('q-village').value.trim();
     const district = document.getElementById('q-district').value.trim();
+    const pincode = document.getElementById('q-pincode').value.trim();
     const submitBtn = document.getElementById('q-submit-btn');
 
     if (!phone || phone.length < 10) {
@@ -1062,7 +1083,8 @@ window.submitQuickLead = async function() {
                 phone_number: phone,
                 customer_name: name,
                 city: village,
-                address: district, // Map district to address field
+                district: district,
+                pincode: pincode,
                 source: 'manual',
                 language: 'EN' // Default
             })

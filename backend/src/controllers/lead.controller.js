@@ -137,7 +137,7 @@ exports.getLeadById = async (req, res) => {
 };
 
 exports.createLead = async (req, res) => {
-    const { phone_number, customer_name, first_message, language, address, city, state, source } = req.body;
+    const { phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, delivery_type } = req.body;
     const connection = await pool.getConnection();
 
     try {
@@ -179,9 +179,9 @@ exports.createLead = async (req, res) => {
         }
 
         const [result] = await connection.query(
-            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, source, status, assigned_to) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [phone_number, customer_name, first_message, language, address, city, state, source || 'manual', status, assignedTo]
+            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [phone_number, customer_name, first_message, language, address, city, state, district || null, pincode || null, source || 'manual', status, assignedTo, delivery_type || null]
         );
 
         const leadId = result.insertId;
@@ -204,9 +204,9 @@ exports.createLead = async (req, res) => {
 
 exports.updateLead = async (req, res) => {
     const {
-        phone_number, customer_name, first_message, language, address, city, state,
+        phone_number, customer_name, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
-        current_crop, acreage
+        current_crop, acreage, delivery_type
     } = req.body;
 
     let connection;
@@ -223,15 +223,15 @@ exports.updateLead = async (req, res) => {
         await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
-                address = ?, city = ?, state = ?, status = ?, assigned_to = ?,
+                address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
-                current_crop = ?, acreage = ?
+                current_crop = ?, acreage = ?, delivery_type = ?
             WHERE lead_id = ?`,
             [
                 phone_number, customer_name, first_message, language,
-                address, city, state, status, finalAssignedTo,
+                address, city, state, district || null, pincode || null, status, finalAssignedTo,
                 score || 'cold', next_followup_date || null, lost_reason || null, lost_notes || null,
-                current_crop || null, acreage || null,
+                current_crop || null, acreage || null, delivery_type || null,
                 req.params.id
             ]
         );

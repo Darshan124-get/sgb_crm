@@ -4,10 +4,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Packing | SGB Agro CRM</title>
+    <title>Packing Orders | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .packing-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+
+        .packing-tab {
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .packing-tab.active {
+            background: #8b5cf620;
+            color: #8b5cf6;
+        }
+
+        .order-details-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content-premium {
+            background: white;
+            width: 90%; max-width: 800px;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            max-height: 90vh; overflow-y: auto;
+            position: relative;
+        }
+
+        .print-only { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea { 
+                position: absolute; 
+                left: 0; top: 0; 
+                width: 100%; 
+                display: flex !important; 
+                flex-direction: column;
+                gap: 20px;
+            }
+            .premium-card, .topbar, .sidebar, .packing-tabs { display: none !important; }
+        }
+    </style>
 </head>
 
 <body>
@@ -15,57 +72,50 @@
         <div id="sidebar-container"></div>
         <main class="main-content">
             <header class="topbar">
-                <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="orderSearch"
-                        oninput="filterOrders()" placeholder="Search orders..."></div>
-                <div class="profile-section"><span class="profile-name" id="profileName">Packing</span>
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="orderSearch" oninput="filterOrders()" placeholder="Search Order ID, Name, Phone...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">Packing Staff</span>
                     <div class="avatar"><i class="fa-solid fa-user"></i></div>
                 </div>
             </header>
+
             <div class="content-body">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
                     <div>
-                        <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">📦 Packing Dashboard</h1>
-                        <p style="color:#64748b;font-size:0.875rem;">Draft orders ready to be packed. Mark each one as
-                            packed to move it to billing.</p>
+                        <h1 style="font-size:1.5rem; font-weight:800; color:#1e293b;">📦 Packing Orders</h1>
+                        <p style="color:#64748b; font-size:0.875rem;">Manage and track product packaging workflow.</p>
                     </div>
-                    <div style="display:flex;align-items:center;gap:1rem;">
-                        <span id="pendingCount"
-                            style="background:#8b5cf620;color:#8b5cf6;font-weight:700;padding:6px 16px;border-radius:20px;font-size:0.875rem;">0
-                            Pending</span>
-                        <button onclick="fetchOrders()"
-                            style="padding:0.5rem 1rem;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:0.875rem;color:#374151;display:flex;align-items:center;gap:0.4rem;"><i
-                                class="fas fa-refresh"></i> Refresh</button>
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <button onclick="fetchOrders()" class="login-btn btn-outline" style="width:auto; padding:0.5rem 1rem;">
+                            <i class="fas fa-sync-alt mr-2"></i> Refresh
+                        </button>
                     </div>
                 </div>
 
+                <div class="packing-tabs">
+                    <div class="packing-tab active" id="tab-pending" onclick="switchTab('pending')">Pending <span id="pendingCount">0</span></div>
+                    <div class="packing-tab" id="tab-completed" onclick="switchTab('completed')">Completed <span id="completedCount">0</span></div>
+                </div>
+
                 <div class="premium-card" style="overflow:hidden;">
-                    <table style="width:100%;border-collapse:collapse;">
+                    <table style="width:100%; border-collapse:collapse;">
                         <thead style="background:#f8fafc;">
                             <tr>
-                                <th
-                                    style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">
-                                    Order ID</th>
-                                <th
-                                    style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">
-                                    Customer / Dealer</th>
-                                <th
-                                    style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">
-                                    Phone</th>
-                                <th
-                                    style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">
-                                    Items</th>
-                                <th
-                                    style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">
-                                    Order Date</th>
-                                <th
-                                    style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">
-                                    Action</th>
+                                <th style="padding:1rem 1.25rem; text-align:left; font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase;">Order ID</th>
+                                <th style="padding:1rem 1.25rem; text-align:left; font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase;">Customer / Address</th>
+                                <th style="padding:1rem 1.25rem; text-align:left; font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase;">Products</th>
+                                <th style="padding:1rem 1.25rem; text-align:left; font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase;">Date</th>
+                                <th style="padding:1rem 1.25rem; text-align:left; font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase;">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="packagingTableBody">
+                        <tbody id="packingTableBody">
                             <tr>
-                                <td colspan="6" style="padding:3rem;text-align:center;color:#94a3b8;"><i
-                                        class="fas fa-circle-notch fa-spin"></i> Loading orders...</td>
+                                <td colspan="5" style="padding:3rem; text-align:center; color:#94a3b8;">
+                                    <i class="fas fa-circle-notch fa-spin"></i> Loading orders...
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -73,13 +123,43 @@
             </div>
         </main>
     </div>
-    <div id="toast" class="toast"
-        style="position:fixed;bottom:1.5rem;right:1.5rem;background:#1e293b;color:white;padding:1rem 1.5rem;border-radius:10px;font-size:0.875rem;font-weight:600;display:none;z-index:9999;">
+
+    <!-- Order Details Modal -->
+    <div id="orderDetailsModal" class="order-details-modal" onclick="if(event.target==this) closeModal()">
+        <div class="modal-content-premium">
+            <button onclick="closeModal()" style="position:absolute; top:1.5rem; right:1.5rem; background:none; border:none; font-size:1.5rem; color:#94a3b8; cursor:pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="modalContent">
+                <!-- Data injected by JS -->
+            </div>
+        </div>
     </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="order-details-modal" style="display: none; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+        <div class="modal-content-premium" style="max-width: 450px; text-align: center; padding: 2.5rem;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: #ede9fe; color: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1.5rem;">
+                <i class="fas fa-question-circle"></i>
+            </div>
+            <h2 id="confirmTitle" style="font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-bottom: 0.75rem;">Are you sure?</h2>
+            <p id="confirmMessage" style="color: #64748b; margin-bottom: 2rem; line-height: 1.6;">Do you really want to perform this action?</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button id="confirmCancel" class="login-btn btn-outline" style="width: auto; padding: 0.75rem 2rem;">No, Cancel</button>
+                <button id="confirmProceed" class="login-btn" style="width: auto; padding: 0.75rem 2rem; background: #8b5cf6;">Yes, Proceed</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Print Area -->
+    <div id="printArea" class="print-only" style="padding:20px; font-family:sans-serif;">
+        <!-- Address label will be injected here -->
+    </div>
+
+    <div id="toast" class="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:#1e293b; color:white; padding:1rem 1.5rem; border-radius:10px; font-size:0.875rem; font-weight:600; display:none; z-index:9999;"></div>
+
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
-    <script src="../../js/decision-engine.js"></script>
     <script src="js/packing.js"></script>
 </body>
-
 </html>

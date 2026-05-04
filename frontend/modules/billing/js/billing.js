@@ -64,7 +64,7 @@ function renderWorkstation() {
                         </div>
                         <div>
                             <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Dispatched Through</label>
-                            <input type="text" id="dispatchThroughInput" class="form-input" style="height: 38px;" value="${data.dispatch_through || ''}">
+                            <input type="text" id="dispatchThroughInput" class="form-input" style="height: 38px;" value="${data.dispatch_through || data.delivery_type || data.lead_delivery_type || ''}">
                         </div>
                         <div>
                             <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Destination</label>

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping Orders | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-light: #ddd6fe;
+            --secondary: #10b981;
+            --bg-body: #f8fafc;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .dashboard-wrapper { display: flex; min-height: 100vh; background: var(--bg-body); }
+        .main-content { flex: 1; padding: 2.5rem; overflow-y: auto; }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .header-title h1 { font-size: 1.875rem; font-weight: 800; color: #1e293b; margin-bottom: 0.25rem; }
+        .header-title p { color: #64748b; font-size: 0.95rem; }
+
+        /* Tabs Styling */
+        .shipping-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            background: #f1f5f9;
+            padding: 0.5rem;
+            border-radius: 16px;
+            width: fit-content;
+        }
+
+        .shipping-tab {
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            color: #64748b;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .shipping-tab.active {
+            background: white;
+            color: #8b5cf6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .tab-count {
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+        .shipping-tab.active .tab-count { background: #ede9fe; color: #8b5cf6; }
+
+        /* Table Styling - Clean & Standard */
+        .shipping-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            border: 1px solid #edf2f7;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .shipping-table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0;
+        }
+
+        .shipping-table th {
+            text-align: left;
+            padding: 1rem 1.5rem;
+            background: #f8fafc;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        .shipping-table td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #f8fafc;
+            vertical-align: middle;
+            transition: background 0.2s;
+        }
+
+        .shipping-table tr:hover td { background: #fcfdfe; }
+
+        .order-id { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 800; 
+            color: #1e293b; 
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+
+        .customer-info h4 { font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0; }
+        .customer-info p { font-size: 0.8rem; color: #64748b; margin: 2px 0 0 0; }
+
+        .items-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .item-tag {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border: 1px solid #e2e8f0;
+        }
+
+        .action-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* Toast Notification - Fixed Position */
+        #toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem; /* User mentioned left bottom, let's make it look like a clean snackbar */
+            background: #1e293b;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: none;
+            z-index: 9999;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.3s ease;
+            min-width: 250px;
+            border-left: 4px solid #8b5cf6;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .btn-ship { background: #8b5cf6; color: white; }
+        .btn-ship:hover { background: #7c3aed; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); }
+
+        .btn-view { background: #f1f5f9; color: #475569; }
+        .btn-view:hover { background: #e2e8f0; }
+
+        /* Modal Enhancements */
+        .modal-content-premium {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 28px;
+            padding: 3rem;
+            max-width: 550px;
+            width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.6rem; }
+        .form-input {
+            width: 100%;
+            padding: 0.85rem 1.25rem;
+            border: 2px solid #f1f5f9;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .form-input:focus { border-color: #8b5cf6; outline: none; background: white; }
+
+        .shipping-table th:nth-child(1) { width: 140px; } /* Order ID */
+        .shipping-table th:nth-child(2) { width: auto; }  /* Customer */
+        .shipping-table th:nth-child(3) { width: 200px; } /* Items */
+        .shipping-table th:nth-child(4) { width: 120px; } /* Date */
+        .shipping-table th:nth-child(5) { width: 140px; } /* Action */
+
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-packed { background: #fff7ed; color: #f59e0b; border: 1px solid #ffedd5; }
+        .status-shipped { background: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; }
+
+        .empty-state { text-align: center; padding: 5rem 2rem; color: #94a3b8; }
+        .empty-state i { font-size: 3.5rem; margin-bottom: 1.5rem; opacity: 0.5; }
+        .empty-state h3 { font-weight: 700; color: #475569; margin-bottom: 0.5rem; }
+
+        /* Modal Base Positioning */
+        .order-details-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        
+        <main class="main-content">
+            <div class="page-header">
+                <div class="header-title">
+                    <h1>Shipping Center</h1>
+                    <p>Fulfill packed orders and manage logistics dispatches.</p>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <div class="refresh-btn" style="background: white; border: 1px solid #e2e8f0; padding: 0.75rem 1.5rem; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; font-weight: 600;" onclick="fetchOrders()">
+                        <i class="fas fa-sync-alt"></i> Refresh Orders
+                    </div>
+                </div>
+            </div>
+
+            <div class="shipping-tabs">
+                <button class="shipping-tab active" onclick="switchTab('pending')" id="tab-pending">
+                    <i class="fas fa-clock"></i> Pending <span class="tab-count" id="pendingCount">0</span>
+                </button>
+                <button class="shipping-tab" onclick="switchTab('completed')" id="tab-completed">
+                    <i class="fas fa-check-circle"></i> Completed <span class="tab-count" id="completedCount">0</span>
+                </button>
+            </div>
+
+            <div class="shipping-card">
+                <table class="shipping-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Order ID</th>
+                            <th style="width: 35%;">Customer & Destination</th>
+                            <th style="width: 25%;">Packed Items</th>
+                            <th style="width: 10%;">Date</th>
+                            <th style="width: 15%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shippingTableBody">
+                        <!-- Content loaded via JS -->
+                    </tbody>
+                </table>
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <i class="fas fa-truck-ramp-box"></i>
+                    <h3>All clear!</h3>
+                    <p>No orders are currently waiting for shipping.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Ship Action Modal -->
+    <div id="shipModal" class="order-details-modal">
+        <div class="modal-content-premium">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 800; color: #1e293b;">🚚 Dispatch Order</h2>
+                <button onclick="closeShipModal()" style="background: none; border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="shipForm" onsubmit="handleShipSubmit(event)">
+                <input type="hidden" id="shipOrderId">
+                
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label>Select Logistics Partner *</label>
+                    <select id="courierName" class="form-input" required>
+                        <option value="">-- Choose Carrier --</option>
+                        <option value="India Post">India Post</option>
+                        <option value="VRL">VRL Logistics</option>
+                        <option value="DTDC">DTDC Courier</option>
+                        <option value="Professional">Professional Courier</option>
+                        <option value="Trackon">Trackon</option>
+                        <option value="Self Pickup">Self Pickup</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 2rem;">
+                    <label>Tracking ID / Docket Number *</label>
+                    <input type="text" id="trackingId" class="form-input" required placeholder="Ex: SGB123456789">
+                </div>
+
+                <div style="display: flex; gap: 1rem;">
+                    <button type="button" onclick="closeShipModal()" class="action-btn btn-view" style="flex: 1; justify-content: center; padding: 1rem;">Cancel</button>
+                    <button type="submit" class="action-btn btn-ship" style="flex: 2; justify-content: center; padding: 1rem;">Confirm Dispatch</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="orderDetailsModal" class="order-details-modal" onclick="if(event.target==this) closeModal()">
+        <div class="modal-content-premium">
+            <button onclick="closeModal()" style="position:absolute; top:1.5rem; right:1.5rem; background:none; border:none; font-size:1.5rem; color:#94a3b8; cursor:pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <div id="toast" style="position:fixed;bottom:1.5rem;right:1.5rem;color:white;padding:1rem 1.5rem;border-radius:12px;font-size:0.875rem;font-weight:700;display:none;z-index:9999;box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);"></div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/shipping.js"></script>
+</body>
+</html>

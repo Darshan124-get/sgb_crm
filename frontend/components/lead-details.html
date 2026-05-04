@@ -99,6 +99,16 @@
                         </select>
                     </div>
                     <div class="info-item">
+                        <label>District</label>
+                        <p id="leadDetailDistrict" class="view-item">-</p>
+                        <input type="text" id="editDistrict" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
+                        <label>Pincode</label>
+                        <p id="leadDetailPincode" class="view-item">-</p>
+                        <input type="text" id="editPincode" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item">
                         <label>Language</label>
                         <p id="leadDetailLanguageInfo" class="view-item">-</p>
                         <select id="editLanguage" class="edit-item form-control-premium" style="display:none">
@@ -321,8 +331,8 @@
             style="display:flex; justify-content:space-between; padding: 1rem 2rem; background:#f8fafc; border-bottom: 1px solid var(--border-color); font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">
             <span id="step1-ind" class="step-ind active" style="color:var(--primary-color);">1. Status</span>
             <span id="step2-ind" class="step-ind">2. Customer</span>
-            <span id="step3-ind" class="step-ind">3. Product</span>
-            <span id="step4-ind" class="step-ind">4. Decision</span>
+            <span id="step3-ind" class="step-ind">3. Decision</span>
+            <span id="step4-ind" class="step-ind">4. Product</span>
         </div>
 
         <!-- Body -->
@@ -383,6 +393,18 @@
                         </select>
                     </div>
                 </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                    <div class="form-group">
+                        <label>District</label>
+                        <input type="text" id="de-district" class="form-control-premium" placeholder="Enter District"
+                            style="color:#000;">
+                    </div>
+                    <div class="form-group">
+                        <label>Pincode</label>
+                        <input type="text" id="de-pincode" class="form-control-premium" placeholder="6-digit Pincode"
+                            style="color:#000;">
+                    </div>
+                </div>
                 <!-- Added Language Field -->
                 <div class="form-group">
                     <label>Lead Language</label>
@@ -403,34 +425,9 @@
                 </div>
             </div>
 
-            <!-- STEP 3: PRODUCT -->
+            <!-- STEP 3: DECISION -->
             <div id="wizard-step-3" class="wizard-step" style="display:none;">
-                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 3: Product Selection</h3>
-                <div class="form-group">
-                    <label>Select Products (Multi-select)</label>
-                    <select id="de-products" class="form-control-premium" multiple style="height:120px; color:#000;">
-                        <!-- Will be populated dynamically or fallback to hardcoded if API fails -->
-                        <option value="Brush Cutter Machine" data-id="1" data-price="12000">Brush Cutter Machine
-                        </option>
-                        <option value="Trolley" data-id="2" data-price="8500">Trolley</option>
-                        <option value="Dumper" data-id="3" data-price="15000">Dumper</option>
-                        <option value="Accessories" data-id="4" data-price="2000">Accessories</option>
-                    </select>
-                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Hold Ctrl (Windows) or
-                        Cmd (Mac) to select multiple.</p>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
-                    <button onclick="dePrevStep(2)" class="login-btn btn-outline"
-                        style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
-                    <button onclick="deNextStep(4)" class="login-btn" style="width:auto; padding: 0.6rem 2rem;">Next <i
-                            class="fas fa-arrow-right ml-2"></i></button>
-                </div>
-            </div>
-
-            <!-- STEP 4: DECISION (Dynamic) -->
-            <div id="wizard-step-4" class="wizard-step" style="display:none;">
-                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 4: Sales Status & Decision
-                </h3>
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 3: Sales Status & Decision</h3>
 
                 <div id="de-sales-status-container" class="form-group">
                     <label>Sales Status *</label>
@@ -445,53 +442,8 @@
                     </select>
                 </div>
 
-                <!-- DYNAMIC SUB-FORMS -->
-
-                <!-- 1A: ORDER FORM -->
-                <div id="de-form-order" class="dynamic-subform"
-                    style="display:none; background:#ecfdf5; padding:1.5rem; border-radius:0.75rem; border:1px solid #d1fae5; margin-top:1rem;">
-                    <h4 style="color:#065f46; margin-bottom:1rem;"><i class="fas fa-shopping-cart mr-2"></i> Order
-                        Configuration</h4>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.875rem;">
-                        <span style="font-weight:600;">Selected Products:</span>
-                        <span id="de-order-products-display">-</span>
-                    </div>
-                    <div class="form-group" style="margin-top:1rem;">
-                        <label>Total Amount (₹)</label>
-                        <input type="number" id="de-order-total" class="form-control-premium"
-                            style="background:white; color:#000;">
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                        <div class="form-group">
-                            <label>Discount (₹)</label>
-                            <input type="number" id="de-order-discount" class="form-control-premium" value="0"
-                                style="background:white; color:#000;">
-                        </div>
-                        <div class="form-group">
-                            <label>Final Amount (₹)</label>
-                            <input type="number" id="de-order-final" class="form-control-premium" readonly
-                                style="background:#f1f5f9; color:#000;">
-                        </div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                        <div class="form-group">
-                            <label>Advance Amount (₹)</label>
-                            <input type="number" id="de-order-advance" class="form-control-premium" value="0"
-                                style="background:white; color:#000;">
-                        </div>
-                        <div class="form-group">
-                            <label>Due Amount (₹)</label>
-                            <input type="number" id="de-order-due" class="form-control-premium" readonly
-                                style="background:#f1f5f9; color:#ef4444; font-weight:700;">
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top:1rem;">
-                        <label>Upload Payment Screenshot *</label>
-                        <input type="file" id="de-order-screenshot" class="form-control-premium" accept="image/*"
-                            style="background:white; color:#000;">
-                    </div>
-                </div>
-
+                <!-- DYNAMIC SUB-FORMS (Decision related) -->
+                
                 <!-- 1B: FOLLOW-UP FORM -->
                 <div id="de-form-followup" class="dynamic-subform"
                     style="display:none; background:#fffbeb; padding:1.5rem; border-radius:0.75rem; border:1px solid #fef3c7; margin-top:1rem;">
@@ -563,7 +515,7 @@
                     </div>
                 </div>
 
-                <!-- NOT CONNECTED / WHATSAPP (Direct Follow-up mode) -->
+                <!-- NOT CONNECTED / WHATSAPP -->
                 <div id="de-form-notconnected" class="dynamic-subform"
                     style="display:none; background:#f1f5f9; padding:1.5rem; border-radius:0.75rem; border:1px solid #cbd5e1; margin-top:1rem;">
                     <h4 style="color:#334155; margin-bottom:1rem;"><i class="fas fa-phone-slash mr-2"></i> Connection
@@ -584,7 +536,92 @@
                 </div>
 
                 <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
-                    <button onclick="dePrevStep(3)" id="de-btn-back-4" class="login-btn btn-outline"
+                    <button onclick="dePrevStep(2)" class="login-btn btn-outline"
+                        style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
+                    <button onclick="deNextStep(4)" id="de-next-3" class="login-btn" style="width:auto; padding: 0.6rem 2rem;">Next <i
+                            class="fas fa-arrow-right ml-2"></i></button>
+                    <button onclick="submitDecisionEngine()" id="de-save-3" class="login-btn"
+                        style="display:none; width:auto; padding: 0.6rem 2rem; background:#10b981;">Save Changes <i
+                            class="fas fa-check ml-2"></i></button>
+                </div>
+            </div>
+
+            <!-- STEP 4: PRODUCT -->
+            <div id="wizard-step-4" class="wizard-step" style="display:none;">
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 4: Product Selection & Order</h3>
+                
+                <div id="de-product-selection-container" class="form-group">
+                    <label>Select Products (Multi-select)</label>
+                    <select id="de-products" class="form-control-premium" multiple style="height:120px; color:#000;">
+                        <option value="Brush Cutter Machine" data-id="1" data-price="12000">Brush Cutter Machine</option>
+                        <option value="Trolley" data-id="2" data-price="8500">Trolley</option>
+                        <option value="Dumper" data-id="3" data-price="15000">Dumper</option>
+                        <option value="Accessories" data-id="4" data-price="2000">Accessories</option>
+                    </select>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Hold Ctrl (Windows) or
+                        Cmd (Mac) to select multiple.</p>
+                </div>
+
+                <!-- 1A: ORDER FORM (Moved here from Decision) -->
+                <div id="de-form-order" class="dynamic-subform"
+                    style="display:none; background:#ecfdf5; padding:1.5rem; border-radius:0.75rem; border:1px solid #d1fae5; margin-top:1rem;">
+                    <h4 style="color:#065f46; margin-bottom:1rem;"><i class="fas fa-shopping-cart mr-2"></i> Order
+                        Configuration</h4>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.875rem;">
+                        <span style="font-weight:600;">Selected Products:</span>
+                        <span id="de-order-products-display">-</span>
+                    </div>
+                    <div class="form-group" style="margin-top:1rem;">
+                        <label>Total Amount (₹)</label>
+                        <input type="number" id="de-order-total" class="form-control-premium"
+                            style="background:white; color:#000;">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Discount (₹)</label>
+                            <input type="number" id="de-order-discount" class="form-control-premium" value="0"
+                                style="background:white; color:#000;">
+                        </div>
+                        <div class="form-group">
+                            <label>Final Amount (₹)</label>
+                            <input type="number" id="de-order-final" class="form-control-premium" readonly
+                                style="background:#f1f5f9; color:#000;">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Advance Amount (₹)</label>
+                            <input type="number" id="de-order-advance" class="form-control-premium" value="0"
+                                style="background:white; color:#000;">
+                        </div>
+                        <div class="form-group">
+                            <label>Due Amount (₹)</label>
+                            <input type="number" id="de-order-due" class="form-control-premium" readonly
+                                style="background:#f1f5f9; color:#ef4444; font-weight:700;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:1rem;">
+                        <label>Delivery Type *</label>
+                        <select id="de-delivery-type" class="form-control-premium" style="background:white; color:#000;" onchange="toggleOtherDelivery(this.value, 'de-delivery-other-wrapper')">
+                            <option value="Post office COD">Post office COD</option>
+                            <option value="VRL COD">VRL COD</option>
+                            <option value="third party">third party</option>
+                            <option value="other">other</option>
+                        </select>
+                    </div>
+                    <div id="de-delivery-other-wrapper" class="form-group" style="margin-top:1rem; display:none;">
+                        <label>Specify Delivery Type *</label>
+                        <input type="text" id="de-delivery-other" class="form-control-premium" placeholder="Enter delivery type" style="background:white; color:#000;">
+                    </div>
+                    <div class="form-group" style="margin-top:1rem;">
+                        <label>Upload Payment Screenshot *</label>
+                        <input type="file" id="de-order-screenshot" class="form-control-premium" accept="image/*"
+                            style="background:white; color:#000;">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
+                    <button onclick="dePrevStep(3)" class="login-btn btn-outline"
                         style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
                     <button onclick="submitDecisionEngine()" id="de-submit-btn" class="login-btn"
                         style="width:auto; padding: 0.6rem 2rem; background:#10b981;">Save & Convert <i

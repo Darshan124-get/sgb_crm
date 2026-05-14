@@ -49,7 +49,7 @@ exports.getLeads = async (req, res) => {
             query += ' AND l.source = ?';
             params.push(source);
         }
-        
+
         if (search) {
             query += ' AND (l.customer_name LIKE ? OR l.phone_number LIKE ? OR l.first_message LIKE ?)';
             const searchVal = `%${search}%`;
@@ -61,6 +61,10 @@ exports.getLeads = async (req, res) => {
         } else if (req.query.date) {
             query += ' AND DATE(l.created_at) = ?';
             params.push(req.query.date);
+        }
+
+        if (req.query.is_open === 'true') {
+            query += " AND (l.status IS NULL OR l.status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))";
         }
 
         query += ' ORDER BY l.created_at DESC';
@@ -141,14 +145,22 @@ exports.createLead = async (req, res) => {
     const connection = await pool.getConnection();
 
     try {
+        console.log('Incoming Lead Request:', req.body);
         await connection.beginTransaction();
 
+        // 1. Basic Validation
+        if (!phone_number) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'Phone number is required.' });
+        }
+
         // 🚫 DUPLICATE PREVENTION: Check if phone exists
-        const [existing] = await connection.query('SELECT lead_id, assigned_to FROM leads WHERE phone_number = ?', [phone_number]);
+        const [existing] = await connection.query('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [phone_number]);
         if (existing.length > 0) {
             await connection.rollback();
+            console.warn(`Lead creation blocked: Phone ${phone_number} already exists as Lead ID ${existing[0].lead_id}`);
             return res.status(400).json({
-                message: 'A lead with this phone number already exists.',
+                message: `Lead already exists: ${existing[0].customer_name || 'Unnamed'} (${phone_number})`,
                 lead_id: existing[0].lead_id,
                 duplicate: true
             });
@@ -181,7 +193,21 @@ exports.createLead = async (req, res) => {
         const [result] = await connection.query(
             `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [phone_number, customer_name, first_message, language, address, city, state, district || null, pincode || null, source || 'manual', status, assignedTo, delivery_type || null]
+            [
+                phone_number, 
+                customer_name || null, 
+                first_message || null, 
+                language || 'EN', 
+                address || null, 
+                city || null, 
+                state || null, 
+                district || null, 
+                pincode || null, 
+                source || 'manual', 
+                status, 
+                assignedTo, 
+                delivery_type || null
+            ]
         );
 
         const leadId = result.insertId;
@@ -195,7 +221,8 @@ exports.createLead = async (req, res) => {
         await connection.commit();
         res.status(201).json({ message: 'Lead created successfully', lead_id: leadId, assignedTo });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) { }
+        if (connection) await connection.rollback();
+        console.error('CRITICAL: Lead Creation Failed:', err);
         res.status(500).json({ message: 'Error creating lead: ' + err.message });
     } finally {
         if (connection) connection.release();
@@ -206,7 +233,7 @@ exports.updateLead = async (req, res) => {
     const {
         phone_number, customer_name, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
-        current_crop, acreage, delivery_type
+        current_crop, acreage, delivery_type, call_count
     } = req.body;
 
     let connection;
@@ -225,13 +252,13 @@ exports.updateLead = async (req, res) => {
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
                 address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
-                current_crop = ?, acreage = ?, delivery_type = ?
+                current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
             WHERE lead_id = ?`,
             [
                 phone_number, customer_name, first_message, language,
                 address, city, state, district || null, pincode || null, status, finalAssignedTo,
                 score || 'cold', next_followup_date || null, lost_reason || null, lost_notes || null,
-                current_crop || null, acreage || null, delivery_type || null,
+                current_crop || null, acreage || null, delivery_type || null, call_count || 0,
                 req.params.id
             ]
         );
@@ -368,26 +395,20 @@ exports.getStats = async (req, res) => {
             params.push(userId);
         }
 
-        const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, params);
+        const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, params);
         const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, params);
-        const [unassigned] = await pool.query(`SELECT COUNT(*) as count FROM leads WHERE assigned_to IS NULL`);
-
-        // Grouped statuses
-        const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("followup", "interested", "callback")`, params);
-        const [converted] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "converted"`, params);
+        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot"`, params);
+        const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, params);
         const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, params);
-        const [scheduled] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "callback"`, params);
-        const [manual] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND source = "manual"`, params);
+        const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, params);
 
         res.json({
             all: all[0].count,
             today: today[0].count,
-            unassigned: userRole === 'sales' ? 0 : unassigned[0].count,
+            hot: hot[0].count,
             followup: followup[0].count,
-            converted: converted[0].count,
             lost: lost[0].count,
-            scheduled: scheduled[0].count,
-            manual: manual[0].count
+            open: open[0].count
         });
     } catch (err) {
         console.error('getStats Error:', err);

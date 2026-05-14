@@ -90,9 +90,16 @@ const getOrderForBilling = async (req, res) => {
     const { id } = req.params;
     try {
         const [orders] = await pool.query(`
-            SELECT o.*, l.delivery_type as lead_delivery_type 
+            SELECT 
+                o.*, 
+                l.customer_name as lead_name, l.phone_number as lead_phone, l.address as lead_address, 
+                l.city as lead_city, l.state as lead_state, l.district as lead_district, l.pincode as lead_pincode,
+                l.delivery_type as lead_delivery_type,
+                d.dealer_name, d.phone as dealer_phone, d.address as dealer_address, 
+                d.city as dealer_city, d.state as dealer_state
             FROM orders o 
             LEFT JOIN leads l ON o.lead_id = l.lead_id 
+            LEFT JOIN dealers d ON o.dealer_id = d.dealer_id
             WHERE o.order_id = ?
         `, [id]);
         if (!orders.length) return res.status(404).json({ message: 'Order not found' });
@@ -127,8 +134,19 @@ const getOrderForBilling = async (req, res) => {
             ORDER BY l.timestamp DESC
         `, [id]);
 
+        const order = orders[0];
+        // Apply fallbacks for auto-fill
+        order.customer_name = order.customer_name || order.lead_name || order.dealer_name || '';
+        order.phone = order.phone || order.lead_phone || order.dealer_phone || '';
+        order.address = order.address || order.lead_address || order.dealer_address || '';
+        order.city = order.city || order.lead_city || order.dealer_city || '';
+        order.state = order.state || order.lead_state || order.dealer_state || '';
+        order.district = order.district || order.lead_district || '';
+        order.pincode = order.pincode || order.lead_pincode || '';
+        order.dispatch_through = order.dispatch_through || order.lead_delivery_type || '';
+
         res.json({
-            ...orders[0],
+            ...order,
             items,
             payments: [...payments, ...leadAdvances],
             logs
@@ -140,7 +158,10 @@ const getOrderForBilling = async (req, res) => {
 
 const updateOrderItems = async (req, res) => {
     const { id } = req.params;
-    const { items, discount, shipping_charges } = req.body;
+    const {
+        items, discount, shipping_charges, extra_charges,
+        customer_name, phone, address, village, district, pincode, state, dispatch_through
+    } = req.body;
     const connection = await pool.getConnection();
 
     try {
@@ -207,14 +228,36 @@ const updateOrderItems = async (req, res) => {
         }
 
         // 4. Update order totals
-        // Note: total_amount in orders table is actually the 'payable subtotal' before invoice tax
-        const finalSubtotal = newSubtotal - (parseFloat(discount || 0)) + (parseFloat(shipping_charges || 0));
-        await connection.query('UPDATE orders SET total_amount = ?, order_status = "in_review" WHERE order_id = ?', [finalSubtotal, id]);
+        // Note: total_amount in orders table is now the 'Grand Total' (Inclusive of GST)
+        const finalSubtotal = newSubtotal - (parseFloat(discount || 0)) + (parseFloat(shipping_charges || 0)) + (parseFloat(extra_charges || 0));
+
+        // Update Order with potential customer changes
+        await connection.query(`
+            UPDATE orders SET 
+                total_amount = ?, 
+                discount = ?,
+                shipping_charges = ?,
+                extra_charges = ?,
+                customer_name = ?,
+                phone = ?,
+                address = ?,
+                village = ?,
+                district = ?,
+                pincode = ?,
+                state = ?,
+                dispatch_through = ?,
+                order_status = "in_review" 
+            WHERE order_id = ?
+        `, [
+            finalSubtotal, discount || 0, shipping_charges || 0, extra_charges || 0,
+            customer_name, phone, address, village, district, pincode, state, dispatch_through || '',
+            id
+        ]);
 
         await connection.commit();
         res.json({ message: 'Order structure updated successfully', newSubtotal: finalSubtotal });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) {}
+        try { if (connection) await connection.rollback(); } catch (re) { }
         res.status(500).json({ message: 'Error updating items: ' + err.message });
     } finally {
         if (connection) connection.release();
@@ -223,9 +266,9 @@ const updateOrderItems = async (req, res) => {
 
 const generateInvoice = async (req, res) => {
     const { id } = req.params;
-    const { 
-        discount, shipping_charges, tax_type, status = 'draft', is_tax_overridden, manual_tax,
-        delivery_note, dispatch_through, destination, payment_terms 
+    const {
+        discount, shipping_charges, extra_charges, tax_type, status = 'draft', is_tax_overridden, manual_tax,
+        delivery_note, dispatch_through, destination, payment_terms
     } = req.body;
     const connection = await pool.getConnection();
 
@@ -272,28 +315,12 @@ const generateInvoice = async (req, res) => {
             await connection.query("UPDATE settings SET setting_value = ? WHERE setting_key = 'last_invoice_num'", [nextSeq.toString()]);
         }
 
-        // 2. Tax Calculations
+        // 2. Tax Calculations (Inclusive - Setting GST to 0)
         const subtotal = parseFloat(order.total_amount);
         let cgst = 0, sgst = 0, igst = 0;
 
-        if (is_tax_overridden && (req.user.role === 'admin' || req.user.role === 'billing')) {
-            cgst = parseFloat(manual_tax?.cgst || 0);
-            sgst = parseFloat(manual_tax?.sgst || 0);
-            igst = parseFloat(manual_tax?.igst || 0);
-        } else {
-            const companyState = (settings.company_state || 'Karnataka').toLowerCase();
-            const customerState = (order.state || '').toLowerCase();
-            const gstRate = parseFloat(settings.gst_rate || 5); // Default to 5% for SGB Dumper
-
-            if (companyState === customerState) {
-                cgst = subtotal * (gstRate / 200);
-                sgst = subtotal * (gstRate / 200);
-            } else {
-                igst = subtotal * (gstRate / 100);
-            }
-        }
-
-        const grandTotal = subtotal + cgst + sgst + igst;
+        // Note: We ignore overrides and rates now because all prices are inclusive.
+        const grandTotal = subtotal;
 
         // 3. Upsert Invoice Record
         if (invoiceId) {
@@ -301,10 +328,15 @@ const generateInvoice = async (req, res) => {
                 UPDATE invoices SET 
                     billing_name = ?, 
                     billing_address = ?, 
+                    billing_phone = ?,
+                    billing_village = ?,
+                    billing_district = ?,
+                    billing_pincode = ?,
                     gst_number = ?, 
                     subtotal = ?, 
                     discount = ?, 
                     shipping_charges = ?, 
+                    extra_charges = ?,
                     tax_type = ?, 
                     cgst = ?, 
                     sgst = ?, 
@@ -319,9 +351,9 @@ const generateInvoice = async (req, res) => {
                     created_by = ?
                 WHERE invoice_id = ?
             `, [
-                order.customer_name, order.address, order.gst_number || '',
-                subtotal, discount || 0, shipping_charges || 0, tax_type || 'CGST_SGST',
-                cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0, 
+                order.customer_name, order.address, order.phone, order.village, order.district, order.pincode, order.gst_number || '',
+                subtotal, discount || 0, shipping_charges || 0, extra_charges || 0, 'NONE',
+                0, 0, 0, subtotal, status, 0,
                 delivery_note || '', dispatch_through || '', destination || '', payment_terms || '',
                 req.user.id, invoiceId
             ]);
@@ -329,14 +361,15 @@ const generateInvoice = async (req, res) => {
             const [invResult] = await connection.query(`
                 INSERT INTO invoices (
                     order_id, invoice_number, invoice_date, billing_name, billing_address, 
-                    gst_number, subtotal, discount, shipping_charges, tax_type, 
+                    billing_phone, billing_village, billing_district, billing_pincode,
+                    gst_number, subtotal, discount, shipping_charges, extra_charges, tax_type, 
                     cgst, sgst, igst, total_amount, invoice_status, is_tax_overridden, 
                     delivery_note, dispatch_through, destination, payment_terms, created_by
-                ) VALUES (?, ?, CURRENT_DATE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, CURRENT_DATE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-                id, invoiceNumber, order.customer_name, order.address,
-                order.gst_number || '', subtotal, discount || 0, shipping_charges || 0,
-                tax_type || 'CGST_SGST', cgst, sgst, igst, grandTotal, status, is_tax_overridden ? 1 : 0,
+                id, invoiceNumber, order.customer_name, order.address, order.phone, order.village, order.district, order.pincode,
+                order.gst_number || '', subtotal, discount || 0, shipping_charges || 0, extra_charges || 0,
+                'NONE', 0, 0, 0, subtotal, status, 0,
                 delivery_note || '', dispatch_through || '', destination || '', payment_terms || '', req.user.id
             ]);
             invoiceId = invResult.insertId;
@@ -377,7 +410,7 @@ const generateInvoice = async (req, res) => {
                 changed_by: req.user.id
             });
         }
- else {
+        else {
             await connection.query('UPDATE orders SET order_status = "in_review" WHERE order_id = ?', [id]);
         }
 
@@ -388,7 +421,7 @@ const generateInvoice = async (req, res) => {
             invoiceNumber
         });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) {}
+        try { if (connection) await connection.rollback(); } catch (re) { }
         res.status(500).json({ message: 'Error generating invoice: ' + err.message });
     } finally {
         if (connection) connection.release();
@@ -441,7 +474,7 @@ const finalizeInvoice = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Invoice finalized. Order is now ready for Packing.' });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) {}
+        try { if (connection) await connection.rollback(); } catch (re) { }
         res.status(500).json({ message: err.message });
     } finally {
         if (connection) connection.release();
@@ -511,7 +544,7 @@ const verifyLeadAdvance = async (req, res) => {
             if (leadId) {
                 const [orders] = await connection.query('SELECT order_id FROM orders WHERE lead_id = ?', [leadId]);
                 const orderId = orders[0]?.order_id;
-                
+
                 if (orderId) {
                     const [invoices] = await connection.query('SELECT * FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [orderId]);
 
@@ -534,7 +567,7 @@ const verifyLeadAdvance = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Lead advance status updated' });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) {}
+        try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('Verify Lead Advance Error:', err);
         res.status(500).json({ message: 'Error verifying lead advance: ' + err.message });
     } finally {
@@ -568,27 +601,27 @@ const verifyPayment = async (req, res) => {
                 const [invoices] = await connection.query('SELECT * FROM invoices WHERE order_id = ? AND invoice_status = "finalized"', [orderId]);
 
                 if (invoices.length > 0) {
-                const verifiedTotal = await getVerifiedBalance(connection, orderId);
-                const grandTotal = parseFloat(invoices[0].total_amount);
+                    const verifiedTotal = await getVerifiedBalance(connection, orderId);
+                    const grandTotal = parseFloat(invoices[0].total_amount);
 
-                if (verifiedTotal >= grandTotal) {
-                    // 3. Move to Packing
-                    await connection.query(`
+                    if (verifiedTotal >= grandTotal) {
+                        // 3. Move to Packing
+                        await connection.query(`
                         UPDATE orders 
                         SET order_status = "billed", is_locked = 1, billing_done_by = ? 
                         WHERE order_id = ?
                     `, [req.user.id, orderId]);
 
-                    await connection.query('INSERT INTO packing (order_id, status) VALUES (?, "pending") ON DUPLICATE KEY UPDATE status="pending"', [orderId]);
+                        await connection.query('INSERT INTO packing (order_id, status) VALUES (?, "pending") ON DUPLICATE KEY UPDATE status="pending"', [orderId]);
 
-                    await logAudit(connection, {
-                        invoice_id: invoices[0].invoice_id,
-                        order_id: orderId,
-                        action: 'AUTO_FINALIZED_ON_PAYMENT',
-                        old_value: 'Awaiting Payment',
-                        new_value: 'Billed/Packing',
-                        changed_by: req.user.id
-                    });
+                        await logAudit(connection, {
+                            invoice_id: invoices[0].invoice_id,
+                            order_id: orderId,
+                            action: 'AUTO_FINALIZED_ON_PAYMENT',
+                            old_value: 'Awaiting Payment',
+                            new_value: 'Billed/Packing',
+                            changed_by: req.user.id
+                        });
                     }
                 }
             }
@@ -597,7 +630,7 @@ const verifyPayment = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Payment status updated' });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) {}
+        try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('Verify Payment Error:', err);
         res.status(500).json({ message: 'Error verifying payment: ' + err.message });
     } finally {
@@ -608,7 +641,8 @@ const verifyPayment = async (req, res) => {
 const getAllInvoices = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT i.*, o.customer_name as order_customer 
+            SELECT i.*, o.customer_name as order_customer, o.delivery_type, o.village, o.district, o.state, o.pincode,
+                   (SELECT SUM(amount) FROM payments WHERE order_id = o.order_id AND payment_status = 'verified') as advance_paid
             FROM invoices i 
             LEFT JOIN orders o ON i.order_id = o.order_id 
             ORDER BY i.created_at DESC
@@ -629,7 +663,13 @@ const getInvoiceById = async (req, res) => {
 
         // 2. Fetch Invoice & Order Details
         const [invoices] = await pool.query(`
-            SELECT i.*, o.customer_name, o.phone, o.address, o.city, o.state, o.pincode,
+            SELECT i.*, 
+                   COALESCE(i.billing_name, o.customer_name) as customer_name,
+                   COALESCE(i.billing_phone, o.phone) as phone,
+                   COALESCE(i.billing_address, o.address) as address,
+                   COALESCE(i.billing_village, o.village) as village,
+                   COALESCE(i.billing_district, o.district) as district,
+                   o.city, o.state, o.pincode,
                    o.shipping_name, o.shipping_address, o.shipping_city, o.shipping_state, o.shipping_pincode,
                    o.created_at as order_date
             FROM invoices i
@@ -650,9 +690,9 @@ const getInvoiceById = async (req, res) => {
         const invoice = invoices[0];
         const amountInWords = numberToWords(invoice.total_amount);
 
-        res.json({ 
-            ...invoice, 
-            items, 
+        res.json({
+            ...invoice,
+            items,
             settings,
             amount_in_words: amountInWords
         });
@@ -787,7 +827,7 @@ const numberToWords = (num) => {
 
     const [whole, decimal] = num.toString().split('.');
     let res = format(parseInt(whole)) + ' Only';
-    
+
     if (decimal && parseInt(decimal.padEnd(2, '0')) > 0) {
         res = format(parseInt(whole)) + ' and ' + format(parseInt(decimal.padEnd(2, '0'))) + ' Paise Only';
     }

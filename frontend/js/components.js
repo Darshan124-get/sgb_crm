@@ -116,6 +116,35 @@ function initSidebar(links) {
         };
         logoutBtn.addEventListener('click', window._logoutHandler);
     }
+
+    // ── Mobile Sidebar Logic ──
+    const sidebar = document.querySelector('.sidebar');
+    let overlay = document.getElementById('sidebar-overlay');
+    
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'sidebar-overlay';
+        overlay.className = 'sidebar-overlay';
+        document.body.appendChild(overlay);
+    }
+
+    window.toggleMobileSidebar = () => {
+        if (!sidebar) return;
+        sidebar.classList.toggle('mobile-active');
+        overlay.classList.toggle('active');
+    };
+
+    overlay.onclick = window.toggleMobileSidebar;
+
+    // Close on link click
+    links.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('mobile-active');
+                overlay.classList.remove('active');
+            }
+        });
+    });
 }
 
 // ─── Global API URL ──────────────────────────────────────────
@@ -134,11 +163,12 @@ async function updateLeadStats() {
         if (response.ok) {
             const stats = await response.json();
             const badgeMap = {
+                'badge-open': stats.open,
+                'badge-today': stats.today,
+                'badge-hot': stats.hot,
                 'badge-followup': stats.followup,
-                'badge-converted': stats.converted,
                 'badge-lost': stats.lost,
-                'badge-scheduled': stats.scheduled,
-                'badge-manual': stats.manual
+                'badge-all': stats.all
             };
             Object.entries(badgeMap).forEach(([id, val]) => {
                 const el = document.getElementById(id);
@@ -167,12 +197,12 @@ function initLeadNav() {
                 await loadComponent(contentArea, `${window.ROOT_PATH}components/manual-lead-form.html`, initManualLeadForm);
             } else {
                 const filterConfig = {
-                    all: {},
+                    open: { is_open: 'true' },
                     today: { is_today: 'true' },
-                    unassigned: { is_unassigned: 'true' },
-                    followup: { status: 'followup,interested,callback' },
-                    converted: { status: 'converted' },
-                    lost: { status: 'lost,not_interested' }
+                    hot: { score: 'hot', status: 'interested' },
+                    followup: { status: 'followup' },
+                    lost: { status: 'lost,not_interested' },
+                    all: {}
                 };
                 await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(filterConfig[filter] || {}));
             }
@@ -188,7 +218,7 @@ function initLeadNav() {
 async function initLeadList(filters = {}) {
     const tbody = document.getElementById('leadsTableBody');
     if (!tbody) return;
-    
+
     // ─── Filter Setup ───
     const searchInput = document.getElementById('leadSearch');
     if (searchInput && !searchInput.dataset.listenerSet) {
@@ -206,9 +236,9 @@ async function initLeadList(filters = {}) {
     }
 
     const statusF = document.getElementById('leadStatusFilter');
-    const scoreF  = document.getElementById('leadScoreFilter');
-    const dateF   = document.getElementById('leadDateFilter');
-    const btnAll  = document.getElementById('btnFilterAll');
+    const scoreF = document.getElementById('leadScoreFilter');
+    const dateF = document.getElementById('leadDateFilter');
+    const btnAll = document.getElementById('btnFilterAll');
 
     if (statusF && !statusF.dataset.listenerSet) {
         statusF.dataset.listenerSet = 'true';
@@ -226,8 +256,8 @@ async function initLeadList(filters = {}) {
         btnAll.dataset.listenerSet = 'true';
         btnAll.onclick = () => {
             if (statusF) statusF.value = 'all';
-            if (scoreF)  scoreF.value = 'all';
-            if (dateF)   dateF.value = '';
+            if (scoreF) scoreF.value = 'all';
+            if (dateF) dateF.value = '';
             initLeadList(window.currentBaseFilters);
         };
     }
@@ -237,7 +267,7 @@ async function initLeadList(filters = {}) {
     window.currentBaseFilters = filters; // Original context (e.g. {assigned_to: NULL})
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
-    
+
     // Start with base filters
     Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
 
@@ -265,10 +295,14 @@ async function initLeadList(filters = {}) {
             const date = new Date(lead.created_at).toLocaleDateString();
             const nameInitial = lead.customer_name ? lead.customer_name.charAt(0).toUpperCase() : '?';
 
+            const callTag = lead.call_count >= 3 ? '<span class="call-tag tag-3">3rd Call</span>' :
+                (lead.call_count === 2 ? '<span class="call-tag tag-2">2nd Call</span>' :
+                    (lead.call_count === 1 ? '<span class="call-tag tag-1">1st Call</span>' : ''));
+
             return `
             <tr onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
                 <td><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
-                <td><div class="name-cell"><div class="name-initial">${nameInitial}</div>${lead.customer_name || 'Unknown'}</div></td>
+                <td><div class="name-cell"><div class="name-initial">${nameInitial}</div>${lead.customer_name || 'Unknown'} ${callTag}</div></td>
                 <td><span class="${statusClass}">${lead.status}</span></td>
                 <td><span class="badge-score ${scoreClass}">${lead.score || 'COLD'}</span></td>
                 <td>${lead.state || '-'}</td>
@@ -474,6 +508,7 @@ async function populateLeadDetails(leadId) {
         const response = await fetch(`${API_URL}/leads/${leadId}`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (response.ok) {
             const lead = await response.json();
+            window.currentLeadData = lead; // Store globally for decision engine
 
             // ── Primary Field Mapping ──
             const fields = {
@@ -495,7 +530,7 @@ async function populateLeadDetails(leadId) {
                 leadDetailCrop: lead.current_crop || '-',
                 leadDetailAcreage: lead.acreage || '-',
                 leadDetailFeedback: lead.feedback || '-',
-                leadDetailAttempt: lead.call_attempts || '0',
+                leadDetailAttempt: lead.call_count || '0',
 
                 // Edit Inputs mapping
                 editName: lead.customer_name,
@@ -1055,7 +1090,7 @@ window.openAddLeadModal = async function () {
     } catch (err) { console.error('Add lead modal error:', err); }
 };
 
-window.submitQuickLead = async function() {
+window.submitQuickLead = async function () {
     const phone = document.getElementById('q-phone').value.trim();
     const name = document.getElementById('q-name').value.trim();
     const village = document.getElementById('q-village').value.trim();
@@ -1100,7 +1135,14 @@ window.submitQuickLead = async function() {
                 window.initLeadList(window.currentBaseFilters || {});
             }
         } else {
-            window.showAlert("Error", result.message || "Failed to create lead", "error");
+            // Check for specific duplicate flag from backend
+            if (result.duplicate && result.lead_id) {
+                window.showAlert("Duplicate Lead", result.message, "warning");
+                // Option: Redirect to the existing lead's detail page if desired
+                // window.location.href = `lead-details.html?id=${result.lead_id}`;
+            } else {
+                window.showAlert("Creation Failed", result.message || "Failed to create lead", "error");
+            }
         }
     } catch (err) {
         console.error('Submit lead error:', err);

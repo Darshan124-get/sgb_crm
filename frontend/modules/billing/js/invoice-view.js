@@ -1,9 +1,9 @@
 document.addEventListener('DOMContentLoaded', async () => {
     if (!window.requireAuth(['admin', 'billing'])) return;
-    
+
     const urlParams = new URLSearchParams(window.location.search);
     const invoiceId = urlParams.get('id');
-    
+
     if (!invoiceId) {
         document.getElementById('pageContent').innerHTML = `
             <div class="invoice-v2-container" style="text-align:center; padding:5rem;">
@@ -31,7 +31,7 @@ async function fetchInvoiceDetails(id) {
         } else {
             document.getElementById('pageContent').innerHTML = `<div class="invoice-v2-container"><h2>Error: ${data.message}</h2></div>`;
         }
-    } catch(err) {
+    } catch (err) {
         console.error(err);
     }
 }
@@ -40,7 +40,7 @@ function renderInvoice(inv) {
     const content = document.getElementById('pageContent');
     const settings = inv.settings || {};
     const items = inv.items || [];
-    
+
     const subtotal = parseFloat(inv.subtotal || 0);
     const cgst = parseFloat(inv.cgst || 0);
     const sgst = parseFloat(inv.sgst || 0);
@@ -71,7 +71,7 @@ function renderInvoice(inv) {
                         </div>
                         <div class="meta-cell">
                             <span class="label">Dated</span>
-                            <span class="value">${new Date(inv.invoice_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'})}</span>
+                            <span class="value">${new Date(inv.invoice_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                         </div>
                     </div>
                     <div class="meta-row border-b">
@@ -114,8 +114,10 @@ function renderInvoice(inv) {
                     <h3 class="customer-name">${inv.shipping_name || inv.customer_name}</h3>
                     <p class="customer-address">
                         ${inv.shipping_address || inv.address}<br>
+                        ${inv.shipping_village || inv.village ? (inv.shipping_village || inv.village) + ', ' : ''}
+                        ${inv.shipping_district || inv.district ? (inv.shipping_district || inv.district) + ', ' : ''}
                         ${inv.shipping_city || inv.city}, ${inv.shipping_state || inv.state} - ${inv.shipping_pincode || inv.pincode || ''}<br>
-                        State Name: <strong>${inv.shipping_state || inv.state}</strong>, Code: <strong></strong>
+                        State Name: <strong>${inv.shipping_state || inv.state}</strong>
                     </p>
                 </div>
                 <div class="address-section col-span-1 border-b">
@@ -123,8 +125,10 @@ function renderInvoice(inv) {
                     <h3 class="customer-name">${inv.customer_name}</h3>
                     <p class="customer-address">
                         ${inv.address}<br>
+                        ${inv.village ? inv.village + ', ' : ''}
+                        ${inv.district ? inv.district + ', ' : ''}
                         ${inv.city}, ${inv.state} - ${inv.pincode || ''}<br>
-                        State Name: <strong>${inv.state}</strong>, Code: <strong></strong>
+                        State Name: <strong>${inv.state}</strong>
                     </p>
                     <p>GSTIN/UIN: <strong>${inv.gst_number || ''}</strong></p>
                 </div>
@@ -243,13 +247,13 @@ function renderInvoice(inv) {
                 <tbody>
                     <!-- Grouping items by HSN for tax breakdown -->
                     ${Object.entries(items.reduce((acc, item) => {
-                        const hsn = item.hsn_code || 'N/A';
-                        if (!acc[hsn]) acc[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
-                        acc[hsn].taxable += parseFloat(item.total);
-                        acc[hsn].cgst += parseFloat(item.total) * (cgst / subtotal);
-                        acc[hsn].sgst += parseFloat(item.total) * (sgst / subtotal);
-                        return acc;
-                    }, {})).map(([hsn, vals]) => `
+        const hsn = item.hsn_code || 'N/A';
+        if (!acc[hsn]) acc[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+        acc[hsn].taxable += parseFloat(item.total);
+        acc[hsn].cgst += parseFloat(item.total) * (cgst / subtotal);
+        acc[hsn].sgst += parseFloat(item.total) * (sgst / subtotal);
+        return acc;
+    }, {})).map(([hsn, vals]) => `
                         <tr>
                             <td>${hsn}</td>
                             <td style="text-align:right;">${vals.taxable.toFixed(2)}</td>
@@ -310,6 +314,6 @@ function renderInvoice(inv) {
 // Helper for tax amount in words (simplified for now)
 function numberToWordsInWords(num) {
     // We can reuse the backend logic or a similar JS implementation
-    return "INR " + num.toFixed(2) + " Only"; 
+    return "INR " + num.toFixed(2) + " Only";
 }
 

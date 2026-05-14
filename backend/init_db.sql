@@ -396,7 +396,7 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ON DUPLICATE KEY UPDATE setting_key=setting_key;
 
 
--- Insert default admin user: admin / password123
+-- Insert default admin user: admin /password123
 INSERT INTO users (name, phone, email, password_hash, role_id, language, status)
 SELECT 'Admin', '0000000000', 'admin@sgbagro.com', '$2a$10$xp5204oZU8a6eHFQFTsMUOJLFBSM3E2lkPO7NVb6PC/fn1PxiC0tK', role_id, 'EN', 'active'
 FROM roles WHERE name = 'admin'

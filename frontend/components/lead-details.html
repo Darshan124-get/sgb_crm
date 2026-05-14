@@ -101,7 +101,8 @@
                     <div class="info-item">
                         <label>District</label>
                         <p id="leadDetailDistrict" class="view-item">-</p>
-                        <input type="text" id="editDistrict" class="edit-item form-control-premium" style="display:none">
+                        <input type="text" id="editDistrict" class="edit-item form-control-premium"
+                            style="display:none">
                     </div>
                     <div class="info-item">
                         <label>Pincode</label>
@@ -130,46 +131,6 @@
                 </div>
             </div>
 
-            <!-- Requirements -->
-            <div id="requirementSection" class="detail-section">
-                <div class="detail-section-title">
-                    <div class="section-icon" style="background: #f0fdf4; color: #16a34a;">
-                        <i class="fas fa-seedling"></i>
-                    </div>
-                    Crop & Requirement
-                    <button onclick="toggleLeadEdit('requirementSection')" class="edit-section-btn view-item">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                </div>
-                <div class="info-display-grid">
-                    <div class="info-item">
-                        <label>Current Crop</label>
-                        <p id="leadDetailCrop" class="view-item">-</p>
-                        <input type="text" id="editCrop" class="edit-item form-control-premium" style="display:none">
-                    </div>
-                    <div class="info-item">
-                        <label>Acreage</label>
-                        <p id="leadDetailAcreage" class="view-item">-</p>
-                        <input type="text" id="editAcreage" class="edit-item form-control-premium" style="display:none">
-                    </div>
-                    <div class="info-item">
-                        <label>Interest In</label>
-                        <div id="leadDetailInterest" class="view-item"
-                            style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;">
-                            <!-- Badges injected here -->
-                        </div>
-                        <input type="text" id="editInterest" class="edit-item form-control-premium" style="display:none"
-                            placeholder="Comma separated products">
-                    </div>
-                </div>
-                <div class="edit-controls edit-item" style="display:none">
-                    <button onclick="saveLeadSection('requirementSection')" class="login-btn btn-sm">Save
-                        Changes</button>
-                    <button onclick="toggleLeadEdit('requirementSection')"
-                        class="login-btn btn-outline btn-sm">Cancel</button>
-                </div>
-            </div>
-
             <!-- Sales & Lead Progress -->
             <div id="salesSection" class="detail-section">
                 <div class="detail-section-title">
@@ -177,7 +138,8 @@
                         <i class="fas fa-handshake"></i>
                     </div>
                     Sales & Lead Progress
-                    <button class="edit-section-btn view-item" style="opacity:0.5; cursor:not-allowed;" title="Update via Conversion Wizard">
+                    <button class="edit-section-btn view-item" style="opacity:0.5; cursor:not-allowed;"
+                        title="Update via Conversion Wizard">
                         <i class="fas fa-lock"></i> Locked
                     </button>
                 </div>
@@ -427,7 +389,8 @@
 
             <!-- STEP 3: DECISION -->
             <div id="wizard-step-3" class="wizard-step" style="display:none;">
-                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 3: Sales Status & Decision</h3>
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 3: Sales Status & Decision
+                </h3>
 
                 <div id="de-sales-status-container" class="form-group">
                     <label>Sales Status *</label>
@@ -443,7 +406,7 @@
                 </div>
 
                 <!-- DYNAMIC SUB-FORMS (Decision related) -->
-                
+
                 <!-- 1B: FOLLOW-UP FORM -->
                 <div id="de-form-followup" class="dynamic-subform"
                     style="display:none; background:#fffbeb; padding:1.5rem; border-radius:0.75rem; border:1px solid #fef3c7; margin-top:1rem;">
@@ -538,8 +501,8 @@
                 <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
                     <button onclick="dePrevStep(2)" class="login-btn btn-outline"
                         style="width:auto; padding: 0.6rem 1.5rem;"><i class="fas fa-arrow-left mr-2"></i> Back</button>
-                    <button onclick="deNextStep(4)" id="de-next-3" class="login-btn" style="width:auto; padding: 0.6rem 2rem;">Next <i
-                            class="fas fa-arrow-right ml-2"></i></button>
+                    <button onclick="deNextStep(4)" id="de-next-3" class="login-btn"
+                        style="width:auto; padding: 0.6rem 2rem;">Next <i class="fas fa-arrow-right ml-2"></i></button>
                     <button onclick="submitDecisionEngine()" id="de-save-3" class="login-btn"
                         style="display:none; width:auto; padding: 0.6rem 2rem; background:#10b981;">Save Changes <i
                             class="fas fa-check ml-2"></i></button>
@@ -548,12 +511,14 @@
 
             <!-- STEP 4: PRODUCT -->
             <div id="wizard-step-4" class="wizard-step" style="display:none;">
-                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 4: Product Selection & Order</h3>
-                
+                <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 4: Product Selection &
+                    Order</h3>
+
                 <div id="de-product-selection-container" class="form-group">
                     <label>Select Products (Multi-select)</label>
                     <select id="de-products" class="form-control-premium" multiple style="height:120px; color:#000;">
-                        <option value="Brush Cutter Machine" data-id="1" data-price="12000">Brush Cutter Machine</option>
+                        <option value="Brush Cutter Machine" data-id="1" data-price="12000">Brush Cutter Machine
+                        </option>
                         <option value="Trolley" data-id="2" data-price="8500">Trolley</option>
                         <option value="Dumper" data-id="3" data-price="15000">Dumper</option>
                         <option value="Accessories" data-id="4" data-price="2000">Accessories</option>
@@ -602,7 +567,8 @@
                     </div>
                     <div class="form-group" style="margin-top:1rem;">
                         <label>Delivery Type *</label>
-                        <select id="de-delivery-type" class="form-control-premium" style="background:white; color:#000;" onchange="toggleOtherDelivery(this.value, 'de-delivery-other-wrapper')">
+                        <select id="de-delivery-type" class="form-control-premium" style="background:white; color:#000;"
+                            onchange="toggleOtherDelivery(this.value, 'de-delivery-other-wrapper')">
                             <option value="Post office COD">Post office COD</option>
                             <option value="VRL COD">VRL COD</option>
                             <option value="third party">third party</option>
@@ -611,7 +577,8 @@
                     </div>
                     <div id="de-delivery-other-wrapper" class="form-group" style="margin-top:1rem; display:none;">
                         <label>Specify Delivery Type *</label>
-                        <input type="text" id="de-delivery-other" class="form-control-premium" placeholder="Enter delivery type" style="background:white; color:#000;">
+                        <input type="text" id="de-delivery-other" class="form-control-premium"
+                            placeholder="Enter delivery type" style="background:white; color:#000;">
                     </div>
                     <div class="form-group" style="margin-top:1rem;">
                         <label>Upload Payment Screenshot *</label>
@@ -637,6 +604,17 @@
 <button onclick="submitDecisionEngine()" id="de-submit-btn" class="login-btn"
     style="width:auto; padding: 0.75rem 2.5rem; background:#10b981; border-radius:0.75rem; font-weight:700;">SAVE ALL
     CHANGES <i class="fas fa-check-circle ml-2"></i></button>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
 </div>
 </div>
 

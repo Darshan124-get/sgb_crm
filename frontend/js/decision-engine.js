@@ -32,6 +32,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+
+        // Jump to Step logic for Wizard Indicators
+        if (e.target.classList.contains('step-ind')) {
+            const stepId = e.target.id;
+            const stepNum = parseInt(stepId.replace('step', '').replace('-ind', ''));
+            if (!isNaN(stepNum)) {
+                // Validation: Don't jump ahead of step 1 without a status
+                if (stepNum > 1 && !document.getElementById('de-call-status').value) {
+                    return window.showAlert("Selection Required", "Please select a Call Status first", "info");
+                }
+                goToStep(stepNum);
+            }
+        }
+
+        // Jump to Step for Manual Wizard
+        const mStepEl = e.target.closest('.progress-step');
+        if (mStepEl) {
+            const stepId = mStepEl.id;
+            const stepNum = parseInt(stepId.replace('mstep-', ''));
+            if (!isNaN(stepNum)) {
+                if (stepNum > 1 && !document.getElementById('m-de-call-status').value) {
+                    return window.showAlert("Selection Required", "Please select a Call Status first", "info");
+                }
+                mGoToStep(stepNum);
+            }
+        }
     });
 
     // Delegate change event for dynamic logic
@@ -216,7 +242,19 @@ window.handleLeadConversionModal = function () {
     // 3. Load dynamic products
     loadProductsForEngine();
 
-    // 4. Show Modal
+    // 4. Auto-select Next Attempt
+    const currentCount = parseInt(window.currentLeadData?.call_count || 0);
+    const nextAttempt = Math.min(currentCount + 1, 3);
+    const attemptInput = document.getElementById('de-call-attempt');
+    if (attemptInput) {
+        attemptInput.value = nextAttempt;
+        // Update UI pills
+        document.querySelectorAll('#de-call-attempt-wrapper .status-pill').forEach(pill => {
+            pill.classList.toggle('active', pill.getAttribute('data-value') == nextAttempt);
+        });
+    }
+
+    // 5. Show Modal
     modal.classList.add('active');
     document.body.classList.add('modal-open');
     console.log("Modal activated.");
@@ -235,12 +273,19 @@ function closeDecisionEngine() {
 function handleCallStatusChange(status) {
     if (!status) return;
 
-    if (status === 'Received') {
-        leadPath = 'normal';
-    } else if (status === 'Booked') {
-        leadPath = 'quick_order';
+    if (status === 'Received' || status === 'Booked') {
+        leadPath = (status === 'Booked') ? 'quick_order' : 'connected';
     } else if (['Not Received', 'Switched Off', 'Busy', 'Not Reachable', 'Not Interested', 'WhatsApp'].includes(status)) {
         leadPath = 'not_connected';
+    }
+
+    // Check for auto-routing to Lost on 3rd attempt
+    const currentAttemptInput = document.getElementById('de-call-attempt');
+    const currentAttempt = currentAttemptInput ? currentAttemptInput.value : '1';
+    const unsuccessfulStatuses = ['Not Received', 'Switched Off', 'Busy', 'Not Reachable', 'Not Interested'];
+    
+    if (currentAttempt == '3' && unsuccessfulStatuses.includes(status)) {
+        console.log("[DecisionEngine] 3rd Attempt Unsuccessful - Recommendation: Route to Lost");
     }
 }
 
@@ -269,7 +314,7 @@ function handleSalesStatusChange(status) {
         // If ordered, we MUST go to step 4 (Product Selection)
         if (nextBtn) nextBtn.style.display = 'block';
         if (saveBtn) saveBtn.style.display = 'none';
-        
+
         // Show the order form in STEP 4 (it will be visible when we go there)
         document.getElementById('de-form-order').style.display = 'block';
         document.getElementById('de-order-screenshot').setAttribute('required', 'true');
@@ -279,21 +324,21 @@ function handleSalesStatusChange(status) {
         // Let's allow going to step 4 to pick what they are interested in
         if (nextBtn) nextBtn.style.display = 'block';
         if (saveBtn) saveBtn.style.display = 'block'; // Allow direct save too
-        
+
         document.getElementById('de-form-followup').style.display = 'block';
         document.getElementById('de-followup-date').setAttribute('required', 'true');
     } else if (status === 'not_interested' || status === 'Cold/Not Interested') {
         // Just save
         if (nextBtn) nextBtn.style.display = 'none';
         if (saveBtn) saveBtn.style.display = 'block';
-        
+
         document.getElementById('de-form-reason').style.display = 'block';
         document.getElementById('de-lost-reason').setAttribute('required', 'true');
     } else if (status === 'lost' || status === 'Old Purchased') {
         // Just save
         if (nextBtn) nextBtn.style.display = 'none';
         if (saveBtn) saveBtn.style.display = 'block';
-        
+
         document.getElementById('de-form-feedback').style.display = 'block';
         document.getElementById('de-feedback-satisfaction').setAttribute('required', 'true');
     } else {
@@ -314,7 +359,22 @@ function deNextStep(targetStep) {
         }
 
         // Routing logic based on Call Status
-        if (leadPath === 'quick_order') {
+        const currentAttemptInput = document.getElementById('de-call-attempt');
+        const currentAttempt = currentAttemptInput ? currentAttemptInput.value : '1';
+        const unsuccessfulStatuses = ['Not Received', 'Switched Off', 'Busy', 'Not Reachable', 'Not Interested'];
+
+        if (currentAttempt == '3' && unsuccessfulStatuses.includes(callStatus)) {
+            // Force Lost Status
+            hideAllSubforms();
+            targetStep = 3;
+            document.getElementById('de-sales-status-container').style.display = 'block';
+            const salesStatusSelect = document.getElementById('de-sales-status');
+            if (salesStatusSelect) {
+                salesStatusSelect.value = 'lost';
+                handleSalesStatusChange('lost');
+            }
+            window.showAlert("Max Attempts Reached", "This is the 3rd unsuccessful attempt. Lead is being marked as Lost.", "warning");
+        } else if (leadPath === 'quick_order') {
             // Booked -> Skip to Decision
             hideAllSubforms();
             targetStep = 3;
@@ -329,6 +389,22 @@ function deNextStep(targetStep) {
             document.getElementById('de-sales-status-container').style.display = 'none';
             document.getElementById('de-form-notconnected').style.display = 'block';
             document.getElementById('de-nc-date').setAttribute('required', 'true');
+            // Auto-set tomorrow's date
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(10, 0, 0, 0);
+            const offset = tomorrow.getTimezoneOffset() * 60000;
+            const localISOTime = (new Date(tomorrow - offset)).toISOString().slice(0, 16);
+            document.getElementById('de-nc-date').value = localISOTime;
+            const currentCount = (window.currentLeadData ? window.currentLeadData.call_count : 0) || 0;
+            const nextAttempt = Math.min(currentCount + 1, 3);
+            const attemptSelect = document.getElementById('de-nc-attempt');
+            if (attemptSelect) {
+                if (nextAttempt === 1) attemptSelect.value = "1st Attempt";
+                else if (nextAttempt === 2) attemptSelect.value = "2nd Attempt";
+                else if (nextAttempt === 3) attemptSelect.value = "3rd Attempt";
+            }
+
             // In not_connected path, Step 3 should show Save button
             if (document.getElementById('de-next-3')) document.getElementById('de-next-3').style.display = 'none';
             if (document.getElementById('de-save-3')) document.getElementById('de-save-3').style.display = 'block';
@@ -540,11 +616,26 @@ async function submitDecisionEngine() {
         let summaryNote = `[Decision Engine] Call: ${callStatus}. Path: ${leadPath}. `;
         let finalStatus = 'contacted';
 
+        let currentCallCount = (window.currentLeadData ? window.currentLeadData.call_count : 0) || 0;
+
         if (leadPath === 'not_connected') {
             const ncDate = document.getElementById('de-nc-date').value;
-            const attempt = document.getElementById('de-nc-attempt').value;
-            summaryNote += `Attempt: ${attempt}. Callback scheduled for: ${ncDate}.`;
-            finalStatus = 'callback';
+            const attemptLabel = document.getElementById('de-nc-attempt').value;
+
+            const unreachedStatuses = ['Not Received', 'Switched Off', 'Busy', 'Not Reachable', 'Not Interested'];
+            if (unreachedStatuses.includes(callStatus)) {
+                currentCallCount++;
+                if (currentCallCount >= 3) {
+                    finalStatus = 'lost';
+                    summaryNote += `Attempt ${currentCallCount} (${callStatus}). Lead automatically marked as LOST after 3 attempts.`;
+                } else {
+                    finalStatus = 'callback';
+                    summaryNote += `Attempt ${currentCallCount} (${callStatus}). Callback scheduled for: ${ncDate}.`;
+                }
+            } else {
+                finalStatus = 'callback';
+                summaryNote += `Status: ${callStatus}. Callback scheduled for: ${ncDate}.`;
+            }
         } else {
             summaryNote += `Decision: ${salesStatus}. `;
             if (salesStatus === 'interested' || salesStatus === 'Hot/Very Interested') {
@@ -593,7 +684,8 @@ async function submitDecisionEngine() {
             phone_number: phone,
             language: document.getElementById('de-language').value,
             assigned_to: document.getElementById('leadDetailAssignedId')?.value,
-            first_message: document.getElementById('leadDetailAmount')?.textContent || '' // preserve
+            first_message: document.getElementById('leadDetailAmount')?.textContent || '', // preserve
+            call_count: currentCallCount
         };
 
         if (leadPath === 'not_connected') {
@@ -647,7 +739,7 @@ async function submitDecisionEngine() {
                 pincode: pincode,
                 state: state,
                 delivery_type: deliveryType,
-                total_amount: totalAmt, 
+                total_amount: totalAmt,
                 advance_amount: advAmt,
                 items: items
             };
@@ -662,7 +754,7 @@ async function submitDecisionEngine() {
                 const errData = await orderRes.json();
                 throw new Error("ORDER SAVE FAILED: " + (errData.error || errData.message));
             }
-            
+
             const oData = await orderRes.json();
             const formattedId = window.formatOrderId(oData.orderId);
             window.showAlert("Success", "ORDER " + formattedId + " SAVED WITH ₹" + totalAmt + "!", "success");
@@ -803,10 +895,10 @@ function mDeNextStep(targetStep) {
             mHideAllSubforms();
             const ncForm = document.getElementById('m-de-form-notconnected');
             if (ncForm) ncForm.classList.remove('hidden');
-            
+
             if (document.getElementById('m-de-next-3')) document.getElementById('m-de-next-3').style.display = 'none';
             if (document.getElementById('m-de-save-3')) document.getElementById('m-de-save-3').style.display = 'block';
-            
+
             targetStep = 3; // Decision (Not Connected)
         } else {
             targetStep = 2;
@@ -894,7 +986,7 @@ async function submitManualLeadWizard() {
             language: lang,
             status: finalLeadStatus,
             source: 'manual',
-            delivery_type: (document.getElementById('m-de-sales-status').value === 'Ordered') ? 
+            delivery_type: (document.getElementById('m-de-sales-status').value === 'Ordered') ?
                 (document.getElementById('m-de-delivery-type').value === 'other' ? document.getElementById('m-de-delivery-other').value : document.getElementById('m-de-delivery-type').value) : null
         };
 

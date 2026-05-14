@@ -44,7 +44,7 @@ exports.getOrders = async (req, res) => {
         query += " ORDER BY o.order_id DESC";
 
         const [rows] = await pool.query(query, params);
-        
+
         const ordersMap = {};
         rows.forEach(row => {
             if (!ordersMap[row.order_id]) {
@@ -56,7 +56,7 @@ exports.getOrders = async (req, res) => {
                     quantity: row.quantity || 1,
                     price: row.price || 0,
                     item_total: row.item_total || 0,
-                    subtotal: row.item_total || 0 
+                    subtotal: row.item_total || 0
                 });
             }
         });
@@ -68,11 +68,10 @@ exports.getOrders = async (req, res) => {
 
 exports.convertLeadToOrder = async (req, res) => {
     try {
-        let { lead_id, customer_name, phone, address, city, state, district, pincode, delivery_type, total_amount, advance_amount, items } = req.body;
-
+        let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, items } = req.body;
         const [resOrder] = await pool.query(
-            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, city, state, district, pincode, delivery_type, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 1)",
-            [lead_id, customer_name, phone, address || '', city || '', state || '', district || '', pincode || '', delivery_type || null, total_amount || 0, advance_amount || 0, (total_amount - advance_amount) || 0]
+            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 1)",
+            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, (total_amount - advance_amount) || 0]
         );
         const orderId = resOrder.insertId;
 
@@ -81,7 +80,7 @@ exports.convertLeadToOrder = async (req, res) => {
             for (const item of parsedItems) {
                 let pid = parseInt(item.product_id);
                 let dbPrice = parseFloat(item.price) || 0;
-                
+
                 if (isNaN(pid) || dbPrice === 0) {
                     // FIX: Using 'selling_price' instead of 'sale_price'
                     const [pRows] = await pool.query("SELECT product_id, selling_price, dealer_price FROM products WHERE sku = ? OR name = ? OR name LIKE ? LIMIT 1", [item.product_id, item.product_id, `%${item.product_id}%`]);

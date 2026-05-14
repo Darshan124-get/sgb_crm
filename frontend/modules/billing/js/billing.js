@@ -1,6 +1,6 @@
 let currentOrder = null;
 
-async function openOrderBilling(orderId) {
+window.openOrderBilling = async function (orderId) {
     const modal = document.getElementById('billingModal');
     const modalBody = document.getElementById('modalBody');
     modal.style.display = 'flex';
@@ -24,68 +24,89 @@ function renderWorkstation() {
 
     modalBody.innerHTML = `
         <div class="workstation-body">
-            <!-- Left Side: Core Sections -->
-            <div style="display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; padding-right: 1rem;">
-                
+            <div class="workstation-content">
                 <!-- SECTION 1: CUSTOMER INFO -->
                 <div class="work-section">
-                    <h4 style="margin-bottom: 1.25rem; font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                        <i class="fas fa-user-circle" style="margin-right: 0.5rem;"></i> SECTION 1: CUSTOMER INFO
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="grid-2">
                         <div>
-                            <p style="font-weight: 800; font-size: 1.25rem; margin-bottom: 0.25rem;">${data.customer_name}</p>
-                            <p style="font-weight: 600; color: #64748b; font-size: 0.9rem;">${data.phone}</p>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Customer Name <span style="color:red">*</span></label>
+                            <input type="text" id="billCustomerName" class="form-input" style="height: 38px; font-weight: 700;" value="${data.customer_name || ''}">
+                            
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin: 0.75rem 0 0.5rem 0;">Phone Number <span style="color:red">*</span></label>
+                            <input type="text" id="billCustomerPhone" class="form-input" style="height: 38px;" value="${data.phone || ''}">
                         </div>
                         <div>
-                            <p style="font-size: 0.9rem; font-weight: 500; line-height: 1.6; color: #475569;">
-                                ${data.address || 'No address provided'}<br>
-                                ${data.city || ''}, ${data.state || ''}
-                            </p>
-                            ${data.gst_number ? `
-                                <div style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                    <i class="fas fa-id-card" style="color: #10b981;"></i>
-                                    <span style="font-size: 0.75rem; color: #166534; font-weight: 700;">GST: ${data.gst_number}</span>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Address <span style="color:red">*</span></label>
+                            <textarea id="billCustomerAddress" class="form-input" style="height: 80px; resize: none; font-size: 0.85rem;">${data.address || ''}</textarea>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; margin-bottom: 1rem;">
+                                <div>
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Village</label>
+                                    <input type="text" id="billCustomerVillage" class="form-input" style="height: 38px;" value="${data.village || ''}">
                                 </div>
-                            ` : ''}
+                                <div>
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">District</label>
+                                    <input type="text" id="billCustomerDistrict" class="form-input" style="height: 38px;" value="${data.district || ''}">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div>
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Pincode <span style="color:red">*</span></label>
+                                    <input type="text" id="billCustomerPincode" class="form-input" style="height: 38px;" value="${data.pincode || ''}">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">State <span style="color:red">*</span></label>
+                                    <input type="text" id="billCustomerState" class="form-input" style="height: 38px;" value="${data.state || ''}">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- SECTION 1.5: SHIPPING & EXTRA DETAILS -->
+                <!-- SECTION 1.5: SHIPPING & BILLING DETAILS -->
                 <div class="work-section">
-                    <h4 style="margin-bottom: 1.25rem; font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                        <i class="fas fa-truck-fast" style="margin-right: 0.5rem;"></i> SECTION 1.5: SHIPPING & EXTRA DETAILS
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="grid-3" style="gap: 1rem;">
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Courier Partner <span style="color:red">*</span></label>
+                            <select id="dispatchThroughInput" class="form-input" style="height: 38px;">
+                                <option value="">Select Courier</option>
+                                <option value="Post" ${(data.dispatch_through || data.delivery_type) === 'Post' ? 'selected' : ''}>Post</option>
+                                <option value="VRL" ${(data.dispatch_through || data.delivery_type) === 'VRL' ? 'selected' : ''}>VRL</option>
+                                <option value="Other" ${!['Post', 'VRL'].includes(data.dispatch_through || data.delivery_type) && (data.dispatch_through || data.delivery_type) ? 'selected' : ''}>Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Discount (₹)</label>
+                            <input type="number" id="discountInput" class="form-input" style="height: 38px; font-weight: 700;" value="${data.discount || 0}" onchange="recalculateAll()">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Shipping (₹)</label>
+                            <input type="number" id="shippingInput" class="form-input" style="height: 38px; font-weight: 700;" value="${data.shipping_charges || 0}" onchange="recalculateAll()">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Destination</label>
+                            <input type="text" id="destinationInput" class="form-input" style="height: 38px;" value="${data.destination || data.city || ''}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Extra Charges (₹)</label>
+                            <input type="number" id="extraChargesInput" class="form-input" style="height: 38px; font-weight: 700;" value="${data.extra_charges || 0}" onchange="recalculateAll()">
+                        </div>
                         <div>
                             <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Delivery Note</label>
                             <input type="text" id="deliveryNoteInput" class="form-input" style="height: 38px;" value="${data.delivery_note || ''}">
                         </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Dispatched Through</label>
-                            <input type="text" id="dispatchThroughInput" class="form-input" style="height: 38px;" value="${data.dispatch_through || data.delivery_type || data.lead_delivery_type || ''}">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Destination</label>
-                            <input type="text" id="destinationInput" class="form-input" style="height: 38px;" value="${data.destination || ''}">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Payment Terms</label>
-                            <input type="text" id="paymentTermsInput" class="form-input" style="height: 38px;" value="${data.payment_terms || ''}">
-                        </div>
                     </div>
                 </div>
 
-                <!-- SECTION 2 & 3: ORDER DETAILS & PRODUCT EDITING -->
+                <!-- SECTION 2 & 3: ORDER ITEMS -->
                 <div class="work-section">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
                         <h4 style="font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                            <i class="fas fa-box-open" style="margin-right: 0.5rem;"></i> SECTION 2 & 3: ORDER ITEMS & EDITING
+                            <i class="fas fa-box-open" style="margin-right: 0.5rem;"></i> SECTION 2 & 3: ORDER ITEMS
                         </h4>
                         <div style="position: relative; width: 320px;">
                             <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.8rem;"></i>
-                            <input type="text" class="form-input" style="padding-left: 2.5rem; border-radius: 12px;" placeholder="Add Product by Name/SKU..." oninput="searchProducts(this.value)">
+                            <input type="text" class="form-input" style="padding-left: 2.5rem; border-radius: 12px;" placeholder="Add Product..." oninput="searchProducts(this.value)">
                             <div id="productSearchResults" class="search-results"></div>
                         </div>
                     </div>
@@ -93,7 +114,6 @@ function renderWorkstation() {
                         <thead>
                             <tr>
                                 <th>Product Specification</th>
-                                <th style="width: 100px;">HSN/SAC</th>
                                 <th style="width: 130px;">Unit Price</th>
                                 <th style="width: 90px; text-align: center;">Qty</th>
                                 <th style="width: 130px; text-align: right;">Total</th>
@@ -105,10 +125,7 @@ function renderWorkstation() {
                                 <tr data-index="${index}">
                                     <td>
                                         <div style="font-weight: 700; color: #1e293b;">${item.product_name}</div>
-                                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; margin-top: 0.25rem;">SKU: ${item.sku} | Stock: <span style="color: ${item.available_stock > 5 ? '#10b981' : '#ef4444'}">${item.available_stock || 0}</span></div>
-                                    </td>
-                                    <td style="font-size: 0.8rem; color: #64748b; font-weight: 700;">
-                                        ${item.hsn_code || 'N/A'}
+                                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">SKU: ${item.sku}</div>
                                     </td>
                                     <td>
                                         <div style="position: relative;">
@@ -119,9 +136,9 @@ function renderWorkstation() {
                                     <td>
                                         <input type="number" class="form-input" style="text-align: center;" value="${item.quantity}" onchange="updateItem(${index}, 'quantity', this.value)">
                                     </td>
-                                    <td style="text-align: right; font-weight: 800; color: #1e293b; font-size: 0.95rem;">₹${(item.price * item.quantity).toLocaleString()}</td>
+                                    <td style="text-align: right; font-weight: 800; color: #1e293b;">₹${(item.price * item.quantity).toLocaleString()}</td>
                                     <td>
-                                        <button class="btn-remove" onclick="removeItem(${index})" title="Remove Item"><i class="fas fa-trash-can"></i></button>
+                                        <button class="btn-remove" onclick="removeItem(${index})"><i class="fas fa-trash-can"></i></button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -129,150 +146,35 @@ function renderWorkstation() {
                     </table>
                 </div>
 
-                <!-- SECTION 5: PAYMENT & TRANSACTION HISTORY -->
-                <div class="work-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-                        <h4 style="font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                            <i class="fas fa-history" style="margin-right: 0.5rem;"></i> SECTION 5: PAYMENT & TRANSACTION HISTORY
-                        </h4>
-                        <button class="btn-billing primary" style="width: auto; padding: 0.5rem 1rem; font-size: 0.75rem;" onclick="showAddPaymentForm()">
-                            <i class="fas fa-plus-circle"></i> ADD BALANCE PAYMENT
-                        </button>
-                    </div>
-                    
-                    <!-- Add Payment Inline Form (Hidden by default) -->
-                    <div id="addPaymentForm" style="display: none; background: #f8fafc; padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
-                         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                            <div>
-                                <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Amount (₹)</label>
-                                <input type="number" id="newPayAmount" class="form-input" placeholder="0.00">
-                            </div>
-                            <div>
-                                <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Mode</label>
-                                <select id="newPayMode" class="form-input">
-                                    <option value="upi">UPI</option>
-                                    <option value="bank">Bank Transfer</option>
-                                    <option value="cash">Cash</option>
-                                    <option value="cod">COD</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Reference/Proof URL</label>
-                                <input type="text" id="newPayProof" class="form-input" placeholder="URL to screenshot">
-                            </div>
-                         </div>
-                         <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                            <button class="btn-billing success" style="width: auto; padding: 0.5rem 1.5rem;" onclick="submitNewPayment()">SAVE PAYMENT</button>
-                            <button class="btn-billing" style="width: auto; padding: 0.5rem 1.5rem; background: #94a3b8; color: white;" onclick="toggleAddPayment(false)">CANCEL</button>
-                         </div>
-                    </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem;">
-                        ${data.payments && data.payments.length ? data.payments.map(p => `
-                            <div style="background: #ffffff; padding: 1.25rem; border-radius: 16px; border: 1px solid #e2e8f0; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-left: 4px solid ${p.verified === 'yes' || p.payment_status === 'verified' ? '#10b981' : '#f59e0b'};">
-                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 0.5rem;">
-                                    <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">${p.source === 'lead_advance' ? 'Lead Advance' : (p.payment_type || 'Balance Payment')}</span>
-                                    ${p.proof_url ? `<a href="${p.proof_url}" target="_blank" style="color: #3b82f6; font-size: 0.75rem; text-decoration: none; font-weight: 700;" title="View Receipt"><i class="fas fa-file-image"></i> PROOF</a>` : ''}
-                                </div>
-                                <div style="font-weight: 900; font-size: 1.35rem; color: #1e293b;">₹${parseFloat(p.amount).toLocaleString()}</div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem;">
-                                    <span style="font-size: 0.7rem; padding: 2px 8px; background: #f1f5f9; border-radius: 4px; font-weight: 700; color: #475569;">${p.payment_mode.toUpperCase()}</span>
-                                    <span class="status-badge status-${p.payment_status || (p.verified === 'yes' ? 'verified' : 'pending')}" style="font-size: 0.65rem;">${p.payment_status || (p.verified === 'yes' ? 'verified' : 'pending')}</span>
-                                </div>
-                                <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.5rem; font-weight: 600;">Recorded: ${new Date(p.created_at).toLocaleDateString()}</div>
-                                ${(p.payment_status === 'pending' || (p.source === 'lead_advance' && p.verified === 'no')) ? `
-                                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid #f1f5f9; padding-top: 1rem;">
-                                        <button class="btn-action btn-primary" style="flex:1; font-weight: 700; font-size: 0.7rem; height: 32px;" onclick="verifyGenericPayment('${p.source}', ${p.payment_id || p.advance_id}, 'verified')">VERIFY</button>
-                                        <button class="btn-action" style="flex:1; font-weight: 700; font-size: 0.7rem; height: 32px; background: #fff5f5; color: #f87171; border: 1px solid #fecaca;" onclick="verifyGenericPayment('${p.source}', ${p.payment_id || p.advance_id}, 'rejected')">REJECT</button>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `).join('') : `
-                            <div style="grid-column: 1/-1; text-align: center; padding: 3rem; background: #f8fafc; border-radius: 16px; border: 2px dashed #e2e8f0;">
-                                <i class="fas fa-money-bill-transfer" style="font-size: 2.5rem; color: #cbd5e1; margin-bottom: 1rem; display: block;"></i>
-                                <p style="color: #94a3b8; font-size: 0.9rem; font-weight: 600;">No payment history found.</p>
-                            </div>
-                        `}
-                    </div>
-                </div>
-
-                <!-- ORDER AUDIT TRAIL -->
-                <div class="work-section">
-                    <h4 style="margin-bottom: 1.25rem; font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                        <i class="fas fa-history" style="margin-right: 0.5rem;"></i> ORDER AUDIT LOGS
-                    </h4>
-                    <div style="font-size: 0.8rem; color: #475569; max-height: 180px; overflow-y: auto; border-radius: 12px; border: 1px solid #f1f5f9;">
-                        ${data.logs && data.logs.length ? data.logs.map(log => `
-                            <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #f8fafc; display: flex; justify-content: space-between; align-items: center;">
-                                <div style="flex: 1;">
-                                    <span style="font-weight: 800; color: #1e293b;">${log.action}</span>
-                                    <i class="fas fa-angle-right" style="margin: 0 0.5rem; opacity: 0.3;"></i>
-                                    <span style="color: #64748b;">${log.new_value}</span>
-                                </div>
-                                <div style="text-align: right; opacity: 0.6; font-size: 0.75rem;">
-                                    <div style="font-weight: 700;">${log.user_name}</div>
-                                    <div>${new Date(log.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
-                                </div>
-                            </div>
-                        `).join('') : '<p style="padding: 2rem; text-align: center; color: #94a3b8;">No history available.</p>'}
-                    </div>
-                </div>
             </div>
 
-            <!-- Right Side: SECTION 4 & 6 & 7: CALCULATION & INVOICE GENERATION -->
-            <div class="calc-sidebar">
-                <h3 style="margin-bottom: 2rem; display: flex; align-items: center; gap: 0.75rem; font-size: 1.25rem;">
-                    <i class="fas fa-file-invoice-dollar" style="color: #10b981;"></i> SECTION 4: BILLING ENGINE
-                </h3>
-                
-                <div class="calc-row"><span>Items Subtotal:</span> <span style="font-weight: 800;">₹${calculateItemsSubtotal().toLocaleString()}</span></div>
-                
-                <div style="margin: 1.5rem 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">Discount Amount (₹)</label>
-                    <input type="number" id="discountInput" class="form-input" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.15); height: 48px; font-size: 1.1rem; font-weight: 700;" value="${currentOrder.discount || 0}" onchange="recalculateAll()">
-                </div>
-
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">Shipping Charges (₹)</label>
-                    <input type="number" id="shippingInput" class="form-input" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.15); height: 48px; font-size: 1.1rem; font-weight: 700;" value="${currentOrder.shipping_charges || 0}" onchange="recalculateAll()">
-                </div>
-
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">Extra Charges (₹)</label>
-                    <input type="number" id="extraChargesInput" class="form-input" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.15); height: 48px; font-size: 1.1rem; font-weight: 700;" value="${currentOrder.extra_charges || 0}" onchange="recalculateAll()">
-                </div>
-
-                <div id="taxDetails" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
-                    <!-- Tax rows inject here -->
-                </div>
-
-                <div class="calc-row total" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <span>Final Total:</span> <span id="grandTotalLabel" style="font-size: 1.5rem; color: white;">₹0.00</span>
-                </div>
-
-                <div id="financialSummary" style="margin-top: 1rem; padding: 1.25rem; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2);">
-                    <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.5rem; color: #a7f3d0;">
-                        <span>Verified Paid:</span>
-                        <span id="verifiedPaidLabel" style="font-weight: 800;">₹0.00</span>
+            <!-- STICKY SUMMARY BAR -->
+            <div class="billing-summary-bar">
+                <div style="display: flex; gap: 3rem;">
+                    <div class="summary-item">
+                        <span class="summary-label">Total Amount</span>
+                        <span id="grandTotalLabel" class="summary-value">₹0.00</span>
                     </div>
-                    <div style="display:flex; justify-content:space-between; font-size: 1.1rem; color: #fff;">
-                        <span style="font-weight: 600;">Balance Due:</span>
-                        <span id="balanceDueLabel" style="font-weight: 900; color: #f87171;">₹0.00</span>
+                    <div class="summary-item">
+                        <span class="summary-label">Advance Amount</span>
+                        <span id="verifiedPaidLabel" class="summary-value paid">₹0.00</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Due Amount</span>
+                        <span id="balanceDueLabel" class="summary-value due">₹0.00</span>
                     </div>
                 </div>
-
-                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 1rem; padding-top: 3rem;">
-                    <!-- SECTION 7: FINAL ACTIONS -->
-                    <button class="btn-billing primary" style="height: 54px; font-size: 1rem;" onclick="saveOrderDraft()">
-                        <i class="fas fa-save-as"></i> SAVE AS DRAFT
+                
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <button class="btn-billing" style="width: auto; background: transparent; color: #64748b; border: 1px solid #e2e8f0;" onclick="saveOrderDraft()">
+                        SAVE DRAFT
                     </button>
-                    <!-- SECTION 6: INVOICE GENERATION -->
-                    <button class="btn-billing success" style="height: 54px; font-size: 1.1rem; font-weight: 900;" onclick="generateFinalInvoice()">
-                        <i class="fas fa-file-circle-check"></i> GENERATE INVOICE
+                    <button class="btn-bill" id="finalizeBtn" onclick="generateFinalInvoice()">
+                        <i class="fas fa-receipt"></i> BILL ORDER
                     </button>
-                    
-                    <button onclick="closeModal()" style="background:transparent; border:none; color: #94a3b8; font-size: 0.875rem; cursor:pointer; margin-top: 0.5rem; text-decoration: underline; font-weight: 600;">
-                        Discard Changes & Close
+                    <button onclick="closeModal()" style="background:transparent; border:none; color: #94a3b8; font-size: 0.8rem; cursor:pointer; text-decoration: underline;">
+                        Close
                     </button>
                 </div>
             </div>
@@ -288,38 +190,21 @@ function calculateItemsSubtotal() {
 
 function recalculateAll() {
     if (!currentOrder) return;
-    
+
     const subtotal = calculateItemsSubtotal();
     const discount = parseFloat(document.getElementById('discountInput').value || 0);
     const shipping = parseFloat(document.getElementById('shippingInput').value || 0);
     const extra = parseFloat(document.getElementById('extraChargesInput').value || 0);
-    
-    // Tax Logic
-    const companyState = "Karnataka"; 
-// Should come from a global config ideally
-    const taxRate = 18;
-    const taxableAmount = subtotal - discount + shipping + extra;
-    
-    let taxHtml = '';
-    let grandTotal = taxableAmount;
 
-    if (currentOrder.state === companyState) {
-        const cgst = taxableAmount * (taxRate / 200);
-        const sgst = taxableAmount * (taxRate / 200);
-        taxHtml = `
-            <div class="calc-row"><span>CGST (9%):</span> <span>₹${cgst.toFixed(2)}</span></div>
-            <div class="calc-row"><span>SGST (9%):</span> <span>₹${sgst.toFixed(2)}</span></div>
-        `;
-        grandTotal += cgst + sgst;
-    } else {
-        const igst = taxableAmount * (taxRate / 100);
-        taxHtml = `<div class="calc-row"><span>IGST (18%):</span> <span>₹${igst.toFixed(2)}</span></div>`;
-        grandTotal += igst;
-    }
+    // Tax Logic (Removed GST as per request - All items are inclusive)
+    let grandTotal = subtotal - discount + shipping + extra;
 
-    document.getElementById('taxDetails').innerHTML = taxHtml;
-    document.getElementById('grandTotalLabel').innerText = `₹${grandTotal.toLocaleString()}`;
+    const taxDetails = document.getElementById('taxDetails');
+    if (taxDetails) taxDetails.style.display = 'none';
     
+    const grandTotalLabel = document.getElementById('grandTotalLabel');
+    if (grandTotalLabel) grandTotalLabel.innerText = `₹${grandTotal.toLocaleString()}`;
+
     // Financial Summary
     const verifiedTotal = (currentOrder.payments || []).reduce((sum, p) => {
         if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
@@ -332,20 +217,21 @@ function recalculateAll() {
     document.getElementById('balanceDueLabel').innerText = `₹${balanceDue.toLocaleString()}`;
     document.getElementById('balanceDueLabel').style.color = balanceDue > 0 ? '#f87171' : '#10b981';
 
-    const generateBtn = document.querySelector('button[onclick="generateFinalInvoice()"]');
-    if (generateBtn) {
+    const finalizeBtn = document.getElementById('finalizeBtn');
+    if (finalizeBtn) {
         if (balanceDue > 0) {
-            generateBtn.innerHTML = `<i class="fas fa-file-circle-check"></i> FINALIZE (AWAITING ₹${balanceDue.toLocaleString()})`;
-            generateBtn.style.opacity = "0.8";
+            finalizeBtn.innerHTML = `<i class="fas fa-receipt"></i> BILL ORDER (AWAITING ₹${balanceDue.toLocaleString()})`;
+            finalizeBtn.style.opacity = "0.8";
         } else {
-            generateBtn.innerHTML = `<i class="fas fa-truck-fast"></i> FINALIZE & MOVE TO PACKING`;
-            generateBtn.style.opacity = "1";
+            finalizeBtn.innerHTML = `<i class="fas fa-receipt"></i> BILL ORDER`;
+            finalizeBtn.style.opacity = "1";
         }
     }
 
     // Store in state
     currentOrder.discount = discount;
     currentOrder.shipping_charges = shipping;
+    currentOrder.extra_charges = extra;
     currentOrder.grandTotal = grandTotal;
     currentOrder.balanceDue = balanceDue;
 }
@@ -369,7 +255,7 @@ async function submitNewPayment() {
     try {
         const res = await fetch(`${BILLING_API_URL}/payments`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
@@ -401,35 +287,21 @@ async function submitNewPayment() {
 }
 
 async function verifyGenericPayment(source, id, status) {
-    // If it's a lead advance, we need a special endpoint or handle it in billing controller if extended
-    // For now, let's assume we use the regular verifyPayment for order-linked payments
-    // If it's source='lead_advance', we might need to handle it differently or migrate it
-    
-    // In our backend getOrderForBilling, we normalized them.
-    // However, lead_advance_payments might need their own verification if they aren't part of the regular payments table.
-    
-    // DECISION: In the interest of time and following the user's specific table mention, 
-    // I'll check if the billing controller can handle both.
-    
-    // Actually, I'll update verifyPayment in the backend to handle both OR use the regular one if they were migrated.
-    // Since they weren't migrated, I'll use a specific logic here.
-    
     let url = `${BILLING_API_URL}/payments/${id}/verify`;
     if (source === 'lead_advance') {
-        // We'll need to create this endpoint or handle it
-        url = `${BILLING_API_URL}/payments/lead-advance/${id}/verify`; 
+        url = `${BILLING_API_URL}/payments/lead-advance/${id}/verify`;
     }
 
     try {
         const res = await fetch(url, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ status })
         });
-        
+
         if (res.ok) {
             const refreshRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -461,7 +333,7 @@ async function searchProducts(q) {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const products = await res.json();
-            
+
             resultsDiv.innerHTML = products.map(p => `
                 <div class="search-item" onclick="addItemToOrder(${JSON.stringify(p).replace(/"/g, '&quot;')})">
                     <div>
@@ -491,7 +363,7 @@ function addItemToOrder(p) {
         quantity: 1,
         available_stock: p.current_stock - p.reserved_stock
     });
-    
+
     document.getElementById('productSearchResults').style.display = 'none';
     renderWorkstation();
 }
@@ -510,39 +382,49 @@ function removeItem(index) {
 /** Persistence Actions **/
 async function saveOrderDraft(options = { silent: false }) {
     try {
-        // 1. Save core order info (items, discount, shipping)
+        const orderData = {
+            customer_name: document.getElementById('billCustomerName').value,
+            phone: document.getElementById('billCustomerPhone').value,
+            address: document.getElementById('billCustomerAddress').value,
+            village: document.getElementById('billCustomerVillage').value,
+            district: document.getElementById('billCustomerDistrict').value,
+            pincode: document.getElementById('billCustomerPincode').value,
+            state: document.getElementById('billCustomerState').value,
+            items: currentOrder.items,
+            discount: parseFloat(document.getElementById('discountInput').value) || 0,
+            shipping_charges: parseFloat(document.getElementById('shippingInput').value) || 0,
+            extra_charges: parseFloat(document.getElementById('extraChargesInput').value) || 0,
+            dispatch_through: document.getElementById('dispatchThroughInput').value
+        };
+
         const orderRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                items: currentOrder.items,
-                discount: currentOrder.discount,
-                shipping_charges: currentOrder.shipping_charges
-            })
+            body: JSON.stringify(orderData)
         });
-        
+
         if (!orderRes.ok) {
             const err = await orderRes.json();
             throw new Error(err.message || 'Failed to save order draft');
         }
 
-        // 2. Initialize/Update a Draft Invoice record
         const invRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/invoice`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                discount: currentOrder.discount,
-                shipping_charges: currentOrder.shipping_charges,
-                tax_type: currentOrder.state === 'Karnataka' ? 'CGST_SGST' : 'IGST',
+                discount: orderData.discount,
+                shipping_charges: orderData.shipping_charges,
+                extra_charges: orderData.extra_charges,
+                tax_type: 'NONE',
                 status: 'draft',
                 delivery_note: document.getElementById('deliveryNoteInput')?.value || '',
-                dispatch_through: document.getElementById('dispatchThroughInput')?.value || '',
+                dispatch_through: orderData.dispatch_through,
                 destination: document.getElementById('destinationInput')?.value || '',
                 payment_terms: document.getElementById('paymentTermsInput')?.value || ''
             })
@@ -565,14 +447,13 @@ async function verifyPayment(paymentId, status) {
     try {
         await fetch(`${BILLING_API_URL}/payments/${paymentId}/verify`, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ status })
         });
-        
-        // Refresh full order to get updated payment statuses
+
         const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
@@ -584,44 +465,51 @@ async function verifyPayment(paymentId, status) {
 }
 
 async function generateFinalInvoice() {
-    // Single click process: No redundant confirm unless absolutely critical
-    
+    const customerName = document.getElementById('billCustomerName').value.trim();
+    const phone = document.getElementById('billCustomerPhone').value.trim();
+    const address = document.getElementById('billCustomerAddress').value.trim();
+    const pincode = document.getElementById('billCustomerPincode').value.trim();
+    const state = document.getElementById('billCustomerState').value.trim();
+    const courier = document.getElementById('dispatchThroughInput').value;
+
+    if (!customerName || !phone || !address || !pincode || !state || !courier) {
+        window.showAlert("Mandatory Fields Missing", "Please ensure Name, Phone, Address, Pincode, State, and Courier Partner are all filled before finalizing.", "error");
+        return;
+    }
+
+    if (!confirm("Are you sure you want to finalize this order and send it to packing?")) return;
+
     try {
-        // First save the latest changes as a draft silently
         await saveOrderDraft({ silent: true });
 
         const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/invoice`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                discount: currentOrder.discount,
-                shipping_charges: currentOrder.shipping_charges,
-                tax_type: currentOrder.state === 'Karnataka' ? 'CGST_SGST' : 'IGST',
-                status: 'finalized',
-                delivery_note: document.getElementById('deliveryNoteInput')?.value || '',
-                dispatch_through: document.getElementById('dispatchThroughInput')?.value || '',
-                destination: document.getElementById('destinationInput')?.value || '',
-                payment_terms: document.getElementById('paymentTermsInput')?.value || ''
+                status: 'finalized'
             })
         });
-        
+
         if (res.ok) {
             const invData = await res.json();
-            // Open invoice in new tab immediately
-            window.open(`invoice.html?id=${invData.invoiceId}`, '_blank');
-            
+            // window.open(`invoice.html?id=${invData.invoiceId}`, '_blank'); // REMOVED AS PER REQUEST
+
             closeModal();
-            switchTab('invoices');
+            showFinalizeCopyModal(invData.invoiceId);
+
+            if (typeof switchTab === 'function') {
+                switchTab('invoices');
+            }
             loadInvoices();
         } else {
             const err = await res.json();
-            alert(err.message);
+            window.showAlert("Error", err.message || "Failed to generate invoice", "error");
         }
     } catch (err) {
-        alert('Invoice generation failed: ' + err.message);
+        window.showAlert("Error", "Invoice generation failed: " + err.message, "error");
     }
 }
 
@@ -634,7 +522,7 @@ async function loadInvoices() {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const invoices = await res.json();
-        
+
         tbody.innerHTML = invoices.map(inv => `
             <tr>
                 <td style="font-weight: 800; color: var(--billing-primary);">${inv.invoice_number}</td>
@@ -644,9 +532,9 @@ async function loadInvoices() {
                 <td style="font-weight: 700;">₹${parseFloat(inv.total_amount).toLocaleString()}</td>
                 <td><span class="status-badge status-${inv.invoice_status}">${inv.invoice_status}</span></td>
                 <td>
-                    ${inv.invoice_status === 'draft' ? 
-                        `<button class="btn-billing success" style="width: auto; padding: 0.5rem 1rem;" onclick="finalizeInvoice(${inv.invoice_id})">Finalize</button>` :
-                        `<div style="display:flex; gap:0.5rem;">
+                    ${inv.invoice_status === 'draft' ?
+                `<button class="btn-billing success" style="width: auto; padding: 0.5rem 1rem;" onclick="finalizeInvoice(${inv.invoice_id})">Finalize</button>` :
+                `<div style="display:flex; gap:0.5rem;">
                             <button class="btn-billing primary" style="width: auto; padding: 0.5rem 0.75rem;" title="View Invoice" onclick="viewInvoice(${inv.invoice_id})"><i class="fas fa-eye"></i></button>
                             <button class="btn-billing success" style="width: auto; padding: 0.5rem 0.75rem;" title="Print/Download" onclick="printInvoice(${inv.invoice_id})"><i class="fas fa-print"></i></button>
                          </div>`}
@@ -687,7 +575,7 @@ async function loadPayments(status = 'pending') {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const payments = await res.json();
-        
+
         tbody.innerHTML = payments.map(p => `
             <tr>
                 <td>${new Date(p.created_at).toLocaleDateString()}</td>
@@ -697,9 +585,9 @@ async function loadPayments(status = 'pending') {
                 <td><span style="font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">${p.payment_mode.toUpperCase()}</span></td>
                 <td><span class="status-badge status-${p.payment_status}">${p.payment_status}</span></td>
                 <td>
-                    ${p.payment_status === 'pending' ? 
-                        `<button class="btn-billing primary" style="width: auto; padding: 0.5rem 1rem;" onclick="verifyPayment(${p.payment_id}, 'verified'); loadPayments('${status}')">Verify</button>` : 
-                        `<a href="${p.proof_url}" target="_blank" class="btn-billing" style="width: auto; padding: 0.5rem 0.75rem; background: #f1f5f9; color: #475569; text-decoration:none;"><i class="fas fa-file-invoice"></i> Proof</a>`}
+                    ${p.payment_status === 'pending' ?
+                `<button class="btn-billing primary" style="width: auto; padding: 0.5rem 1rem;" onclick="verifyPayment(${p.payment_id}, 'verified'); loadPayments('${status}')">Verify</button>` :
+                `<a href="${p.proof_url}" target="_blank" class="btn-billing" style="width: auto; padding: 0.5rem 0.75rem; background: #f1f5f9; color: #475569; text-decoration:none;"><i class="fas fa-file-invoice"></i> Proof</a>`}
                 </td>
             </tr>
         `).join('');
@@ -712,13 +600,90 @@ function closeModal() {
     document.getElementById('billingModal').style.display = 'none';
 }
 
+/** Finalize & Copy Modal Logic **/
+async function showFinalizeCopyModal(invoiceId) {
+    const modal = document.getElementById('finalizeCopyModal');
+    const dataBox = document.getElementById('finalizeCopyData');
+    
+    modal.style.display = 'flex';
+    dataBox.innerHTML = '<div style="text-align:center; padding: 2rem;"><i class="fas fa-spinner fa-spin"></i> Preparing summary...</div>';
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/invoices/${invoiceId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch invoice details');
+        
+        const data = await res.json();
+        
+        if (!data || !data.items) throw new Error('Incomplete data received');
+
+        const productsStr = data.items.map(item => `- ${item.product_name} x ${item.quantity} (₹${parseFloat(item.price).toLocaleString()})`).join('\n');
+        
+        const message = `
+================================
+📦 BILLING DATA SUMMARY
+================================
+👤 CUSTOMER: ${data.billing_name}
+📞 PHONE: ${data.billing_phone}
+📍 ADDRESS: ${data.billing_address}
+🏡 VILLAGE: ${data.billing_village || 'N/A'}
+🏙️ DISTRICT: ${data.billing_district || 'N/A'}
+🗺️ STATE: ${data.state || 'N/A'}
+🔢 PINCODE: ${data.billing_pincode || 'N/A'}
+
+🛒 PRODUCTS:
+${productsStr}
+
+💰 TOTAL AMOUNT: ₹${parseFloat(data.total_amount).toLocaleString()}
+💸 ADVANCES: ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
+📉 DUE AMOUNT: ₹${(parseFloat(data.total_amount) - parseFloat(data.advance_paid || 0)).toLocaleString()}
+🚚 COURIER PARTNER: ${data.dispatch_through || 'N/A'}
+📍 DESTINATION: ${data.destination || 'N/A'}
+================================
+Generated by SGB AGRIVAAN
+`.trim();
+
+        dataBox.innerText = message;
+        // Store for copying
+        window.lastBilledMessage = message;
+        
+    } catch (err) {
+        console.error(err);
+        dataBox.innerHTML = '<p style="color: #ef4444;">Failed to generate summary. Please check History tab.</p>';
+    }
+}
+
+async function copyFinalizeData() {
+    const btn = document.querySelector('.btn-finalize-copy.primary');
+    const originalContent = btn.innerHTML;
+    
+    try {
+        if (!window.lastBilledMessage) return;
+        await navigator.clipboard.writeText(window.lastBilledMessage);
+        
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied to Clipboard!';
+        btn.style.background = '#10b981';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalContent;
+            btn.style.background = '';
+        }, 2000);
+    } catch (err) {
+        alert('Failed to copy to clipboard');
+    }
+}
+
+function closeFinalizeCopyModal() {
+    document.getElementById('finalizeCopyModal').style.display = 'none';
+}
+
 function viewInvoice(invoiceId) {
     window.open(`invoice.html?id=${invoiceId}`, '_blank');
 }
 
 function printInvoice(invoiceId) {
-    // Open viewer first, which auto-triggers print if handled correctly, 
-    // or just direct the user to the print-optimized viewer.
     window.open(`invoice.html?id=${invoiceId}`, '_blank');
 }
 
@@ -726,7 +691,6 @@ function setupSearch() {
     const searchInput = document.getElementById('globalSearch');
     if (searchInput) {
         searchInput.oninput = (e) => {
-            // Future global filter
         };
     }
 }
@@ -753,37 +717,138 @@ function loadSidebar() {
     }
 }
 
-function switchTab(tabId) {
-    currentTab = tabId;
-    // Hide all contents
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    // Show target
-    const targetTab = document.getElementById(tabId);
-    if (targetTab) targetTab.classList.add('active');
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
-    // Update Sidebar highlighting
-    document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    document.getElementById(tab).style.display = 'block';
+    const link = document.getElementById(`side-${tab}`);
+    if (link) link.classList.add('active');
 
-    const activeSideLink = document.getElementById(`side-${tabId}`);
-    if (activeSideLink) {
-        activeSideLink.classList.add('active');
-        const navItem = activeSideLink.closest('.nav-item');
-        if (navItem) navItem.classList.add('active');
+    if (tab === 'pending') loadPendingOrders();
+    if (tab === 'in-review') loadInReviewOrders();
+    if (tab === 'history') loadBilledHistory();
+    if (tab === 'payments') loadPayments();
+    if (tab === 'dashboard') loadDashboard();
+    if (tab === 'invoices') loadInvoices();
+    if (tab === 'reports') loadReports();
+    if (tab === 'settings') loadSettings();
+}
+
+async function loadBilledHistory() {
+    try {
+        const res = await fetch(`${BILLING_API_URL}/invoices`);
+        const invoices = await res.json();
+        const list = document.getElementById('historyList');
+        list.innerHTML = '';
+
+        if (!invoices.length) {
+            list.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No billed data found.</p>';
+            return;
+        }
+
+        for (const inv of invoices) {
+            const card = document.createElement('div');
+            card.className = 'history-card';
+            
+            const date = new Date(inv.invoice_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+            const total = parseFloat(inv.total_amount || 0);
+            const advances = parseFloat(inv.advance_paid || 0);
+            const due = total - advances;
+            
+            card.innerHTML = `
+                <div class="history-card-header">
+                    <div>
+                        <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${inv.order_customer || 'Guest'}</div>
+                        <div style="color: #64748b; font-size: 0.75rem;">Inv #${inv.invoice_number} | ${date}</div>
+                    </div>
+                    <div class="status-badge" style="background: #dcfce7; color: #166534; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 800;">BILLED</div>
+                </div>
+                <div class="history-card-body">
+                    <div class="history-item"><span class="history-label">Phone</span> <span style="font-weight: 700;">${inv.billing_phone || 'N/A'}</span></div>
+                    <div class="history-item"><span class="history-label">Village</span> <span>${inv.village || inv.billing_village || 'N/A'}</span></div>
+                    <div class="history-item"><span class="history-label">District</span> <span>${inv.district || inv.billing_district || 'N/A'}</span></div>
+                    <div class="history-item"><span class="history-label">Pincode</span> <span>${inv.pincode || inv.billing_pincode || 'N/A'}</span></div>
+                    <div class="history-item"><span class="history-label">Delivery</span> <span style="color: #6366f1; font-weight: 700;">${inv.delivery_type || 'N/A'}</span></div>
+                    
+                    <div style="margin: 1rem 0; padding-top: 1rem; border-top: 1px dashed #e2e8f0;">
+                        <div class="history-item"><span class="history-label">Total Amount</span> <span style="font-weight: 800; color: #1e293b;">₹${total.toLocaleString()}</span></div>
+                        <div class="history-item"><span class="history-label">Advances</span> <span style="color: #10b981; font-weight: 700;">₹${advances.toLocaleString()}</span></div>
+                        <div class="history-item"><span class="history-label">Due Balance</span> <span style="color: #ef4444; font-weight: 800;">₹${due.toLocaleString()}</span></div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button class="btn-copy" style="flex: 1;" onclick="copyFullBillData(${inv.invoice_id}, this)">
+                        <i class="fa-solid fa-copy"></i> Copy Full Data
+                    </button>
+                    <button class="btn-copy" style="background: #1e293b; color: white; flex: 0 0 45px; justify-content: center;" title="Print Invoice" onclick="window.open('${window.BASE_URL}/api/billing/print-invoice/${inv.invoice_id}', '_blank')">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+                </div>
+            `;
+            list.appendChild(card);
+        }
+    } catch (err) {
+        console.error(err);
     }
+}
 
-    // Sync with top tabs if they exist (for backwards compat)
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(tabId));
-    });
+async function copyFullBillData(invoiceId, btn) {
+    try {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Copying...';
+        
+        const res = await fetch(`${BILLING_API_URL}/invoices/${invoiceId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
 
-    // Fetch data based on tab
-    if (tabId === 'dashboard') loadDashboard();
-    if (tabId === 'pending') loadPendingOrders();
-    if (tabId === 'in-review') loadInReviewOrders();
-    if (tabId === 'invoices') loadInvoices();
-    if (tabId === 'reports') loadReports();
-    if (tabId === 'settings') loadSettings();
+        if (!res.ok) throw new Error('Failed to fetch invoice details');
+
+        const data = await res.json();
+        
+        if (!data || !data.items) throw new Error('No data found');
+
+        const productsStr = data.items.map(item => `- ${item.product_name} x ${item.quantity} (₹${parseFloat(item.price).toLocaleString()})`).join('\n');
+        
+        const message = `
+================================
+📦 BILLING DATA SUMMARY
+================================
+👤 CUSTOMER: ${data.billing_name}
+📞 PHONE: ${data.billing_phone}
+📍 ADDRESS: ${data.billing_address}
+🏡 VILLAGE: ${data.billing_village || 'N/A'}
+🏙️ DISTRICT: ${data.billing_district || 'N/A'}
+🗺️ STATE: ${data.state || 'N/A'}
+🔢 PINCODE: ${data.billing_pincode || 'N/A'}
+
+🛒 PRODUCTS:
+${productsStr}
+
+💰 TOTAL AMOUNT: ₹${parseFloat(data.total_amount).toLocaleString()}
+💸 ADVANCES: ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
+📉 DUE AMOUNT: ₹${(parseFloat(data.total_amount) - parseFloat(data.advance_paid || 0)).toLocaleString()}
+🚚 COURIER PARTNER: ${data.dispatch_through || 'N/A'}
+📍 DESTINATION: ${data.destination || 'N/A'}
+================================
+Generated by SGB AGRIVAAN
+`.trim();
+
+        await navigator.clipboard.writeText(message);
+        
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        btn.style.background = '#22c55e';
+        btn.style.color = 'white';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.background = '';
+            btn.style.color = '';
+        }, 2000);
+    } catch (err) {
+        console.error(err);
+        btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error';
+    }
 }
 
 async function loadReports() {
@@ -796,7 +861,7 @@ async function loadReports() {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const stats = await res.json();
-        
+
         container.innerHTML = `
             <div style="background: white; padding: 2rem; border-radius: 16px; border: 1px solid #e2e8f0;">
                 <h3 style="margin-bottom: 2rem;">Financial Performance Report</h3>
@@ -842,7 +907,7 @@ async function loadDashboard() {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const stats = await res.json();
-        
+
         const grid = document.getElementById('statsGrid');
         grid.innerHTML = `
             <div class="stat-card">
@@ -882,7 +947,7 @@ async function loadDashboard() {
                     <div style="font-size: 0.875rem; font-weight: 600;">Invoice ${inv.invoice_number} generated</div>
                     <div style="font-size: 0.75rem; color: #64748b;">${inv.order_customer} | ₹${parseFloat(inv.total_amount).toLocaleString()}</div>
                 </div>
-                <div style="font-size: 0.7rem; color: #94a3b8;">${new Date(inv.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;">${new Date(inv.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
         `).join('') || '<p style="text-align:center; padding: 2rem; color: #94a3b8;">No recent activity.</p>';
 
@@ -915,12 +980,12 @@ async function loadPendingOrders() {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         allPendingOrders = await res.json();
-        
+
         // Wire up filters once
         document.querySelectorAll('.filter-input-v2').forEach(input => {
             input.onchange = () => applyPendingFilters();
         });
-        
+
         applyPendingFilters();
     } catch (err) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444;">Error loading pending orders.</td></tr>';
@@ -937,10 +1002,10 @@ function applyPendingFilters() {
     const filtered = allPendingOrders.filter(order => {
         const matchesDate = !filterDate || new Date(order.created_at).toISOString().split('T')[0] === filterDate;
         const matchesSales = !filterSales || order.sales_person_name === filterSales;
-        const matchesPayment = !filterPayment || 
+        const matchesPayment = !filterPayment ||
             (filterPayment === 'verified' ? order.advance_verified : !order.advance_verified);
         const matchesSource = !filterSource || order.lead_source === filterSource;
-        
+
         return matchesDate && matchesSales && matchesPayment && matchesSource;
     });
 
@@ -957,9 +1022,9 @@ function applyPendingFilters() {
             <td>${order.sales_person_name || 'Staff'}</td>
             <td style="font-weight: 700;">₹${parseFloat(order.advance_paid || 0).toLocaleString()}</td>
             <td>
-                ${order.has_payment_proof ? 
-                    `<button class="btn-billing" style="width: auto; padding: 4px 10px; background: #f1f5f9; color: #3b82f6;" onclick="openOrderBilling(${order.order_id})"><i class="fas fa-image"></i> View</button>` : 
-                    '<span style="opacity: 0.4;">N/A</span>'}
+                ${order.has_payment_proof ?
+            `<button class="btn-billing" style="width: auto; padding: 4px 10px; background: #f1f5f9; color: #3b82f6;" onclick="openOrderBilling(${order.order_id})"><i class="fas fa-image"></i> View</button>` :
+            '<span style="opacity: 0.4;">N/A</span>'}
             </td>
             <td style="font-weight: 800; color: var(--billing-primary);">₹${parseFloat(order.total_amount).toLocaleString()}</td>
             <td><span class="status-badge status-${order.order_status}">${order.order_status}</span></td>
@@ -992,7 +1057,7 @@ async function loadInReviewOrders() {
         });
         const allOrders = await res.json();
         const inReview = allOrders.filter(o => o.order_status === 'in_review');
-        
+
         if (inReview.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 3rem; color: #64748b;">No orders currently in review.</td></tr>';
             return;
@@ -1028,7 +1093,7 @@ function calculateWaitTime(updatedAt) {
 async function loadSettings() {
     const container = document.getElementById('settingsForm');
     container.innerHTML = '<div style="text-align:center; padding: 2rem;"><div class="loader"></div></div>';
-    
+
     try {
         const res = await fetch(`${BILLING_API_URL}/settings`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -1071,7 +1136,7 @@ async function saveSettings() {
     try {
         const res = await fetch(`${BILLING_API_URL}/settings`, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },

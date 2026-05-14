@@ -1,159 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Pipeline | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
+
 <body>
-<div class="dashboard-wrapper">
-    <div id="sidebar-container"></div>
-    <main class="main-content">
-        <header class="topbar">
-            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search..."></div>
-            <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
-        </header>
-        <div class="content-body" id="pageContent">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <div>
-                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.25rem;">Sales Pipeline</h1>
-                    <p style="color:#64748b;font-size:0.875rem;">Monitor and manage lead progression across all stages.</p>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text"
+                        placeholder="Search..."></div>
+                <div class="profile-section"><span class="profile-name" id="profileName">Administrator</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
                 </div>
-                <div class="pipeline-actions">
-                    <button class="login-btn" style="margin-top:0; width:auto; padding:0.6rem 1.25rem;" onclick="location.reload()">
-                        <i class="fa-solid fa-rotate"></i> Refresh board
-                    </button>
+            </header>
+            <div class="content-body" id="pageContent">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <div>
+                        <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;margin-bottom:0.25rem;">Sales Pipeline
+                        </h1>
+                        <p style="color:#64748b;font-size:0.875rem;">Monitor and manage lead progression across all
+                            stages.</p>
+                    </div>
+                    <div class="pipeline-actions">
+                        <button class="login-btn" style="margin-top:0; width:auto; padding:0.6rem 1.25rem;"
+                            onclick="location.reload()">
+                            <i class="fa-solid fa-rotate"></i> Refresh board
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Overview -->
+                <div class="pipeline-stats-cards">
+                    <div class="pipeline-stat-card">
+                        <span class="pipeline-stat-label">Total Leads</span>
+                        <span class="pipeline-stat-value" id="stat-total-leads">0</span>
+                    </div>
+                    <div class="pipeline-stat-card">
+                        <span class="pipeline-stat-label">Hot Leads</span>
+                        <span class="pipeline-stat-value" id="stat-hot-leads" style="color: #e11d48;">0</span>
+                    </div>
+                    <div class="pipeline-stat-card">
+                        <span class="pipeline-stat-label">Avg. Conversion</span>
+                        <span class="pipeline-stat-value" id="stat-conv-rate">0%</span>
+                    </div>
+                    <div class="pipeline-stat-card">
+                        <span class="pipeline-stat-label">Stuck Leads</span>
+                        <span class="pipeline-stat-value" id="stat-stuck-leads" style="color: #ca8a04;">0</span>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="pipeline-filter-bar">
+                    <div class="filter-item">
+                        <label>Assigned Staff</label>
+                        <select id="filter-staff">
+                            <option value="">All Staff</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Source</label>
+                        <select id="filter-source">
+                            <option value="">All Sources</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="manual">Manual</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="website">Website</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Lead Score</label>
+                        <select id="filter-score">
+                            <option value="">All scores</option>
+                            <option value="hot">Hot</option>
+                            <option value="warm">Warm</option>
+                            <option value="cold">Cold</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Language</label>
+                        <select id="filter-lang">
+                            <option value="">All Languages</option>
+                            <option value="EN">English</option>
+                            <option value="HI">Hindi</option>
+                            <option value="KA">Kannada</option>
+                            <option value="TE">Telugu</option>
+                        </select>
+                    </div>
+                    <div class="filter-item" style="flex: 1; min-width: 200px;">
+                        <label>Search Lead</label>
+                        <input type="text" id="pipeline-search" placeholder="Name or Phone...">
+                    </div>
+                </div>
+
+                <!-- Kanban Board -->
+                <div class="pipeline-board" id="pipeline-board">
+                    <!-- Columns will be injected by JavaScript -->
+                    <div style="padding: 3rem; text-align: center; width: 100%; color: #64748b;">
+                        <i class="fas fa-circle-notch fa-spin fa-2x"></i>
+                        <p style="margin-top: 1rem; font-weight: 600;">Building your pipeline view...</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Stats Overview -->
-            <div class="pipeline-stats-cards">
-                <div class="pipeline-stat-card">
-                    <span class="pipeline-stat-label">Total Leads</span>
-                    <span class="pipeline-stat-value" id="stat-total-leads">0</span>
-                </div>
-                <div class="pipeline-stat-card">
-                    <span class="pipeline-stat-label">Hot Leads</span>
-                    <span class="pipeline-stat-value" id="stat-hot-leads" style="color: #e11d48;">0</span>
-                </div>
-                <div class="pipeline-stat-card">
-                    <span class="pipeline-stat-label">Avg. Conversion</span>
-                    <span class="pipeline-stat-value" id="stat-conv-rate">0%</span>
-                </div>
-                <div class="pipeline-stat-card">
-                    <span class="pipeline-stat-label">Stuck Leads</span>
-                    <span class="pipeline-stat-value" id="stat-stuck-leads" style="color: #ca8a04;">0</span>
-                </div>
-            </div>
-
-            <!-- Filters -->
-            <div class="pipeline-filter-bar">
-                <div class="filter-item">
-                    <label>Assigned Staff</label>
-                    <select id="filter-staff"><option value="">All Staff</option></select>
-                </div>
-                <div class="filter-item">
-                    <label>Source</label>
-                    <select id="filter-source">
-                        <option value="">All Sources</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="manual">Manual</option>
-                        <option value="facebook">Facebook</option>
-                        <option value="website">Website</option>
-                    </select>
-                </div>
-                <div class="filter-item">
-                    <label>Lead Score</label>
-                    <select id="filter-score">
-                        <option value="">All scores</option>
-                        <option value="hot">Hot</option>
-                        <option value="warm">Warm</option>
-                        <option value="cold">Cold</option>
-                    </select>
-                </div>
-                <div class="filter-item">
-                    <label>Language</label>
-                    <select id="filter-lang">
-                        <option value="">All Languages</option>
-                        <option value="EN">English</option>
-                        <option value="HI">Hindi</option>
-                        <option value="KA">Kannada</option>
-                        <option value="TE">Telugu</option>
-                    </select>
-                </div>
-                <div class="filter-item" style="flex: 1; min-width: 200px;">
-                    <label>Search Lead</label>
-                    <input type="text" id="pipeline-search" placeholder="Name or Phone...">
-                </div>
-            </div>
-
-            <!-- Kanban Board -->
-            <div class="pipeline-board" id="pipeline-board">
-                <!-- Columns will be injected by JavaScript -->
-                <div style="padding: 3rem; text-align: center; width: 100%; color: #64748b;">
-                    <i class="fas fa-circle-notch fa-spin fa-2x"></i>
-                    <p style="margin-top: 1rem; font-weight: 600;">Building your pipeline view...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Decision Engine Modal -->
-        <div id="decisionEngineModal" class="modal" style="position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center;">
-            <div class="modal-content premium-card" style="width: 100%; max-width: 650px; background:white; border-radius: 1rem; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
-                <!-- Header -->
-                <div class="wizard-header" style="background:var(--primary-color); color:white; padding: 1.5rem; text-align:center; position:relative;">
-                    <h2 style="margin:0; font-weight:800; font-size:1.25rem;">Order Conversion Wizard</h2>
-                    <button onclick="document.getElementById('decisionEngineModal').classList.remove('active')" style="position:absolute; right:1.5rem; top:1.5rem; background:none; border:none; color:white; cursor:pointer;"><i class="fas fa-times"></i></button>
-                </div>
-                <!-- Body -->
-                <div class="modal-body" style="padding: 2rem; overflow-y:auto; flex-grow:1;">
-                    <div id="wizard-step-1" class="wizard-step">
-                        <h3>Call Status</h3>
-                        <div class="form-group"><label>Phone</label><input type="text" id="de-phone" class="form-control-premium" readonly></div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <div id="de-call-status-wrapper" class="status-pill-grid">
-                                <button type="button" class="status-pill" data-value="Received">Received</button>
-                                <button type="button" class="status-pill" data-value="Booked">Booked</button>
-                                <button type="button" class="status-pill" data-value="Not Interested">Not Interested</button>
+            <!-- Decision Engine Modal -->
+            <div id="decisionEngineModal" class="modal"
+                style="position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center;">
+                <div class="modal-content premium-card"
+                    style="width: 100%; max-width: 650px; background:white; border-radius: 1rem; overflow:hidden; display:flex; flex-direction:column; max-height: 90vh;">
+                    <!-- Header -->
+                    <div class="wizard-header"
+                        style="background:var(--primary-color); color:white; padding: 1.5rem; text-align:center; position:relative;">
+                        <h2 style="margin:0; font-weight:800; font-size:1.25rem;">Order Conversion Wizard</h2>
+                        <button onclick="document.getElementById('decisionEngineModal').classList.remove('active')"
+                            style="position:absolute; right:1.5rem; top:1.5rem; background:none; border:none; color:white; cursor:pointer;"><i
+                                class="fas fa-times"></i></button>
+                    </div>
+                    <!-- Body -->
+                    <div class="modal-body" style="padding: 2rem; overflow-y:auto; flex-grow:1;">
+                        <div id="wizard-step-1" class="wizard-step">
+                            <h3>Call Status</h3>
+                            <div class="form-group"><label>Phone</label><input type="text" id="de-phone"
+                                    class="form-control-premium" readonly></div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <div id="de-call-status-wrapper" class="status-pill-grid">
+                                    <button type="button" class="status-pill" data-value="Received">Received</button>
+                                    <button type="button" class="status-pill" data-value="Booked">Booked</button>
+                                    <button type="button" class="status-pill" data-value="Not Interested">Not
+                                        Interested</button>
+                                </div>
+                                <input type="hidden" id="de-call-status">
                             </div>
-                            <input type="hidden" id="de-call-status">
+                            <button onclick="deNextStep(2)" class="login-btn">Next</button>
                         </div>
-                        <button onclick="deNextStep(2)" class="login-btn">Next</button>
-                    </div>
-                    <div id="wizard-step-2" class="wizard-step" style="display:none;">
-                        <h3>Customer</h3>
-                        <div class="form-group"><label>Name</label><input type="text" id="de-customer-name" class="form-control-premium"></div>
-                        <button onclick="deNextStep(3)" class="login-btn">Next</button>
-                    </div>
-                    <div id="wizard-step-3" class="wizard-step" style="display:none;">
-                        <h3>Product</h3>
-                        <select id="de-products" class="form-control-premium" multiple>
-                            <option value="Brush Cutter">Brush Cutter</option>
-                        </select>
-                        <button onclick="deNextStep(4)" class="login-btn">Next</button>
-                    </div>
-                    <div id="wizard-step-4" class="wizard-step" style="display:none;">
-                        <h3>Decision</h3>
-                        <select id="de-sales-status" class="form-control-premium">
-                            <option value="Ordered">Ordered</option>
-                        </select>
-                        <div id="de-form-order" style="display:none;">
-                             <input type="number" id="de-order-total" class="form-control-premium">
-                             <input type="number" id="de-order-advance" class="form-control-premium">
+                        <div id="wizard-step-2" class="wizard-step" style="display:none;">
+                            <h3>Customer</h3>
+                            <div class="form-group"><label>Name</label><input type="text" id="de-customer-name"
+                                    class="form-control-premium"></div>
+                            <button onclick="deNextStep(3)" class="login-btn">Next</button>
                         </div>
-                        <button onclick="submitDecisionEngine()" class="login-btn">Confirm</button>
+                        <div id="wizard-step-3" class="wizard-step" style="display:none;">
+                            <h3>Product</h3>
+                            <select id="de-products" class="form-control-premium" multiple>
+                                <option value="Brush Cutter">Brush Cutter</option>
+                            </select>
+                            <button onclick="deNextStep(4)" class="login-btn">Next</button>
+                        </div>
+                        <div id="wizard-step-4" class="wizard-step" style="display:none;">
+                            <h3>Decision</h3>
+                            <select id="de-sales-status" class="form-control-premium">
+                                <option value="Ordered">Ordered</option>
+                            </select>
+                            <div id="de-form-order" style="display:none;">
+                                <input type="number" id="de-order-total" class="form-control-premium">
+                                <input type="number" id="de-order-advance" class="form-control-premium">
+                            </div>
+                            <button onclick="submitDecisionEngine()" class="login-btn">Confirm</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
-</div>
+        </main>
+    </div>
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
-<script src="../../js/decision-engine.js"></script>
+    <script src="../../js/decision-engine.js"></script>
     <script src="js/pipeline.js"></script>
 </body>
+
 </html>

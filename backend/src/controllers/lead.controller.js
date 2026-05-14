@@ -397,7 +397,7 @@ exports.getStats = async (req, res) => {
 
         const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, params);
         const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, params);
-        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot"`, params);
+        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, params);
         const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, params);
         const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, params);
         const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, params);

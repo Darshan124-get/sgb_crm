@@ -241,11 +241,16 @@ exports.updateLead = async (req, res) => {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        const [oldLead] = await connection.query('SELECT assigned_to, next_followup_date FROM leads WHERE lead_id = ?', [req.params.id]);
-        const oldAssignedTo = oldLead[0] ? oldLead[0].assigned_to : null;
-        const oldFollowupDate = oldLead[0] ? oldLead[0].next_followup_date : null;
+        // Fetch current lead data for comparison or partial updates
+        const [rows] = await connection.query('SELECT * FROM leads WHERE lead_id = ?', [req.params.id]);
+        if (rows.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Lead not found' });
+        }
+        const currentLead = rows[0];
 
-        const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : oldAssignedTo;
+        const finalStatus = status || currentLead.status;
+        const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
         await connection.query(
             `UPDATE leads SET 
@@ -255,10 +260,25 @@ exports.updateLead = async (req, res) => {
                 current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
             WHERE lead_id = ?`,
             [
-                phone_number, customer_name, first_message, language,
-                address, city, state, district || null, pincode || null, status, finalAssignedTo,
-                score || 'cold', next_followup_date || null, lost_reason || null, lost_notes || null,
-                current_crop || null, acreage || null, delivery_type || null, call_count || 0,
+                phone_number || currentLead.phone_number, 
+                customer_name || currentLead.customer_name, 
+                first_message || currentLead.first_message, 
+                language || currentLead.language,
+                address || currentLead.address, 
+                city || currentLead.city, 
+                state || currentLead.state, 
+                district !== undefined ? district : currentLead.district, 
+                pincode !== undefined ? pincode : currentLead.pincode, 
+                finalStatus, 
+                finalAssignedTo,
+                score || currentLead.score || 'cold', 
+                next_followup_date || currentLead.next_followup_date, 
+                lost_reason || currentLead.lost_reason, 
+                lost_notes || currentLead.lost_notes,
+                current_crop || currentLead.current_crop, 
+                acreage || currentLead.acreage, 
+                delivery_type || currentLead.delivery_type, 
+                call_count !== undefined ? call_count : currentLead.call_count,
                 req.params.id
             ]
         );
@@ -333,49 +353,69 @@ exports.addLeadNote = async (req, res) => {
 };
 
 exports.transferLead = async (req, res) => {
-    const { target_language } = req.body;
+    const { target_language, userId } = req.body;
     const leadId = req.params.id;
     const connection = await pool.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        // 1. Find the best target Sales staff for the new language
-        const [salesStaff] = await connection.query(
-            `SELECT u.user_id, u.name 
-             FROM users u 
-             JOIN roles r ON u.role_id = r.role_id 
-             WHERE r.name = 'sales' AND u.language = ? AND u.status = 'active'
-             ORDER BY u.updated_at ASC LIMIT 1`,
-            [target_language]
-        );
+        let targetUser = null;
 
-        if (salesStaff.length === 0) {
+        // 1. If direct userId is provided, use it
+        if (userId) {
+            const [userRows] = await connection.query(
+                'SELECT user_id, name, language FROM users WHERE user_id = ? AND status = "active"',
+                [userId]
+            );
+            if (userRows.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: 'Target sales person not found or inactive' });
+            }
+            targetUser = userRows[0];
+        } 
+        // 2. Otherwise, find the best target Sales staff for the new language (Round Robin)
+        else if (target_language) {
+            const [salesStaff] = await connection.query(
+                `SELECT u.user_id, u.name 
+                 FROM users u 
+                 JOIN roles r ON u.role_id = r.role_id 
+                 WHERE r.name = 'sales' AND u.language = ? AND u.status = 'active'
+                 ORDER BY u.updated_at ASC LIMIT 1`,
+                [target_language]
+            );
+
+            if (salesStaff.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: `No active sales staff found for language: ${target_language}` });
+            }
+            targetUser = salesStaff[0];
+        } else {
             await connection.rollback();
-            return res.status(404).json({ message: `No active sales staff found for language: ${target_language}` });
+            return res.status(400).json({ message: 'Either userId or target_language is required for transfer' });
         }
 
-        const targetUser = salesStaff[0];
-
-        // 2. Perform the transfer
+        // 3. Perform the transfer
+        const finalLanguage = target_language || targetUser.language || 'EN';
         await connection.query(
             'UPDATE leads SET assigned_to = ?, language = ?, status = "assigned" WHERE lead_id = ?',
-            [targetUser.user_id, target_language, leadId]
+            [targetUser.user_id, finalLanguage, leadId]
         );
 
-        // 3. Log the transfer
+        // 4. Log the transfer
         await connection.query(
             'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [leadId, req.user.id, `Lead transferred to ${targetUser.name} (ID: ${targetUser.user_id}) due to language shift to ${target_language}`]
+            [leadId, req.user.id, `Lead transferred to ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
         );
 
-        // 4. Update target user's rotation timestamp
+        // 5. Update target user's rotation timestamp
         await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [targetUser.user_id]);
 
         await connection.commit();
         res.json({ message: 'Lead transferred successfully', target_user: targetUser.name });
     } catch (err) {
         try { if (connection) await connection.rollback(); } catch (re) { }
+        console.error('Transfer error:', err);
         res.status(500).json({ message: 'Transfer error: ' + err.message });
     } finally {
         if (connection) connection.release();

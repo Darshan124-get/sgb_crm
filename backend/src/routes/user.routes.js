@@ -3,7 +3,10 @@ const router = express.Router();
 const userController = require('../controllers/user.controller');
 const { authenticateToken, isAdmin } = require('../middleware/auth.middleware');
 
-// All user management routes require admin privileges
+// Public routes for authenticated staff
+router.get('/sales', authenticateToken, userController.getSalesTeam);
+
+// All other user management routes require admin privileges
 router.get('/', authenticateToken, isAdmin, userController.getAllUsers);
 router.get('/roles', authenticateToken, isAdmin, userController.getRoles);
 router.post('/', authenticateToken, isAdmin, userController.createUser);

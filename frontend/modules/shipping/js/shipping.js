@@ -165,6 +165,40 @@ window.handleShipSubmit = async function(e) {
 
         if (response.ok) {
             showToast("Order dispatched successfully!", "success");
+            
+            // AUTOMATED WHATSAPP NOTIFICATION
+            const order = allOrders.find(o => o.order_id == orderId);
+            if (order && order.phone) {
+                const productNames = (order.items || []).map(i => i.product_name).join(', ');
+                const orderDate = new Date(order.created_at).toLocaleDateString('en-GB');
+                const formattedId = window.formatOrderId(orderId, order.created_at);
+                
+                let trackingUrl = "";
+                if (courier === 'India Post') {
+                    trackingUrl = `\n\n*Track here:* https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx?articlenumber=${tracking}`;
+                } else if (courier === 'VRL') {
+                    trackingUrl = `\n\n*Track here:* https://www.vrlgroup.in/vrl_consignment_track.aspx`;
+                }
+
+                const waMessage = `*Dispatch Notification - SGB Agro Industries*\n\nDear *${order.customer_name || order.firm_name}*,\nYour order *${formattedId}* has been dispatched successfully! 🚚\n\n*Order Details:*\n📦 Product: ${productNames}\n🗓️ Ordered on: ${orderDate}\n🚛 Logistics: ${courier}\n🆔 Tracking ID: *${tracking}*${trackingUrl}\n\nThank you for choosing *SGB Agro Industries*. Have a great day! 🌱`;
+
+                // Fire and forget (don't block the UI if notification fails)
+                fetch(`${window.API_URL}/whatsapp/send`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                    },
+                    body: JSON.stringify({ 
+                        phone: order.phone, 
+                        message: waMessage 
+                    })
+                }).then(res => {
+                    if (res.ok) console.log('WhatsApp notification sent');
+                    else console.error('WhatsApp notification failed');
+                }).catch(e => console.error('WA Notify Error:', e));
+            }
+
             closeShipModal();
             fetchOrders(); // Refresh data
         } else {

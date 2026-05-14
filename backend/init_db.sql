@@ -364,10 +364,20 @@ CREATE TABLE chat_messages (
     session_id INT,
     sender_type ENUM('user', 'admin') NOT NULL,
     message TEXT,
-    media_url TEXT,
+    media_data LONGBLOB,
+    mime_type VARCHAR(100),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE
 );
+
+CREATE TABLE bot_sessions (
+    phone VARCHAR(20) PRIMARY KEY,
+    current_state VARCHAR(100) DEFAULT 'START',
+    data JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 
 -- SEED DATA
 INSERT INTO roles (name, description) VALUES 

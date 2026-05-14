@@ -602,6 +602,14 @@ async function populateLeadDetails(leadId) {
                 const nameStr = lead.assigned_to_name || '?';
                 avatar.textContent = nameStr.charAt(0).toUpperCase();
             }
+            // ── WhatsApp Button ──
+            const waBtn = document.getElementById('whatsappBtn');
+            if (waBtn && lead.phone_number) {
+                // Link to our internal WhatsApp module with deep linking
+                waBtn.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number}`;
+                waBtn.target = '_self'; // Open in same window/tab
+                waBtn.onclick = null; // Remove any old handlers
+            }
 
             // ── Purchase History ──
             const historyContainer = document.getElementById('purchaseHistoryContainer');

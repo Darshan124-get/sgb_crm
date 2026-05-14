@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp CRM - SGB Agro</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/whatsapp.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .main-content { overflow: hidden !important; }
+        .dashboard-wrapper { background: var(--whatsapp-bg); }
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" placeholder="Search leads, orders, dealers...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">User</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="content-body" id="contentBody" style="padding: 0; overflow: hidden;">
+                <div id="app-container" class="app-container">
+        <!-- Sidebar: Conversations List -->
+        <aside class="chat-sidebar">
+            <header class="sidebar-header">
+                <h2>Conversations</h2>
+                <div class="search-box" style="margin-top: 15px; position: relative;">
+                    <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #8696a0;"></i>
+                    <input type="text" id="customer-search" placeholder="Search conversations..." 
+                           style="width: 100%; background: #202c33; border: 1px solid #222d34; padding: 10px 10px 10px 40px; border-radius: 8px; color: white; outline: none; transition: border-color 0.2s;">
+                </div>
+            </header>
+
+            <nav class="sidebar-tabs">
+                <div class="tab-item active" data-tab="open">Open</div>
+                <div class="tab-item" data-tab="assigned">Assigned</div>
+                <div class="tab-item" data-tab="closed">Closed</div>
+            </nav>
+
+            <div id="customer-list" class="customer-list">
+                <div class="loading-spinner">Loading conversations...</div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <!-- Welcome Screen -->
+            <div id="chat-welcome" class="chat-welcome">
+                <div style="max-width: 400px;">
+                    <div style="font-size: 5rem; color: #25D366; margin-bottom: 30px; opacity: 0.8;">
+                        <i class="fab fa-whatsapp"></i>
+                    </div>
+                    <h1 style="color: #e9edef; margin-top: 40px;">WhatsApp for CRM</h1>
+                    <p style="color: #8696a0; line-height: 1.6;">Select a conversation to start messaging. Manage your leads and support requests directly from here.</p>
+                </div>
+            </div>
+
+            <!-- Chat Window -->
+            <div id="chat-window" class="chat-window hidden" style="height: 100%; display: flex; flex-direction: column;">
+                <header class="chat-header">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button id="mobile-back-btn" class="mobile-only-btn" style="background: none; border: none; color: #8696a0; font-size: 1.2rem; display: none;"><i class="fas fa-arrow-left"></i></button>
+                        <div id="active-avatar" class="avatar" style="width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: #666;">?</div>
+                        <div class="customer-info">
+                            <h2 id="active-customer-name">Loading...</h2>
+                            <span id="active-customer-phone">...</span>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <button id="transfer-btn" class="action-link-btn">
+                            <i class="fas fa-exchange-alt"></i> Transfer
+                        </button>
+                        <button id="resolve-btn" class="btn-resolve">
+                            Resolve
+                        </button>
+                    </div>
+                </header>
+
+                <div id="message-container" class="message-container">
+                    <!-- Messages will appear here -->
+                </div>
+
+                <footer class="chat-footer">
+                    <div class="input-container">
+                        <button id="attach-btn" style="background: none; border: none; color: #8696a0; font-size: 1.3rem; cursor: pointer; padding: 5px;">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <input type="file" id="media-input" class="hidden">
+                        <input type="text" id="message-input" placeholder="Type a message...">
+                        <button id="send-btn" class="send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </footer>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Lead Details -->
+        <aside id="details-sidebar" class="details-sidebar hidden">
+            <div class="details-header">
+                <div id="details-avatar" class="lg-avatar" style="background-color: #00a884;">?</div>
+                <h2 id="details-name">Loading...</h2>
+                <p id="details-phone">...</p>
+                <div style="margin-top: 15px;">
+                    <a href="#" id="view-more-toggle" style="color: var(--whatsapp-green); font-size: 0.9rem; text-decoration: none;">View More Details <i class="fas fa-chevron-down"></i></a>
+                </div>
+            </div>
+
+            <!-- Contact Details Section -->
+            <div class="details-section">
+                <div class="section-header">
+                    <span class="section-title">Contact Details</span>
+                    <button id="edit-contact-btn" class="action-link-btn" style="font-size: 0.8rem; padding: 4px 8px;">Edit</button>
+                </div>
+                
+                <div id="contact-info-display">
+                    <div class="info-row">
+                        <span class="label">Location</span>
+                        <span id="display-location" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Language</span>
+                        <span id="display-language" class="value">-</span>
+                    </div>
+                </div>
+
+                <!-- Edit Form (Hidden by default) -->
+                <div id="contact-info-edit" class="hidden">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="edit-name" placeholder="Customer Name">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label>City/Village</label>
+                            <input type="text" id="edit-city">
+                        </div>
+                        <div class="form-group">
+                            <label>District</label>
+                            <input type="text" id="edit-district">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                        <div class="form-group">
+                            <label>State</label>
+                            <input type="text" id="edit-state">
+                        </div>
+                        <div class="form-group">
+                            <label>Pincode</label>
+                            <input type="text" id="edit-pincode">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>Language Preference</label>
+                        <select id="edit-language">
+                            <option value="EN">English</option>
+                            <option value="KN">Kannada</option>
+                            <option value="HI">Hindi</option>
+                            <option value="TE">Telugu</option>
+                        </select>
+                    </div>
+                    <div class="form-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button id="save-details-btn" class="save-btn" style="flex: 1;">Save Changes</button>
+                        <button id="cancel-edit-btn" class="cancel-btn" style="flex: 1;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-section">
+                <span class="section-title">System Info</span>
+                <div class="info-row">
+                    <span class="label">Assigned To:</span>
+                    <span id="details-assigned-to" class="value">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Source:</span>
+                    <span class="value">WhatsApp</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Media Preview Modal (WhatsApp Style) -->
+    <div id="media-preview-modal" class="modal hidden" style="z-index: 2000;">
+        <div class="modal-content media-preview-content">
+            <div class="preview-header">
+                <button id="close-preview-btn" class="close-icon"><i class="fas fa-times"></i></button>
+                <span>Preview Media</span>
+            </div>
+            <div class="preview-body">
+                <div id="image-preview-container">
+                    <img id="preview-img" src="" alt="Preview">
+                </div>
+                <div id="file-preview-container" class="hidden">
+                    <i class="fas fa-file-alt"></i>
+                    <p id="preview-file-name"></p>
+                </div>
+            </div>
+            <div class="preview-footer">
+                <input type="text" id="preview-caption" placeholder="Add a caption...">
+                <button id="send-media-btn" class="send-media-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Modal -->
+    <div id="transfer-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Transfer Conversation</h3>
+                <button id="close-transfer-modal"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="transfer-search">
+                    <input type="text" id="sales-search" placeholder="Search sales person...">
+                    <i class="fas fa-search"></i>
+                </div>
+                
+                <div id="sales-person-list" class="sales-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="confirm-transfer-btn" class="btn-primary" disabled>Transfer</button>
+            </div>
+        </div>
+    </div>
+        </div> <!-- end contentBody -->
+        </main>
+    </div> <!-- end dashboard-wrapper -->
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <!-- Fullscreen Image Preview Modal -->
+    <div id="fullscreenModal" class="modal">
+        <div class="fullscreen-content">
+            <span class="close-fullscreen" onclick="closeFullscreen()">&times;</span>
+            <img id="fullscreenImage" src="" alt="Full Screen Preview">
+        </div>
+    </div>
+
+    <script src="js/whatsapp.js"></script>
+</body>
+</html>

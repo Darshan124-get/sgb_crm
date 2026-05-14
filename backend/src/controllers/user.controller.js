@@ -38,6 +38,23 @@ exports.getAllUsers = async (req, res) => {
     }
 };
 
+exports.getSalesTeam = async (req, res) => {
+    try {
+        const query = `
+            SELECT u.user_id, u.name, u.email, u.phone
+            FROM users u
+            JOIN roles r ON u.role_id = r.role_id
+            WHERE r.name = 'sales' AND u.status = 'active'
+            ORDER BY u.name ASC
+        `;
+        const [users] = await db.execute(query);
+        res.json(users);
+    } catch (err) {
+        console.error('getSalesTeam Error:', err);
+        res.status(500).json({ message: err.message });
+    }
+};
+
 exports.getRoles = async (req, res) => {
     try {
         const [roles] = await db.execute('SELECT * FROM roles ORDER BY name ASC');

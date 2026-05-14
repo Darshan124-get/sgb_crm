@@ -75,7 +75,8 @@
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
             border: 1px solid #edf2f7;
-            overflow: hidden;
+            overflow-y: auto;
+            max-height: calc(100vh - 300px);
             margin-top: 1rem;
         }
 
@@ -95,6 +96,9 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             border-bottom: 1px solid #edf2f7;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .shipping-table td {

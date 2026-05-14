@@ -18,13 +18,32 @@ const settingsRoutes = require('./routes/settings.routes');
 const billingRoutes = require('./routes/billing.routes');
 const scheduleRoutes = require('./routes/schedule.routes');
 const logRoutes = require('./routes/log.routes');
+const whatsappRoutes = require('./routes/whatsapp.routes');
+const webhookRoutes = require('./routes/webhook.routes');
+
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Middleware
+// Security & Performance Middleware
+app.use(helmet({
+    contentSecurityPolicy: false, // Allow external assets
+}));
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Rate Limiting (General API)
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -35,6 +54,9 @@ app.use('/uploads', express.static(uploadsDir));
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../../frontend')));
+
+// Webhook Route (Public - Must be BEFORE any auth or fallback)
+app.use('/webhook', webhookRoutes);
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -52,7 +74,10 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/logs', logRoutes);
-console.log('✅ Staff Management API: Mounted at /api/users');
+app.use('/api/whatsapp', whatsappRoutes);
+
+console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
+console.log('✅ WhatsApp Webhook: Mounted at /webhook');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)
 app.all('/api/*', (req, res) => {

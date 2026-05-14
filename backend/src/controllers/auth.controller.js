@@ -7,15 +7,15 @@ require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
 exports.login = async (req, res) => {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
     try {
         const [rows] = await pool.query(
             `SELECT u.*, r.name as role_name 
              FROM users u 
              LEFT JOIN roles r ON u.role_id = r.role_id 
-             WHERE u.email = ?`, 
-            [email]
+             WHERE u.email = ? OR u.phone = ?`, 
+            [identifier, identifier]
         );
         const user = rows[0];
 

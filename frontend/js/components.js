@@ -1061,13 +1061,13 @@ window.showModal = function ({ title, content, hideFooter }) {
 
     if (!titleEl || !bodyEl || !footerEl) {
         modal.innerHTML = `
-            <div class="modal-content premium-card" style="width: 100%; max-width: 600px; padding: 0; overflow: hidden; border: none;">
-                <div style="background: var(--primary-color, #2563eb); color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div class="modal-content premium-card">
+                <div class="modal-header" style="background: var(--primary-color, #2563eb); color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <h3 id="modalTitle" style="margin: 0; font-size: 1.125rem;"></h3>
                     <button onclick="window.hideModal()" style="background: none; border: none; color: white; cursor: pointer;"><i class="fas fa-times"></i></button>
                 </div>
-                <div id="modalBody" style="padding: 1.5rem; overflow-y: auto; max-height: 80vh;"></div>
-                <div id="modalFooter" style="padding: 1rem 1.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <div id="modalBody" class="modal-body"></div>
+                <div id="modalFooter" class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 0.75rem;">
                     <button onclick="window.hideModal()" class="btn btn-outline">Close</button>
                 </div>
             </div>
@@ -1083,11 +1083,13 @@ window.showModal = function ({ title, content, hideFooter }) {
     if (footerEl) footerEl.style.display = hideFooter ? 'none' : 'flex';
 
     modal.classList.add('active');
+    document.body.classList.add('modal-open');
 };
 
 window.hideModal = function () {
     const modal = document.getElementById('globalModal');
     if (modal) modal.classList.remove('active');
+    document.body.classList.remove('modal-open');
 };
 
 window.openAddLeadModal = async function () {

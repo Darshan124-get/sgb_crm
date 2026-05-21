@@ -1,36 +1,9 @@
 <div class="leads-detail-container">
     <div class="leads-detail-header" style="padding-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9;">
-        <!-- Status & Score Badges (Selectable) -->
-        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-            <div class="header-pill-select" style="background: #f0fdf4; color: #166534;">
-                <i class="fas fa-signal mr-1"></i>
-                <select id="leadDetailStatusSelect" onchange="updateLeadFromHeader()"
-                    style="background:transparent; border:none; color:inherit; font-weight:700; font-size:0.75rem; cursor:pointer;">
-                    <option value="new">New Lead</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="interested">Interested</option>
-                    <option value="followup">In Follow-up</option>
-                    <option value="callback">Callback Scheduled</option>
-                    <option value="converted">Converted / Ordered</option>
-                    <option value="not_interested">Not Interested</option>
-                    <option value="lost">Lost</option>
-                    <option value="dealer">Dealer Lead</option>
-                </select>
-            </div>
-
-            <div class="header-pill-select" style="background: #fff7ed; color: #9a3412;">
-                <i class="fas fa-fire mr-1"></i>
-                <select id="leadDetailScoreSelect" onchange="updateLeadFromHeader()"
-                    style="background:transparent; border:none; color:inherit; font-weight:700; font-size:0.75rem; cursor:pointer;">
-                    <option value="hot">Hot</option>
-                    <option value="warm">Warm</option>
-                    <option value="cold">Cold</option>
-                </select>
-            </div>
-
-            <span id="leadDetailLanguage" class="language-tag"
-                style="padding: 0.25rem 0.75rem; background: #e0f2fe; color: #0369a1; border-radius: 2rem; font-size: 0.75rem; font-weight:700;">HI</span>
-        </div>
+        <!-- Status & Score Badges (Hidden - managed via Sales & Lead Progress section) -->
+        <input type="hidden" id="leadDetailStatusSelect" value="new">
+        <input type="hidden" id="leadDetailScoreSelect" value="cold">
+        <span id="leadDetailLanguage" style="display:none;"></span>
 
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <!-- Customer Name & Primary Info -->

@@ -81,10 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadCustomers();
     loadSalesUsers();
-    
+
     // Refresh customer list every 30 seconds
     setInterval(loadCustomers, 30000);
-    
+
     // Polling for new messages in active chat
     setInterval(() => {
         if (activeCustomer) {
@@ -219,17 +219,17 @@ function renderCustomerList() {
         const displayName = customer.customer_name || customer.phone;
         const initials = getInitials(customer.customer_name);
         const color = getAvatarStyle(customer.phone);
-        
+
         let lastTime = 'New';
         if (customer.last_message_at) {
             const date = new Date(customer.last_message_at);
-            if (!isNaN(date.getTime())) lastTime = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            if (!isNaN(date.getTime())) lastTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
-        
+
         const item = document.createElement('div');
         item.className = `customer-item ${activeCustomer && activeCustomer.phone === customer.phone ? 'active' : ''}`;
         item.dataset.phone = customer.phone;
-        
+
         const lastMsg = customer.last_message || '';
         const scoreClass = (customer.score || 'cold').toLowerCase();
         const scoreLabel = customer.score ? customer.score.toUpperCase() : '';
@@ -263,13 +263,13 @@ function renderCustomerList() {
  */
 async function selectCustomer(customer) {
     activeCustomer = customer;
-    
+
     // UI Transitions
     chatWelcomeEl.classList.add('hidden');
     chatWindowEl.classList.remove('hidden');
     detailsSidebarEl.classList.remove('hidden');
     appContainerEl.classList.add('show-chat');
-    
+
     // Reset edit state
     contactEditEl.classList.add('hidden');
     contactDisplayEl.classList.remove('hidden');
@@ -280,13 +280,13 @@ async function selectCustomer(customer) {
     activeCustomerPhoneEl.innerText = customer.phone;
     activeAvatarEl.innerText = getInitials(customer.customer_name);
     activeAvatarEl.style.backgroundColor = getAvatarStyle(customer.phone);
-    
+
     // Sidebar Details
     detailsNameEl.innerText = displayName;
     detailsPhoneEl.innerText = customer.phone;
     detailsAvatarEl.innerText = getInitials(customer.customer_name);
     detailsAvatarEl.style.backgroundColor = getAvatarStyle(customer.phone);
-    
+
     const location = [customer.village_city, customer.district, customer.state].filter(s => s).join(', ') || '-';
     displayLocationEl.innerText = location;
     displayLanguageEl.innerText = customer.language || '-';
@@ -297,7 +297,7 @@ async function selectCustomer(customer) {
         if (el.dataset.phone === customer.phone) el.classList.add('active');
         else el.classList.remove('active');
     });
-    
+
     await loadChatHistory(customer.phone);
 }
 
@@ -355,7 +355,7 @@ async function handleSaveDetails() {
  */
 async function handleResolve() {
     if (!activeCustomer) return;
-    
+
     if (!confirm('Mark this conversation as Resolved? This will move it to the Closed tab.')) return;
 
     try {
@@ -392,8 +392,8 @@ async function loadSalesUsers() {
 
 function renderSalesList(filter = '') {
     salesPersonListEl.innerHTML = '';
-    const filteredUsers = salesUsers.filter(u => 
-        u.name.toLowerCase().includes(filter.toLowerCase()) || 
+    const filteredUsers = salesUsers.filter(u =>
+        u.name.toLowerCase().includes(filter.toLowerCase()) ||
         (u.phone && u.phone.includes(filter))
     );
 
@@ -410,7 +410,7 @@ function renderSalesList(filter = '') {
         `;
         item.onclick = () => {
             selectedTransferUserId = user.user_id;
-            confirmTransferBtnEl.disabled = false;
+            confirmTransferBtnEl.disabled = (activeCustomer && selectedTransferUserId === activeCustomer.assigned_to);
             renderSalesList(filter); // Re-render to show selection
         };
         salesPersonListEl.appendChild(item);
@@ -445,7 +445,17 @@ async function handleTransfer() {
 
         if (response.ok) {
             window.showAlert('Success', 'Lead transferred successfully', 'success');
-            transferModal.classList.add('hidden');
+            transferModal.classList.remove('active');
+            document.body.classList.remove('modal-open');
+
+            // Update local active customer state so UI changes immediately
+            const newOwner = salesUsers.find(u => u.user_id === selectedTransferUserId);
+            if (newOwner) {
+                activeCustomer.assigned_to = newOwner.user_id;
+                activeCustomer.assigned_name = newOwner.name;
+                selectCustomer(activeCustomer);
+            }
+
             loadCustomers();
         } else {
             const err = await response.json();
@@ -489,7 +499,8 @@ const closePreviewBtn = document.getElementById('close-preview-btn');
 document.addEventListener('DOMContentLoaded', () => {
     // Media Preview Events
     closePreviewBtn.onclick = () => {
-        mediaPreviewModal.classList.add('hidden');
+        mediaPreviewModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
         selectedFile = null;
     };
 
@@ -498,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mediaInputEl.onchange = (e) => {
         const file = e.target.files[0];
         if (!file || !activeCustomer) return;
-        
+
         selectedFile = file;
         const reader = new FileReader();
         reader.onload = (re) => {
@@ -512,7 +523,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('file-preview-container').classList.remove('hidden');
             }
             previewCaption.value = '';
-            mediaPreviewModal.classList.remove('hidden');
+            mediaPreviewModal.classList.remove('hidden'); // legacy cleanup
+            mediaPreviewModal.classList.add('active');
+            document.body.classList.add('modal-open');
         };
         reader.readAsDataURL(file);
     };
@@ -520,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function handleSendMedia() {
     if (!selectedFile || !activeCustomer) return;
-    
+
     const reader = new FileReader();
     reader.readAsDataURL(selectedFile);
     reader.onload = async () => {
@@ -528,16 +541,17 @@ async function handleSendMedia() {
         const response = await fetch(`${API_BASE}/send`, {
             method: 'POST',
             headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                phone: activeCustomer.phone, 
-                mediaData: reader.result, 
-                mimeType: selectedFile.type, 
-                message: caption || selectedFile.name 
+            body: JSON.stringify({
+                phone: activeCustomer.phone,
+                mediaData: reader.result,
+                mimeType: selectedFile.type,
+                message: caption || selectedFile.name
             })
         });
 
         if (response.ok) {
-            mediaPreviewModal.classList.add('hidden');
+            mediaPreviewModal.classList.remove('active');
+            document.body.classList.remove('modal-open');
             selectedFile = null;
             loadChatHistory(activeCustomer.phone);
         } else {
@@ -573,7 +587,7 @@ async function deleteMessage(chatId) {
 }
 
 // Fullscreen Image Functions
-window.openFullscreen = function(url) {
+window.openFullscreen = function (url) {
     const modal = document.getElementById('fullscreenModal');
     const modalImg = document.getElementById('fullscreenImage');
     if (modal && modalImg) {
@@ -582,7 +596,7 @@ window.openFullscreen = function(url) {
     }
 }
 
-window.closeFullscreen = function() {
+window.closeFullscreen = function () {
     const modal = document.getElementById('fullscreenModal');
     if (modal) {
         modal.style.display = 'none';
@@ -604,7 +618,7 @@ function renderMessages(history) {
         msgEl.id = `msg-${msg.chat_id}`;
 
         let contentHtml = '';
-        
+
         // Add Delete Action
         const actionsHtml = `<div class="message-actions" onclick="deleteMessage(${msg.chat_id})" title="Delete Message">
             <i class="fas fa-trash"></i>
@@ -613,7 +627,7 @@ function renderMessages(history) {
         if (msg.mime_type) {
             let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
             let mediaUrl = msg.media_url || proxyUrl;
-            
+
             if (msg.mime_type.startsWith('image/')) {
                 contentHtml = `
                     <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
@@ -657,7 +671,7 @@ function renderMessages(history) {
             ${contentHtml}
             <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
         `;
-        
+
         messageContainerEl.appendChild(msgEl);
     });
 
@@ -683,7 +697,7 @@ async function handleSend() {
 function handleMediaSelect(e) {
     const file = e.target.files[0];
     if (!file || !activeCustomer) return;
-    
+
     selectedFile = file;
     const reader = new FileReader();
     reader.onload = (re) => {
@@ -697,7 +711,9 @@ function handleMediaSelect(e) {
             document.getElementById('file-preview-container').classList.remove('hidden');
         }
         previewCaption.value = '';
-        mediaPreviewModal.classList.remove('hidden');
+        mediaPreviewModal.classList.remove('hidden'); // legacy cleanup
+        mediaPreviewModal.classList.add('active');
+        document.body.classList.add('modal-open');
     };
     reader.readAsDataURL(file);
 }
@@ -713,15 +729,22 @@ function initEventListeners() {
     // Transfer Modal
     if (transferBtnEl) {
         transferBtnEl.onclick = () => {
-            transferModal.classList.remove('hidden');
-            selectedTransferUserId = null;
-            confirmTransferBtnEl.disabled = true;
+            transferModal.classList.remove('hidden'); // legacy cleanup
+            transferModal.classList.add('active');
+            document.body.classList.add('modal-open');
+            selectedTransferUserId = activeCustomer ? activeCustomer.assigned_to : null;
+            confirmTransferBtnEl.disabled = true; // initially disabled as it matches current assignee
             salesSearchEl.value = '';
             loadSalesUsers();
         };
     }
 
-    if (closeTransferModalBtn) closeTransferModalBtn.onclick = () => transferModal.classList.add('hidden');
+    if (closeTransferModalBtn) {
+        closeTransferModalBtn.onclick = () => {
+            transferModal.classList.remove('active');
+            document.body.classList.remove('modal-open');
+        };
+    }
     if (salesSearchEl) salesSearchEl.oninput = (e) => renderSalesList(e.target.value);
     if (confirmTransferBtnEl) confirmTransferBtnEl.onclick = handleTransfer;
     if (resolveBtnEl) resolveBtnEl.onclick = handleResolve;
@@ -729,7 +752,8 @@ function initEventListeners() {
     // Media Preview
     if (closePreviewBtn) {
         closePreviewBtn.onclick = () => {
-            mediaPreviewModal.classList.add('hidden');
+            mediaPreviewModal.classList.remove('active');
+            document.body.classList.remove('modal-open');
             selectedFile = null;
         };
     }

@@ -433,9 +433,18 @@
     width: 100%;
     margin-bottom: 12px;
     font-size: 0.9rem;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.btn-save {
+.form-group input:focus, .form-group select:focus {
+    background-color: #2a3942;
+    border-color: var(--whatsapp-green);
+    color: #e9edef;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.25);
+}
+
+.save-btn {
     background-color: var(--whatsapp-green);
     color: white;
     width: 100%;
@@ -445,6 +454,28 @@
     border: none;
     cursor: pointer;
     font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.save-btn:hover {
+    background-color: #008f72;
+}
+
+.cancel-btn {
+    background-color: #3b4a54;
+    color: #e9edef;
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.cancel-btn:hover {
+    background-color: #4a5b67;
 }
 
 /* System Info Row */
@@ -465,23 +496,12 @@
 }
 
 /* Transfer Modal Styles */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-}
+/* .modal uses global styles from styles.css */
 
-.modal-content {
+.whatsapp-modal-content {
     background: white;
     width: 450px;
+    max-width: 95%;
     border-radius: 12px;
     display: flex;
     flex-direction: column;

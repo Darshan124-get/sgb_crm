@@ -7,7 +7,7 @@ const BACKEND_PORT = 5000;
 const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
 // window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 // Set this to true if you want to use the local backend (localhost:5000)
-const USE_LOCAL_BACKEND = true; 
+const USE_LOCAL_BACKEND = true;
 
 window.BASE_URL = USE_LOCAL_BACKEND ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 window.API_URL = `${window.BASE_URL}/api`;
@@ -39,10 +39,10 @@ window.API_URL = `${window.BASE_URL}/api`;
 
 // ─── Role-Based Redirect Targets ─────────────────────────────
 window.ROLE_REDIRECTS = {
-    admin:    'modules/admin/dashboard.html',
-    sales:    'modules/sales/dashboard.html',
-    billing:  'modules/billing/billing.html',
-    packing:  'modules/packing/dashboard.html',
+    admin: 'modules/admin/dashboard.html',
+    sales: 'modules/sales/dashboard.html',
+    billing: 'modules/billing/billing.html',
+    packing: 'modules/packing/dashboard.html',
     shipping: 'modules/shipping/dashboard.html',
     shipment: 'modules/shipping/dashboard.html'
 };
@@ -50,7 +50,7 @@ window.ROLE_REDIRECTS = {
 // ─── Get Current User ────────────────────────────────────────
 window.getCurrentUser = function () {
     let user = null;
-    try { user = JSON.parse(localStorage.getItem('user')); } catch(e) {}
+    try { user = JSON.parse(localStorage.getItem('user')); } catch (e) { }
 
     if (!user || !user.role) {
         const token = localStorage.getItem('token');
@@ -77,8 +77,8 @@ window.requireAuth = function (allowedRoles = []) {
         return false;
     }
 
-    const user  = window.getCurrentUser();
-    const role  = (user.role || '').toLowerCase();
+    const user = window.getCurrentUser();
+    const role = (user.role || '').toLowerCase();
 
     if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
         const home = window.ROLE_REDIRECTS[role] || 'index.html';
@@ -95,7 +95,7 @@ window.doLogout = function () {
 };
 
 // ─── Global Notification Helper ─────────────────────────────
-window.showAlert = function(title, message, type = 'info') {
+window.showAlert = function (title, message, type = 'info') {
     let overlay = document.querySelector('.alert-overlay');
     if (!overlay) {
         overlay = document.createElement('div');
@@ -144,7 +144,7 @@ window.showAlert = function(title, message, type = 'info') {
 };
 
 // ─── Order ID Formatter ──────────────────────────────────────
-window.formatOrderId = function(id, dateStr) {
+window.formatOrderId = function (id, dateStr) {
     if (!id) return 'N/A';
     const d = dateStr ? new Date(dateStr) : new Date();
     const year = d.getFullYear();
@@ -153,9 +153,9 @@ window.formatOrderId = function(id, dateStr) {
     return `#SGB-${year}-${month}-${day}-${id}`;
 };
 
-window.debounce = function(func, wait) {
+window.debounce = function (func, wait) {
     let timeout;
-    return function(...args) {
+    return function (...args) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
     };

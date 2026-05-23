@@ -938,7 +938,11 @@ window.changeAssigneeFromDetails = async function () {
                 <p style="margin-bottom: 1rem; color: #64748b;">Assign this lead to a staff member:</p>
                 <select id="singleStaffSelect" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <option value="">Select Staff Member...</option>
-                    ${users.map(u => `<option value="${u.user_id}">${u.name} (${u.language || 'General'})</option>`).join('')}
+                    ${users.map(u => {
+                        const langMap = { EN: 'English', HI: 'Hindi', KA: 'Kannada', KN: 'Kannada', TN: 'Tamil', TE: 'Telugu', ML: 'Malayalam', MR: 'Marathi' };
+                        const langs = u.language ? u.language.split(',').map(l => langMap[l.trim()] || l.trim()).join(', ') : 'General';
+                        return `<option value="${u.user_id}">${u.name} (${langs})</option>`;
+                    }).join('')}
                 </select>
                 <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
                     <button onclick="performSingleAssign(${leadId})" class="btn" style="flex: 2; background: #059669; color: white;">Confirm Change</button>

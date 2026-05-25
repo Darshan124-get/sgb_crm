@@ -292,7 +292,9 @@ async function initLeadList(filters = {}) {
         tbody.innerHTML = leads.map(lead => {
             const statusClass = lead.status === 'assigned' ? 'badge-assigned' : (lead.status === 'new' ? 'badge-unassigned' : 'badge-state');
             const scoreClass = `badge-score-${(lead.score || 'COLD').toLowerCase()}`;
-            const date = new Date(lead.created_at).toLocaleDateString();
+            const _dateObj = new Date(lead.created_at);
+            const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+            const time = _dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
             const nameInitial = lead.customer_name ? lead.customer_name.charAt(0).toUpperCase() : '?';
 
             const callTag = lead.call_count >= 3 ? '<span class="call-tag tag-3">3rd Call</span>' :
@@ -307,9 +309,9 @@ async function initLeadList(filters = {}) {
                 <td><span class="badge-score ${scoreClass}">${lead.score || 'COLD'}</span></td>
                 <td>${lead.state || '-'}</td>
                 <td><span class="language-tag">${lead.language || 'EN'}</span></td>
-                <td>${lead.phone_number || '-'}</td>
+                <td onclick="event.stopPropagation()"><a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat"><i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}</a></td>
                 <td><div class="msg-trunk" title="${lead.first_message || ''}">${lead.first_message || '-'}</div></td>
-                <td>${date}</td>
+                <td><div style="font-size:0.85rem;font-weight:600;color:#1e293b;white-space:nowrap;">${date}</div><div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">${time}</div></td>
                 <td>${lead.assigned_to_name || 'Unassigned'}</td>
             </tr>`;
         }).join('');
@@ -939,7 +941,7 @@ window.changeAssigneeFromDetails = async function () {
                 <select id="singleStaffSelect" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <option value="">Select Staff Member...</option>
                     ${users.map(u => {
-                        const langMap = { EN: 'English', HI: 'Hindi', KA: 'Kannada', KN: 'Kannada', TN: 'Tamil', TE: 'Telugu', ML: 'Malayalam', MR: 'Marathi' };
+                        const langMap = { EN: 'English', HI: 'Hindi', KA: 'Kannada', KN: 'Kannada', TN: 'Tamil', TA: 'Tamil', TE: 'Telugu', ML: 'Malayalam', MR: 'Marathi' };
                         const langs = u.language ? u.language.split(',').map(l => langMap[l.trim()] || l.trim()).join(', ') : 'General';
                         return `<option value="${u.user_id}">${u.name} (${langs})</option>`;
                     }).join('')}

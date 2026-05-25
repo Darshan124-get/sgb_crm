@@ -21,7 +21,7 @@ exports.packOrder = async (req, res) => {
                 await connection.query(
                     `UPDATE inventory 
                      SET current_stock = current_stock - ?, 
-                         reserved_stock = reserved_stock - ? 
+                         reserved_stock = GREATEST(0, reserved_stock - ?) 
                      WHERE product_id = ?`,
                     [item.quantity, item.quantity, item.product_id]
                 );

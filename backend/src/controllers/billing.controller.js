@@ -214,7 +214,7 @@ const updateOrderItems = async (req, res) => {
         // 3. Handle Removed Items
         for (const oi of oldItems) {
             if (!items.find(i => i.product_id === oi.product_id)) {
-                await connection.query('UPDATE inventory SET reserved_stock = reserved_stock - ? WHERE product_id = ?', [oi.quantity, oi.product_id]);
+                await connection.query('UPDATE inventory SET reserved_stock = GREATEST(0, reserved_stock - ?) WHERE product_id = ?', [oi.quantity, oi.product_id]);
                 await connection.query('DELETE FROM order_items WHERE order_item_id = ?', [oi.order_item_id]);
 
                 await logAudit(connection, {

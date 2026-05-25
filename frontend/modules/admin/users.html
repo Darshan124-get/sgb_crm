@@ -145,27 +145,26 @@
                 </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem;">
+            <div style="margin-top:1.5rem;">
                 <div class="form-group">
                     <label style="color:#1e293b;font-weight:700;">System Role</label>
                     <div class="input-wrapper">
                         <select id="userRole" required style="width:100%;padding:1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#1e293b;"></select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label style="color:#1e293b;font-weight:700;">Target Languages</label>
-                    <div class="input-wrapper">
-                        <select id="userLang" multiple required style="width:100%;padding:0.5rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;min-height:90px;color:#1e293b;">
-                            <option value="EN">English</option>
-                            <option value="HI">Hindi</option>
-                            <option value="KN">Kannada</option>
-                            <option value="TE">Telugu</option>
-                            <option value="TA">Tamil</option>
-                            <option value="MR">Marathi</option>
-                        </select>
-                    </div>
-                    <p style="font-size:0.65rem;color:#94a3b8;margin-top:6px;">Hold Ctrl to select multiple</p>
+            </div>
+
+            <div class="form-group" id="langGroup" style="margin-top:1.5rem;display:none;">
+                <label style="color:#1e293b;font-weight:700;">Target Languages</label>
+                <div id="langToggleContainer" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+                    <button type="button" class="lang-toggle" data-lang="EN">English</button>
+                    <button type="button" class="lang-toggle" data-lang="HI">Hindi</button>
+                    <button type="button" class="lang-toggle" data-lang="KN">Kannada</button>
+                    <button type="button" class="lang-toggle" data-lang="TE">Telugu</button>
+                    <button type="button" class="lang-toggle" data-lang="TA">Tamil</button>
+                    <button type="button" class="lang-toggle" data-lang="MR">Marathi</button>
                 </div>
+                <p style="font-size:0.65rem;color:#94a3b8;margin-top:6px;">Click to select / deselect languages</p>
             </div>
 
             <div class="form-group" id="passGroup" style="margin-top:1.5rem;">

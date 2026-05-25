@@ -33,30 +33,32 @@ function renderWorkstation() {
                             <input type="text" id="billCustomerName" class="form-input" style="height: 38px; font-weight: 700;" value="${data.customer_name || ''}">
                             
                             <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin: 0.75rem 0 0.5rem 0;">Phone Number <span style="color:red">*</span></label>
-                            <input type="text" id="billCustomerPhone" class="form-input" style="height: 38px;" value="${data.phone || ''}">
+                            <input type="text" id="billCustomerPhone" class="form-input" style="height: 38px;" value="${data.phone || ''}" oninput="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
                         </div>
                         <div>
                             <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Address <span style="color:red">*</span></label>
-                            <textarea id="billCustomerAddress" class="form-input" style="height: 80px; resize: none; font-size: 0.85rem;">${data.address || ''}</textarea>
+                            <textarea id="billCustomerAddress" class="form-input" style="height: 80px; resize: none; font-size: 0.85rem;" placeholder="Auto-fills from details below...">${data.address || ''}</textarea>
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; margin-bottom: 1rem;">
                                 <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Village</label>
-                                    <input type="text" id="billCustomerVillage" class="form-input" style="height: 38px;" value="${data.village || ''}">
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Pincode <span style="color:red">*</span></label>
+                                    <input type="text" id="billCustomerPincode" class="form-input" style="height: 38px;" value="${data.pincode || ''}" maxlength="6" oninput="if(typeof fetchPincodeDetails === 'function') fetchPincodeDetails(this.value);">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">District</label>
-                                    <input type="text" id="billCustomerDistrict" class="form-input" style="height: 38px;" value="${data.district || ''}">
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Village</label>
+                                    <select id="billCustomerVillage" class="form-input" style="height: 38px;" onchange="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
+                                        <option value="${data.village || ''}">${data.village || 'Select Village'}</option>
+                                    </select>
                                 </div>
                             </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                                 <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Pincode <span style="color:red">*</span></label>
-                                    <input type="text" id="billCustomerPincode" class="form-input" style="height: 38px;" value="${data.pincode || ''}">
+                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">District</label>
+                                    <input type="text" id="billCustomerDistrict" class="form-input" style="height: 38px;" value="${data.district || ''}" oninput="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
                                 </div>
                                 <div>
                                     <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">State <span style="color:red">*</span></label>
-                                    <input type="text" id="billCustomerState" class="form-input" style="height: 38px;" value="${data.state || ''}">
+                                    <input type="text" id="billCustomerState" class="form-input" style="height: 38px;" value="${data.state || ''}" oninput="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
                                 </div>
                             </div>
                         </div>
@@ -619,30 +621,33 @@ async function showFinalizeCopyModal(invoiceId) {
         
         if (!data || !data.items) throw new Error('Incomplete data received');
 
-        const productsStr = data.items.map(item => `- ${item.product_name} x ${item.quantity} (₹${parseFloat(item.price).toLocaleString()})`).join('\n');
+        const productsStr = data.items.map((item, index) => `${index + 1}. ${item.product_name} (Qty: ${item.quantity}) - ₹${parseFloat(item.price * item.quantity).toLocaleString()}`).join('\n');
         
-        const message = `
-================================
-📦 BILLING DATA SUMMARY
-================================
-👤 CUSTOMER: ${data.billing_name}
-📞 PHONE: ${data.billing_phone}
-📍 ADDRESS: ${data.billing_address}
-🏡 VILLAGE: ${data.billing_village || 'N/A'}
-🏙️ DISTRICT: ${data.billing_district || 'N/A'}
-🗺️ STATE: ${data.state || 'N/A'}
-🔢 PINCODE: ${data.billing_pincode || 'N/A'}
+        const addressLine = [data.billing_village, data.billing_district, data.state].filter(Boolean).join(', ');
+        const pincodeStr = data.billing_pincode ? ` - ${data.billing_pincode}` : '';
 
-🛒 PRODUCTS:
+        const message = `
+SGB AGRIVAAN - DISPATCH SUMMARY
+--------------------------------------------------
+[ CUSTOMER DETAILS ]
+Name     : ${data.billing_name || 'N/A'}
+Phone    : ${data.billing_phone || 'N/A'}
+Address  : ${data.billing_address || 'N/A'}
+           ${addressLine}${pincodeStr}
+
+[ ORDER DETAILS ]
 ${productsStr}
 
-💰 TOTAL AMOUNT: ₹${parseFloat(data.total_amount).toLocaleString()}
-💸 ADVANCES: ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
-📉 DUE AMOUNT: ₹${(parseFloat(data.total_amount) - parseFloat(data.advance_paid || 0)).toLocaleString()}
-🚚 COURIER PARTNER: ${data.dispatch_through || 'N/A'}
-📍 DESTINATION: ${data.destination || 'N/A'}
-================================
-Generated by SGB AGRIVAAN
+[ FINANCIALS ]
+Total Amount : ₹${parseFloat(data.total_amount || 0).toLocaleString()}
+Advance Paid : ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
+Balance Due  : ₹${(parseFloat(data.total_amount || 0) - parseFloat(data.advance_paid || 0)).toLocaleString()}
+
+[ LOGISTICS ]
+Courier      : ${data.dispatch_through || 'N/A'}
+Destination  : ${data.destination || 'N/A'}
+--------------------------------------------------
+System Generated Document
 `.trim();
 
         dataBox.innerText = message;
@@ -737,7 +742,9 @@ function switchTab(tab) {
 
 async function loadBilledHistory() {
     try {
-        const res = await fetch(`${BILLING_API_URL}/invoices`);
+        const res = await fetch(`${BILLING_API_URL}/invoices`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const invoices = await res.json();
         const list = document.getElementById('historyList');
         list.innerHTML = '';
@@ -774,7 +781,7 @@ async function loadBilledHistory() {
                     <div style="margin: 1rem 0; padding-top: 1rem; border-top: 1px dashed #e2e8f0;">
                         <div class="history-item"><span class="history-label">Total Amount</span> <span style="font-weight: 800; color: #1e293b;">₹${total.toLocaleString()}</span></div>
                         <div class="history-item"><span class="history-label">Advances</span> <span style="color: #10b981; font-weight: 700;">₹${advances.toLocaleString()}</span></div>
-                        <div class="history-item"><span class="history-label">Due Balance</span> <span style="color: #ef4444; font-weight: 800;">₹${due.toLocaleString()}</span></div>
+                        <div class="history-item"><span class="history-label">Due Balance</span> <span style="font-weight: 800; color: #ef4444;">₹${due.toLocaleString()}</span></div>
                     </div>
                 </div>
                 <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
@@ -808,30 +815,33 @@ async function copyFullBillData(invoiceId, btn) {
         
         if (!data || !data.items) throw new Error('No data found');
 
-        const productsStr = data.items.map(item => `- ${item.product_name} x ${item.quantity} (₹${parseFloat(item.price).toLocaleString()})`).join('\n');
+        const productsStr = data.items.map((item, index) => `${index + 1}. ${item.product_name} (Qty: ${item.quantity}) - ₹${parseFloat(item.price * item.quantity).toLocaleString()}`).join('\n');
         
-        const message = `
-================================
-📦 BILLING DATA SUMMARY
-================================
-👤 CUSTOMER: ${data.billing_name}
-📞 PHONE: ${data.billing_phone}
-📍 ADDRESS: ${data.billing_address}
-🏡 VILLAGE: ${data.billing_village || 'N/A'}
-🏙️ DISTRICT: ${data.billing_district || 'N/A'}
-🗺️ STATE: ${data.state || 'N/A'}
-🔢 PINCODE: ${data.billing_pincode || 'N/A'}
+        const addressLine = [data.billing_village, data.billing_district, data.state].filter(Boolean).join(', ');
+        const pincodeStr = data.billing_pincode ? ` - ${data.billing_pincode}` : '';
 
-🛒 PRODUCTS:
+        const message = `
+SGB AGRIVAAN - DISPATCH SUMMARY
+--------------------------------------------------
+[ CUSTOMER DETAILS ]
+Name     : ${data.billing_name || 'N/A'}
+Phone    : ${data.billing_phone || 'N/A'}
+Address  : ${data.billing_address || 'N/A'}
+           ${addressLine}${pincodeStr}
+
+[ ORDER DETAILS ]
 ${productsStr}
 
-💰 TOTAL AMOUNT: ₹${parseFloat(data.total_amount).toLocaleString()}
-💸 ADVANCES: ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
-📉 DUE AMOUNT: ₹${(parseFloat(data.total_amount) - parseFloat(data.advance_paid || 0)).toLocaleString()}
-🚚 COURIER PARTNER: ${data.dispatch_through || 'N/A'}
-📍 DESTINATION: ${data.destination || 'N/A'}
-================================
-Generated by SGB AGRIVAAN
+[ FINANCIALS ]
+Total Amount : ₹${parseFloat(data.total_amount || 0).toLocaleString()}
+Advance Paid : ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
+Balance Due  : ₹${(parseFloat(data.total_amount || 0) - parseFloat(data.advance_paid || 0)).toLocaleString()}
+
+[ LOGISTICS ]
+Courier      : ${data.dispatch_through || 'N/A'}
+Destination  : ${data.destination || 'N/A'}
+--------------------------------------------------
+System Generated Document
 `.trim();
 
         await navigator.clipboard.writeText(message);
@@ -1126,14 +1136,14 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
-    const data = {
-        company_state: document.getElementById('setting_company_state').value,
-        invoice_prefix: document.getElementById('setting_invoice_prefix').value,
-        gst_rate: document.getElementById('setting_gst_rate').value,
-        last_invoice_num: document.getElementById('setting_last_invoice_num').value
-    };
-
     try {
+        const data = {
+            company_state: document.getElementById('setting_company_state').value,
+            invoice_prefix: document.getElementById('setting_invoice_prefix').value,
+            gst_rate: document.getElementById('setting_gst_rate').value,
+            last_invoice_num: document.getElementById('setting_last_invoice_num').value
+        };
+
         const res = await fetch(`${BILLING_API_URL}/settings`, {
             method: 'PATCH',
             headers: {
@@ -1142,13 +1152,68 @@ async function saveSettings() {
             },
             body: JSON.stringify(data)
         });
+
         if (res.ok) {
-            alert('Settings updated successfully.');
+            alert('Settings saved!');
             loadSettings();
         } else {
-            alert('Failed to update settings. Admin access required.');
+            alert('Failed to save settings.');
         }
     } catch (err) {
-        alert('Error saving settings');
+        alert('Error saving settings.');
     }
 }
+
+// ─── Auto Fill Logic ─────────────────────────────────────────
+
+window.fetchPincodeDetails = async function(pincode) {
+    if (!pincode || pincode.length !== 6) return;
+    
+    try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+        const data = await res.json();
+        
+        if (data && data[0] && data[0].Status === 'Success') {
+            const postOffices = data[0].PostOffice;
+            const state = postOffices[0].State;
+            const district = postOffices[0].District;
+            
+            document.getElementById('billCustomerState').value = state;
+            document.getElementById('billCustomerDistrict').value = district;
+            
+            const villageSelect = document.getElementById('billCustomerVillage');
+            if (villageSelect) {
+                villageSelect.innerHTML = postOffices.map(po => `<option value="${po.Name}">${po.Name}</option>`).join('');
+                if (postOffices.length > 0) {
+                    villageSelect.value = postOffices[0].Name; // Force selection
+                }
+            }
+            
+            if (typeof autoFormatAddress === 'function') autoFormatAddress();
+        }
+    } catch (e) {
+        console.error('Failed to fetch pincode details', e);
+    }
+};
+
+window.autoFormatAddress = function() {
+    const village = document.getElementById('billCustomerVillage')?.value || '';
+    const district = document.getElementById('billCustomerDistrict')?.value || '';
+    const state = document.getElementById('billCustomerState')?.value || '';
+    const pincode = document.getElementById('billCustomerPincode')?.value || '';
+    const phone = document.getElementById('billCustomerPhone')?.value || '';
+    
+    const parts = [];
+    if (village && village !== 'Select Village') parts.push(village);
+    if (district) parts.push(district);
+    if (state) parts.push(state);
+    
+    let addressStr = parts.join(', ');
+    if (pincode) addressStr += ` - ${pincode}`;
+    if (phone) addressStr += `\nPh: ${phone}`;
+    
+    const addressInput = document.getElementById('billCustomerAddress');
+    if (addressInput) {
+        addressInput.value = addressStr;
+    }
+};

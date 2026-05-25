@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         <div style="font-size:0.7rem; color:#64748b;">SKU: ${i.sku}</div>
                                     </td>
                                     <td style="font-weight:600; ${isLow ? 'color:#ef4444;' : ''}">
-                                        ${i.current_stock} ${i.unit || ''}
+                                        ${i.current_stock}
                                         ${isLow ? '<i class="fas fa-triangle-exclamation" style="margin-left:4px;"></i>' : ''}
                                     </td>
                                     <td style="color:#94a3b8;">${i.reserved_stock}</td>

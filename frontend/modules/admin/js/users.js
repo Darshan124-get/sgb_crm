@@ -9,8 +9,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     let usersData = [];
     let rolesData = [];
 
+    // Inject lang-toggle pill styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .lang-toggle {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1.5px solid #e2e8f0;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            user-select: none;
+        }
+        .lang-toggle:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .lang-toggle.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: #fff;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Toggle-pill click handler
+    document.getElementById('langToggleContainer').addEventListener('click', (e) => {
+        const btn = e.target.closest('.lang-toggle');
+        if (btn) btn.classList.toggle('active');
+    });
+
+    // Show language group only for SALES role
+    function updateLangVisibility() {
+        const roleSelect = document.getElementById('userRole');
+        const selectedRole = roleSelect.options[roleSelect.selectedIndex]?.text || '';
+        const langGroup = document.getElementById('langGroup');
+        langGroup.style.display = selectedRole.toLowerCase() === 'sales' ? 'block' : 'none';
+    }
+
     // 2. Initial Data Load
     await Promise.all([fetchRoles(), fetchUsers()]);
+
+    // Attach role-change listener after roles are populated
+    document.getElementById('userRole').addEventListener('change', updateLangVisibility);
 
     // 3. Tab Logic
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -50,10 +94,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('editUserId').value = userId || '';
         document.getElementById('passGroup').style.display = userId ? 'none' : 'block';
         document.getElementById('modalTitle').textContent = userId ? 'Edit Staff Member' : 'Add New Staff Member';
-        
-        // Reset multiples select
-        const langSelect = document.getElementById('userLang');
-        Array.from(langSelect.options).forEach(opt => opt.selected = false);
+
+        // Reset all language toggle pills
+        document.querySelectorAll('.lang-toggle').forEach(btn => btn.classList.remove('active'));
 
         if (userId) {
             const u = usersData.find(x => x.user_id === userId);
@@ -62,17 +105,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 document.getElementById('userEmail').value = u.email;
                 document.getElementById('userPhone').value = u.phone || '';
                 document.getElementById('userRole').value = rolesData.find(r => r.name.toLowerCase() === u.role_name.toLowerCase())?.role_id || '';
-                
-                const langs = (u.language || 'EN').split(',');
-                Array.from(langSelect.options).forEach(opt => {
-                    if (langs.includes(opt.value)) opt.selected = true;
+
+                const langs = (u.language || '').split(',').map(l => l.trim());
+                document.querySelectorAll('.lang-toggle').forEach(btn => {
+                    if (langs.includes(btn.dataset.lang)) btn.classList.add('active');
                 });
             }
         }
 
+        // Sync language section visibility
+        updateLangVisibility();
+
         userModal.style.display = 'flex';
         // Force repaint for animation
-        userModal.offsetHeight; 
+        userModal.offsetHeight;
         userModal.style.opacity = '1';
         userModal.style.pointerEvents = 'auto';
         userModal.querySelector('.premium-card').style.transform = 'translateY(0)';
@@ -175,8 +221,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function saveUser() {
         const id = document.getElementById('editUserId').value;
-        const langSelect = document.getElementById('userLang');
-        const selectedLangs = Array.from(langSelect.selectedOptions).map(opt => opt.value).join(',');
+
+        // Collect selected language pills (only relevant if SALES)
+        const isSales = document.getElementById('langGroup').style.display !== 'none';
+        const selectedLangs = isSales
+            ? Array.from(document.querySelectorAll('.lang-toggle.active')).map(btn => btn.dataset.lang).join(',')
+            : '';
+
         const password = document.getElementById('userPass').value;
 
         // Validation
@@ -190,7 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             email: document.getElementById('userEmail').value,
             phone: document.getElementById('userPhone').value,
             role_id: document.getElementById('userRole').value,
-            language: selectedLangs || 'EN',
+            language: selectedLangs || null,
         };
 
         if (!id) payload.password = password;

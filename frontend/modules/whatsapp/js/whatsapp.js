@@ -20,6 +20,7 @@ let currentHistory = [];
 let allCustomers = [];
 let currentTab = 'open';
 let salesUsers = [];
+const activeUploads = new Map();
 
 // DOM Elements
 const appContainerEl = document.getElementById('app-container');
@@ -506,59 +507,128 @@ document.addEventListener('DOMContentLoaded', () => {
 
     sendMediaBtn.onclick = handleSendMedia;
 
-    mediaInputEl.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file || !activeCustomer) return;
-
-        selectedFile = file;
-        const reader = new FileReader();
-        reader.onload = (re) => {
-            if (file.type.startsWith('image/')) {
-                previewImg.src = re.target.result;
-                document.getElementById('image-preview-container').classList.remove('hidden');
-                document.getElementById('file-preview-container').classList.add('hidden');
-            } else {
-                previewFileName.innerText = file.name;
-                document.getElementById('image-preview-container').classList.add('hidden');
-                document.getElementById('file-preview-container').classList.remove('hidden');
-            }
-            previewCaption.value = '';
-            mediaPreviewModal.classList.remove('hidden'); // legacy cleanup
-            mediaPreviewModal.classList.add('active');
-            document.body.classList.add('modal-open');
-        };
-        reader.readAsDataURL(file);
-    };
+    // mediaInputEl onchange is bound in initEventListeners
 });
 
 async function handleSendMedia() {
     if (!selectedFile || !activeCustomer) return;
 
-    const reader = new FileReader();
-    reader.readAsDataURL(selectedFile);
-    reader.onload = async () => {
-        const caption = previewCaption.value.trim();
-        const response = await fetch(`${API_BASE}/send`, {
-            method: 'POST',
-            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                phone: activeCustomer.phone,
-                mediaData: reader.result,
-                mimeType: selectedFile.type,
-                message: caption || selectedFile.name
-            })
-        });
+    // Capture variables needed for background upload
+    const file = selectedFile;
+    const phone = activeCustomer.phone;
+    const caption = previewCaption.value.trim();
+    const mimeType = file.type;
+    const fileName = file.name;
 
-        if (response.ok) {
-            mediaPreviewModal.classList.remove('active');
-            document.body.classList.remove('modal-open');
-            selectedFile = null;
-            loadChatHistory(activeCustomer.phone);
-        } else {
-            alert('Failed to send media');
+    // 1. Immediately close the modal to prevent blocking the UI
+    mediaPreviewModal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+    selectedFile = null;
+
+    // 2. Optimistic UI update - Add uploading message to the chat
+    const msgId = 'upload-' + Date.now();
+    const msgEl = document.createElement('div');
+    msgEl.className = `message message-outgoing`;
+    msgEl.id = msgId;
+
+    let mediaPreview = '';
+    if (mimeType.startsWith('image/')) {
+        mediaPreview = `<img src="${URL.createObjectURL(file)}" alt="Uploading..." style="opacity: 0.6; border-radius: 8px;">`;
+    } else if (mimeType.startsWith('video/')) {
+        mediaPreview = `<video src="${URL.createObjectURL(file)}" style="opacity: 0.6; max-width: 100%; border-radius: 8px;"></video>`;
+    } else {
+        mediaPreview = `<div style="padding: 10px; background: rgba(0,0,0,0.1); border-radius: 8px;"><i class="fas fa-file"></i> ${fileName}</div>`;
+    }
+
+    msgEl.innerHTML = `
+        <div class="message-media" style="position: relative;">
+            ${mediaPreview}
+            <div class="upload-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.6); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 0.9rem; font-weight: bold;">
+                <span class="upload-percent">0%</span>
+            </div>
+            ${caption ? `<div class="message-content" style="opacity: 0.7;">${caption}</div>` : ''}
+        </div>
+        <div class="message-time">Uploading...</div>
+    `;
+
+    if (activeCustomer && activeCustomer.phone === phone && messageContainerEl) {
+        messageContainerEl.appendChild(msgEl);
+        messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    }
+
+    // Save to global state so it persists across chat switching
+    activeUploads.set(msgId, {
+        phone: phone,
+        element: msgEl
+    });
+
+    // 3. Process and Upload in background with Progress Tracking
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/send`, true);
+        xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                const percentEl = msgEl.querySelector('.upload-percent');
+                if (percentEl) {
+                    percentEl.innerText = `${percentComplete}%`;
+                }
+            }
+        };
+
+        xhr.onload = () => {
+            activeUploads.delete(msgId); // Remove from global tracking
+            if (xhr.status >= 200 && xhr.status < 300) {
+                // If they are still in the same chat, reload history to get the real message
+                if (activeCustomer && activeCustomer.phone === phone) {
+                    loadChatHistory(phone);
+                }
+            } else {
+                handleUploadError();
+            }
+        };
+
+        xhr.onerror = () => {
+            activeUploads.delete(msgId);
+            handleUploadError();
+        };
+
+        function handleUploadError() {
+            console.error('Media upload error');
+            const overlay = msgEl.querySelector('.upload-overlay');
+            if (overlay) overlay.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ef4444; font-size: 1.2rem;"></i>';
+            const timeEl = msgEl.querySelector('.message-time');
+            if (timeEl) timeEl.innerText = 'Failed';
+            
+            // Re-append to DOM if it was detached but we are still on the same chat
+            if (activeCustomer && activeCustomer.phone === phone && messageContainerEl && !document.getElementById(msgId)) {
+                messageContainerEl.appendChild(msgEl);
+                messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+            }
         }
+
+        xhr.send(JSON.stringify({
+            phone: phone,
+            mediaData: reader.result,
+            mimeType: mimeType,
+            message: caption || fileName
+        }));
     };
 }
+
+// Warn before leaving if there are active uploads
+window.addEventListener('beforeunload', (e) => {
+    if (activeUploads.size > 0) {
+        const msg = 'You have media uploads in progress. If you leave this page, they will be cancelled.';
+        e.returnValue = msg;
+        return msg;
+    }
+});
 
 async function deleteMessage(chatId) {
     if (!confirm('Are you sure you want to delete this message?')) return;
@@ -675,6 +745,15 @@ function renderMessages(history) {
         messageContainerEl.appendChild(msgEl);
     });
 
+    // Re-append active uploads for this phone
+    if (activeCustomer) {
+        activeUploads.forEach((upload, msgId) => {
+            if (upload.phone === activeCustomer.phone) {
+                messageContainerEl.appendChild(upload.element);
+            }
+        });
+    }
+
     messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
 }
 
@@ -682,6 +761,11 @@ async function handleSend() {
     const text = messageInputEl.value.trim();
     if (!text || !activeCustomer) return;
     messageInputEl.value = '';
+
+    const originalIcon = sendBtnEl.innerHTML;
+    sendBtnEl.disabled = true;
+    sendBtnEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+
     try {
         const response = await fetch(`${API_BASE}/send`, {
             method: 'POST',
@@ -690,7 +774,12 @@ async function handleSend() {
         });
         if (response.ok) loadChatHistory(activeCustomer.phone);
         else window.showAlert('Error', 'Failed to send message', 'error');
-    } catch (err) { console.error('Send error:', err); }
+    } catch (err) { 
+        console.error('Send error:', err); 
+    } finally {
+        sendBtnEl.disabled = false;
+        sendBtnEl.innerHTML = originalIcon;
+    }
 }
 
 // Media Selection Handler
@@ -699,23 +788,23 @@ function handleMediaSelect(e) {
     if (!file || !activeCustomer) return;
 
     selectedFile = file;
-    const reader = new FileReader();
-    reader.onload = (re) => {
-        if (file.type.startsWith('image/')) {
-            previewImg.src = re.target.result;
-            document.getElementById('image-preview-container').classList.remove('hidden');
-            document.getElementById('file-preview-container').classList.add('hidden');
-        } else {
-            previewFileName.innerText = file.name;
-            document.getElementById('image-preview-container').classList.add('hidden');
-            document.getElementById('file-preview-container').classList.remove('hidden');
-        }
-        previewCaption.value = '';
-        mediaPreviewModal.classList.remove('hidden'); // legacy cleanup
-        mediaPreviewModal.classList.add('active');
-        document.body.classList.add('modal-open');
-    };
-    reader.readAsDataURL(file);
+    
+    if (file.type.startsWith('image/')) {
+        previewImg.src = URL.createObjectURL(file);
+        document.getElementById('image-preview-container').classList.remove('hidden');
+        document.getElementById('file-preview-container').classList.add('hidden');
+    } else {
+        previewFileName.innerText = file.name;
+        document.getElementById('image-preview-container').classList.add('hidden');
+        document.getElementById('file-preview-container').classList.remove('hidden');
+    }
+    previewCaption.value = '';
+    mediaPreviewModal.classList.remove('hidden');
+    mediaPreviewModal.classList.add('active');
+    document.body.classList.add('modal-open');
+    
+    // Reset file input so same file can be selected again
+    e.target.value = '';
 }
 
 // Event Listeners Initialization

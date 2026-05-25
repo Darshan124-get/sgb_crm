@@ -82,9 +82,17 @@ exports.updateUser = async (req, res) => {
     const { id } = req.params;
     const { name, email, phone, role_id, language, status } = req.body;
     try {
+        // Fetch current row so we can preserve language for non-SALES roles
+        const [[current]] = await db.execute(
+            'SELECT language, status FROM users WHERE user_id = ?', [id]
+        );
+
+        const safeLang   = (language != null && language !== '') ? language : (current?.language ?? null);
+        const safeStatus = (status   != null && status   !== '') ? status   : (current?.status ?? 'active');
+
         await db.execute(
             'UPDATE users SET name = ?, email = ?, phone = ?, role_id = ?, language = ?, status = ? WHERE user_id = ?',
-            [name, email, phone, role_id, language, status, id]
+            [name, email, phone, role_id, safeLang, safeStatus, id]
         );
         res.json({ message: 'Staff updated successfully' });
     } catch (err) {

@@ -25,17 +25,16 @@ window.initFlatpickrForDecisionEngine = function() {
 window.applyFlatpickrToFields = function() {
     if (typeof flatpickr === 'undefined') return;
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(10, 0, 0, 0);
+    const defaultDate = new Date();
+    defaultDate.setMinutes(defaultDate.getMinutes() + 30);
 
     const config = {
         enableTime: true,
         dateFormat: "Y-m-d\\TH:i",
         altInput: true,
         altFormat: "d-m-Y h:i K", // 12-hour AM/PM with date
-        minDate: tomorrow, // Disables today and previous days
-        defaultDate: tomorrow // Defaults to tomorrow at 10:00 AM
+        minDate: "today", // Disables previous days
+        defaultDate: defaultDate 
     };
 
     flatpickr("#de-followup-date", config);
@@ -114,8 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Handle amount changes effectively for final/due calculation
-    document.body.addEventListener('input', (e) => {
+    // Handle amount changes effectively for final/due calculation and Pincode auto-fill
+    document.body.addEventListener('input', async (e) => {
         const amountIds = [
             'de-order-total', 'de-order-discount', 'de-order-advance',
             'm-de-order-total', 'm-de-order-discount', 'm-de-order-advance'
@@ -123,6 +122,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (amountIds.includes(e.target.id)) {
             const prefix = e.target.id.startsWith('m-') ? 'm-' : '';
             updateFinalAndDue(prefix);
+        }
+
+        // Pincode auto-fill logic
+        if (e.target.id === 'de-pincode' || e.target.id === 'm-de-pincode') {
+            const prefix = e.target.id.startsWith('m-') ? 'm-de-' : 'de-';
+            const pincode = e.target.value.trim();
+            
+            if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+                try {
+                    const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+                    const data = await response.json();
+                    
+                    if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+                        const postOffice = data[0].PostOffice[0];
+                        const state = postOffice.State;
+                        const district = postOffice.District;
+                        
+                        const stateSelect = document.getElementById(prefix + 'state');
+                        const districtInput = document.getElementById(prefix + 'district');
+                        
+                        if (districtInput && !districtInput.value) {
+                            districtInput.value = district;
+                        }
+                        
+                        if (stateSelect) {
+                            stateSelect.value = state;
+                        }
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch location by pincode", error);
+                }
+            }
         }
     });
 });
@@ -270,6 +301,10 @@ window.handleLeadConversionModal = function () {
 
     if (pincodeInput && leadPincode && leadPincode !== '-') {
         pincodeInput.value = leadPincode;
+        // Dispatch input event to trigger auto-fill for State/District if State is 'Other' or missing
+        if (!leadState || leadState === '-' || leadState.toLowerCase() === 'other') {
+            pincodeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
     }
 
     if (stateInput && leadState && leadState !== '-') {

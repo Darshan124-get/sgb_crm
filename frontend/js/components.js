@@ -831,16 +831,15 @@ window.rescheduleCallFromDetails = function () {
     
     setTimeout(() => {
         if (typeof flatpickr !== 'undefined') {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(10, 0, 0, 0);
+            const defaultDate = new Date();
+            defaultDate.setMinutes(defaultDate.getMinutes() + 30);
             flatpickr("#rescheduleDate", {
                 enableTime: true,
                 dateFormat: "Y-m-d\\TH:i",
                 altInput: true,
                 altFormat: "d M Y h:i K",
-                minDate: tomorrow,
-                defaultDate: tomorrow
+                minDate: "today",
+                defaultDate: defaultDate
             });
         }
     }, 50);

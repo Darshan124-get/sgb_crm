@@ -377,6 +377,19 @@ CREATE TABLE bot_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS `whatsapp_quick_replies` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `shortcut` varchar(50) NOT NULL,
+  `message` text NOT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `shortcut` (`shortcut`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert default quick replies
+INSERT IGNORE INTO `whatsapp_quick_replies` (`shortcut`, `message`) VALUES 
+('thanks', 'Thank you for your business! We look forward to working with you again.'),
+('questions', 'Hello sir\nHow are you');
 
 
 -- SEED DATA

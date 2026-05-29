@@ -99,6 +99,23 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCustomers();
     loadSalesUsers();
 
+    // 3-dot menu toggle logic
+    const menuBtn = document.getElementById('sidebar-menu-btn');
+    const menuContent = document.getElementById('sidebar-menu-content');
+    
+    if (menuBtn && menuContent) {
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menuContent.style.display = menuContent.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!menuBtn.contains(e.target) && !menuContent.contains(e.target)) {
+                menuContent.style.display = 'none';
+            }
+        });
+    }
+
     // Refresh customer list every 30 seconds
     setInterval(loadCustomers, 30000);
 
@@ -240,7 +257,19 @@ function renderCustomerList() {
         let lastTime = 'New';
         if (customer.last_message_at) {
             const date = new Date(customer.last_message_at);
-            if (!isNaN(date.getTime())) lastTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (!isNaN(date.getTime())) {
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                if (date.toDateString() === today.toDateString()) {
+                    lastTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else if (date.toDateString() === yesterday.toDateString()) {
+                    lastTime = 'Yesterday';
+                } else {
+                    lastTime = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                }
+            }
         }
 
         const item = document.createElement('div');
@@ -320,7 +349,7 @@ async function selectCustomer(customer) {
     detailsAvatarEl.innerText = getInitials(customer.customer_name);
     detailsAvatarEl.style.backgroundColor = getAvatarStyle(customer.phone);
 
-    const location = [customer.village_city, customer.district, customer.state].filter(s => s).join(', ') || '-';
+    const location = [customer.city, customer.district, customer.state].filter(s => s).join(', ') || '-';
     displayLocationEl.innerText = location;
     displayLanguageEl.innerText = customer.language || '-';
     assignedToEl.innerText = customer.assigned_name || 'Unassigned';
@@ -411,7 +440,7 @@ function update24hWindow(customer) {
 function populateEditForm() {
     if (!activeCustomer) return;
     editNameInput.value = activeCustomer.customer_name || '';
-    editCityInput.value = activeCustomer.village_city || '';
+    editCityInput.value = activeCustomer.city || '';
     editDistrictInput.value = activeCustomer.district || '';
     editStateInput.value = activeCustomer.state || '';
     editPincodeInput.value = activeCustomer.pincode || '';
@@ -435,7 +464,7 @@ async function handleSaveDetails() {
 
     const payload = {
         customer_name: editNameInput.value.trim(),
-        village_city: editCityInput.value.trim(),
+        city: editCityInput.value.trim(),
         district: editDistrictInput.value.trim(),
         state: editStateInput.value.trim(),
         pincode: editPincodeInput.value.trim(),
@@ -796,7 +825,36 @@ function renderMessages(history) {
     if (!messageContainerEl) return;
     messageContainerEl.innerHTML = '';
 
+    let lastDateStr = null;
+
     history.forEach(msg => {
+        const msgDate = new Date(msg.timestamp);
+        
+        // --- Date Divider Logic ---
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        let dateLabel = '';
+        if (msgDate.toDateString() === today.toDateString()) {
+            dateLabel = 'TODAY';
+        } else if (msgDate.toDateString() === yesterday.toDateString()) {
+            dateLabel = 'YESTERDAY';
+        } else {
+            dateLabel = msgDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        if (dateLabel !== lastDateStr) {
+            const dateDivider = document.createElement('div');
+            dateDivider.style.display = 'flex';
+            dateDivider.style.justifyContent = 'center';
+            dateDivider.style.margin = '15px 0';
+            dateDivider.innerHTML = `<span style="background: var(--whatsapp-bg); color: var(--whatsapp-secondary); padding: 5px 12px; border-radius: 8px; font-size: 0.8rem; text-transform: uppercase;">${dateLabel}</span>`;
+            messageContainerEl.appendChild(dateDivider);
+            lastDateStr = dateLabel;
+        }
+        // ------------------------
+
         const msgEl = document.createElement('div');
         msgEl.className = `message message-${msg.direction}`;
         msgEl.id = `msg-${msg.chat_id}`;
@@ -849,11 +907,18 @@ function renderMessages(history) {
             contentHtml = `<div class="message-content">${msg.body || '(Empty message)'}</div>`;
         }
 
+        const tickHtml = msg.direction === 'outgoing' 
+            ? `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #53bdeb;"></i>` 
+            : '';
+
         msgEl.innerHTML = `
             ${actionsHtml}
             ${msg.direction === 'outgoing' && msg.sender_name ? `<div class="message-sender">${msg.sender_name}</div>` : ''}
             ${contentHtml}
-            <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="message-time">
+                ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                ${tickHtml}
+            </div>
         `;
 
         messageContainerEl.appendChild(msgEl);
@@ -875,6 +940,7 @@ async function handleSend() {
     const text = messageInputEl.value.trim();
     if (!text || !activeCustomer) return;
     messageInputEl.value = '';
+    messageInputEl.style.height = 'auto';
 
     const originalIcon = sendBtnEl.innerHTML;
     sendBtnEl.disabled = true;
@@ -927,7 +993,17 @@ function initEventListeners() {
     attachBtnEl.onclick = () => mediaInputEl.click();
     mediaInputEl.onchange = handleMediaSelect;
     mobileBackBtnEl.onclick = () => appContainerEl.classList.remove('show-chat');
-    messageInputEl.onkeydown = (e) => { if (e.key === 'Enter') handleSend(); };
+    messageInputEl.onkeydown = (e) => { 
+        if (e.key === 'Enter' && !e.shiftKey) { 
+            e.preventDefault();
+            handleSend(); 
+        } 
+    };
+    
+    messageInputEl.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight < 100 ? this.scrollHeight : 100) + 'px';
+    });
 
     // Transfer Modal
     if (transferBtnEl) {
@@ -965,3 +1041,263 @@ function initEventListeners() {
 
 // Initialize on load
 initEventListeners();
+
+// ==========================================
+// Quick Replies Implementation
+// ==========================================
+const qrManagerModal = document.getElementById('qr-manager-modal');
+const closeQrManagerBtn = document.getElementById('close-qr-manager-btn');
+const qrListView = document.getElementById('qr-list-view');
+const qrEditView = document.getElementById('qr-edit-view');
+const qrManagerList = document.getElementById('qr-manager-list');
+const qrAddNewBtn = document.getElementById('qr-add-new-btn');
+const qrSaveBtn = document.getElementById('qr-save-btn');
+const qrCancelEditBtn = document.getElementById('qr-cancel-edit-btn');
+const qrDeleteBtn = document.getElementById('qr-delete-btn');
+const qrEditIndex = document.getElementById('qr-edit-index');
+const qrEditShortcut = document.getElementById('qr-edit-shortcut');
+const qrEditMessage = document.getElementById('qr-edit-message');
+const menuQuickReplies = document.getElementById('menu-quick-replies');
+
+const quickRepliesPopover = document.getElementById('quick-replies-popover');
+const qrPopoverList = document.getElementById('qr-popover-list');
+const qrPopoverEditBtn = document.getElementById('qr-popover-edit-btn');
+
+let quickReplies = [];
+
+async function loadQuickReplies() {
+    try {
+        const response = await fetch(`${API_BASE}/quick-replies`, {
+            headers: AUTH_HEADER
+        });
+        if (response.ok) {
+            quickReplies = await response.json();
+        }
+    } catch (err) {
+        console.error('Failed to load quick replies', err);
+    }
+}
+loadQuickReplies();
+
+async function saveQuickReplyAPI(qr) {
+    try {
+        const response = await fetch(`${API_BASE}/quick-replies`, {
+            method: 'POST',
+            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+            body: JSON.stringify(qr)
+        });
+        if (response.ok) {
+            await loadQuickReplies();
+            showQrList();
+        } else {
+            window.showAlert('Error', 'Failed to save quick reply', 'error');
+        }
+    } catch (err) {
+        console.error('Failed to save quick reply', err);
+        window.showAlert('Error', 'Failed to save quick reply', 'error');
+    }
+}
+
+async function deleteQuickReplyAPI(id) {
+    try {
+        const response = await fetch(`${API_BASE}/quick-replies/${id}`, {
+            method: 'DELETE',
+            headers: AUTH_HEADER
+        });
+        if (response.ok) {
+            await loadQuickReplies();
+            showQrList();
+        } else {
+            window.showAlert('Error', 'Failed to delete quick reply', 'error');
+        }
+    } catch (err) {
+        console.error('Failed to delete quick reply', err);
+        window.showAlert('Error', 'Failed to delete quick reply', 'error');
+    }
+}
+
+function openQrManager() {
+    if(qrManagerModal) {
+        qrManagerModal.classList.remove('hidden');
+        qrManagerModal.classList.add('active');
+        document.body.classList.add('modal-open');
+        showQrList();
+    }
+}
+
+function closeQrManager() {
+    if(qrManagerModal) {
+        qrManagerModal.classList.remove('active');
+        qrManagerModal.classList.add('hidden');
+        document.body.classList.remove('modal-open');
+    }
+}
+
+function renderQrManagerList() {
+    if(!qrManagerList) return;
+    qrManagerList.innerHTML = '';
+    quickReplies.forEach((qr, index) => {
+        const item = document.createElement('div');
+        item.style.padding = '15px 20px';
+        item.style.borderBottom = '1px solid var(--whatsapp-border)';
+        item.style.cursor = 'pointer';
+        item.style.position = 'relative';
+        item.innerHTML = `
+            <div style="font-weight: 600; font-size: 1rem; margin-bottom: 5px;">/${qr.shortcut}</div>
+            <div style="color: var(--whatsapp-secondary); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px;">${qr.message}</div>
+            
+            <div class="qr-item-menu-btn" style="position: absolute; right: 20px; top: 15px; padding: 5px; color: var(--whatsapp-secondary);">
+                <i class="fas fa-ellipsis-v"></i>
+            </div>
+            
+            <div class="qr-item-dropdown" style="display: none; position: absolute; right: 20px; top: 40px; background: #233138; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.5); z-index: 10; min-width: 100px;">
+                <div class="qr-item-delete" style="padding: 12px 15px; color: #f15c6d; font-size: 0.9rem;">Delete</div>
+            </div>
+        `;
+        
+        const menuBtn = item.querySelector('.qr-item-menu-btn');
+        const dropdown = item.querySelector('.qr-item-dropdown');
+        const deleteBtn = item.querySelector('.qr-item-delete');
+
+        menuBtn.onclick = (e) => {
+            e.stopPropagation(); // prevent edit modal from opening
+            
+            // Hide all other dropdowns
+            document.querySelectorAll('.qr-item-dropdown').forEach(d => {
+                if (d !== dropdown) d.style.display = 'none';
+            });
+            
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        };
+
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            if(confirm('Are you sure you want to delete this quick reply?')) {
+                deleteQuickReplyAPI(qr.id);
+            }
+        };
+
+        // Click anywhere else to edit
+        item.onclick = () => showQrEdit(index);
+        
+        qrManagerList.appendChild(item);
+    });
+
+    // Close dropdowns if clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.qr-item-menu-btn')) {
+            document.querySelectorAll('.qr-item-dropdown').forEach(d => d.style.display = 'none');
+        }
+    });
+}
+
+function showQrList() {
+    renderQrManagerList();
+    qrListView.classList.remove('hidden');
+    qrEditView.classList.add('hidden');
+}
+
+function showQrEdit(index = -1) {
+    qrListView.classList.add('hidden');
+    qrEditView.classList.remove('hidden');
+    qrEditIndex.value = index;
+    if (index >= 0) {
+        // use the id from db if exists, otherwise index
+        qrEditShortcut.dataset.id = quickReplies[index].id || '';
+        qrEditShortcut.value = quickReplies[index].shortcut;
+        qrEditMessage.value = quickReplies[index].message;
+        qrDeleteBtn.classList.remove('hidden');
+    } else {
+        qrEditShortcut.dataset.id = '';
+        qrEditShortcut.value = '';
+        qrEditMessage.value = '';
+        qrDeleteBtn.classList.add('hidden');
+    }
+}
+
+function saveQrEdit() {
+    const shortcut = qrEditShortcut.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const message = qrEditMessage.value.trim();
+    if (!shortcut || !message) {
+        window.showAlert('Error', 'Shortcut and message are required', 'error');
+        return;
+    }
+    
+    const id = qrEditShortcut.dataset.id;
+    saveQuickReplyAPI({ id: id || undefined, shortcut, message });
+}
+
+function deleteQrEdit() {
+    const id = qrEditShortcut.dataset.id;
+    if (id) {
+        deleteQuickReplyAPI(id);
+    } else {
+        showQrList();
+    }
+}
+
+function filterAndShowPopover(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    const matches = quickReplies.filter(qr => qr.shortcut.toLowerCase().includes(term));
+    
+    if (matches.length === 0) {
+        quickRepliesPopover.style.display = 'none';
+        return;
+    }
+
+    qrPopoverList.innerHTML = '';
+    matches.forEach(qr => {
+        const item = document.createElement('div');
+        item.style.padding = '12px 20px';
+        item.style.cursor = 'pointer';
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        item.onmouseover = () => item.style.backgroundColor = '#2a3942';
+        item.onmouseout = () => item.style.backgroundColor = 'transparent';
+        item.innerHTML = `
+            <div style="font-weight: 600; color: #e9edef; font-size: 0.95rem;">/${qr.shortcut}</div>
+            <div style="color: #8696a0; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;">${qr.message}</div>
+        `;
+        item.onclick = () => {
+            messageInputEl.value = qr.message;
+            quickRepliesPopover.style.display = 'none';
+            messageInputEl.focus();
+        };
+        qrPopoverList.appendChild(item);
+    });
+    quickRepliesPopover.style.display = 'block';
+}
+
+// Bind QR Events
+if (menuQuickReplies) {
+    menuQuickReplies.onclick = (e) => {
+        e.preventDefault();
+        const sidebarMenu = document.getElementById('sidebar-menu-content');
+        if (sidebarMenu) sidebarMenu.style.display = 'none';
+        openQrManager();
+    };
+}
+if (closeQrManagerBtn) closeQrManagerBtn.onclick = closeQrManager;
+if (qrAddNewBtn) qrAddNewBtn.onclick = () => showQrEdit(-1);
+if (qrCancelEditBtn) qrCancelEditBtn.onclick = showQrList;
+if (qrSaveBtn) qrSaveBtn.onclick = saveQrEdit;
+if (qrDeleteBtn) qrDeleteBtn.onclick = deleteQrEdit;
+if (qrPopoverEditBtn) qrPopoverEditBtn.onclick = openQrManager;
+
+// Trigger popover when typing '/'
+if (messageInputEl) {
+    messageInputEl.addEventListener('input', (e) => {
+        const val = e.target.value;
+        const lastWord = val.split(/\s+/).pop();
+        if (lastWord.startsWith('/')) {
+            filterAndShowPopover(lastWord.substring(1));
+        } else {
+            quickRepliesPopover.style.display = 'none';
+        }
+    });
+
+    messageInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            quickRepliesPopover.style.display = 'none';
+        }
+    });
+}

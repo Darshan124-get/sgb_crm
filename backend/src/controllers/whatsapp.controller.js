@@ -2,6 +2,7 @@ const whatsappService = require('../services/whatsapp.service');
 const messageService = require('../services/message.service');
 const logger = require('../utils/whatsappLogger');
 const { normalizePhone, formatForWhatsApp } = require('../utils/phoneUtils');
+const pool = require('../config/db');
 
 /**
  * Handles Meta/WhatsApp Webhook Verification (GET)
@@ -204,6 +205,47 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+const getQuickReplies = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM whatsapp_quick_replies ORDER BY shortcut ASC');
+    res.json(rows);
+  } catch (err) {
+    logger.error('Error fetching quick replies:', err.message);
+    res.status(500).json({ error: 'Failed to fetch quick replies' });
+  }
+};
+
+const saveQuickReply = async (req, res) => {
+  try {
+    const { id, shortcut, message } = req.body;
+    if (!shortcut || !message) {
+      return res.status(400).json({ error: 'Shortcut and message are required' });
+    }
+    
+    if (id) {
+      await pool.query('UPDATE whatsapp_quick_replies SET shortcut=?, message=? WHERE id=?', [shortcut, message, id]);
+      res.json({ id, shortcut, message });
+    } else {
+      const [result] = await pool.query('INSERT INTO whatsapp_quick_replies (shortcut, message) VALUES (?, ?) ON DUPLICATE KEY UPDATE message=VALUES(message)', [shortcut, message]);
+      res.json({ id: result.insertId, shortcut, message });
+    }
+  } catch (err) {
+    logger.error('Error saving quick reply:', err.message);
+    res.status(500).json({ error: 'Failed to save quick reply' });
+  }
+};
+
+const deleteQuickReply = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM whatsapp_quick_replies WHERE id=?', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Error deleting quick reply:', err.message);
+    res.status(500).json({ error: 'Failed to delete quick reply' });
+  }
+};
+
 module.exports = {
   verifyWebhook,
   receiveMessage,
@@ -211,5 +253,8 @@ module.exports = {
   getHistory,
   sendReply,
   getMedia,
-  deleteMessage
+  deleteMessage,
+  getQuickReplies,
+  saveQuickReply,
+  deleteQuickReply
 };

@@ -190,6 +190,9 @@ exports.createLead = async (req, res) => {
             await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [assignedTo]);
         }
 
+        const combinedAddress = [city, district, state, pincode].filter(Boolean).join(', ');
+        const finalAddress = address || combinedAddress || null;
+
         const [result] = await connection.query(
             `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -198,7 +201,7 @@ exports.createLead = async (req, res) => {
                 customer_name || null, 
                 first_message || null, 
                 language || 'EN', 
-                address || null, 
+                finalAddress, 
                 city || null, 
                 state || null, 
                 district || null, 
@@ -252,6 +255,14 @@ exports.updateLead = async (req, res) => {
         const finalStatus = status || currentLead.status;
         const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
+        const finalCity = city !== undefined ? city : currentLead.city;
+        const finalState = state !== undefined ? state : currentLead.state;
+        const finalDistrict = district !== undefined ? district : currentLead.district;
+        const finalPincode = pincode !== undefined ? pincode : currentLead.pincode;
+        
+        const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
+        const finalAddress = address !== undefined ? address : combinedAddress;
+
         await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
@@ -264,11 +275,11 @@ exports.updateLead = async (req, res) => {
                 customer_name || currentLead.customer_name, 
                 first_message || currentLead.first_message, 
                 language || currentLead.language,
-                address || currentLead.address, 
-                city || currentLead.city, 
-                state || currentLead.state, 
-                district !== undefined ? district : currentLead.district, 
-                pincode !== undefined ? pincode : currentLead.pincode, 
+                finalAddress, 
+                finalCity, 
+                finalState, 
+                finalDistrict, 
+                finalPincode, 
                 finalStatus, 
                 finalAssignedTo,
                 score || currentLead.score || 'cold', 

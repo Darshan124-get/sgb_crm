@@ -32,7 +32,19 @@
         <!-- Sidebar: Conversations List -->
         <aside class="chat-sidebar">
             <header class="sidebar-header">
-                <h2>Conversations</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Conversations</h2>
+                    <div class="whatsapp-dropdown" style="position: relative;">
+                        <button id="sidebar-menu-btn" style="background: none; border: none; color: #8696a0; font-size: 1.2rem; cursor: pointer; padding: 5px 10px;">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div id="sidebar-menu-content" style="display: none; position: absolute; right: 0; top: 100%; background: #233138; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 6px; z-index: 100; min-width: 180px; padding: 8px 0; border: 1px solid rgba(255,255,255,0.1);">
+                            <a href="#" style="display: block; padding: 12px 20px; color: #d1d7db; text-decoration: none; font-size: 0.95rem; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#182229'" onmouseout="this.style.backgroundColor='transparent'">New Group</a>
+                            <a href="#" style="display: block; padding: 12px 20px; color: #d1d7db; text-decoration: none; font-size: 0.95rem; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#182229'" onmouseout="this.style.backgroundColor='transparent'">Starred messages</a>
+                            <a href="#" id="menu-quick-replies" style="display: block; padding: 12px 20px; color: #d1d7db; text-decoration: none; font-size: 0.95rem; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#182229'" onmouseout="this.style.backgroundColor='transparent'">Quick Replies</a>
+                        </div>
+                    </div>
+                </div>
                 <div class="search-box" style="margin-top: 15px; position: relative;">
                     <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #8696a0;"></i>
                     <input type="text" id="customer-search" placeholder="Search conversations..." 
@@ -89,13 +101,24 @@
                     <!-- Messages will appear here -->
                 </div>
 
-                <footer class="chat-footer">
+                <footer class="chat-footer" style="position: relative;">
+                    <!-- Quick Replies Popover -->
+                    <div id="quick-replies-popover" style="position: absolute; bottom: 100%; left: 0; right: 0; max-height: 300px; background-color: #233138; border-radius: 8px 8px 0 0; box-shadow: 0 -4px 15px rgba(0,0,0,0.3); overflow-y: auto; z-index: 1000; display: none; margin: 0 15px;">
+                        <div style="padding: 12px 20px; border-bottom: 1px solid #111b21; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #233138;">
+                            <span style="color: #e9edef; font-weight: 600; font-size: 0.95rem;">Quick Replies</span>
+                            <button id="qr-popover-edit-btn" style="background: none; border: none; color: var(--whatsapp-green); cursor: pointer; font-size: 0.9rem;">Edit</button>
+                        </div>
+                        <div id="qr-popover-list" style="display: flex; flex-direction: column;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
                     <div class="input-container">
                         <button id="attach-btn" style="background: none; border: none; color: #8696a0; font-size: 1.3rem; cursor: pointer; padding: 5px;">
                             <i class="fas fa-paperclip"></i>
                         </button>
                         <input type="file" id="media-input" class="hidden">
-                        <input type="text" id="message-input" placeholder="Type a message...">
+                        <textarea id="message-input" placeholder="Type a message..." rows="1" style="resize: none; font-family: inherit; width: 100%; border: none; outline: none; background: #2a3942; color: #d1d7db; padding: 12px 15px; border-radius: 8px; margin: 0 10px; max-height: 100px; overflow-y: auto;"></textarea>
                         <button id="send-btn" class="send-btn">
                             <i class="fas fa-paper-plane"></i>
                         </button>
@@ -286,6 +309,56 @@
                     <!-- Populated by JS -->
                 </div>
             </div>
+            <div class="modal-footer">
+                <button id="confirm-transfer-btn" class="btn-primary" disabled>Transfer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Replies Manager Modal -->
+    <div id="qr-manager-modal" class="modal hidden" style="z-index: 2000;">
+        <div class="whatsapp-modal-content" style="background: var(--whatsapp-bg); color: var(--whatsapp-text); border: 1px solid var(--whatsapp-border); width: 500px;">
+            <div class="modal-header" style="background: var(--whatsapp-header); border-bottom: 1px solid var(--whatsapp-border);">
+                <h3 style="color: var(--whatsapp-text);">Quick Replies</h3>
+                <button id="close-qr-manager-btn" style="color: var(--whatsapp-secondary);"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <!-- List View -->
+            <div id="qr-list-view" class="modal-body" style="padding: 0; display: flex; flex-direction: column; max-height: 400px;">
+                <div style="padding: 15px 20px; border-bottom: 1px solid var(--whatsapp-border); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.9rem; color: var(--whatsapp-secondary);">Your replies</span>
+                    <button id="qr-add-new-btn" style="background: var(--whatsapp-green); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i class="fas fa-plus"></i></button>
+                </div>
+                <div id="qr-manager-list" style="overflow-y: auto; flex: 1;">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Add/Edit View -->
+            <div id="qr-edit-view" class="modal-body hidden" style="padding: 20px;">
+                <input type="hidden" id="qr-edit-index" value="-1">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Shortcut</label>
+                    <div style="display: flex; align-items: center; border-bottom: 2px solid var(--whatsapp-green);">
+                        <span style="color: var(--whatsapp-secondary); font-size: 1.1rem; margin-right: 5px;">/</span>
+                        <input type="text" id="qr-edit-shortcut" placeholder="word" style="background: transparent; border: none; padding: 10px 0; font-size: 1rem; flex: 1; outline: none; margin-bottom: 0;">
+                    </div>
+                    <small style="color: var(--whatsapp-secondary); font-size: 0.75rem; display: block; margin-top: 5px;">A word that will quickly retrieve this reply</small>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Reply message</label>
+                    <textarea id="qr-edit-message" placeholder="Enter text..." style="width: 100%; background: transparent; border: none; border-bottom: 2px solid var(--whatsapp-green); color: var(--whatsapp-text); padding: 10px 0; font-size: 1rem; outline: none; resize: none; min-height: 80px;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+                    <button id="qr-delete-btn" style="background: none; border: none; color: #ef4444; font-weight: 600; cursor: pointer; font-size: 0.9rem;" class="hidden">Delete</button>
+                    <div style="margin-left: auto; display: flex; gap: 15px;">
+                        <button id="qr-cancel-edit-btn" style="background: none; border: none; color: var(--whatsapp-secondary); font-weight: 600; cursor: pointer; font-size: 0.9rem;">CANCEL</button>
+                        <button id="qr-save-btn" style="background: none; border: none; color: var(--whatsapp-green); font-weight: 600; cursor: pointer; font-size: 0.9rem;">SAVE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
             <div class="modal-footer">
                 <button id="confirm-transfer-btn" class="btn-primary" disabled>Transfer</button>

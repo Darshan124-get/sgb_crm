@@ -74,6 +74,22 @@ const cancelEditBtn = document.getElementById('cancel-edit-btn');
 // Header Actions (Already declared above)
 
 /**
+ * Navigate back to Lead Details page
+ */
+function goToLeadDetails() {
+    if (!activeCustomer || !activeCustomer.lead_id) {
+        window.showAlert('Error', 'No lead selected', 'error');
+        return;
+    }
+    const user = window.getCurrentUser();
+    const role = (user.role || '').toLowerCase();
+    const basePath = (role === 'admin' || role === 'super-admin')
+        ? `${window.ROOT_PATH}modules/admin/leads.html`
+        : `${window.ROOT_PATH}modules/sales/leads.html`;
+    window.location.href = `${basePath}?leadId=${activeCustomer.lead_id}`;
+}
+
+/**
  * Initialize
  */
 document.addEventListener('DOMContentLoaded', () => {
@@ -235,8 +251,24 @@ function renderCustomerList() {
         const scoreClass = (customer.score || 'cold').toLowerCase();
         const scoreLabel = customer.score ? customer.score.toUpperCase() : '';
 
+        // 24h window remaining badge
+        let windowBadge = '';
+        const inboundTs = customer.last_inbound_at || customer.last_message_at;
+        if (inboundTs) {
+            const remaining = (24 * 60 * 60 * 1000) - (Date.now() - new Date(inboundTs).getTime());
+            if (remaining > 0) {
+                const hrs = Math.ceil(remaining / (60 * 60 * 1000));
+                windowBadge = `<span class="window-badge window-open">${hrs}h</span>`;
+            } else {
+                windowBadge = `<span class="window-badge window-closed-badge">✕</span>`;
+            }
+        }
+
         item.innerHTML = `
-            <div class="avatar" style="background-color: ${color}">${initials}</div>
+            <div class="avatar-wrap">
+                <div class="avatar" style="background-color: ${color}">${initials}</div>
+                ${windowBadge}
+            </div>
             <div class="customer-meta">
                 <div class="customer-meta-header">
                     <h3>${displayName}</h3>
@@ -293,6 +325,9 @@ async function selectCustomer(customer) {
     displayLanguageEl.innerText = customer.language || '-';
     assignedToEl.innerText = customer.assigned_name || 'Unassigned';
 
+    // 24h Window Badge
+    update24hWindow(customer);
+
     // Highlight active item
     document.querySelectorAll('.customer-item').forEach(el => {
         if (el.dataset.phone === customer.phone) el.classList.add('active');
@@ -301,6 +336,74 @@ async function selectCustomer(customer) {
 
     await loadChatHistory(customer.phone);
 }
+
+// ── 24h Window Timer ──────────────────────────────────────────────────────────
+let _windowTimerInterval = null;
+
+function update24hWindow(customer) {
+    const badge     = document.getElementById('wa-window-badge');
+    const openEl    = document.getElementById('wa-window-open');
+    const closedEl  = document.getElementById('wa-window-closed');
+    const countdown = document.getElementById('wa-window-countdown');
+    const bar       = document.getElementById('wa-window-bar');
+
+    if (!badge) return;
+
+    // Clear any previous timer
+    if (_windowTimerInterval) { clearInterval(_windowTimerInterval); _windowTimerInterval = null; }
+
+    const lastInbound = customer.last_inbound_at || customer.last_message_at;
+    badge.style.display = 'block';
+
+    if (!lastInbound) {
+        // No messages yet — window is closed
+        openEl.style.display   = 'none';
+        closedEl.style.display = 'block';
+        return;
+    }
+
+    const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours in ms
+
+    function tick() {
+        const now       = Date.now();
+        const lastTime  = new Date(lastInbound).getTime();
+        const remaining = WINDOW_MS - (now - lastTime);
+
+        if (remaining <= 0) {
+            // Window closed
+            clearInterval(_windowTimerInterval);
+            openEl.style.display   = 'none';
+            closedEl.style.display = 'block';
+            return;
+        }
+
+        // Window still open
+        openEl.style.display   = 'block';
+        closedEl.style.display = 'none';
+
+        // Format HH:MM:SS
+        const totalSecs = Math.floor(remaining / 1000);
+        const h = Math.floor(totalSecs / 3600);
+        const m = Math.floor((totalSecs % 3600) / 60);
+        const s = totalSecs % 60;
+        if (countdown) countdown.textContent =
+            `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+        // Progress bar — goes from 100% → 0% over 24h
+        if (bar) {
+            const pct = Math.max(0, (remaining / WINDOW_MS) * 100);
+            bar.style.width = pct + '%';
+            // Color shifts: green → yellow → red as time runs out
+            if (pct > 50)      bar.style.background = 'linear-gradient(90deg,#10b981,#34d399)';
+            else if (pct > 20) bar.style.background = 'linear-gradient(90deg,#f59e0b,#fbbf24)';
+            else               bar.style.background = 'linear-gradient(90deg,#ef4444,#f87171)';
+        }
+    }
+
+    tick(); // run immediately
+    _windowTimerInterval = setInterval(tick, 1000);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Populate Edit Form
@@ -313,6 +416,12 @@ function populateEditForm() {
     editStateInput.value = activeCustomer.state || '';
     editPincodeInput.value = activeCustomer.pincode || '';
     editLangInput.value = activeCustomer.language || 'EN';
+    
+    // Check for edit-crop and edit-acreage if they exist (they might not be defined at the top yet, so query them)
+    const cropInput = document.getElementById('edit-crop');
+    const acreageInput = document.getElementById('edit-acreage');
+    if(cropInput) cropInput.value = activeCustomer.current_crop || '';
+    if(acreageInput) acreageInput.value = activeCustomer.acreage || '';
 }
 
 /**
@@ -321,13 +430,18 @@ function populateEditForm() {
 async function handleSaveDetails() {
     if (!activeCustomer) return;
 
+    const cropInput = document.getElementById('edit-crop');
+    const acreageInput = document.getElementById('edit-acreage');
+
     const payload = {
         customer_name: editNameInput.value.trim(),
         village_city: editCityInput.value.trim(),
         district: editDistrictInput.value.trim(),
         state: editStateInput.value.trim(),
         pincode: editPincodeInput.value.trim(),
-        language: editLangInput.value
+        language: editLangInput.value,
+        current_crop: cropInput ? cropInput.value.trim() : '',
+        acreage: acreageInput ? (acreageInput.value ? parseFloat(acreageInput.value) : null) : null
     };
 
     try {

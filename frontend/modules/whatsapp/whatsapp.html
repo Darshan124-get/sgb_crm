@@ -110,7 +110,29 @@
                 <div id="details-avatar" class="lg-avatar" style="background-color: #00a884;">?</div>
                 <h2 id="details-name">Loading...</h2>
                 <p id="details-phone">...</p>
-                <div style="margin-top: 15px;">
+
+                <!-- 24h Window Timer -->
+                <div id="wa-window-badge" style="display:none; margin-top: 10px;">
+                    <div id="wa-window-open" style="display:none; background: linear-gradient(135deg, #064e3b, #065f46); border: 1px solid #10b981; border-radius: 10px; padding: 8px 12px; font-size: 0.78rem;">
+                        <div style="display:flex; align-items:center; gap:6px; color:#34d399; font-weight:600; margin-bottom:3px;">
+                            <i class="fas fa-circle" style="font-size:0.5rem; animation: pulse-green 1.5s infinite;"></i>
+                            24h Window Open
+                        </div>
+                        <div style="color:#6ee7b7; font-size:0.75rem;">Closes in: <span id="wa-window-countdown" style="font-weight:700; color:#fff;">--:--:--</span></div>
+                        <div id="wa-window-bar-wrap" style="margin-top:5px; background:#064e3b; border-radius:4px; overflow:hidden; height:4px;">
+                            <div id="wa-window-bar" style="height:4px; background: linear-gradient(90deg,#10b981,#34d399); border-radius:4px; transition: width 1s linear; width:100%;"></div>
+                        </div>
+                    </div>
+                    <div id="wa-window-closed" style="display:none; background: linear-gradient(135deg, #450a0a, #7f1d1d); border: 1px solid #ef4444; border-radius: 10px; padding: 8px 12px; font-size: 0.78rem;">
+                        <div style="display:flex; align-items:center; gap:6px; color:#f87171; font-weight:600;">
+                            <i class="fas fa-circle" style="font-size:0.5rem;"></i>
+                            24h Window Closed
+                        </div>
+                        <div style="color:#fca5a5; margin-top:2px; font-size:0.72rem;">Customer must message first to reopen</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px;">
                     <a href="#" id="view-more-toggle" style="color: var(--whatsapp-green); font-size: 0.9rem; text-decoration: none;">View More Details <i class="fas fa-chevron-down"></i></a>
                 </div>
             </div>
@@ -168,6 +190,16 @@
                             <option value="TE">Telugu</option>
                         </select>
                     </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                        <div class="form-group">
+                            <label>Current Crop</label>
+                            <input type="text" id="edit-crop" placeholder="e.g. Tomato">
+                        </div>
+                        <div class="form-group">
+                            <label>Acreage</label>
+                            <input type="number" step="0.1" id="edit-acreage" placeholder="e.g. 2.5">
+                        </div>
+                    </div>
                     <div class="form-actions" style="margin-top: 15px; display: flex; gap: 10px;">
                         <button id="save-details-btn" class="save-btn" style="flex: 1;">Save Changes</button>
                         <button id="cancel-edit-btn" class="cancel-btn" style="flex: 1;">Cancel</button>
@@ -185,6 +217,28 @@
                     <span class="label">Source:</span>
                     <span class="value">WhatsApp</span>
                 </div>
+            </div>
+
+            <!-- Back to Lead Button -->
+            <div class="details-section" style="padding: 15px;">
+                <button id="back-to-lead-btn" onclick="goToLeadDetails()" style="
+                    width: 100%;
+                    padding: 10px 16px;
+                    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: opacity 0.2s, transform 0.15s;
+                ">
+                    <i class="fas fa-arrow-left"></i> Back to Lead
+                </button>
             </div>
         </aside>
     </div>

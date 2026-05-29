@@ -26,6 +26,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (Fixes express-rate-limit X-Forwarded-For error)
 
 // Security & Performance Middleware
 app.use(helmet({

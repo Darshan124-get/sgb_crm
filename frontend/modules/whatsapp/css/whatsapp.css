@@ -925,3 +925,40 @@
 .message-outgoing .message-sender {
     color: #d1f4cc; /* Lighter green for outgoing sender name */
 }
+
+/* 24h Window Badge on Avatar */
+.avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.window-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 0.55rem;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 6px;
+    line-height: 1.2;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.window-badge.window-open {
+    background: #065f46;
+    color: #34d399;
+    border: 1px solid #10b981;
+}
+
+.window-badge.window-closed-badge {
+    background: #7f1d1d;
+    color: #f87171;
+    border: 1px solid #ef4444;
+}
+
+/* 24h Window Timer Animation */
+@keyframes pulse-green {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}

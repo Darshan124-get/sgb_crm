@@ -284,7 +284,7 @@ exports.updateLead = async (req, res) => {
         );
 
         // Sync lead_followups if date changed
-        if (next_followup_date && next_followup_date !== oldFollowupDate) {
+        if (next_followup_date && next_followup_date !== currentLead.next_followup_date) {
             // Check if there's already a pending followup
             const [existing] = await connection.query('SELECT followup_id FROM lead_followups WHERE lead_id = ? AND status = "pending"', [req.params.id]);
             if (existing.length > 0) {

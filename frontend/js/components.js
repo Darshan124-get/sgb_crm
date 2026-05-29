@@ -120,7 +120,7 @@ function initSidebar(links) {
     // ── Mobile Sidebar Logic ──
     const sidebar = document.querySelector('.sidebar');
     let overlay = document.getElementById('sidebar-overlay');
-    
+
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'sidebar-overlay';
@@ -212,6 +212,13 @@ function initLeadNav() {
     updateLeadStats();
     const todayTab = document.querySelector('.nav-tab[data-filter="today"]') || document.querySelector('.nav-tab[data-filter="all"]');
     if (todayTab) todayTab.click();
+
+    // Auto-open lead details if ?leadId= is in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const deepLinkLeadId = urlParams.get('leadId');
+    if (deepLinkLeadId) {
+        setTimeout(() => viewLeadDetails(parseInt(deepLinkLeadId)), 600);
+    }
 }
 
 // ─── Lead List Renderer ───────────────────────────────────────
@@ -301,17 +308,39 @@ async function initLeadList(filters = {}) {
                 (lead.call_count === 2 ? '<span class="call-tag tag-2">2nd Call</span>' :
                     (lead.call_count === 1 ? '<span class="call-tag tag-1">1st Call</span>' : ''));
 
+            let dateHtml = '';
+            if (lead.next_followup_date) {
+                const fuDate = new Date(lead.next_followup_date);
+                const d = fuDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                const t = fuDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                
+                // Smart color based on due date
+                const diffHrs = (fuDate - new Date()) / (1000 * 60 * 60);
+                let colorClass = '#10b981'; // Green (future)
+                let icon = '📅';
+                if (diffHrs < 0) { colorClass = '#ef4444'; icon = '⚠'; } // Red (overdue)
+                else if (diffHrs < 24) { colorClass = '#f59e0b'; icon = '🔴'; } // Orange (due soon)
+
+                dateHtml = `<div style="font-size:0.75rem;font-weight:700;color:${colorClass};text-transform:uppercase;margin-bottom:2px;">${icon} Follow-up</div>
+                            <div style="font-size:0.85rem;font-weight:600;color:#1e293b;white-space:nowrap;">${d}</div>
+                            <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">${t}</div>`;
+            } else {
+                dateHtml = `<div style="font-size:0.75rem;font-weight:600;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Added</div>
+                            <div style="font-size:0.85rem;font-weight:600;color:#1e293b;white-space:nowrap;">${date}</div>
+                            <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">${time}</div>`;
+            }
+
             return `
             <tr onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
-                <td><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
+                <td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
                 <td><div class="name-cell"><div class="name-initial">${nameInitial}</div>${lead.customer_name || 'Unknown'} ${callTag}</div></td>
                 <td><span class="${statusClass}">${lead.status}</span></td>
-                <td><span class="badge-score ${scoreClass}">${lead.score || 'COLD'}</span></td>
+                <td><span class="badge-score ${scoreClass}">${(lead.score || 'COLD').toUpperCase() === 'WARM' ? 'MILD' : (lead.score || 'COLD').toUpperCase()}</span></td>
                 <td>${lead.state || '-'}</td>
                 <td><span class="language-tag">${lead.language || 'EN'}</span></td>
                 <td onclick="event.stopPropagation()"><a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat"><i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}</a></td>
                 <td><div class="msg-trunk" title="${lead.first_message || ''}">${lead.first_message || '-'}</div></td>
-                <td><div style="font-size:0.85rem;font-weight:600;color:#1e293b;white-space:nowrap;">${date}</div><div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">${time}</div></td>
+                <td>${dateHtml}</td>
                 <td>${lead.assigned_to_name || 'Unassigned'}</td>
             </tr>`;
         }).join('');
@@ -589,10 +618,11 @@ async function populateLeadDetails(leadId) {
             // ── Follow-up Card ──
             const fDate = document.getElementById('leadDetailFollowupDate');
             const fAction = document.getElementById('leadDetailFollowupAction');
-            if (lead.next_followup_date) {
-                const dateObj = new Date(lead.next_followup_date);
+            if (lead.next_followup_date || lead.next_followup) {
+                const followupDate = lead.next_followup_date || (lead.next_followup ? lead.next_followup.followup_date : null);
+                const dateObj = new Date(followupDate);
                 if (fDate) fDate.textContent = dateObj.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-                if (fAction) fAction.textContent = "Scheduled call";
+                if (fAction) fAction.textContent = (lead.next_followup && lead.next_followup.remarks) ? lead.next_followup.remarks : "Scheduled call";
             } else {
                 if (fDate) fDate.textContent = "No Schedule";
                 if (fAction) fAction.textContent = "No pending action";
@@ -745,11 +775,15 @@ window.saveLeadSection = async function (sectionId) {
         payload.district = document.getElementById('editDistrict').value;
         payload.pincode = document.getElementById('editPincode').value;
         payload.language = document.getElementById('editLanguage').value;
+        
+        const cropEl = document.getElementById('editCrop');
+        if(cropEl) payload.current_crop = cropEl.value;
+        
+        const acreEl = document.getElementById('editAcreage');
+        if(acreEl) payload.acreage = acreEl.value ? parseFloat(acreEl.value) : null;
     } else if (sectionId === 'requirementSection') {
-        payload.current_crop = document.getElementById('editCrop').value;
-        payload.acreage = document.getElementById('editAcreage').value;
         // Interests might need a specialized endpoint or array formatting
-        payload.interests_raw = document.getElementById('editInterest').value;
+        payload.interests_raw = document.getElementById('editInterest') ? document.getElementById('editInterest').value : '';
     } else if (sectionId === 'salesSection') {
         payload.status = document.getElementById('editSaleStatus').value;
         payload.feedback = document.getElementById('editFeedback').value;
@@ -781,7 +815,7 @@ window.rescheduleCallFromDetails = function () {
         <div style="padding: 1rem;">
             <div class="form-group">
                 <label>Next Call Date & Time</label>
-                <input type="datetime-local" id="rescheduleDate" class="form-control-premium" style="width: 100%;">
+                <input type="text" id="rescheduleDate" class="form-control-premium flatpickr-input" style="width: 100%;" placeholder="Select Date & Time">
             </div>
             <div class="form-group" style="margin-top: 1rem;">
                 <label>Reason / Note</label>
@@ -794,6 +828,22 @@ window.rescheduleCallFromDetails = function () {
         </div>
     `;
     window.showModal({ title: 'Reschedule Follow-up', content, hideFooter: true });
+    
+    setTimeout(() => {
+        if (typeof flatpickr !== 'undefined') {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(10, 0, 0, 0);
+            flatpickr("#rescheduleDate", {
+                enableTime: true,
+                dateFormat: "Y-m-d\\TH:i",
+                altInput: true,
+                altFormat: "d M Y h:i K",
+                minDate: tomorrow,
+                defaultDate: tomorrow
+            });
+        }
+    }, 50);
 };
 
 window.performReschedule = async function (leadId) {
@@ -811,15 +861,25 @@ window.performReschedule = async function (leadId) {
         });
 
         // 2. Update the lead's next followup date and status
-        await fetch(`${API_URL}/leads/${leadId}`, {
+        const response = await fetch(`${API_URL}/leads/${leadId}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ next_followup_date: date, status: 'callback' })
+            body: JSON.stringify({ next_followup_date: date, status: 'followup' })
         });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Failed to update schedule');
+        }
 
         window.hideModal();
         populateLeadDetails(leadId);
         window.showAlert("Scheduled", "Callback successfully scheduled.", "success");
+        if (typeof window.initLeadList === 'function') {
+            window.initLeadList(window.currentFilters || window.currentBaseFilters || {});
+        } else if (typeof initLeadList === 'function') {
+            initLeadList(window.currentFilters || window.currentBaseFilters || {});
+        }
     } catch (err) {
         window.showAlert("Error", "Failed to save schedule.", "error");
     }
@@ -941,10 +1001,10 @@ window.changeAssigneeFromDetails = async function () {
                 <select id="singleStaffSelect" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <option value="">Select Staff Member...</option>
                     ${users.map(u => {
-                        const langMap = { EN: 'English', HI: 'Hindi', KA: 'Kannada', KN: 'Kannada', TN: 'Tamil', TA: 'Tamil', TE: 'Telugu', ML: 'Malayalam', MR: 'Marathi' };
-                        const langs = u.language ? u.language.split(',').map(l => langMap[l.trim()] || l.trim()).join(', ') : 'General';
-                        return `<option value="${u.user_id}">${u.name} (${langs})</option>`;
-                    }).join('')}
+            const langMap = { EN: 'English', HI: 'Hindi', KA: 'Kannada', KN: 'Kannada', TN: 'Tamil', TA: 'Tamil', TE: 'Telugu', ML: 'Malayalam', MR: 'Marathi' };
+            const langs = u.language ? u.language.split(',').map(l => langMap[l.trim()] || l.trim()).join(', ') : 'General';
+            return `<option value="${u.user_id}">${u.name} (${langs})</option>`;
+        }).join('')}
                 </select>
                 <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
                     <button onclick="performSingleAssign(${leadId})" class="btn" style="flex: 2; background: #059669; color: white;">Confirm Change</button>

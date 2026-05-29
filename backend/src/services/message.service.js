@@ -247,6 +247,7 @@ const getAllChatCustomers = async (user = null) => {
     let query = `
       SELECT l.*, l.phone_number AS phone, u.name AS assigned_name,
        MAX(cm.timestamp) as last_message_at,
+       MAX(CASE WHEN cm.sender_type = 'user' THEN cm.timestamp ELSE NULL END) as last_inbound_at,
        (SELECT message FROM chat_messages WHERE session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = l.lead_id) ORDER BY timestamp DESC LIMIT 1) as last_message
        FROM leads l
        LEFT JOIN chat_sessions cs ON l.lead_id = cs.lead_id

@@ -4,6 +4,49 @@
 
 // Global logic for Dynamic Sales Decision Engine
 
+window.initFlatpickrForDecisionEngine = function() {
+    if (typeof flatpickr === 'undefined') {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+        document.head.appendChild(css);
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+        script.onload = () => {
+            window.applyFlatpickrToFields();
+        };
+        document.head.appendChild(script);
+    } else {
+        window.applyFlatpickrToFields();
+    }
+};
+
+window.applyFlatpickrToFields = function() {
+    if (typeof flatpickr === 'undefined') return;
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+
+    const config = {
+        enableTime: true,
+        dateFormat: "Y-m-d\\TH:i",
+        altInput: true,
+        altFormat: "d-m-Y h:i K", // 12-hour AM/PM with date
+        minDate: tomorrow, // Disables today and previous days
+        defaultDate: tomorrow // Defaults to tomorrow at 10:00 AM
+    };
+
+    flatpickr("#de-followup-date", config);
+    flatpickr("#de-nc-date", config);
+    flatpickr("#m-de-followup-date", config);
+    flatpickr("#m-de-nc-date", config);
+};
+
+// Initialize flatpickr script on load
+window.initFlatpickrForDecisionEngine();
+
 document.addEventListener('DOMContentLoaded', () => {
     // We bind events later because modal might be loaded dynamically via components.js
     // We'll rely on an observer or simple delegation for static listeners.
@@ -258,6 +301,10 @@ window.handleLeadConversionModal = function () {
     modal.classList.add('active');
     document.body.classList.add('modal-open');
     console.log("Modal activated.");
+    if (window.applyFlatpickrToFields) window.applyFlatpickrToFields();
+    
+    // Initialize flatpickr fields
+    if (window.applyFlatpickrToFields) window.applyFlatpickrToFields();
 }
 
 function closeDecisionEngine() {
@@ -690,7 +737,7 @@ async function submitDecisionEngine() {
 
         if (leadPath === 'not_connected') {
             updatePayload.next_followup_date = document.getElementById('de-nc-date').value;
-        } else if (['Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
+        } else if (['interested', 'followup', 'dealer', 'Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
             updatePayload.next_followup_date = document.getElementById('de-followup-date').value;
         }
         const updateRes = await fetch(`${window.API_URL}/leads/${leadId}`, {

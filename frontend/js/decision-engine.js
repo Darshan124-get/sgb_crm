@@ -357,7 +357,9 @@ function handleCallStatusChange(status) {
 
     if (status === 'Received' || status === 'Booked') {
         leadPath = (status === 'Booked') ? 'quick_order' : 'connected';
-    } else if (['Not Received', 'Switched Off', 'Busy', 'Not Reachable', 'Not Interested', 'WhatsApp'].includes(status)) {
+    } else if (status === 'Not Interested') {
+        leadPath = 'not_interested';
+    } else if (['Not Received', 'Switched Off', 'Busy', 'Not Reachable', 'WhatsApp'].includes(status)) {
         leadPath = 'not_connected';
     }
 
@@ -463,6 +465,16 @@ function deNextStep(targetStep) {
             document.getElementById('de-sales-status-container').style.display = 'block';
             document.getElementById('de-sales-status').value = 'Ordered';
             handleSalesStatusChange('Ordered');
+        } else if (leadPath === 'not_interested') {
+            // Not Interested -> Skip Customer, go to Decision and auto-select
+            hideAllSubforms();
+            targetStep = 3;
+            document.getElementById('de-sales-status-container').style.display = 'block';
+            const salesStatusSelect = document.getElementById('de-sales-status');
+            if (salesStatusSelect) {
+                salesStatusSelect.value = 'not_interested';
+                handleSalesStatusChange('not_interested');
+            }
         } else if (leadPath === 'not_connected') {
             // Not connected -> Skip to Form directly
             hideAllSubforms();
@@ -906,6 +918,8 @@ function mHandleCallStatusChange(status) {
         mLeadPath = 'normal';
     } else if (status === 'Booked') {
         mLeadPath = 'quick_order';
+    } else if (status === 'Not Interested') {
+        mLeadPath = 'not_interested';
     } else {
         mLeadPath = 'not_connected';
     }
@@ -971,6 +985,16 @@ function mDeNextStep(targetStep) {
             if (salesStatusInput) {
                 salesStatusInput.value = 'Ordered';
                 mHandleSalesStatusChange('Ordered');
+            }
+            targetStep = 3; // Decision
+        } else if (mLeadPath === 'not_interested') {
+            mHideAllSubforms();
+            const statusContainer = document.getElementById('m-de-sales-status-container');
+            if (statusContainer) statusContainer.classList.remove('hidden');
+            const salesStatusInput = document.getElementById('m-de-sales-status');
+            if (salesStatusInput) {
+                salesStatusInput.value = 'Cold/Not Interested';
+                mHandleSalesStatusChange('Cold/Not Interested');
             }
             targetStep = 3; // Decision
         } else if (mLeadPath === 'not_connected') {

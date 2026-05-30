@@ -68,15 +68,15 @@ const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
  */
 const sendMediaMessage = async (to, mediaId, type, caption = '') => {
   try {
+    const mediaObj = mediaId.startsWith('http') ? { link: mediaId } : { id: mediaId };
+    if (caption) mediaObj.caption = caption;
+    
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to,
       type: type, // 'image', 'document', 'video', 'audio'
-      [type]: { 
-        id: mediaId,
-        ...(caption ? { caption } : {})
-      },
+      [type]: mediaObj,
     };
 
     const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {

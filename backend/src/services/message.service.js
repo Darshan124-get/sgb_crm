@@ -138,7 +138,7 @@ const logInteraction = async (phoneInput, action, data = {}) => {
 /**
  * Logs a message to the chat history (linked to CRM chat_sessions)
  */
-const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null) => {
+const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent') => {
   const phone = normalizePhone(phoneInput);
   try {
     // 1. Get Lead ID
@@ -159,12 +159,13 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     // 3. Log Message
     const sender_type = (direction === 'incoming') ? 'user' : 'admin';
     
-    // Handle Supabase Upload
     let mediaUrl = null;
-    let buffer = mediaData;
+    let buffer = null;
     
     if (mediaData) {
-      if (typeof mediaData === 'string' && mediaData.startsWith('data:')) {
+      if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
+        mediaUrl = mediaData;
+      } else if (typeof mediaData === 'string' && mediaData.startsWith('data:')) {
         buffer = Buffer.from(mediaData.split(',')[1], 'base64');
       }
 
@@ -196,8 +197,8 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     }
 
     await db.execute(
-      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message, media_data, media_url, mime_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      mapParams([session_id, sender_type, senderId, body, (mediaUrl ? null : buffer), mediaUrl, mimeType])
+      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message, media_data, media_url, mime_type, message_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      mapParams([session_id, sender_type, senderId, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status])
     );
   } catch (err) {
     logger.error('Chat logging error:', err);
@@ -279,6 +280,19 @@ const deleteChatMessage = async (chatId) => {
   await db.execute('DELETE FROM chat_messages WHERE chat_id = ?', [chatId]);
 };
 
+/**
+ * Updates the delivery/read status of an outgoing message
+ */
+const updateMessageStatus = async (messageId, status) => {
+  try {
+    // Only update if it's a valid progression (e.g. sent -> delivered -> read)
+    // Or just let WhatsApp's webhook order dictate it for simplicity.
+    await db.execute('UPDATE chat_messages SET status = ? WHERE message_id = ?', [status, messageId]);
+  } catch (err) {
+    logger.error('Message status update error:', err.message);
+  }
+};
+
 module.exports = {
   storeMessageAsLead,
   getSession,
@@ -289,5 +303,6 @@ module.exports = {
   logChatMessage,
   getChatHistory,
   getAllChatCustomers,
-  deleteChatMessage
+  deleteChatMessage,
+  updateMessageStatus
 };

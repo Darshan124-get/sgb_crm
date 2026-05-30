@@ -283,7 +283,6 @@
     box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
     color: #e9edef;
     line-height: 1.4;
-    white-space: pre-wrap;
 }
 
 .message-content {
@@ -316,6 +315,20 @@
     border-radius: 6px;
     margin-bottom: 5px;
     cursor: pointer;
+}
+
+.message.has-media {
+    padding: 4px;
+}
+
+.message.has-media .message-content {
+    padding: 2px 8px 4px 8px;
+}
+
+.message.has-media .message-time {
+    padding-right: 8px;
+    padding-bottom: 4px;
+    margin-top: 0;
 }
 
 /* Input Footer */
@@ -850,11 +863,6 @@
 
 .message-actions:hover {
     color: #ef4444;
-}
-
-.message-outgoing .message-actions {
-    right: auto;
-    left: 5px;
 }
 
 /* Media Styling in Chat */

@@ -37,6 +37,20 @@ const receiveMessage = async (req, res) => {
     for (const entry of body.entry) {
       for (const change of (entry.changes || [])) {
         const value = change.value;
+        
+        // Handle message statuses (sent, delivered, read)
+        if (value.statuses) {
+          for (const statusObj of value.statuses) {
+            const { id, status } = statusObj;
+            try {
+              await messageService.updateMessageStatus(id, status);
+              logger.info(`Message ${id} status updated to ${status}`);
+            } catch (err) {
+              logger.error(`Failed to update message status for ${id}:`, err.message);
+            }
+          }
+        }
+
         if (!value.messages) continue;
 
         for (const msg of value.messages) {
@@ -131,28 +145,37 @@ const sendReply = async (req, res) => {
   try {
     // 1. Handle Media Sending
     if (mediaData) {
-      // Convert Base64 to Buffer
-      const base64Data = mediaData.split(',')[1];
-      const buffer = Buffer.from(base64Data, 'base64');
-      // Upload to Meta
-      const category = mimeType.startsWith('image') ? 'image' : 
-                       mimeType.startsWith('video') ? 'video' :
-                       mimeType.startsWith('audio') ? 'audio' : 'document';
+      const category = mimeType && mimeType.startsWith('image') ? 'image' : 
+                       mimeType && mimeType.startsWith('video') ? 'video' :
+                       mimeType && mimeType.startsWith('audio') ? 'audio' : 'document';
+                       
+      let mediaId;
+      if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
+        mediaId = mediaData;
+      } else {
+        // Convert Base64 to Buffer
+        const base64Data = mediaData.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        mediaId = await whatsappService.uploadMedia(buffer, mimeType, category, message || 'file');
+      }
       
-      const mediaId = await whatsappService.uploadMedia(buffer, mimeType, category, message || 'file');
-      
-      // Send to Customer (Use formatted number for Meta)
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message);
+      const metaResponse = await whatsappService.sendMediaMessage(waPhone, mediaId, category, message);
+      console.log('MEDIA META RESPONSE:', JSON.stringify(metaResponse));
+      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
+      console.log('MEDIA META MESSAGE ID:', metaMessageId);
       
       // Log to local Chat History (Use normalized number for DB)
-      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', category, message || '', mediaData, mimeType, req.user.id);
+      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', category, message || '', mediaData, mimeType, req.user.id, metaMessageId, 'sent');
     } 
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMessage(waPhone, message);
-      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id);
+      const metaResponse = await whatsappService.sendMessage(waPhone, message);
+      logger.info('TEXT META RESPONSE:', metaResponse);
+      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
+      logger.info('TEXT META MESSAGE ID:', metaMessageId);
+      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id, metaMessageId, 'sent');
     }
     
     res.json({ success: true });
@@ -217,17 +240,76 @@ const getQuickReplies = async (req, res) => {
 
 const saveQuickReply = async (req, res) => {
   try {
-    const { id, shortcut, message } = req.body;
-    if (!shortcut || !message) {
-      return res.status(400).json({ error: 'Shortcut and message are required' });
+    const { id, shortcut, message, mediaData, mimeType } = req.body;
+    if (!shortcut) {
+      return res.status(400).json({ error: 'Shortcut is required' });
     }
     
+    let mediaUrl = null;
+    let mediaType = null;
+
+    if (mediaData) {
+      const supabase = require('../config/supabase');
+      const dataArray = Array.isArray(mediaData) ? mediaData : [mediaData];
+      const typeArray = Array.isArray(mimeType) ? mimeType : [mimeType];
+      
+      let uploadedUrls = [];
+      let mappedTypes = [];
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const mData = dataArray[i];
+        const mType = typeArray[i] || 'application/octet-stream';
+        
+        if (mData.startsWith('http')) {
+          uploadedUrls.push(mData);
+          mappedTypes.push(mType.startsWith('image') ? 'image' : 
+                     mType.startsWith('video') ? 'video' :
+                     mType.startsWith('audio') ? 'audio' : 'document');
+          continue;
+        }
+
+        const buffer = Buffer.from(mData.split(',')[1], 'base64');
+        const extension = mType ? mType.split('/')[1] : 'bin';
+        const fileName = `quick-replies/${Date.now()}-${shortcut}-${i}.${extension}`;
+
+        const { error } = await supabase.storage
+          .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
+          .upload(fileName, buffer, {
+            contentType: mType,
+            upsert: true
+          });
+
+        if (error) {
+          logger.error('Supabase upload error in quick replies:', error.message);
+          throw error;
+        }
+        
+        const { data: urlData } = supabase.storage
+          .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
+          .getPublicUrl(fileName);
+          
+        uploadedUrls.push(urlData.publicUrl);
+        mappedTypes.push(mType.startsWith('image') ? 'image' : 
+                    mType.startsWith('video') ? 'video' :
+                    mType.startsWith('audio') ? 'audio' : 'document');
+      }
+
+      mediaUrl = JSON.stringify(uploadedUrls);
+      mediaType = JSON.stringify(mappedTypes);
+    }
+
     if (id) {
-      await pool.query('UPDATE whatsapp_quick_replies SET shortcut=?, message=? WHERE id=?', [shortcut, message, id]);
-      res.json({ id, shortcut, message });
+      if (mediaData) {
+        await pool.query('UPDATE whatsapp_quick_replies SET shortcut=?, message=?, media_url=?, media_type=? WHERE id=?', [shortcut, message, mediaUrl, mediaType, id]);
+        res.json({ id, shortcut, message, media_url: mediaUrl, media_type: mediaType });
+      } else {
+        await pool.query('UPDATE whatsapp_quick_replies SET shortcut=?, message=? WHERE id=?', [shortcut, message, id]);
+        const [rows] = await pool.query('SELECT * FROM whatsapp_quick_replies WHERE id=?', [id]);
+        res.json(rows[0]);
+      }
     } else {
-      const [result] = await pool.query('INSERT INTO whatsapp_quick_replies (shortcut, message) VALUES (?, ?) ON DUPLICATE KEY UPDATE message=VALUES(message)', [shortcut, message]);
-      res.json({ id: result.insertId, shortcut, message });
+      const [result] = await pool.query('INSERT INTO whatsapp_quick_replies (shortcut, message, media_url, media_type) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE message=VALUES(message), media_url=VALUES(media_url), media_type=VALUES(media_type)', [shortcut, message, mediaUrl, mediaType]);
+      res.json({ id: result.insertId, shortcut, message, media_url: mediaUrl, media_type: mediaType });
     }
   } catch (err) {
     logger.error('Error saving quick reply:', err.message);

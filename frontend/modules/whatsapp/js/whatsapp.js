@@ -618,7 +618,7 @@ async function handleTransfer() {
  */
 async function loadChatHistory(phone, isPolling = false) {
     try {
-        const response = await fetch(`${API_BASE}/history/${phone}`, { headers: AUTH_HEADER });
+        const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: AUTH_HEADER });
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
         const history = await response.json();
         if (isPolling && JSON.stringify(history) === JSON.stringify(currentHistory)) return;
@@ -870,7 +870,8 @@ function renderMessages(history) {
             let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
             let mediaUrl = msg.media_url || proxyUrl;
 
-            if (msg.mime_type.startsWith('image/')) {
+            if (msg.mime_type.startsWith('image')) {
+                msgEl.classList.add('has-media');
                 contentHtml = `
                     <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
                         <img src="${mediaUrl}" alt="Attachment" 
@@ -878,20 +879,21 @@ function renderMessages(history) {
                              onerror="if(this.src !== '${proxyUrl}') { console.log('Supabase load failed, falling back to proxy'); this.src='${proxyUrl}'; } else { this.src='https://placehold.co/200?text=Image+Not+Available'; }">
                         ${msg.body && msg.body !== 'Sent a image' && !msg.body.includes('http') ? `<div class="message-content">${msg.body}</div>` : ''}
                     </div>`;
-            } else if (msg.mime_type.startsWith('video/')) {
+            } else if (msg.mime_type.startsWith('video')) {
+                msgEl.classList.add('has-media');
                 contentHtml = `
                     <div class="message-media">
                         <video controls style="max-width: 100%; border-radius: 8px;">
-                            <source src="${mediaUrl}" type="${msg.mime_type}">
+                            <source src="${mediaUrl}" type="${msg.mime_type === 'video' ? 'video/mp4' : msg.mime_type}">
                             Your browser does not support the video tag.
                         </video>
                         ${msg.body && !msg.body.includes('http') ? `<div class="message-content">${msg.body}</div>` : ''}
                     </div>`;
-            } else if (msg.mime_type.startsWith('audio/')) {
+            } else if (msg.mime_type.startsWith('audio')) {
                 contentHtml = `
                     <div class="message-media" style="padding: 10px; background: #202c33; border-radius: 8px;">
                         <audio controls style="width: 100%;">
-                            <source src="${mediaUrl}" type="${msg.mime_type}">
+                            <source src="${mediaUrl}" type="${msg.mime_type === 'audio' ? 'audio/mpeg' : msg.mime_type}">
                         </audio>
                     </div>`;
             } else {
@@ -907,9 +909,21 @@ function renderMessages(history) {
             contentHtml = `<div class="message-content">${msg.body || '(Empty message)'}</div>`;
         }
 
-        const tickHtml = msg.direction === 'outgoing' 
-            ? `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #53bdeb;"></i>` 
-            : '';
+        let tickHtml = '';
+        if (msg.direction === 'outgoing') {
+            if (msg.status === 'sent') {
+                tickHtml = `<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+            } else if (msg.status === 'delivered') {
+                tickHtml = `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+            } else if (msg.status === 'read') {
+                tickHtml = `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #53bdeb;"></i>`;
+            } else if (msg.status === 'failed') {
+                tickHtml = `<i class="fas fa-exclamation-circle" style="margin-left: 5px; font-size: 0.75rem; color: #ef4444;"></i>`;
+            } else {
+                // Default fallback
+                tickHtml = `<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+            }
+        }
 
         msgEl.innerHTML = `
             ${actionsHtml}
@@ -1058,6 +1072,11 @@ const qrEditIndex = document.getElementById('qr-edit-index');
 const qrEditShortcut = document.getElementById('qr-edit-shortcut');
 const qrEditMessage = document.getElementById('qr-edit-message');
 const menuQuickReplies = document.getElementById('menu-quick-replies');
+const qrEditMedia = document.getElementById('qr-edit-media');
+const qrEditMediaBtn = document.getElementById('qr-edit-media-btn');
+const qrEditMediaName = document.getElementById('qr-edit-media-name');
+const qrEditMediaRemove = document.getElementById('qr-edit-media-remove');
+let qrSelectedFiles = [];
 
 const quickRepliesPopover = document.getElementById('quick-replies-popover');
 const qrPopoverList = document.getElementById('qr-popover-list');
@@ -1144,7 +1163,9 @@ function renderQrManagerList() {
         item.style.position = 'relative';
         item.innerHTML = `
             <div style="font-weight: 600; font-size: 1rem; margin-bottom: 5px;">/${qr.shortcut}</div>
-            <div style="color: var(--whatsapp-secondary); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px;">${qr.message}</div>
+            <div style="color: var(--whatsapp-secondary); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px;">
+                ${qr.media_url && qr.media_url !== '[]' ? '<i class="fas fa-paperclip" style="margin-right: 5px;"></i>' : ''}${qr.message || 'Media Reply'}
+            </div>
             
             <div class="qr-item-menu-btn" style="position: absolute; right: 20px; top: 15px; padding: 5px; color: var(--whatsapp-secondary);">
                 <i class="fas fa-ellipsis-v"></i>
@@ -1201,12 +1222,31 @@ function showQrEdit(index = -1) {
     qrListView.classList.add('hidden');
     qrEditView.classList.remove('hidden');
     qrEditIndex.value = index;
+    qrSelectedFiles = [];
+    if(qrEditMedia) qrEditMedia.value = '';
+    if(qrEditMediaName) qrEditMediaName.innerText = '';
+    if(qrEditMediaRemove) qrEditMediaRemove.classList.add('hidden');
     if (index >= 0) {
         // use the id from db if exists, otherwise index
         qrEditShortcut.dataset.id = quickReplies[index].id || '';
         qrEditShortcut.value = quickReplies[index].shortcut;
         qrEditMessage.value = quickReplies[index].message;
         qrDeleteBtn.classList.remove('hidden');
+        if (quickReplies[index].media_url && quickReplies[index].media_url !== '[]') {
+            let names = [];
+            try {
+                let urls = JSON.parse(quickReplies[index].media_url);
+                if (Array.isArray(urls)) {
+                    names = urls.map(url => url.split('/').pop());
+                } else {
+                    names = [quickReplies[index].media_url.split('/').pop()];
+                }
+            } catch (e) {
+                names = [quickReplies[index].media_url.split('/').pop()];
+            }
+            if(qrEditMediaName) qrEditMediaName.innerText = names.join(', ') || 'Attached Media';
+            if(qrEditMediaRemove) qrEditMediaRemove.classList.remove('hidden');
+        }
     } else {
         qrEditShortcut.dataset.id = '';
         qrEditShortcut.value = '';
@@ -1218,13 +1258,52 @@ function showQrEdit(index = -1) {
 function saveQrEdit() {
     const shortcut = qrEditShortcut.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
     const message = qrEditMessage.value.trim();
-    if (!shortcut || !message) {
-        window.showAlert('Error', 'Shortcut and message are required', 'error');
+    if (!shortcut) {
+        window.showAlert('Error', 'Shortcut is required', 'error');
+        return;
+    }
+    if (!message && qrSelectedFiles.length === 0 && !qrEditMediaName.innerText) {
+        window.showAlert('Error', 'Message or media is required', 'error');
         return;
     }
     
+    if (qrSaveBtn) {
+        qrSaveBtn.disabled = true;
+        qrSaveBtn.innerText = 'SAVING...';
+    }
+
     const id = qrEditShortcut.dataset.id;
-    saveQuickReplyAPI({ id: id || undefined, shortcut, message });
+    
+    const performSave = (mediaData, mimeType) => {
+        saveQuickReplyAPI({ id: id || undefined, shortcut, message, mediaData, mimeType }).finally(() => {
+            if (qrSaveBtn) {
+                qrSaveBtn.disabled = false;
+                qrSaveBtn.innerText = 'SAVE';
+            }
+        });
+    };
+
+    if (qrSelectedFiles.length > 0) {
+        const promises = qrSelectedFiles.map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve({ data: reader.result, type: file.type });
+            });
+        });
+
+        Promise.all(promises).then(results => {
+            const mediaData = results.map(r => r.data);
+            const mimeType = results.map(r => r.type);
+            performSave(mediaData, mimeType);
+        });
+    } else if (!qrEditMediaName.innerText) {
+        // If they removed existing media, send empty arrays
+        performSave([], []);
+    } else {
+        // If they didn't attach new files and didn't remove existing, keep existing media in DB
+        performSave();
+    }
 }
 
 function deleteQrEdit() {
@@ -1255,12 +1334,67 @@ function filterAndShowPopover(searchTerm) {
         item.onmouseout = () => item.style.backgroundColor = 'transparent';
         item.innerHTML = `
             <div style="font-weight: 600; color: #e9edef; font-size: 0.95rem;">/${qr.shortcut}</div>
-            <div style="color: #8696a0; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;">${qr.message}</div>
+            <div style="color: #8696a0; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;">
+                ${qr.media_url && qr.media_url !== '[]' ? '<i class="fas fa-paperclip" style="margin-right: 5px;"></i>' : ''}${qr.message || 'Media Reply'}
+            </div>
         `;
-        item.onclick = () => {
-            messageInputEl.value = qr.message;
-            quickRepliesPopover.style.display = 'none';
-            messageInputEl.focus();
+        item.onclick = async () => {
+            if (qr.media_url && qr.media_url !== '[]') {
+                quickRepliesPopover.style.display = 'none';
+                messageInputEl.value = '';
+                if (!activeCustomer) return;
+                
+                try {
+                    let urls = [];
+                    let types = [];
+                    try {
+                        urls = JSON.parse(qr.media_url);
+                        types = JSON.parse(qr.media_type);
+                        if (!Array.isArray(urls)) {
+                            urls = [qr.media_url];
+                            types = [qr.media_type];
+                        }
+                    } catch(e) {
+                        urls = [qr.media_url];
+                        types = [qr.media_type];
+                    }
+
+                    // Send text message if any
+                    if (qr.message) {
+                        await fetch(`${API_BASE}/send`, {
+                            method: 'POST',
+                            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                phone: activeCustomer.phone, 
+                                message: qr.message
+                            })
+                        });
+                    }
+
+                    // Send media messages individually
+                    for (let i = 0; i < urls.length; i++) {
+                        await fetch(`${API_BASE}/send`, {
+                            method: 'POST',
+                            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                phone: activeCustomer.phone, 
+                                message: '', // Caption
+                                mediaData: urls[i],
+                                mimeType: types[i]
+                            })
+                        });
+                    }
+
+                    loadChatHistory(activeCustomer.phone);
+                } catch (err) {
+                    console.error('Send QR media error:', err);
+                    window.showAlert('Error', 'Failed to send quick reply media', 'error');
+                }
+            } else {
+                messageInputEl.value = qr.message;
+                quickRepliesPopover.style.display = 'none';
+                messageInputEl.focus();
+            }
         };
         qrPopoverList.appendChild(item);
     });
@@ -1283,6 +1417,32 @@ if (qrSaveBtn) qrSaveBtn.onclick = saveQrEdit;
 if (qrDeleteBtn) qrDeleteBtn.onclick = deleteQrEdit;
 if (qrPopoverEditBtn) qrPopoverEditBtn.onclick = openQrManager;
 
+if (qrEditMediaBtn) {
+    qrEditMediaBtn.onclick = (e) => {
+        e.preventDefault();
+        qrEditMedia.click();
+    };
+}
+if (qrEditMedia) {
+    qrEditMedia.onchange = (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            qrSelectedFiles = files;
+            qrEditMediaName.innerText = files.map(f => f.name).join(', ');
+            qrEditMediaRemove.classList.remove('hidden');
+        }
+    };
+}
+if (qrEditMediaRemove) {
+    qrEditMediaRemove.onclick = (e) => {
+        e.preventDefault();
+        qrSelectedFiles = [];
+        qrEditMedia.value = '';
+        qrEditMediaName.innerText = '';
+        qrEditMediaRemove.classList.add('hidden');
+    };
+}
+
 // Trigger popover when typing '/'
 if (messageInputEl) {
     messageInputEl.addEventListener('input', (e) => {
@@ -1298,6 +1458,13 @@ if (messageInputEl) {
     messageInputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             quickRepliesPopover.style.display = 'none';
+        } else if (e.key === 'Enter' && !e.shiftKey && quickRepliesPopover.style.display === 'block') {
+            const firstItem = qrPopoverList.firstElementChild;
+            if (firstItem) {
+                e.preventDefault();
+                e.stopPropagation();
+                firstItem.click();
+            }
         }
-    });
+    }, true);
 }

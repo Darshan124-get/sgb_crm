@@ -95,6 +95,16 @@
 | DELETE | /api/users/:id | ✅ | Admin | ✅ | Delete staff |
 | PATCH | /api/users/:id/password | ✅ | Admin | ✅ | Reset password |
 | GET | /api/users/roles | ✅ | Admin | ⚠️ | Not implemented |
+| **WHATSAPP & WEBHOOKS** |
+| POST | /webhook | ❌ | Public | ✅ | Meta webhook integration |
+| GET/POST | /api/whatsapp/* | ✅ | System | ✅ | WhatsApp service endpoints |
+| **OTHER NEW MODULES** |
+| * | /api/categories | ✅ | Admin | ✅ | Category management |
+| * | /api/inventory | ✅ | Admin | ✅ | Inventory operations |
+| * | /api/settings | ✅ | Admin | ✅ | System settings |
+| * | /api/billing | ✅ | Billing | ✅ | Billing operations |
+| * | /api/schedules | ✅ | Sales | ✅ | Schedule management |
+| * | /api/logs | ✅ | Admin | ✅ | System activity logs |
 
 ---
 
@@ -190,7 +200,6 @@ Or at any step: CANCELLED (Order cancelled)
 |------|----------|--------|-----------------|
 | No Input Validation | CRITICAL | SQL Injection, Data corruption | Add validation middleware |
 | File Upload Unprotected | CRITICAL | Malicious file upload, System compromise | Validate file types, size limits |
-| No Rate Limiting | CRITICAL | Brute force, DDoS attack | Implement rate limiting middleware |
 | JWT Secret Fallback | HIGH | Token forgery if env var missing | Remove fallback, require env var |
 | XSS via localStorage | HIGH | Session hijacking, Data theft | Implement CSRF tokens, HttpOnly cookies |
 | No Logout Endpoint | MEDIUM | Token can't be revoked | Add token blacklist system |
@@ -375,6 +384,6 @@ http://localhost:5000       # After backend started
 
 ---
 
-**Document Generated:** April 11, 2026
-**Version:** 1.0 Complete Analysis
+**Document Generated:** June 2, 2026
+**Version:** 1.1 Updated with WhatsApp & Decision Engine
 **Status:** Ready for Development/Deployment

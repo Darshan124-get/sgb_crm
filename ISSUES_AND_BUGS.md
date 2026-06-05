@@ -15,52 +15,33 @@
 
 ### CRITICAL ISSUES (0️⃣ CRITICAL)
 
-#### 1. No Input Validation on API Endpoints
+#### 1. Insufficient Input Validation & SQL Injection Risk
 **Severity:** CRITICAL  
-**Location:** All controllers (lead.controller.js, order.controller.js, product.controller.js, etc)  
+**Location:** search.controller.js, lead.controller.js, order.controller.js  
 **Description:**
-- No validation on required fields before database insertion
-- Phone number format not validated (accepts any string)
-- Email format not validated
-- Prices/amounts not validated for positive numbers
-- String lengths not validated (buffer overflow risk)
+- Global input sanitization for `LIKE` queries in search controllers is missing, posing an SQL Injection risk.
+- Phone number and email formats not strictly validated everywhere.
+- Prices/amounts not strictly validated for positive numbers.
 
 **Impact:**
-- SQL Injection possible despite parameterized queries (type confusion)
-- Data corruption (invalid formats stored)
-- Business logic broken (negative prices, null amounts)
+- SQL Injection possible via unescaped characters in `LIKE` queries (`%` and `_`).
+- Data corruption (invalid formats stored).
+- Business logic broken (negative prices, null amounts).
 
-**Example - Lead Creation:**
+**Example - Search Controller:**
 ```javascript
-// CURRENT - NO VALIDATION
-exports.createLead = async (req, res) => {
-    const { phone_number, customer_name, first_message, ... } = req.body;
-    // Can contain: phone_number = "abc", customer_name = null, etc
-    await connection.query('INSERT INTO leads ...');
-};
+// CURRENT - VULNERABLE TO WILDCARD INJECTION
+const searchTerm = req.query.q;
+await connection.query('SELECT * FROM leads WHERE customer_name LIKE ?', [`%${searchTerm}%`]);
 
-// NEEDED
-if (!phone_number || !/^\d{10,12}$/.test(phone_number)) {
-    return res.status(400).json({ error: 'Invalid phone format' });
-}
-```
-
-**Example - Order Creation:**
-```javascript
-// CURRENT
-const amount = req.body.advance_amount; // Could be negative or string
-await connection.query('UPDATE orders SET advance_amount = ?', [amount]);
-
-// NEEDED
-if (amount && (isNaN(amount) || amount < 0)) {
-    return res.status(400).json({ error: 'Invalid amount' });
-}
+// NEEDED - ESCAPED WILDCARDS
+const escapedTerm = searchTerm.replace(/[%_]/g, '\\$&');
+await connection.query('SELECT * FROM leads WHERE customer_name LIKE ?', [`%${escapedTerm}%`]);
 ```
 
 **Fix Required:**
-- Add validation middleware
-- Use library like `joi` or `express-validator`
-- Validate all input fields before processing
+- Add global sanitization middleware for search inputs.
+- Use `express-validator` or `joi` to strictly enforce schema for all POST/PUT/PATCH requests.
 
 ---
 
@@ -108,37 +89,13 @@ const upload = multer({
 
 ---
 
-#### 3. No Rate Limiting - Brute Force & DDoS Vulnerable
-**Severity:** CRITICAL  
-**Location:** All routes, especially /api/auth/login  
+#### 3. Rate Limiting & Security Headers
+**Severity:** ✅ RESOLVED (Was: CRITICAL)  
+**Location:** app.js (Global Middleware)  
 **Description:**
-- No request rate limiting on any endpoint
-- Can make unlimited login attempts (brute force possible)
-- Can make unlimited API calls (DDoS possible)
-- No IP-based throttling
-- No user-based throttling
-
-**Impact:**
-- Attacker can crack passwords via brute force
-- System can be DOS'd with rapid requests
-- Denial of service to legitimate users
-
-**Current Code:**
-```javascript
-// No rate limiting middleware
-router.post('/login', authController.login); // Can call 1000x per second
-```
-
-**Fix Required:**
-```javascript
-const rateLimit = require('express-rate-limit');
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts per window
-    message: 'Too many login attempts'
-});
-router.post('/login', loginLimiter, authController.login);
-```
+- **Status:** Fixed. System is no longer vulnerable to basic brute force or DDoS due to lack of rate limiting.
+- **Implementation:** `express-rate-limit` has been applied globally (1000 requests per 15 minutes).
+- **Security Hardening:** `helmet` is active to secure HTTP headers, and `compression` is added for payload optimization.
 
 ---
 
@@ -300,52 +257,21 @@ ALTER TABLE users ADD INDEX idx_email (email);
 
 ---
 
-#### 9. No Logout Endpoint - Token Cannot Be Revoked
+#### 9. No Server-Side Session Revocation / Logout Endpoint
 **Severity:** HIGH (Security)  
-**Location:** auth.routes.js  
+**Location:** auth.routes.js, auth.controller.js  
 **Description:**
-- No logout endpoint to invalidate tokens
-- Token remains valid even after logout button clicked
-- User's token can be used even after logout
-- No token blacklist system
-
-**Current Code:**
-```javascript
-// NO LOGOUT ENDPOINT
-router.post('/login', authController.login);
-router.get('/users', authenticateToken, authController.getUsers);
-// Missing: router.post('/logout', ...)
-```
-
-**Frontend:**
-```javascript
-// Logout just clears localStorage, token still valid on server
-function logout() {
-    localStorage.removeItem('token');
-    window.location.href = 'index.html';
-}
-```
+- No server-side session revocation endpoint exists.
+- Token relies purely on client-side storage cleanup (`localStorage.removeItem`).
+- Token remains valid on the server until its 8-hour expiry is reached.
 
 **Impact:**
-- Session hijacking not mitigated
-- Stolen tokens can't be revoked
-- User can't force logout of other sessions
+- Stolen tokens cannot be revoked before their expiry.
+- Users cannot force a logout of active sessions across multiple devices.
 
 **Fix Required:**
-```javascript
-// Implement token blacklist
-const blacklist = new Set();
-router.post('/logout', (req, res) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    blacklist.add(token);
-    res.json({ message: 'Logged out' });
-});
-
-// Check blacklist in middleware
-if (blacklist.has(token)) {
-    return res.status(401).json({ message: 'Token revoked' });
-}
-```
+- Implement a server-side token blacklist (e.g., using Redis) or migrate to session-based auth.
+- Create a `POST /api/auth/logout` endpoint to add the current token to the invalidation list.
 
 ---
 
@@ -392,65 +318,37 @@ exports.deleteUser = async (req, res) => {
 
 ---
 
-#### 11. No Inventory Reservation - Double Booking Possible
+#### 11. No Atomic Transactions for Inventory Reservation
 **Severity:** HIGH (Business Logic)  
 **Location:** order.controller.js  
 **Description:**
-- When order created, inventory is not reserved
-- Multiple orders can be created for same stock
-- Stock becomes negative after packing
-- Overselling problem
-
-**Current Code:**
-```javascript
-exports.convertLeadToOrder = async (req, res) => {
-    // Order items added to order_items table
-    // ❌ inventory.reserved_stock NOT updated
-    await connection.query(
-        'INSERT INTO order_items (order_id, product_id, quantity, ...)',
-        [orderId, product_id, quantity, ...]
-    );
-    // Should reserve stock here
-};
-```
-
-**Example Scenario:**
-```
-1. 10 units of product A in stock
-2. Order 1: 8 units → Order created (stock not reserved)
-3. Order 2: 5 units → Order created (stock not reserved)
-4. Packing: Orders 1 & 2 packed, but only 10 units available
-5. 1 unit short - customer 2 not fulfilled
-```
+- When an order is created, inventory is not safely reserved using atomic database transactions.
+- Lack of transaction isolation (`BEGIN`, `COMMIT`, `ROLLBACK`) means race conditions can occur.
+- Multiple simultaneous orders can oversell the same stock.
 
 **Impact:**
-- Overselling/double booking
-- Customer dissatisfaction
-- Fulfillment issues
-- Financial losses
+- Overselling/double booking under concurrent load.
+- Fulfillment issues and financial losses.
+- Inconsistent database state if a query fails mid-execution.
 
 **Fix Required:**
+- Transition `order.controller.js` to use formal atomic database transactions for inventory reservation.
+- Example:
 ```javascript
-exports.convertLeadToOrder = async (req, res) => {
-    // Check stock availability
-    for (const item of items) {
-        const [stock] = await connection.query(
-            'SELECT current_stock FROM inventory WHERE product_id = ?',
-            [item.product_id]
-        );
-        if (stock[0].current_stock < item.quantity) {
-            throw new Error('Insufficient stock');
-        }
-    }
-    
-    // Reserve stock
-    for (const item of items) {
-        await connection.query(
-            'UPDATE inventory SET reserved_stock = reserved_stock + ? WHERE product_id = ?',
-            [item.quantity, item.product_id]
-        );
-    }
-};
+const conn = await pool.getConnection();
+await conn.beginTransaction();
+try {
+    // 1. Lock rows for update: SELECT ... FOR UPDATE
+    // 2. Check stock availability
+    // 3. Insert order
+    // 4. Update reserved_stock
+    await conn.commit();
+} catch (error) {
+    await conn.rollback();
+    throw error;
+} finally {
+    conn.release();
+}
 ```
 
 ---
@@ -757,53 +655,64 @@ router.patch('/orders/:id/status', isPacking, updateStatus);
 
 ---
 
-## COMPARISON: CURRENT vs NEEDED
+## NEW FEATURE BACKLOG & ENHANCEMENTS
+
+#### 21. WhatsApp Two-Way Sync
+**Severity:** FEATURE  
+**Location:** /api/whatsapp, frontend/js/whatsapp.js  
+**Description:** Implement direct synchronization of incoming WhatsApp messages to replace the remaining manual tracking components. Webhooks are receiving data, but the frontend needs a real-time websocket/polling sync for two-way chat natively in the CRM.
+
+#### 22. UI/UX: Dark Mode & Mobile Responsiveness
+**Severity:** LOW (UX)  
+**Location:** CSS/Frontend  
+**Description:** Roll out the planned "Dark Mode" and responsive optimizations for mobile users working in the field.
+
+#### 23. System-Wide Audit Trail
+**Severity:** MEDIUM (Compliance)  
+**Location:** Global  
+**Description:** Implement a global `audit_logs` table to track every modification (who, what, when) across all modules (Orders, Leads, Products) for compliance and security forensics.
+
+---
+
+## COMPARISON: CURRENT vs NEEDED (v1.1)
 
 | Aspect | Current | Needed | Gap |
 |--------|---------|--------|-----|
-| Input Validation | None | 100% | CRITICAL |
-| Rate Limiting | None | Implemented | HIGH |
+| Input Validation | Partial (Guarded) | 100% (Strict) | HIGH |
+| Rate Limiting | Implemented | Implemented | ✅ RESOLVED |
+| Security Headers | Implemented | Implemented | ✅ RESOLVED |
 | Pagination | No | Yes (all lists) | HIGH |
 | Database Indexes | 5% | 100% | HIGH |
 | Soft Deletes | No | Yes | MEDIUM |
 | Audit Logging | No | Yes | MEDIUM |
 | CSRF Protection | No | Yes | HIGH |
-| Inventory Reservations | No | Yes | HIGH |
-| Status Transitions | Unrestricted | Restricted | MEDIUM |
+| Inventory Transactions| Non-Atomic | Atomic (ACID) | HIGH |
+| Status Transitions | Dynamic (Sales Engine)| Dynamic (Sales Engine)| ✅ RESOLVED |
 | Error Handling | Basic | Comprehensive | MEDIUM |
-| API Documentation | None | Full OpenAPI | LOW |
-| Unit Tests | None | 80%+ coverage | MEDIUM |
-| Performance Monitoring | None | APM tool | LOW |
+| Session Revocation | No | Yes (Logout Endpoint)| HIGH |
+| Performance Monitoring | None | APM tool / Logging | LOW |
 
 ---
 
 ## IMMEDIATE ACTION ITEMS (Priority Order)
 
-### Week 1
-1. Add input validation on all endpoints (CRITICAL)
-2. Implement rate limiting on login (CRITICAL)
-3. Add pagination to all list endpoints (HIGH)
-4. Create database indexes (HIGH)
+### Phase 1: Security & Stability (Next Sprint)
+1. **Inventory Integrity:** Transition `order.controller.js` to use formal atomic database transactions for inventory reservation. (HIGH)
+2. **Input Sanitization:** Add global sanitization for `LIKE` queries to mitigate SQL injection risks. (CRITICAL)
+3. **Session Management:** Implement a robust JWT invalidation/logout mechanism. (HIGH)
+4. **File Validation:** Implement strict file-type validation on uploaded evidence files. (CRITICAL)
 
-### Week 2  
-5. Implement soft deletes (MEDIUM)
-6. Add inventory reservations (HIGH)
-7. Fix permission controls (MEDIUM)
-8. Implement token blacklist for logout (HIGH)
+### Phase 2: Compliance & Performance
+5. **Audit Trail:** Implement a global `audit_logs` table for all modifications. (MEDIUM)
+6. **WhatsApp Sync:** Finalize two-way real-time sync for WhatsApp messages. (FEATURE)
+7. **Database Indexes:** Add explicit indexes for frequently filtered columns. (HIGH)
+8. **Pagination:** Add pagination to all list API endpoints to prevent OOM errors. (HIGH)
 
-### Week 3
-9. Add audit logging (MEDIUM)
-10. Implement CSRF protection (HIGH)
-11. Add status transition validation (MEDIUM)
-12. Fix auto-assignment logic (MEDIUM)
-
-### Week 4
-13. Update file upload security (CRITICAL)
-14. Add API pagination (HIGH)
-15. Implement error tracking (MEDIUM)
-16. Document all APIs (LOW)
+### Phase 3: UX & Observability
+9. **UI/UX Refinements:** Roll out "Dark Mode" and mobile-responsive UI. (LOW)
+10. **Monitoring Integration:** Integrate a simple APM/logging solution to monitor API performance and rate-limit hits. (LOW)
 
 ---
 
-**Last Updated:** April 11, 2026  
-**Status:** Analysis Complete
+**Last Updated:** June 02, 2026  
+**Status:** Analysis Complete - Production V1.1 Readiness Reviewed

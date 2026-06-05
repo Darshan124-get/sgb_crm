@@ -47,6 +47,8 @@
 │  │                                                                             │             │
 │  └─ src/app.js ──────────────────────────────────────────────────────────────┘             │
 │     ├─ MIDDLEWARE STACK                                                                    │
+│     │  ├─ helmet() & compression()                                                        │
+│     │  ├─ expressRateLimit()                                                              │
 │     │  ├─ cors()                                                                          │
 │     │  ├─ express.json() (50MB limit)                                                    │
 │     │  ├─ express.urlencoded() (50MB limit)                                              │
@@ -56,9 +58,11 @@
 │     └─ ROUTE MOUNTING                                                                    │
 │        ├─ /api/auth         → authRoutes                                                  │
 │        ├─ /api/leads        → leadRoutes     [PRIMARY BUSINESS LOGIC]                      │
+│        ├─ /api/whatsapp     → whatsappRoutes [WHATSAPP INTEGRATION]                        │
+│        ├─ /webhook          → webhookRoutes  [META WEBHOOKS]                               │
+│        ├─ /api/orders       → orderRoutes    [CONVERSION PIPELINE]                        │
 │        ├─ /api/products     → productRoutes                                               │
 │        ├─ /api/dealers      → dealerRoutes                                                │
-│        ├─ /api/orders       → orderRoutes    [CONVERSION PIPELINE]                        │
 │        ├─ /api/logistics    → logisticsRoutes                                             │
 │        ├─ /api/reports      → reportRoutes   [BI]                                         │
 │        ├─ /api/search       → searchRoutes                                                │

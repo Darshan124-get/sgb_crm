@@ -290,6 +290,7 @@ async function initLeadList(filters = {}) {
         });
         if (!response.ok) throw new Error('API Error');
         const leads = await response.json();
+        window.currentLeadsList = leads; // For export
 
         if (!leads || leads.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No leads available.</td></tr>';
@@ -1226,6 +1227,87 @@ window.submitQuickLead = async function () {
         submitBtn.innerHTML = originalHtml;
         submitBtn.disabled = false;
     }
+};
+
+// ─── Export Leads to Excel (CSV) ──────────────────────────────
+window.exportLeadsToExcel = function() {
+    if (!window.currentLeadsList || window.currentLeadsList.length === 0) {
+        if(window.showAlert) {
+            window.showAlert("Export Failed", "No leads available to export.", "info");
+        } else {
+            alert("No leads available to export.");
+        }
+        return;
+    }
+
+    // Determine which leads to export
+    let leadsToExport = window.currentLeadsList;
+    if (window.currentSelectedLeadIds && window.currentSelectedLeadIds.length > 0) {
+        leadsToExport = window.currentLeadsList.filter(lead => window.currentSelectedLeadIds.includes(lead.lead_id));
+    }
+
+    // Define CSV headers
+    const headers = [
+        "Lead ID", "Customer Name", "Phone Number", "Status", "Score", 
+        "State", "District", "City/Village", "Pincode", "Language", 
+        "Crop", "Acreage", "First Message", "Next Follow-up", "Assigned Staff", "Created At"
+    ];
+
+    // Build CSV content
+    let csvContent = headers.join(",") + "\n";
+
+    leadsToExport.forEach(lead => {
+        const row = [
+            lead.lead_id || '',
+            `"${(lead.customer_name || '').replace(/"/g, '""')}"`,
+            `"${lead.phone_number || ''}"`,
+            `"${lead.status || ''}"`,
+            `"${lead.score || ''}"`,
+            `"${(lead.state || '').replace(/"/g, '""')}"`,
+            `"${(lead.district || '').replace(/"/g, '""')}"`,
+            `"${(lead.city || '').replace(/"/g, '""')}"`,
+            `"${lead.pincode || ''}"`,
+            `"${lead.language || ''}"`,
+            `"${(lead.current_crop || '').replace(/"/g, '""')}"`,
+            `"${lead.acreage || ''}"`,
+            `"${(lead.first_message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+            `"${lead.next_followup_date ? new Date(lead.next_followup_date).toLocaleString() : ''}"`,
+            `"${(lead.assigned_to_name || 'Unassigned').replace(/"/g, '""')}"`,
+            `"${lead.created_at ? new Date(lead.created_at).toLocaleString() : ''}"`
+        ];
+        csvContent += row.join(",") + "\n";
+    });
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Get active tab name for filename
+    let tabName = "Leads";
+    const activeTab = document.querySelector('.nav-tab.active');
+    if (activeTab) {
+        const filter = activeTab.getAttribute('data-filter');
+        const nameMap = {
+            open: 'Open_Leads',
+            today: 'Todays_Leads',
+            hot: 'Hot_Leads',
+            followup: 'FollowUps_Mild',
+            lost: 'Lost_Leads',
+            all: 'All_Leads'
+        };
+        tabName = nameMap[filter] || 'Leads';
+    }
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `${tabName}_${dateStr}.csv`;
+
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 function initGlobalSearch() {

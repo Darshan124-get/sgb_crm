@@ -123,9 +123,13 @@ d:\sgb scratch\
         │   ├── schedule.html
         │   ├── settings.html
         │   └── js/                  [Sales Module-Specific Logic]
-        └── shipping/                [Logistics & Shipping Module]
-            ├── shipping.html
-            └── js/shipping.js
+        ├── shipping/                [Logistics & Shipping Module]
+        │   ├── shipping.html
+        │   └── js/shipping.js
+        └── whatsapp/                [WhatsApp Integration Module]
+            ├── whatsapp.html
+            ├── css/whatsapp.css
+            └── js/whatsapp.js
 ```
 
 ---
@@ -142,9 +146,11 @@ d:\sgb scratch\
 | Password Reset | Reset staff password by admin | `PATCH /api/users/:id/password` |
 | User Status | Active/Inactive account status | Login blocked if status='inactive' |
 
-### 3.2 LEAD MANAGEMENT (WhatsApp Integration-Ready)
+### 3.2 LEAD MANAGEMENT & WHATSAPP CRM
 | Feature | Description | API Endpoint |
 |---------|-------------|--------------|
+| WhatsApp Integration | Direct Meta Webhook sync for real-time messaging | `/webhook` and `/api/whatsapp` |
+| Decision Engine | Dynamic UI flow for status, product calculations, and pincode lookup | `frontend/js/decision-engine.js` |
 | Create Lead | Add new lead with phone, customer name, message | `POST /api/leads` |
 | List Leads | View all leads with filters (status, language, assigned_to) | `GET /api/leads?status=new&language=EN` |
 | Lead Details | View single lead with full information | `GET /api/leads/:id` |
@@ -671,7 +677,6 @@ app.use(express.static(...))                // Frontend static files
 | SQL Injection Risk | CRITICAL | search.controller.js | LIKE queries susceptible to injection (though using parameters). |
 | File Upload Unprotected | CRITICAL | logistics.controller.js | Evidence files (payment screenshots) can be uploaded without validation. |
 | Export Files Path Traversal | HIGH | report.controller.js | Excel export path not validated - could be exploited. |
-| Missing Rate Limiting | HIGH | All routes | No rate limiting on login, API endpoints vulnerable to brute force/DDoS. |
 | JWT Secret Hardcoded | HIGH | Multiple controllers | Fallback to 'secret' if env variable missing - hardcoded default. |
 | No API Logging | HIGH | app.js | No request/response logging for audit trail. |
 
@@ -751,7 +756,6 @@ app.use(express.static(...))                // Frontend static files
 | Feature | Priority | Module | Description |
 |---------|----------|--------|-------------|
 | 2FA/MFA | HIGH | Auth | Two-factor authentication for security |
-| WhatsApp API Integration | HIGH | Lead | Direct WhatsApp message sync (currently manual) |
 | Email Notifications | HIGH | All | Email alerts for followups, status changes |
 | SMS Notifications | MEDIUM | Lead | SMS to customers for order status |
 | Google Calendar Sync | MEDIUM | Schedule | Sync followups to calendar |

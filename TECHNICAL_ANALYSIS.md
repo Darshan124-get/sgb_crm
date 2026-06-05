@@ -3,7 +3,7 @@
 **Project Type:** Node.js/Express Backend + Vanilla JavaScript/HTML Frontend  
 **Database:** MySQL  
 **Architecture:** Modular MVC with Role-Based Access Control  
-**Date:** April 11, 2026
+**Date:** June 2, 2026
 
 ---
 
@@ -44,6 +44,8 @@
 ```
 
 ### Middleware Stack (app.js)
+- Helmet & Compression (Security & Optimization)
+- Rate Limiting (1000 req/15 min)
 - CORS enabled
 - JSON parser (50MB limit)
 - URL-encoded parser (50MB limit)
@@ -433,7 +435,8 @@ todayAlerts     = COUNT(followups due today)
 - ✅ Data isolation by role
 - ✅ Transaction support for multi-step operations
 - ✅ Input validation on critical endpoints
-- ❌ No rate limiting (potential enhancement)
+- ✅ Rate limiting (express-rate-limit)
+- ✅ Security Headers (Helmet, Compression)
 - ❌ No input sanitization (SQL injection risk via LIKE in search)
 
 ---

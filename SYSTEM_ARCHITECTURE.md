@@ -40,25 +40,30 @@
 │  │ src/app.js - Express Application Setup                         │  │
 │  │                                                                  │  │
 │  │  Middleware Stack:                                              │  │
-│  │  1. cors()                    - Enable cross-origin requests   │  │
-│  │  2. express.json()            - Parse JSON body (50MB limit)   │  │
-│  │  3. express.urlencoded()      - Parse URL-encoded body        │  │
-│  │  4. express.static()          - Serve static frontend files   │  │
-│  │  5. authenticateToken         - JWT verification (custom)     │  │
-│  │  6. isAdmin / isAdminOrSales  - Role-based authorization      │  │
+│  │  1. helmet() & compression()  - Security & response optimization│  │
+│  │  2. expressRateLimit()        - API rate limiting (1000/15min) │  │
+│  │  3. cors()                    - Enable cross-origin requests   │  │
+│  │  4. express.json()            - Parse JSON body (50MB limit)   │  │
+│  │  5. express.urlencoded()      - Parse URL-encoded body        │  │
+│  │  6. express.static()          - Serve static frontend files   │  │
+│  │  7. authenticateToken         - JWT verification (custom)     │  │
+│  │  8. isAdmin / isAdminOrSales  - Role-based authorization      │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 │  ┌─ Routes Layer ─────────────────────────────────────────────────┐   │
 │  │                                                                 │   │
 │  │  /api/auth          → auth.controller.js (Login, Verify)      │   │
 │  │  /api/leads         → lead.controller.js (CRUD, Assignment)   │   │
+│  │  /webhook           → webhook.routes.js (Meta Webhook)        │   │
+│  │  /api/whatsapp      → whatsapp.controller.js (Meta Messaging) │   │
+│  │  /api/orders        → order.controller.js (Sales Orders)      │   │
 │  │  /api/products      → product.controller.js (Inventory)       │   │
 │  │  /api/dealers       → dealer.controller.js (Retailers)        │   │
-│  │  /api/orders        → order.controller.js (Sales Orders)      │   │
 │  │  /api/logistics     → logistics.controller.js (Pack/Ship)     │   │
 │  │  /api/reports       → report.controller.js (Dashboard, Export)│   │
 │  │  /api/search        → search.controller.js (Global Search)    │   │
 │  │  /api/users         → user.controller.js (Staff Management)   │   │
+│  │  /api/billing,...   → Extra Modular Endpoints                 │   │
 │  │                                                                 │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
@@ -758,7 +763,7 @@ Pagination             None            Yes (limit/offset)
 Database Indexes       5               20+
 Connection Pool        10              20-50
 Caching                None            Redis
-Rate Limiting          None            Implemented
+Rate Limiting          Implemented     Implemented
 Error Logging          Basic           Comprehensive
 Monitoring             None            APM tool
 CDN                    None            CloudFront/Cloudflare
@@ -770,5 +775,5 @@ Unit Test Coverage     0%              80%+
 
 ---
 
-**Document Generated:** April 11, 2026  
+**Document Generated:** June 2, 2026  
 **Status:** Architecture Complete

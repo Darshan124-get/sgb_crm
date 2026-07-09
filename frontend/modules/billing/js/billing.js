@@ -18,431 +18,188 @@ window.openOrderBilling = async function (orderId) {
     }
 }
 
-function renderWorkstation() {
+
+window.copyToClipboard = function(text) {
+    if(!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        if(window.showAlert) {
+            window.showAlert('Copied', 'Text copied to clipboard!', 'success');
+        } else {
+            console.log('Copied to clipboard');
+        }
+    }).catch(err => console.error('Could not copy text: ', err));
+};
+
+window.formatFullAddress = function() {
+    if(!currentOrder) return '';
+    const d = currentOrder;
+    let parts = [];
+    if(d.village) parts.push(d.village);
+    if(d.sub_district || d.taluk) parts.push(d.sub_district || d.taluk);
+    if(d.district || d.city) parts.push(d.district || d.city);
+    if(d.state) parts.push(d.state);
+    
+    let str = parts.join(', ');
+    if(d.pincode) str += ' - ' + d.pincode;
+    if(d.phone) str += ' | Ph: ' + d.phone;
+    return str;
+};
+
+window.renderWorkstation = function() {
     const modalBody = document.getElementById('modalBody');
     const data = currentOrder;
+    
+    const subtotal = data.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    const grandTotal = subtotal - (data.discount || 0) + (data.shipping_charges || 0) + (data.extra_charges || 0);
+    const verifiedTotal = (data.payments || []).reduce((sum, p) => {
+        if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
+        return sum;
+    }, 0);
+    const balanceDue = Math.max(0, grandTotal - verifiedTotal);
+    
+    data.grandTotal = grandTotal;
+    data.balanceDue = balanceDue;
+    data.advance_amount = verifiedTotal;
 
     modalBody.innerHTML = `
-        <div class="workstation-body">
-            <div class="workstation-content">
-                <!-- SECTION 1: CUSTOMER INFO -->
-                <div class="work-section">
-                    <div class="grid-2">
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Customer Name <span style="color:red">*</span></label>
-                            <input type="text" id="billCustomerName" class="form-input" style="height: 38px; font-weight: 700;" value="${data.customer_name || ''}">
-                            
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin: 0.75rem 0 0.5rem 0;">Phone Number <span style="color:red">*</span></label>
-                            <input type="text" id="billCustomerPhone" class="form-input" style="height: 38px;" value="${data.phone || ''}" oninput="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Address <span style="color:red">*</span></label>
-                            <textarea id="billCustomerAddress" class="form-input" style="height: 80px; resize: none; font-size: 0.85rem;" placeholder="Auto-fills from details below...">${data.address || ''}</textarea>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; margin-bottom: 1rem;">
-                                <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Pincode <span style="color:red">*</span></label>
-                                    <input type="text" id="billCustomerPincode" class="form-input" style="height: 38px;" value="${data.pincode || ''}" maxlength="6" oninput="if(typeof fetchPincodeDetails === 'function') fetchPincodeDetails(this.value);">
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">Village</label>
-                                    <select id="billCustomerVillage" class="form-input" style="height: 38px;" onchange="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
-                                        <option value="${data.village || ''}">${data.village || 'Select Village'}</option>
-                                    </select>
-                                </div>
+        <div class="workstation-body" style="padding: 1.5rem; background: #f8fafc; max-height: 80vh; overflow-y: auto;">
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem;">
+                    <h3 style="color: #1e293b; font-weight: 800; margin: 0;">
+                        <i class="fas fa-clipboard-list" style="color: #3b82f6; margin-right: 0.5rem;"></i> Zoho Booking Reference
+                    </h3>
+                    <span style="font-size: 0.8rem; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 0.2rem 0.6rem; border-radius: 4px;">ORDER #${data.order_id}</span>
+                </div>
+                
+                <div class="grid-2" style="gap: 2rem; margin-bottom: 2rem;">
+                    <div>
+                        <div style="margin-bottom: 1rem;">
+                            <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Customer Name</label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.25rem;">
+                                <span style="font-weight: 700; color: #0f172a; font-size: 1.1rem;">${data.customer_name || 'N/A'}</span>
+                                <button onclick="copyToClipboard('${(data.customer_name || '').replace(/'/g, "\\'")}')" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0.5rem;"><i class="fas fa-copy"></i></button>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                                <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">District</label>
-                                    <input type="text" id="billCustomerDistrict" class="form-input" style="height: 38px;" value="${data.district || ''}" oninput="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem;">State <span style="color:red">*</span></label>
-                                    <input type="text" id="billCustomerState" class="form-input" style="height: 38px;" value="${data.state || ''}" oninput="if(typeof autoFormatAddress === 'function') autoFormatAddress()">
-                                </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Phone Number</label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.25rem;">
+                                <span style="font-weight: 700; color: #0f172a; font-size: 1.1rem;">${data.phone || 'N/A'}</span>
+                                <button onclick="copyToClipboard('${data.phone || ''}')" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0.5rem;"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1rem;">
+                            <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Delivery Type</label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.25rem;">
+                                <span style="font-weight: 700; color: #0f172a; font-size: 1.1rem;">${data.dispatch_through || data.delivery_type || 'N/A'}</span>
+                                <button onclick="copyToClipboard('${(data.dispatch_through || data.delivery_type || '').replace(/'/g, "\\'")}')" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0.5rem;"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Complete Address</label>
+                        <div style="background: #f1f5f9; padding: 1.25rem; border-radius: 8px; margin-top: 0.25rem; position: relative; line-height: 1.8;">
+                            <button onclick="copyToClipboard(formatFullAddress())" style="position: absolute; top: 1rem; right: 1rem; background: #e0e7ff; border: none; color: #3730a3; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;"><i class="fas fa-copy"></i> Copy All</button>
+                            
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div><strong style="color:#475569; display:inline-block; width: 90px;">Village:</strong> <span style="font-weight: 600; color:#0f172a;">${data.village || 'N/A'}</span></div>
+                                <button onclick="copyToClipboard('${(data.village || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div><strong style="color:#475569; display:inline-block; width: 90px;">Sub-District:</strong> <span style="font-weight: 600; color:#0f172a;">${data.sub_district || data.taluk || 'N/A'}</span></div>
+                                <button onclick="copyToClipboard('${(data.sub_district || data.taluk || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div><strong style="color:#475569; display:inline-block; width: 90px;">District:</strong> <span style="font-weight: 600; color:#0f172a;">${data.district || data.city || 'N/A'}</span></div>
+                                <button onclick="copyToClipboard('${(data.district || data.city || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div><strong style="color:#475569; display:inline-block; width: 90px;">State:</strong> <span style="font-weight: 600; color:#0f172a;">${data.state || 'N/A'}</span></div>
+                                <button onclick="copyToClipboard('${(data.state || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div><strong style="color:#475569; display:inline-block; width: 90px;">PIN Code:</strong> <span style="font-weight: 600; color:#0f172a;">${data.pincode || 'N/A'}</span></div>
+                                <button onclick="copyToClipboard('${data.pincode || ''}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div><strong style="color:#475569; display:inline-block; width: 90px;">Phone:</strong> <span style="font-weight: 600; color:#0f172a;">${data.phone || 'N/A'}</span></div>
+                                <button onclick="copyToClipboard('${data.phone || ''}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- SECTION 1.5: SHIPPING & BILLING DETAILS -->
-                <div class="work-section">
-                    <div class="grid-3" style="gap: 1rem;">
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Courier Partner <span style="color:red">*</span></label>
-                            <select id="dispatchThroughInput" class="form-input" style="height: 38px;">
-                                <option value="">Select Courier</option>
-                                <option value="Post" ${(data.dispatch_through || data.delivery_type) === 'Post' ? 'selected' : ''}>Post</option>
-                                <option value="VRL" ${(data.dispatch_through || data.delivery_type) === 'VRL' ? 'selected' : ''}>VRL</option>
-                                <option value="Other" ${!['Post', 'VRL'].includes(data.dispatch_through || data.delivery_type) && (data.dispatch_through || data.delivery_type) ? 'selected' : ''}>Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Discount (₹)</label>
-                            <input type="number" id="discountInput" class="form-input" style="height: 38px; font-weight: 700;" value="${data.discount || 0}" onchange="recalculateAll()">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Shipping (₹)</label>
-                            <input type="number" id="shippingInput" class="form-input" style="height: 38px; font-weight: 700;" value="${data.shipping_charges || 0}" onchange="recalculateAll()">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Destination</label>
-                            <input type="text" id="destinationInput" class="form-input" style="height: 38px;" value="${data.destination || data.city || ''}">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Extra Charges (₹)</label>
-                            <input type="number" id="extraChargesInput" class="form-input" style="height: 38px; font-weight: 700;" value="${data.extra_charges || 0}" onchange="recalculateAll()">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size: 0.7rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem;">Delivery Note</label>
-                            <input type="text" id="deliveryNoteInput" class="form-input" style="height: 38px;" value="${data.delivery_note || ''}">
-                        </div>
-                    </div>
-                </div>
+                <h3 style="margin-bottom: 1rem; color: #1e293b; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-box" style="color: #10b981; margin-right: 0.5rem;"></i> Product Details</span>
+                </h3>
 
-                <!-- SECTION 2 & 3: ORDER ITEMS -->
-                <div class="work-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-                        <h4 style="font-size: 0.75rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                            <i class="fas fa-box-open" style="margin-right: 0.5rem;"></i> SECTION 2 & 3: ORDER ITEMS
-                        </h4>
-                        <div style="position: relative; width: 320px;">
-                            <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.8rem;"></i>
-                            <input type="text" class="form-input" style="padding-left: 2.5rem; border-radius: 12px;" placeholder="Add Product..." oninput="searchProducts(this.value)">
-                            <div id="productSearchResults" class="search-results"></div>
-                        </div>
-                    </div>
-                    <table class="edit-table">
-                        <thead>
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem;">
+                    <table class="edit-table" style="margin: 0; width: 100%;">
+                        <thead style="background: #f8fafc;">
                             <tr>
-                                <th>Product Specification</th>
-                                <th style="width: 130px;">Unit Price</th>
-                                <th style="width: 90px; text-align: center;">Qty</th>
-                                <th style="width: 130px; text-align: right;">Total</th>
-                                <th style="width: 50px;"></th>
+                                <th style="padding: 1rem; text-align: left;">Product Name</th>
+                                <th style="width: 120px; text-align: right; padding: 1rem;">Unit Price</th>
+                                <th style="width: 80px; text-align: center; padding: 1rem;">Qty</th>
+                                <th style="width: 120px; text-align: right; padding: 1rem;">Total</th>
                             </tr>
                         </thead>
-                        <tbody id="workstationItems">
-                            ${data.items.map((item, index) => `
-                                <tr data-index="${index}">
-                                    <td>
-                                        <div style="font-weight: 700; color: #1e293b;">${item.product_name}</div>
-                                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">SKU: ${item.sku}</div>
-                                    </td>
-                                    <td>
-                                        <div style="position: relative;">
-                                            <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.8rem;">₹</span>
-                                            <input type="number" class="form-input" style="padding-left: 1.75rem;" value="${item.price}" onchange="updateItem(${index}, 'price', this.value)">
+                        <tbody>
+                            ${data.items.length > 0 ? data.items.map(item => `
+                                <tr style="border-top: 1px solid #e2e8f0;">
+                                    <td style="font-weight: 700; padding: 1rem;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                ${item.product_name}
+                                                <div style="font-size:0.7rem; color:#64748b; font-weight: 600;">SKU: ${item.sku}</div>
+                                            </div>
+                                            <button onclick="copyToClipboard('${(item.product_name || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
                                         </div>
                                     </td>
-                                    <td>
-                                        <input type="number" class="form-input" style="text-align: center;" value="${item.quantity}" onchange="updateItem(${index}, 'quantity', this.value)">
+                                    <td style="text-align: right; font-weight: 600; padding: 1rem;">
+                                        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.5rem;">
+                                            ₹${item.price}
+                                            <button onclick="copyToClipboard('${item.price}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                                        </div>
                                     </td>
-                                    <td style="text-align: right; font-weight: 800; color: #1e293b;">₹${(item.price * item.quantity).toLocaleString()}</td>
-                                    <td>
-                                        <button class="btn-remove" onclick="removeItem(${index})"><i class="fas fa-trash-can"></i></button>
+                                    <td style="text-align: center; font-weight: 800; color: #0f172a; padding: 1rem;">
+                                        <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                                            ${item.quantity}
+                                            <button onclick="copyToClipboard('${item.quantity}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
+                                        </div>
                                     </td>
+                                    <td style="text-align: right; font-weight: 800; color: #0f172a; padding: 1rem;">₹${(item.price * item.quantity).toLocaleString()}</td>
                                 </tr>
-                            `).join('')}
+                            `).join('') : `<tr><td colspan="4" style="text-align:center; padding: 2rem; color: #64748b;">No items found.</td></tr>`}
                         </tbody>
                     </table>
                 </div>
 
-
-            </div>
-
-            <!-- STICKY SUMMARY BAR -->
-            <div class="billing-summary-bar">
-                <div style="display: flex; gap: 3rem;">
-                    <div class="summary-item">
-                        <span class="summary-label">Total Amount</span>
-                        <span id="grandTotalLabel" class="summary-value">₹0.00</span>
+                <div style="display: flex; justify-content: flex-end; gap: 3rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Amount</div>
+                        <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">₹${grandTotal.toLocaleString()}</div>
                     </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Advance Amount</span>
-                        <span id="verifiedPaidLabel" class="summary-value paid">₹0.00</span>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Advance Paid</div>
+                        <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">₹${verifiedTotal.toLocaleString()}</div>
                     </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Due Amount</span>
-                        <span id="balanceDueLabel" class="summary-value due">₹0.00</span>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Due Amount</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">₹${balanceDue.toLocaleString()}</div>
                     </div>
                 </div>
                 
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <button class="btn-billing" style="width: auto; background: transparent; color: #64748b; border: 1px solid #e2e8f0;" onclick="saveOrderDraft()">
-                        SAVE DRAFT
-                    </button>
-                    <button class="btn-bill" id="finalizeBtn" onclick="generateFinalInvoice()">
-                        <i class="fas fa-receipt"></i> BILL ORDER
-                    </button>
-                    <button onclick="closeModal()" style="background:transparent; border:none; color: #94a3b8; font-size: 0.8rem; cursor:pointer; text-decoration: underline;">
-                        Close
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+                    <button onclick="closeModal()" style="padding: 0.75rem 2rem; background: white; color: #64748b; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; cursor: pointer;">Cancel</button>
+                    <button onclick="generateFinalInvoice()" style="padding: 0.75rem 2.5rem; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 6px -1px rgb(59 130 246 / 0.3);">
+                        <i class="fas fa-check-circle" style="margin-right: 0.5rem;"></i> MARK AS BILLED
                     </button>
                 </div>
             </div>
         </div>
     `;
-    recalculateAll();
-}
-
-/** Calculation Engine **/
-function calculateItemsSubtotal() {
-    return currentOrder.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-}
-
-function recalculateAll() {
-    if (!currentOrder) return;
-
-    const subtotal = calculateItemsSubtotal();
-    const discount = parseFloat(document.getElementById('discountInput').value || 0);
-    const shipping = parseFloat(document.getElementById('shippingInput').value || 0);
-    const extra = parseFloat(document.getElementById('extraChargesInput').value || 0);
-
-    // Tax Logic (Removed GST as per request - All items are inclusive)
-    let grandTotal = subtotal - discount + shipping + extra;
-
-    const taxDetails = document.getElementById('taxDetails');
-    if (taxDetails) taxDetails.style.display = 'none';
-    
-    const grandTotalLabel = document.getElementById('grandTotalLabel');
-    if (grandTotalLabel) grandTotalLabel.innerText = `₹${grandTotal.toLocaleString()}`;
-
-    // Financial Summary
-    const verifiedTotal = (currentOrder.payments || []).reduce((sum, p) => {
-        if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
-        return sum;
-    }, 0);
-
-    const balanceDue = Math.max(0, grandTotal - verifiedTotal);
-
-    document.getElementById('verifiedPaidLabel').innerText = `₹${verifiedTotal.toLocaleString()}`;
-    document.getElementById('balanceDueLabel').innerText = `₹${balanceDue.toLocaleString()}`;
-    document.getElementById('balanceDueLabel').style.color = balanceDue > 0 ? '#f87171' : '#10b981';
-
-    const finalizeBtn = document.getElementById('finalizeBtn');
-    if (finalizeBtn) {
-        if (balanceDue > 0) {
-            finalizeBtn.innerHTML = `<i class="fas fa-receipt"></i> BILL ORDER (AWAITING ₹${balanceDue.toLocaleString()})`;
-            finalizeBtn.style.opacity = "0.8";
-        } else {
-            finalizeBtn.innerHTML = `<i class="fas fa-receipt"></i> BILL ORDER`;
-            finalizeBtn.style.opacity = "1";
-        }
-    }
-
-    // Store in state
-    currentOrder.discount = discount;
-    currentOrder.shipping_charges = shipping;
-    currentOrder.extra_charges = extra;
-    currentOrder.grandTotal = grandTotal;
-    currentOrder.balanceDue = balanceDue;
-}
-
-/** Payment Actions **/
-function showAddPaymentForm() {
-    toggleAddPayment(true);
-}
-
-function toggleAddPayment(show) {
-    document.getElementById('addPaymentForm').style.display = show ? 'block' : 'none';
-}
-
-async function submitNewPayment() {
-    const amount = document.getElementById('newPayAmount').value;
-    const mode = document.getElementById('newPayMode').value;
-    const proof = document.getElementById('newPayProof').value;
-
-    if (!amount || amount <= 0) return alert('Please enter a valid amount.');
-
-    try {
-        const res = await fetch(`${BILLING_API_URL}/payments`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                order_id: currentOrder.order_id,
-                amount,
-                mode,
-                type: 'balance_payment',
-                proof_url: proof
-            })
-        });
-
-        if (res.ok) {
-            alert('Payment recorded. Refreshing order...');
-            toggleAddPayment(false);
-            // Refresh full order
-            const refreshed = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
-            currentOrder = await refreshed.json();
-            renderWorkstation();
-        } else {
-            const err = await res.json();
-            alert(err.message);
-        }
-    } catch (err) {
-        alert('Failed to record payment');
-    }
-}
-
-async function verifyGenericPayment(source, id, status) {
-    let url = `${BILLING_API_URL}/payments/${id}/verify`;
-    if (source === 'lead_advance') {
-        url = `${BILLING_API_URL}/payments/lead-advance/${id}/verify`;
-    }
-
-    try {
-        const res = await fetch(url, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status })
-        });
-
-        if (res.ok) {
-            const refreshRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
-            currentOrder = await refreshRes.json();
-            renderWorkstation();
-        } else {
-            const err = await res.json();
-            alert(err.message);
-        }
-    } catch (err) {
-        alert('Verification failed.');
-    }
-}
-
-/** Product Search & Management **/
-let searchTimeout;
-async function searchProducts(q) {
-    const resultsDiv = document.getElementById('productSearchResults');
-    if (q.length < 2) {
-        resultsDiv.style.display = 'none';
-        return;
-    }
-
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-        try {
-            const res = await fetch(`${window.API_URL}/inventory/search?q=${q}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
-            const products = await res.json();
-
-            resultsDiv.innerHTML = products.map(p => `
-                <div class="search-item" onclick="addItemToOrder(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                    <div>
-                        <div style="font-weight: 600;">${p.name}</div>
-                        <div style="font-size: 0.7rem; opacity: 0.6;">SKU: ${p.sku}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-weight: 700;">₹${p.default_price}</div>
-                        <div style="font-size: 0.7rem; color: ${p.current_stock > 0 ? '#10b981' : '#ef4444'}">Stock: ${p.current_stock}</div>
-                    </div>
-                </div>
-            `).join('');
-            resultsDiv.style.display = 'block';
-        } catch (err) {
-            console.error('Search error:', err);
-        }
-    }, 300);
-}
-
-function addItemToOrder(p) {
-    currentOrder.items.push({
-        product_id: p.product_id,
-        product_name: p.name,
-        sku: p.sku,
-        price: p.default_price,
-        hsn_code: p.hsn_code,
-        quantity: 1,
-        available_stock: p.current_stock - p.reserved_stock
-    });
-
-    document.getElementById('productSearchResults').style.display = 'none';
-    renderWorkstation();
-}
-
-function updateItem(index, field, value) {
-    if (field === 'quantity' && value < 1) value = 1;
-    currentOrder.items[index][field] = value;
-    renderWorkstation();
-}
-
-function removeItem(index) {
-    currentOrder.items.splice(index, 1);
-    renderWorkstation();
-}
-
-/** Persistence Actions **/
-async function saveOrderDraft(options = { silent: false }) {
-    try {
-        const orderData = {
-            customer_name: document.getElementById('billCustomerName').value,
-            phone: document.getElementById('billCustomerPhone').value,
-            address: document.getElementById('billCustomerAddress').value,
-            village: document.getElementById('billCustomerVillage').value,
-            district: document.getElementById('billCustomerDistrict').value,
-            pincode: document.getElementById('billCustomerPincode').value,
-            state: document.getElementById('billCustomerState').value,
-            items: currentOrder.items,
-            discount: parseFloat(document.getElementById('discountInput').value) || 0,
-            shipping_charges: parseFloat(document.getElementById('shippingInput').value) || 0,
-            extra_charges: parseFloat(document.getElementById('extraChargesInput').value) || 0,
-            dispatch_through: document.getElementById('dispatchThroughInput').value
-        };
-
-        const orderRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(orderData)
-        });
-
-        if (!orderRes.ok) {
-            const err = await orderRes.json();
-            throw new Error(err.message || 'Failed to save order draft');
-        }
-
-        const invRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/invoice`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                discount: orderData.discount,
-                shipping_charges: orderData.shipping_charges,
-                extra_charges: orderData.extra_charges,
-                tax_type: 'NONE',
-                status: 'draft',
-                delivery_note: document.getElementById('deliveryNoteInput')?.value || '',
-                dispatch_through: orderData.dispatch_through,
-                destination: document.getElementById('destinationInput')?.value || '',
-                payment_terms: document.getElementById('paymentTermsInput')?.value || ''
-            })
-        });
-
-        if (invRes.ok) {
-            if (!options.silent) alert('Draft Saved Successfully.');
-            if (currentTab === 'pending') await loadPendingOrders();
-            else if (currentTab === 'in-review') await loadInReviewOrders();
-        } else {
-            const err = await invRes.json();
-            if (!options.silent) alert('Order saved, but invoice draft failed: ' + err.message);
-        }
-    } catch (err) {
-        alert(err.message || 'Failed to save draft');
-    }
 }
 
 async function verifyPayment(paymentId, status) {
@@ -466,24 +223,11 @@ async function verifyPayment(paymentId, status) {
     }
 }
 
+
 async function generateFinalInvoice() {
-    const customerName = document.getElementById('billCustomerName').value.trim();
-    const phone = document.getElementById('billCustomerPhone').value.trim();
-    const address = document.getElementById('billCustomerAddress').value.trim();
-    const pincode = document.getElementById('billCustomerPincode').value.trim();
-    const state = document.getElementById('billCustomerState').value.trim();
-    const courier = document.getElementById('dispatchThroughInput').value;
-
-    if (!customerName || !phone || !address || !pincode || !state || !courier) {
-        window.showAlert("Mandatory Fields Missing", "Please ensure Name, Phone, Address, Pincode, State, and Courier Partner are all filled before finalizing.", "error");
-        return;
-    }
-
-    if (!confirm("Are you sure you want to finalize this order and send it to packing?")) return;
+    if (!confirm('Are you sure you want to mark this order as Billed and send it to packing?')) return;
 
     try {
-        await saveOrderDraft({ silent: true });
-
         const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/invoice`, {
             method: 'POST',
             headers: {
@@ -497,21 +241,19 @@ async function generateFinalInvoice() {
 
         if (res.ok) {
             const invData = await res.json();
-            // window.open(`invoice.html?id=${invData.invoiceId}`, '_blank'); // REMOVED AS PER REQUEST
-
             closeModal();
             showFinalizeCopyModal(invData.invoiceId);
 
             if (typeof switchTab === 'function') {
-                switchTab('invoices');
+                // switchTab('invoices'); // User requested to disable auto-navigation
             }
             loadInvoices();
         } else {
             const err = await res.json();
-            window.showAlert("Error", err.message || "Failed to generate invoice", "error");
+            window.showAlert('Error', err.message || 'Failed to generate invoice', 'error');
         }
     } catch (err) {
-        window.showAlert("Error", "Invoice generation failed: " + err.message, "error");
+        window.showAlert('Error', 'Invoice generation failed: ' + err.message, 'error');
     }
 }
 
@@ -711,7 +453,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function init() {
     loadSidebar();
-    switchTab('dashboard');
+    
+    // Hash routing
+    const initialHash = window.location.hash.replace('#', '');
+    const validTabs = ['dashboard', 'pending', 'in-review', 'invoices', 'history', 'payments', 'reports', 'customers', 'settings'];
+    const initialTab = validTabs.includes(initialHash) ? initialHash : 'dashboard';
+    
+    switchTab(initialTab);
+    
+    window.addEventListener('hashchange', () => {
+        const newHash = window.location.hash.replace('#', '');
+        if (newHash && validTabs.includes(newHash)) {
+            switchTab(newHash);
+        }
+    });
+
     setupSearch();
 }
 
@@ -766,7 +522,7 @@ async function loadBilledHistory() {
             card.innerHTML = `
                 <div class="history-card-header">
                     <div>
-                        <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${inv.order_customer || 'Guest'}</div>
+                        <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${inv.order_customer || inv.billing_name || 'Guest'}</div>
                         <div style="color: #64748b; font-size: 0.75rem;">Inv #${inv.invoice_number} | ${date}</div>
                     </div>
                     <div class="status-badge" style="background: #dcfce7; color: #166534; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 800;">BILLED</div>
@@ -788,7 +544,10 @@ async function loadBilledHistory() {
                     <button class="btn-copy" style="flex: 1;" onclick="copyFullBillData(${inv.invoice_id}, this)">
                         <i class="fa-solid fa-copy"></i> Copy Full Data
                     </button>
-                    <button class="btn-copy" style="background: #1e293b; color: white; flex: 0 0 45px; justify-content: center;" title="Print Invoice" onclick="window.open('${window.BASE_URL}/api/billing/print-invoice/${inv.invoice_id}', '_blank')">
+                    <button class="btn-copy" style="background: #3b82f6; color: white; flex: 0 0 45px; justify-content: center;" title="View Invoice" onclick="viewInvoice(${inv.invoice_id})">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="btn-copy" style="background: #1e293b; color: white; flex: 0 0 45px; justify-content: center;" title="Print Invoice" onclick="printInvoice(${inv.invoice_id})">
                         <i class="fa-solid fa-print"></i>
                     </button>
                 </div>

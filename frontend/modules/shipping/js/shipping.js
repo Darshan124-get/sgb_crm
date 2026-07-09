@@ -4,7 +4,10 @@ let currentTab = 'pending';
 document.addEventListener('DOMContentLoaded', async () => {
     // Auth Check
     const user = window.getCurrentUser();
-    if (!user || (user.role !== 'shipping' && user.role !== 'shipment')) {
+    const perms = user ? (typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions) : [];
+    const isSuper = user && (user.role === 'admin' || user.role === 'super-admin');
+    
+    if (!user || (!isSuper && !perms.includes('shipping_shipping'))) {
         window.location.href = '../../index.html';
         return;
     }
@@ -19,7 +22,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Initialize Page
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'completed') {
+        switchTab('completed');
+    } else {
+        switchTab('pending');
+    }
+    
     fetchOrders();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', () => {
+        const newHash = window.location.hash.replace('#', '');
+        if (newHash === 'completed' || newHash === 'pending') {
+            switchTab(newHash);
+        }
+    });
 });
 
 async function fetchOrders() {
@@ -58,7 +76,18 @@ function switchTab(tab) {
     
     // UI Update
     document.querySelectorAll('.shipping-tab').forEach(el => el.classList.remove('active'));
-    document.getElementById(`tab-${tab}`).classList.add('active');
+    const tabEl = document.getElementById(`tab-${tab}`);
+    if (tabEl) tabEl.classList.add('active');
+    
+    // Update Sidebar highlight if possible
+    document.querySelectorAll('.sidebar-nav .nav-link').forEach(el => el.classList.remove('active'));
+    if (tab === 'pending') {
+        const nav = document.getElementById('nav-shipping-pending');
+        if (nav) nav.classList.add('active');
+    } else if (tab === 'completed') {
+        const nav = document.getElementById('nav-shipping-completed');
+        if (nav) nav.classList.add('active');
+    }
     
     renderTable();
 }

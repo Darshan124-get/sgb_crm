@@ -45,8 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('username', data.user.name);
 
                     // Role-based redirect to correct module using ROOT_PATH
-                    const role = (data.user.role || '').toLowerCase();
-                    const dest = window.ROLE_REDIRECTS[role] || 'index.html';
+                    const dest = window.getHomeUrl(data.user);
                     window.location.href = `${window.ROOT_PATH}${dest}`;
                 } else {
                     messageDiv.textContent = data.message || 'Login failed';

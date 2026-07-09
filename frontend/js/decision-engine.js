@@ -50,6 +50,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // We bind events later because modal might be loaded dynamically via components.js
     // We'll rely on an observer or simple delegation for static listeners.
 
+    // Auto-save state on any input change within the modal
+    document.body.addEventListener('input', (e) => {
+        if (e.target.closest('#decisionEngineModal')) {
+            if (typeof saveDecisionEngineState === 'function') {
+                saveDecisionEngineState();
+            }
+        }
+    });
+
+    document.body.addEventListener('change', (e) => {
+        if (e.target.closest('#decisionEngineModal')) {
+            if (typeof saveDecisionEngineState === 'function') {
+                saveDecisionEngineState();
+            }
+        }
+    });
+
     // Delegate click event for pill buttons
     document.body.addEventListener('click', (e) => {
         if (e.target.classList.contains('status-pill')) {
@@ -62,16 +79,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Context Detection: Is this inside the Manual Wizard or the Lead Detail Modal?
             const isManual = e.target.closest('.manual-wizard-container') !== null;
-            const inputId = isManual ? 'm-de-call-status' : 'de-call-status';
-            const input = document.getElementById(inputId);
-
-            if (input) {
-                input.value = val;
-                if (isManual) {
-                    mHandleCallStatusChange(val);
-                } else {
-                    handleCallStatusChange(val);
+            
+            if (wrapper && wrapper.id.includes('call-status')) {
+                const inputId = isManual ? 'm-de-call-status' : 'de-call-status';
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.value = val;
+                    if (isManual) mHandleCallStatusChange(val); else handleCallStatusChange(val);
                 }
+                
+                // Auto-advance for Call Status
+                setTimeout(() => {
+                    if (isManual) mGoToStep(2); else deNextStep(2);
+                }, 300);
+                
+            } else if (wrapper && wrapper.id.includes('sales-status')) {
+                const inputId = isManual ? 'm-de-sales-status' : 'de-sales-status';
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.value = val;
+                    if (isManual) mHandleSalesStatusChange(val); else handleSalesStatusChange(val);
+                }
+                
+                // Auto-advance for Sales Status
+                setTimeout(() => {
+                    if (val === 'converted' || val === 'Ordered') {
+                        if (isManual) {
+                           const nextBtn = document.getElementById('m-de-next-3');
+                           if (nextBtn && nextBtn.style.display !== 'none') {
+                               mDeNextStep(4);
+                           }
+                        } else {
+                           deNextStep(4);
+                        }
+                    } else if (val === 'interested' || val === 'Hot/Very Interested') {
+                        document.getElementById(isManual ? 'm-de-form-followup' : 'de-form-followup')?.scrollIntoView({behavior: 'smooth'});
+                    }
+                }, 300);
             }
         }
 
@@ -175,9 +219,40 @@ function toggleOtherDelivery(val, wrapperId) {
 }
 
 
+window.toggleProductSelection = function(element, prefix) {
+    element.classList.toggle('selected');
+    calculateOrderAmounts(prefix);
+};
+
+function getSelectedProducts(prefix = '') {
+    const productContainer = document.getElementById(prefix + 'de-products-container');
+    if (productContainer) {
+        const selectedCards = productContainer.querySelectorAll('.product-select-card.selected');
+        return Array.from(selectedCards).map(card => ({
+            product_id: parseInt(card.getAttribute('data-id')) || card.getAttribute('data-id'),
+            quantity: 1,
+            price: parseFloat(card.getAttribute('data-price')) || 0,
+            name: card.getAttribute('data-name')
+        }));
+    }
+    
+    // Fallback to select
+    const select = document.getElementById(prefix + 'de-products');
+    if (select) {
+        return Array.from(select.selectedOptions).map(opt => ({
+            product_id: parseInt(opt.getAttribute('data-id')) || opt.getAttribute('data-id'),
+            quantity: 1,
+            price: parseFloat(opt.getAttribute('data-price')) || 0,
+            name: opt.value
+        }));
+    }
+    return [];
+}
+
 async function loadProductsForEngine(prefix = '') {
     const productSelect = document.getElementById(prefix + 'de-products');
-    if (!productSelect) return;
+    const productContainer = document.getElementById(prefix + 'de-products-container');
+    if (!productSelect && !productContainer) return;
 
     try {
         const token = localStorage.getItem('token');
@@ -189,11 +264,24 @@ async function loadProductsForEngine(prefix = '') {
             const products = await response.json();
             if (products && products.length > 0) {
                 // IMPORTANT: Using selling_price and name from DB schema
-                productSelect.innerHTML = products.map(p => `
-                    <option value="${p.name}" data-id="${p.product_id}" data-price="${p.selling_price || 0}">
-                        ${p.name} — ₹${p.selling_price || 0}
-                    </option>
-                `).join('');
+                if (productSelect) {
+                    productSelect.innerHTML = products.map(p => `
+                        <option value="${p.name}" data-id="${p.product_id}" data-price="${p.selling_price || 0}">
+                            ${p.name} — ₹${p.selling_price || 0}
+                        </option>
+                    `).join('');
+                }
+                if (productContainer) {
+                    productContainer.innerHTML = products.map(p => `
+                        <div class="product-select-card" data-name="${p.name}" data-id="${p.product_id}" data-price="${p.selling_price || 0}" onclick="toggleProductSelection(this, '${prefix}')">
+                            <div class="product-info">
+                                <div class="product-name">${p.name}</div>
+                                <div class="product-price">₹${p.selling_price || 0}</div>
+                            </div>
+                            <div class="check-indicator"><i class="fas fa-check"></i></div>
+                        </div>
+                    `).join('');
+                }
             }
         }
     } catch (err) {
@@ -202,16 +290,13 @@ async function loadProductsForEngine(prefix = '') {
 }
 
 function calculateOrderAmounts(prefix = '') {
-    const productSelect = document.getElementById(prefix + 'de-products');
-    if (!productSelect) return;
-
     let total = 0;
     let selectedNames = [];
 
-    Array.from(productSelect.selectedOptions).forEach(option => {
-        const price = parseFloat(option.getAttribute('data-price')) || 0;
-        total += price;
-        selectedNames.push(option.value);
+    const items = getSelectedProducts(prefix);
+    items.forEach(item => {
+        total += item.price;
+        selectedNames.push(item.name);
     });
 
     // Update product display list
@@ -228,6 +313,15 @@ function calculateOrderAmounts(prefix = '') {
         if (total > 0 || !totalInput.value) {
             totalInput.value = Math.round(total);
         }
+    }
+
+    const mTotalSpan = document.getElementById(prefix + 'de-summary-total');
+    if (mTotalSpan) {
+        mTotalSpan.textContent = total;
+    }
+    const mCountSpan = document.getElementById(prefix + 'de-summary-count');
+    if (mCountSpan) {
+        mCountSpan.textContent = selectedNames.length;
     }
 
     updateFinalAndDue(prefix);
@@ -330,6 +424,15 @@ window.handleLeadConversionModal = function () {
         document.querySelectorAll('#de-call-attempt-wrapper .status-pill').forEach(pill => {
             pill.classList.toggle('active', pill.getAttribute('data-value') == nextAttempt);
         });
+    }
+
+    // 4.5. Restore state from DB if available
+    if (window.currentLeadData && window.currentLeadData.decision_engine_state) {
+        let stateObj = window.currentLeadData.decision_engine_state;
+        if (typeof stateObj === 'string') {
+            try { stateObj = JSON.parse(stateObj); } catch(e) {}
+        }
+        restoreDecisionEngineState(stateObj);
     }
 
     // 5. Show Modal
@@ -506,6 +609,17 @@ function deNextStep(targetStep) {
             // Normal flow -> go to Step 2
             targetStep = 2;
             document.getElementById('de-sales-status-container').style.display = 'block';
+            
+            // Intelligent Step Jump
+            if (window.currentLeadData && window.currentLeadData.decision_engine_state) {
+                let stateObj = window.currentLeadData.decision_engine_state;
+                if (typeof stateObj === 'string') {
+                    try { stateObj = JSON.parse(stateObj); } catch(e) {}
+                }
+                if (stateObj && stateObj.lastStep && stateObj.lastStep > 2) {
+                    targetStep = stateObj.lastStep;
+                }
+            }
         }
     } else if (currentStep === 2) {
         targetStep = 3;
@@ -559,6 +673,76 @@ function goToStep(step) {
             calculateOrderAmounts();
         }
     }
+
+    // Save state whenever step changes
+    if (step > 1) {
+        saveDecisionEngineState();
+    }
+}
+
+let deSaveTimeout = null;
+async function saveDecisionEngineState() {
+    if (deSaveTimeout) clearTimeout(deSaveTimeout);
+    deSaveTimeout = setTimeout(async () => {
+        const leadId = window.currentViewingLeadId;
+        if (!leadId) return;
+
+        const state = {
+            lastStep: currentStep,
+            fields: {
+                'de-customer-name': document.getElementById('de-customer-name')?.value,
+                'de-village': document.getElementById('de-village')?.value,
+                'de-district': document.getElementById('de-district')?.value,
+                'de-pincode': document.getElementById('de-pincode')?.value,
+                'de-state': document.getElementById('de-state')?.value,
+                'de-language': document.getElementById('de-language')?.value,
+                'de-sales-status': document.getElementById('de-sales-status')?.value,
+                'de-nc-date': document.getElementById('de-nc-date')?.value,
+                'de-nc-attempt': document.getElementById('de-nc-attempt')?.value,
+                'de-lost-reason': document.getElementById('de-lost-reason')?.value,
+                'de-followup-date': document.getElementById('de-followup-date')?.value,
+                'de-feedback-satisfaction': document.getElementById('de-feedback-satisfaction')?.value,
+                'de-current-crop': document.getElementById('de-current-crop')?.value,
+                'de-acreage': document.getElementById('de-acreage')?.value
+            }
+        };
+
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`/api/leads/${leadId}/de-state`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ decision_engine_state: state })
+            });
+            if (window.currentLeadData) {
+                window.currentLeadData.decision_engine_state = state;
+            }
+        } catch (e) {
+            console.error('Failed to save state:', e);
+        }
+    }, 1000);
+}
+
+function restoreDecisionEngineState(state) {
+    if (!state || !state.fields) return false;
+    
+    for (const [id, value] of Object.entries(state.fields)) {
+        const el = document.getElementById(id);
+        if (el && value !== undefined && value !== null && value !== '') {
+            el.value = value;
+            
+            // Re-trigger visual updates for pill grids
+            if (id === 'de-sales-status') {
+                 const pills = document.querySelectorAll('#de-sales-status-wrapper .status-pill');
+                 pills.forEach(p => p.classList.remove('active'));
+                 const target = Array.from(pills).find(p => p.dataset.value === value);
+                 if (target) target.classList.add('active');
+            }
+        }
+    }
+    
+    // We explicitly do not restore de-call-status because they MUST click it fresh on step 1.
+    return state.lastStep;
 }
 
 function resetDecisionEngine() {
@@ -657,14 +841,8 @@ async function submitDecisionEngine() {
         const pincode = document.getElementById('de-pincode').value;
         const state = document.getElementById('de-state').value;
 
-        // 1. Process Order if status is Ordered
         if (salesStatus === 'Ordered' && leadPath !== 'not_connected') {
-            const selectedOptions = Array.from(document.getElementById('de-products').selectedOptions);
-            const items = selectedOptions.map(opt => ({
-                product_id: parseInt(opt.getAttribute('data-id')) || 0,
-                quantity: 1,
-                price: parseFloat(opt.getAttribute('data-price')) || 0
-            }));
+            const items = getSelectedProducts('');
 
             // Frontend Validation
             if (!leadId || leadId === 'undefined') return window.showAlert("Error", "Lead ID is missing. Please refresh.", "error");
@@ -680,6 +858,7 @@ async function submitDecisionEngine() {
             formData.append('customer_name', customerName);
             formData.append('phone', phone);
             formData.append('city', village);
+            formData.append('village', village);
             formData.append('district', district);
             formData.append('pincode', pincode);
             formData.append('state', state);
@@ -809,16 +988,7 @@ async function submitDecisionEngine() {
             const advAmt = cleanNum('de-order-advance') || cleanNum('de-advance-amount');
 
             // Collect items from Step 3
-            const selectedOptions = Array.from(document.getElementById('de-products')?.selectedOptions || []);
-            const items = selectedOptions.map(opt => {
-                const id = opt.value || opt.getAttribute('data-id');
-                const price = parseFloat(opt.getAttribute('data-price')) || 0;
-                return {
-                    product_id: parseInt(id) || id, // Store ID or Code
-                    quantity: 1,
-                    price: price
-                };
-            });
+            const items = getSelectedProducts('');
 
             const deliveryTypeVal = document.getElementById('de-delivery-type').value;
             const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('de-delivery-other').value : deliveryTypeVal;
@@ -829,6 +999,7 @@ async function submitDecisionEngine() {
                 phone: phone,
                 address: village,
                 city: village,
+                village: village,
                 district: district,
                 pincode: pincode,
                 state: state,
@@ -868,6 +1039,19 @@ async function submitDecisionEngine() {
             initLeadList(window.currentFilters || {});
         } else if (typeof window.initLeadList === 'function') {
             window.initLeadList(window.currentFilters || {});
+        }
+
+        // Clear the decision engine state from DB and locally upon successful submission
+        if (leadId) {
+            fetch(`${window.API_URL}/leads/${leadId}/de-state`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision_engine_state: null })
+            }).catch(e => console.error('Failed to clear state', e));
+            
+            if (window.currentLeadData) {
+                window.currentLeadData.decision_engine_state = null;
+            }
         }
 
         closeDecisionEngine();
@@ -1131,15 +1315,8 @@ async function submitManualLeadWizard() {
             body: JSON.stringify({ note })
         });
 
-        // 3. Create Order if Ordered
         if (salesStatus === 'Ordered' && mLeadPath !== 'not_connected') {
-            const productSelect = document.getElementById('m-de-products');
-            const selectedOptions = Array.from(productSelect.selectedOptions);
-            const items = selectedOptions.map(opt => ({
-                product_id: opt.getAttribute('data-id'),
-                quantity: 1,
-                price: parseFloat(opt.getAttribute('data-price')) || 0
-            }));
+            const items = getSelectedProducts('m-');
 
             const deliveryTypeVal = document.getElementById('m-de-delivery-type').value;
             const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('m-de-delivery-other').value : deliveryTypeVal;
@@ -1149,6 +1326,7 @@ async function submitManualLeadWizard() {
             formData.append('customer_name', name);
             formData.append('phone', phone);
             formData.append('city', village);
+            formData.append('village', village);
             formData.append('district', district);
             formData.append('pincode', pincode);
             formData.append('state', state);

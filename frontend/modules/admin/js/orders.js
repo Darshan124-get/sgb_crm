@@ -144,7 +144,7 @@ function openOrderDrawer(orderId) {
                 </div>
                 <div class="info-item" style="grid-column: span 2;">
                     <label>Address</label>
-                    <p>${order.address || '—'}, ${order.city || ''}, ${order.state || ''}</p>
+                    <p>${order.address || '—'}, ${order.village ? order.village + ', ' : ''}${order.district || order.city || ''}, ${order.state || ''} - ${order.pincode || ''}</p>
                 </div>
             </div>
         </div>

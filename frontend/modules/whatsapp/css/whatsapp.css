@@ -48,37 +48,37 @@
 
 .sidebar-tabs {
     display: flex;
-    padding: 0;
+    padding: 10px 15px;
     border-bottom: 1px solid var(--whatsapp-border);
-    justify-content: space-around;
+    justify-content: flex-start;
+    gap: 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.sidebar-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .tab-item {
-    flex: 1;
+    flex: 0 0 auto;
     text-align: center;
-    padding: 12px 0;
+    padding: 6px 16px;
     color: var(--whatsapp-secondary);
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     position: relative;
-    transition: color 0.2s;
+    transition: all 0.2s;
+    border: 1px solid var(--whatsapp-border);
+    border-radius: 20px;
+    background: #202c33;
 }
 
 .tab-item.active {
-    color: var(--whatsapp-green);
-}
-
-.tab-item.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 3px;
-    background-color: var(--whatsapp-green);
+    color: #00a884;
+    background: rgba(0, 168, 132, 0.1);
+    border-color: #00a884;
 }
 
 .customer-list {

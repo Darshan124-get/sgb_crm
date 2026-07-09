@@ -11,7 +11,9 @@ exports.login = async (req, res) => {
 
     try {
         const [rows] = await pool.query(
-            `SELECT u.*, r.name as role_name 
+            `SELECT u.*, r.name as role_name,
+             (SELECT id FROM departments WHERE manager_id = u.user_id LIMIT 1) as managed_dept_id,
+             (SELECT name FROM departments WHERE manager_id = u.user_id LIMIT 1) as managed_dept_name
              FROM users u 
              LEFT JOIN roles r ON u.role_id = r.role_id 
              WHERE u.email = ? OR u.phone = ?`, 
@@ -32,8 +34,55 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid password' });
         }
 
+        const roleName = user.role_name ? user.role_name.toLowerCase() : '';
+        const is_manager = roleName.includes('manager');
+        
+        let deptName = '';
+        let resolved_department_id = user.department_id;
+        
+        if (user.department_id) {
+            const [deptRows] = await pool.query('SELECT name FROM departments WHERE id = ?', [user.department_id]);
+            if (deptRows.length > 0) {
+                deptName = deptRows[0].name.toLowerCase();
+            }
+        }
+
+        // Parse explicit permissions
+        let perms = [];
+        if (typeof user.permissions === 'string') {
+            try { perms = JSON.parse(user.permissions); } catch(e) {}
+        }
+
+        // Add team management permission for managers
+        if (is_manager) {
+            if (!perms.includes('manager_team')) perms.push('manager_team');
+        }
+
+        // Inject default permissions based on Department (for Manager, Executive, Viewer)
+        if (roleName !== 'super-admin' && roleName !== 'admin' && deptName) {
+            if (deptName.includes('sales')) {
+                const salesPerms = ['sales_dashboard', 'sales_lead_management', 'sales_sales_pipeline', 'sales_schedules', 'sales_orders', 'sales_dealers', 'sales_reports', 'sales_activity', 'sales_settings', 'sales_campaigns', 'whatsapp_whatsapp_chats'];
+                salesPerms.forEach(p => { if (!perms.includes(p)) perms.push(p); });
+            } else if (deptName.includes('billing')) {
+                if (!perms.includes('billing_billing')) perms.push('billing_billing');
+            } else if (deptName.includes('packing')) {
+                if (!perms.includes('packing_dashboard')) perms.push('packing_dashboard');
+                if (!perms.includes('packing_packing')) perms.push('packing_packing');
+            } else if (deptName.includes('ship')) {
+                if (!perms.includes('shipping_dashboard')) perms.push('shipping_dashboard');
+                if (!perms.includes('shipping_shipping')) perms.push('shipping_shipping');
+            }
+        }
+
         const token = jwt.sign(
-            { id: user.user_id, name: user.name, role: user.role_name }, 
+            { 
+                id: user.user_id, 
+                name: user.name, 
+                role: user.role_name,
+                department_id: resolved_department_id,
+                is_manager: is_manager,
+                permissions: perms
+            }, 
             JWT_SECRET, 
             { expiresIn: '8h' }
         );
@@ -47,7 +96,10 @@ exports.login = async (req, res) => {
                 id: user.user_id,
                 name: user.name, 
                 role: user.role_name,
-                language: user.language 
+                language: user.language,
+                permissions: perms,
+                department_id: resolved_department_id,
+                is_manager: is_manager
             } 
         });
 

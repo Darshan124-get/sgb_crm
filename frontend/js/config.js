@@ -7,9 +7,9 @@ const BACKEND_PORT = 5000;
 const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
 // window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 // Set this to true if you want to use the local backend (localhost:5000)
-const USE_LOCAL_BACKEND = false;
+const USE_LOCAL_BACKEND = false ;
 
-window.BASE_URL = USE_LOCAL_BACKEND ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
+window.BASE_URL = USE_LOCAL_BACKEND ? `http://localhost:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 window.API_URL = `${window.BASE_URL}/api`;
 
 // ─── Root Path Computation ───────────────────────────────────
@@ -37,14 +37,44 @@ window.API_URL = `${window.BASE_URL}/api`;
     console.log('Computed ROOT_PATH:', window.ROOT_PATH, 'for path:', path);
 })();
 
-// ─── Role-Based Redirect Targets ─────────────────────────────
 window.ROLE_REDIRECTS = {
     admin: 'modules/admin/dashboard.html',
+    'super-admin': 'modules/admin/dashboard.html',
     sales: 'modules/sales/dashboard.html',
     billing: 'modules/billing/billing.html',
     packing: 'modules/packing/dashboard.html',
     shipping: 'modules/shipping/dashboard.html',
-    shipment: 'modules/shipping/dashboard.html'
+    shipment: 'modules/shipping/dashboard.html',
+    whatsapp_manager: 'modules/whatsapp/whatsapp.html'
+};
+
+window.getHomeUrl = function(user) {
+    if (!user || !user.role) return 'index.html';
+    const role = user.role.toLowerCase();
+    
+    if (role === 'admin' || role === 'super-admin') {
+        return window.ROLE_REDIRECTS[role];
+    }
+    
+    // Check if they have custom PBAC permissions
+    let userPermissions = [];
+    try {
+        userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []);
+    } catch(e) {}
+
+    // Route based on department permissions injected by auth controller
+    if (userPermissions.includes('sales_dashboard')) return 'modules/sales/dashboard.html';
+    if (userPermissions.includes('packing_dashboard')) return 'modules/packing/dashboard.html';
+    if (userPermissions.includes('shipping_dashboard')) return 'modules/shipping/dashboard.html';
+    if (userPermissions.includes('billing_billing')) return 'modules/billing/billing.html';
+
+    // If they have PBAC permissions but don't match the above, or are a manager, route them to the unified dashboard as fallback
+    if ((userPermissions.length > 0 || user.is_manager) && role !== 'admin' && role !== 'super-admin') {
+        return 'modules/admin/dashboard.html';
+    }
+
+    // Otherwise, route them to their native role dashboard (fallback for legacy tokens)
+    return window.ROLE_REDIRECTS[role] || 'index.html';
 };
 
 // ─── Get Current User ────────────────────────────────────────
@@ -61,7 +91,14 @@ window.getCurrentUser = function () {
                     .replace(/_/g, '/')
                     .padEnd(Math.ceil(token.split('.')[1].length / 4) * 4, '=');
                 const payload = JSON.parse(atob(b64));
-                user = { id: payload.id, name: payload.name, role: payload.role };
+                user = { 
+                    id: payload.id, 
+                    name: payload.name, 
+                    role: payload.role,
+                    department_id: payload.department_id,
+                    is_manager: payload.is_manager,
+                    permissions: payload.permissions
+                };
                 localStorage.setItem('user', JSON.stringify(user));
             } catch (e) { console.warn('JWT error:', e); }
         }
@@ -80,8 +117,30 @@ window.requireAuth = function (allowedRoles = []) {
     const user = window.getCurrentUser();
     const role = (user.role || '').toLowerCase();
 
+    // Automatically allow super-admin wherever admin is allowed
+    if (role === 'super-admin' && allowedRoles.includes('admin') && !allowedRoles.includes('super-admin')) {
+        allowedRoles.push('super-admin');
+    }
+    
+    // PBAC Bypass: If the user has custom permissions or is a manager, allow them into unified folders 
+    // Security is handled by the backend APIs and sidebar filtering.
+    let userPermissions = [];
+    try { userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []); } catch(e){}
+    if (userPermissions.length > 0 || user.is_manager) {
+        return true; 
+    }
+
+    // Standard folder-based role restriction
     if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-        const home = window.ROLE_REDIRECTS[role] || 'index.html';
+        const home = window.getHomeUrl(user);
+        
+        // Loop Breaker
+        const targetPath = new URL(home, window.location.origin + window.location.pathname).pathname;
+        if (window.location.pathname.includes(targetPath)) {
+            console.error("Infinite redirect detected. Staying on current page or redirecting to safe state.");
+            return false;
+        }
+
         window.location.href = `${window.ROOT_PATH}${home}`;
         return false;
     }
@@ -159,4 +218,18 @@ window.debounce = function (func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
+};
+
+window.togglePasswordVisibility = function(inputId, button) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
 };

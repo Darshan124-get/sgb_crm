@@ -2,10 +2,86 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Users & Roles | SGB Agro CRM</title>
+    <title>Users & Access | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .settings-layout { display: flex; gap: 2rem; }
+        .settings-sidebar { width: 250px; flex-shrink: 0; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1rem; height: fit-content; }
+        .settings-content { flex-grow: 1; }
+        .settings-nav-title { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin: 1rem 0 0.5rem 0.5rem; letter-spacing: 0.05em; }
+        .settings-nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #475569; text-decoration: none; border-radius: 8px; font-weight: 500; transition: all 0.2s; cursor: pointer; border: none; background: none; width: 100%; text-align: left; }
+        .settings-nav-item:hover { background: #f8fafc; color: #1e293b; }
+        .settings-nav-item.active { background: #eff6ff; color: #3b82f6; }
+        .settings-nav-item i { width: 20px; text-align: center; }
+
+        .data-table th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .data-table td { padding: 1rem; border-bottom: 1px solid #e2e8f0; color: #1e293b; font-size: 0.9rem; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .status-badge.active { background: #dcfce7; color: #166534; }
+        .status-badge.inactive { background: #f1f5f9; color: #475569; }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #fff; width: 100%; max-width: 700px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1.5rem; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; gap: 1rem; }
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        .form-group label { font-size: 0.875rem; font-weight: 600; color: #334155; }
+        .form-group input, .form-group select { padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+        .form-group input:focus, .form-group select:focus { border-color: #3b82f6; }
+        
+        .btn { padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-size: 0.9rem; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn-outline { background: #fff; border: 1px solid #e2e8f0; color: #475569; }
+        .btn-outline:hover { background: #f8fafc; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        
+        .tab-section { display: none; }
+        .tab-section.active { display: block; }
+        
+        /* Wizard Modals */
+        .wizard-step { padding-bottom: 0.5rem; cursor: default; }
+        .wizard-step.active { border-bottom: 2px solid #3b82f6; font-weight: 600; }
+        
+        /* Language Pills */
+        .lang-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .lang-pill input {
+            display: none;
+        }
+        .lang-pill span {
+            padding: 0.5rem 1rem;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            color: #475569;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .lang-pill input:checked + span {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .lang-pill:hover span {
+            background: #e2e8f0;
+        }
+        .lang-pill input:checked:hover + span {
+            background: #dbeafe;
+        }
+    </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
@@ -14,169 +90,432 @@
         <header class="topbar">
             <div class="search-bar">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="userSearch" placeholder="Search staff by name or email...">
+                <input type="text" id="globalOrgSearch" name="globalOrgSearch" placeholder="Search organization...">
             </div>
             <div class="profile-section">
-                <span class="profile-name" id="profileName">Administrator</span>
+                <span class="profile-name" id="profileName">Loading...</span>
                 <div class="avatar"><i class="fa-solid fa-user"></i></div>
             </div>
         </header>
 
         <div class="content-body">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
-                <div>
-                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Users & Roles</h1>
-                    <p style="color:#64748b;font-size:0.875rem;">Manage team access, specific permissions, and performance metrics.</p>
-                </div>
-                <button class="login-btn" id="btnInvite" style="width:auto;padding:0.75rem 1.5rem;margin-top:0;">
-                    <i class="fas fa-user-plus" style="margin-right:0.5rem;"></i> Add Staff Member
-                </button>
-            </div>
+            <div class="settings-layout">
+                <!-- Inner Sidebar Navigation -->
+                <aside class="settings-sidebar">
+                    <div class="settings-nav-title">Organization</div>
+                    <button class="settings-nav-item active" data-tab="departments"><i class="fas fa-building"></i> Departments</button>
+                    <button class="settings-nav-item" data-tab="admins"><i class="fas fa-user-shield"></i> Admin & Manager</button>
+                    <!-- Roles tab removed as roles are now fixed -->
+                    <button class="settings-nav-item" data-tab="users"><i class="fas fa-users"></i> Users</button>
+                </aside>
 
-            <!-- Tabbed Navigation -->
-            <div class="tab-scroller" style="margin-bottom:2rem;border-bottom:1px solid #e2e8f0;display:flex;gap:2rem;">
-                <button class="tab-btn active" data-tab="all-users" style="background:none;border:none;padding:1rem 0;font-weight:600;color:#3b82f6;border-bottom:2px solid #3b82f6;cursor:pointer;">
-                    <i class="fas fa-users" style="margin-right:0.5rem;"></i> All Users
-                </button>
-                <button class="tab-btn" data-tab="roles" style="background:none;border:none;padding:1rem 0;font-weight:600;color:#64748b;cursor:pointer;">
-                    <i class="fas fa-shield-alt" style="margin-right:0.5rem;"></i> Roles & Permissions
-                </button>
-                <button class="tab-btn" data-tab="activity" style="background:none;border:none;padding:1rem 0;font-weight:600;color:#64748b;cursor:pointer;">
-                    <i class="fas fa-stream" style="margin-right:0.5rem;"></i> Activity Overview
-                </button>
-            </div>
+                <!-- Main Content Area -->
+                <div class="settings-content">
+                    
+                    <!-- DEPARTMENTS TAB -->
+                    <div id="tab-departments" class="tab-section active">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+                            <div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+                                    <div style="width:28px;height:28px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;">1</div>
+                                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Departments</h1>
+                                </div>
+                                <p style="color:#64748b;font-size:0.875rem;margin-left:2.25rem;">Manage all departments and their managers</p>
+                            </div>
+                            <button class="btn btn-primary" id="btnCreateDepartment">
+                                <i class="fas fa-plus"></i> Create Department
+                            </button>
+                        </div>
 
-            <div id="tab-all-users" class="tab-content">
-                <div class="stats-grid" style="margin-bottom:2rem;grid-template-columns: repeat(4, 1fr);">
-                    <div class="stat-card premium-card" style="padding:1.25rem;">
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Total Staff</p>
-                        <p style="font-size:1.5rem;font-weight:800;" id="countTotal">0</p>
+                        <div class="premium-card" style="overflow:hidden;">
+                            <table class="data-table" style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr>
+                                        <th>Department Name</th>
+                                        <th>Manager</th>
+                                        <th>Total Users</th>
+                                        <th>Status</th>
+                                        <th>Created Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="departmentTableBody">
+                                    <tr><td colspan="6" style="text-align:center;padding:2rem;">Loading departments...</td></tr>
+                                </tbody>
+                            </table>
+                            <div style="padding:1rem;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2e8f0;">
+                                <span style="font-size:0.875rem;color:#64748b;" id="deptCountText">Showing 0 entries</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat-card premium-card" style="padding:1.25rem;">
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Active Now</p>
-                        <p style="font-size:1.5rem;font-weight:800;color:#10b981;" id="countActive">0</p>
-                    </div>
-                    <div class="stat-card premium-card" style="padding:1.25rem;">
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Avg. Conversion</p>
-                        <p style="font-size:1.5rem;font-weight:800;color:#3b82f6;" id="avgConversion">0%</p>
-                    </div>
-                    <div class="stat-card premium-card" style="padding:1.25rem;">
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Top Performer</p>
-                        <p style="font-size:1rem;font-weight:700;" id="topPerformer">-</p>
-                    </div>
-                </div>
 
-                <div class="premium-card">
-                    <div id="usersTableContainer" style="overflow-x:auto;">
-                        <table class="data-table" style="width:100%;border-collapse:collapse;">
-                            <thead>
-                                <tr style="text-align:left;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
-                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">STAFF MEMBER</th>
-                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">ROLE / ACCESS</th>
-                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">LANGUAGES</th>
-                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">STATUS</th>
-                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">PERFORMANCE</th>
-                                    <th style="padding:1rem 1.5rem;font-size:0.75rem;font-weight:700;color:#64748b;">ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usersTableBody">
-                                <tr><td colspan="6" style="padding:4rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin fa-2x"></i></td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+                    <!-- ADMINS TAB -->
+                    <div id="tab-admins" class="tab-section">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+                            <div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+                                    <div style="width:28px;height:28px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;">2</div>
+                                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Admin & Manager Creation</h1>
+                                </div>
+                                <p style="color:#64748b;font-size:0.875rem;margin-left:2.25rem;">Manage system administrators and department managers</p>
+                            </div>
+                            <button class="btn btn-primary" id="btnCreateAdmin">
+                                <i class="fas fa-user-plus"></i> Create Admin / Manager
+                            </button>
+                        </div>
 
-            <div id="tab-roles" class="tab-content" style="display:none;">
-                <div class="stats-grid" id="rolesList" style="grid-template-columns: repeat(2, 1fr);gap:1.5rem;">
-                    <!-- Roles will be populated here -->
-                    <div class="premium-card" style="padding:1.5rem;text-align:center;grid-column: span 2;color:#94a3b8;">
-                        <i class="fas fa-shield-alt fa-3x" style="margin-bottom:1rem;opacity:0.2;"></i>
-                        <p>Select a role to manage its permissions (Coming Soon)</p>
+                        <div class="premium-card" style="overflow:hidden;">
+                            <table class="data-table" style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr>
+                                        <th>Admin Name</th>
+                                        <th>Email</th>
+                                        <th>Role Type</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminTableBody">
+                                    <tr><td colspan="5" style="text-align:center;padding:2rem;">Loading admins...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div id="tab-activity" class="tab-content" style="display:none;">
-                <div class="premium-card" style="padding:2rem;text-align:center;">
-                    <i class="fas fa-history fa-4x" style="margin-bottom:1rem;opacity:0.2;color:#64748b;"></i>
-                    <h3 style="color:#1e293b;">Team Activity Feed</h3>
-                    <p style="color:#64748b;">Real-time monitoring of user actions and security events will appear here.</p>
+                    <!-- ROLES TAB REMOVED: Roles are now fixed (manager, executive, viewer, etc.) -->
+                    
+                    <!-- USERS TAB -->
+                    <div id="tab-users" class="tab-section">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+                            <div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+                                    <div style="width:28px;height:28px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;">4</div>
+                                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Users</h1>
+                                </div>
+                                <p style="color:#64748b;font-size:0.875rem;margin-left:2.25rem;">Manage users in your organization</p>
+                            </div>
+                            <button class="btn btn-primary" id="btnCreateUser">
+                                <i class="fas fa-plus"></i> Add User
+                            </button>
+                        </div>
+
+                        <!-- Filters -->
+                        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;align-items:center;background:white;padding:1rem;border-radius:12px;border:1px solid #e2e8f0;">
+                            <div style="flex:1;position:relative;">
+                                <i class="fas fa-search" style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:#94a3b8;"></i>
+                                <input type="text" id="userSearch" placeholder="Search user..." style="width:100%;padding:0.75rem 1rem 0.75rem 2.5rem;border:1px solid #e2e8f0;border-radius:8px;outline:none;font-family:inherit;">
+                            </div>
+                            <select id="userFilterDept" style="padding:0.75rem 1rem;border:1px solid #e2e8f0;border-radius:8px;outline:none;font-family:inherit;min-width:150px;">
+                                <option value="">All Departments</option>
+                            </select>
+                            <select id="userFilterRole" style="padding:0.75rem 1rem;border:1px solid #e2e8f0;border-radius:8px;outline:none;font-family:inherit;min-width:150px;">
+                                <option value="">All Roles</option>
+                            </select>
+                            <select id="userFilterStatus" style="padding:0.75rem 1rem;border:1px solid #e2e8f0;border-radius:8px;outline:none;font-family:inherit;min-width:150px;">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+
+                        <div class="premium-card" style="overflow:hidden;">
+                            <table class="data-table" style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Employee ID</th>
+                                        <th>Department</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Last Login</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userTableBody">
+                                    <tr><td colspan="7" style="text-align:center;padding:2rem;">Loading users...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 </div>
 
-<!-- Add/Edit User Modal -->
-<div id="userModal" class="modal-overlay">
-    <div class="premium-card" style="width:100%;max-width:550px;padding:3rem;background:white;position:relative;">
-        <div style="display:flex;gap:1.5rem;align-items:start;margin-bottom:2.5rem;">
-            <div style="width:50px;height:50px;border-radius:12px;background:#eff6ff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
-                <i class="fas fa-user-shield"></i>
+<!-- Create/Edit Department Modal -->
+<div class="modal" id="departmentModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="width:24px;height:24px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;">1</div>
+                <h2 style="font-size:1.1rem;font-weight:700;color:#1e293b;" id="deptModalTitle">Create Department</h2>
             </div>
-            <div>
-                <h2 id="modalTitle" style="font-size:1.5rem;font-weight:800;color:#1e293b;margin:0;">Add New Staff Member</h2>
-                <p style="color:#64748b;font-size:0.875rem;margin-top:4px;">Configure roles, access levels, and language pairs.</p>
+            <button style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;" id="btnCloseDeptModal"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="departmentForm">
+            <input type="hidden" id="deptId">
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="deptName">Department Name <span style="color:#ef4444;">*</span></label>
+                        <input type="text" id="deptName" required placeholder="e.g. Sales">
+                    </div>
+                    <div class="form-group">
+                        <label for="deptCode">Department Code</label>
+                        <input type="text" id="deptCode" placeholder="e.g. SAL">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="deptDesc">Description</label>
+                        <input type="text" id="deptDesc" placeholder="Handle all sales related activities">
+                    </div>
+                    <div class="form-group">
+                        <label for="deptStatus">Status</label>
+                        <select id="deptStatus">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="deptManager">Select Manager <span style="color:#ef4444;">*</span></label>
+                        <select id="deptManager" required>
+                            <option value="">-- Select Manager --</option>
+                            <!-- Populated via JS -->
+                        </select>
+                    </div>
+                </div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="btnCancelDeptModal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Department</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Admins Modal -->
+<div class="modal" id="adminModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="width:24px;height:24px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;">2</div>
+                <h2 style="font-size:1.1rem;font-weight:700;color:#1e293b;" id="adminModalTitle">Create Admin / Manager</h2>
+            </div>
+            <button style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;" id="btnCloseAdminModal"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="adminForm">
+            <input type="hidden" id="adminId">
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="adminName">Full Name <span style="color:#ef4444;">*</span></label>
+                        <input type="text" id="adminName" required placeholder="e.g. John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminEmail">Email Address <span style="color:#ef4444;">*</span></label>
+                        <input type="email" id="adminEmail" required placeholder="john@example.com" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminPhone">Phone Number</label>
+                        <input type="text" id="adminPhone" placeholder="+1 234 567 8900">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminPassword">Password <span style="color:#ef4444;" id="adminPassAsterisk">*</span></label>
+                        <input type="password" id="adminPassword" placeholder="Set temporary password" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminRole">Role / Access Level <span style="color:#ef4444;">*</span></label>
+                        <select id="adminRole" required>
+                            <!-- Populated via JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminDepartment">Department Assignment</label>
+                        <select id="adminDepartment">
+                            <option value="">-- No Department (Global) --</option>
+                            <!-- Populated via JS -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="btnCancelAdminModal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Role Modal REMOVED -->
+<!-- User Multi-Step Modal -->
+<div id="userWizardModal" class="modal">
+    <div class="modal-content" style="max-width:900px;width:95%;">
+        <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="width:28px;height:28px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;" id="userModalNumber">4</div>
+                <h2 style="font-size:1.25rem;font-weight:700;color:#1e293b;" id="userModalTitle">Users > Add User</h2>
+            </div>
+            <button id="btnCloseUserModal" style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;"><i class="fas fa-times"></i></button>
         </div>
         
-        <form id="userForm">
-            <input type="hidden" id="editUserId">
-            <div class="form-group" style="margin-bottom:1.5rem;">
-                <label style="color:#1e293b;font-weight:700;">Full Name</label>
-                <div class="input-wrapper">
-                    <input type="text" id="userName" required placeholder="Full name of staff member" style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
-                </div>
+        <div style="padding:1.5rem 2rem 0;display:flex;justify-content:center;">
+            <div style="display:flex;align-items:center;gap:1rem;color:#94a3b8;font-weight:600;font-size:0.9rem;" id="wizardStepper">
+                <div class="wizard-step active" data-step="1" style="display:flex;align-items:center;gap:0.5rem;color:#3b82f6;"><div style="width:24px;height:24px;border-radius:50%;background:#3b82f6;color:white;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">1</div> Personal Details</div>
+                <div style="width:40px;height:2px;background:#e2e8f0;"></div>
+                <div class="wizard-step" data-step="2" style="display:flex;align-items:center;gap:0.5rem;"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">2</div> Department</div>
+                <div style="width:40px;height:2px;background:#e2e8f0;"></div>
+                <div class="wizard-step" data-step="3" style="display:flex;align-items:center;gap:0.5rem;"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">3</div> Role</div>
+                <div style="width:40px;height:2px;background:#e2e8f0;"></div>
+                <div class="wizard-step" data-step="4" style="display:flex;align-items:center;gap:0.5rem;"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">4</div> Permissions</div>
             </div>
-            
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-                <div class="form-group">
-                    <label style="color:#1e293b;font-weight:700;">Work Email</label>
-                    <div class="input-wrapper">
-                        <input type="email" id="userEmail" required placeholder="email@company.com" style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+        </div>
+
+        <form id="userWizardForm">
+            <input type="hidden" id="wizardUserId">
+            <div class="modal-body" style="min-height:350px;">
+                
+                <!-- Step 1: Personal Details -->
+                <div class="wizard-pane active" id="wizardPane1">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="wizardName">Full Name <span style="color:#ef4444;">*</span></label>
+                            <input type="text" id="wizardName" required placeholder="e.g. Rahul Kumar">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardEmail">Email <span style="color:#ef4444;">*</span></label>
+                            <input type="email" id="wizardEmail" required placeholder="rahul.kumar@crm.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardPhone">Phone <span style="color:#ef4444;">*</span></label>
+                            <input type="text" id="wizardPhone" required placeholder="9876543210">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardEmployeeId">Employee ID <span style="color:#ef4444;">*</span></label>
+                            <input type="text" id="wizardEmployeeId" required placeholder="EMP00123">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardPassword">Password <span style="color:#ef4444;">*</span></label>
+                            <div style="position:relative;">
+                                <input type="password" id="wizardPassword" required placeholder="********" style="width:100%;">
+                                <button type="button" onclick="togglePasswordVisibility('wizardPassword', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;"><i class="far fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardConfirmPassword">Confirm Password <span style="color:#ef4444;">*</span></label>
+                            <div style="position:relative;">
+                                <input type="password" id="wizardConfirmPassword" required placeholder="********" style="width:100%;">
+                                <button type="button" onclick="togglePasswordVisibility('wizardConfirmPassword', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;"><i class="far fa-eye"></i></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label style="color:#1e293b;font-weight:700;">Phone Number</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="userPhone" placeholder="+91 ..." style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+
+                <!-- Step 2: Department -->
+                <div class="wizard-pane" id="wizardPane2" style="display:none; max-width: 500px; margin: 0 auto;">
+                    <div class="form-group">
+                        <label for="wizardDept">Select Department <span style="color:#ef4444;">*</span></label>
+                        <select id="wizardDept" required>
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1.5rem;margin-top:2rem;text-align:center;">
+                        <p style="color:#64748b;font-size:0.9rem;margin-bottom:1rem;">Department not in list?</p>
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('btnCloseUserModal').click(); document.querySelector('[data-tab=departments]').click(); document.getElementById('btnCreateDepartment').click();" style="display:inline-flex;align-items:center;gap:0.5rem;color:#3b82f6;border-color:#3b82f6;"><i class="fas fa-plus"></i> Create Department</button>
                     </div>
                 </div>
-            </div>
 
-            <div style="margin-top:1.5rem;">
-                <div class="form-group">
-                    <label style="color:#1e293b;font-weight:700;">System Role</label>
-                    <div class="input-wrapper">
-                        <select id="userRole" required style="width:100%;padding:1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#1e293b;"></select>
+                <!-- Step 3: Role -->
+                <div class="wizard-pane" id="wizardPane3" style="display:none; max-width: 500px; margin: 0 auto;">
+                    <div class="form-group">
+                        <label for="wizardRole">Select Role <span style="color:#ef4444;">*</span></label>
+                        <select id="wizardRole" required>
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="languageSelectionGroup" style="display:none; margin-top:1.5rem;">
+                        <label>Select Languages <span style="color:#ef4444;">*</span></label>
+                        <div id="languagePills" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem;">
+                            <label class="lang-pill">
+                                <input type="checkbox" name="wizardLanguages" value="Kannada">
+                                <span>Kannada</span>
+                            </label>
+                            <label class="lang-pill">
+                                <input type="checkbox" name="wizardLanguages" value="English">
+                                <span>English</span>
+                            </label>
+                            <label class="lang-pill">
+                                <input type="checkbox" name="wizardLanguages" value="Hindi">
+                                <span>Hindi</span>
+                            </label>
+                            <label class="lang-pill">
+                                <input type="checkbox" name="wizardLanguages" value="Tamil">
+                                <span>Tamil</span>
+                            </label>
+                            <label class="lang-pill">
+                                <input type="checkbox" name="wizardLanguages" value="Telugu">
+                                <span>Telugu</span>
+                            </label>
+                            <label class="lang-pill">
+                                <input type="checkbox" name="wizardLanguages" value="Marathi">
+                                <span>Marathi</span>
+                            </label>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.75rem;">Tap to select multiple languages.</p>
+                    </div>
+                    <div style="background:#eff6ff;color:#1e40af;padding:1rem;border-radius:8px;font-size:0.9rem;margin-top:1.5rem;display:flex;align-items:flex-start;gap:0.75rem;">
+                        <i class="fas fa-info-circle" style="margin-top:0.2rem;"></i>
+                        <div>Roles are templates. You can customize permissions in the next step.</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="form-group" id="langGroup" style="margin-top:1.5rem;display:none;">
-                <label style="color:#1e293b;font-weight:700;">Target Languages</label>
-                <div id="langToggleContainer" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
-                    <button type="button" class="lang-toggle" data-lang="EN">English</button>
-                    <button type="button" class="lang-toggle" data-lang="HI">Hindi</button>
-                    <button type="button" class="lang-toggle" data-lang="KN">Kannada</button>
-                    <button type="button" class="lang-toggle" data-lang="TE">Telugu</button>
-                    <button type="button" class="lang-toggle" data-lang="TA">Tamil</button>
-                    <button type="button" class="lang-toggle" data-lang="MR">Marathi</button>
+                <!-- Step 4: Permissions -->
+                <div class="wizard-pane" id="wizardPane4" style="display:none;">
+                    <h3 style="font-size:1.1rem;font-weight:700;color:#1e293b;margin-bottom:0.25rem;">View Permissions</h3>
+                    <p style="color:#64748b;font-size:0.9rem;margin-bottom:1.5rem;">Permissions are automatically configured based on the selected Role and cannot be modified.</p>
+                    
+                    <div style="display:grid;grid-template-columns: 200px 1fr 250px;gap:1.5rem;height:400px;background:white;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                        <!-- Modules -->
+                        <div style="background:#f8fafc;border-right:1px solid #e2e8f0;overflow-y:auto;" id="permissionCategories">
+                            <!-- JS injected -->
+                        </div>
+                        
+                        <!-- Checkboxes -->
+                        <div style="padding:1.5rem;overflow-y:auto;">
+                            <h4 id="permissionCategoryTitle" style="font-size:1rem;font-weight:600;margin-bottom:1rem;color:#1e293b;border-bottom:1px solid #e2e8f0;padding-bottom:0.5rem;">Select Category</h4>
+                            <div id="permissionCheckboxes" style="display:flex;flex-direction:column;gap:1rem;">
+                                <!-- JS injected -->
+                            </div>
+                        </div>
+
+                        <!-- Summary -->
+                        <div style="background:#f8fafc;border-left:1px solid #e2e8f0;padding:1.5rem;">
+                            <h4 style="font-size:1rem;font-weight:600;margin-bottom:1rem;color:#1e293b;">Summary</h4>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.75rem;font-size:0.9rem;">
+                                <span style="color:#64748b;">Department</span>
+                                <span style="color:#1e293b;font-weight:500;" id="summaryDept">-</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.75rem;font-size:0.9rem;">
+                                <span style="color:#64748b;">Role</span>
+                                <span style="color:#1e293b;font-weight:500;" id="summaryRole">-</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:1.5rem;font-size:0.9rem;">
+                                <span style="color:#64748b;">Permissions</span>
+                                <span style="color:#1e293b;font-weight:500;" id="summaryPerms">0 Selected</span>
+                            </div>
+                            <p style="font-size:0.8rem;color:#64748b;line-height:1.4;">User will be able to access the selected modules and actions.</p>
+                        </div>
+                    </div>
                 </div>
-                <p style="font-size:0.65rem;color:#94a3b8;margin-top:6px;">Click to select / deselect languages</p>
-            </div>
 
-            <div class="form-group" id="passGroup" style="margin-top:1.5rem;">
-                <label style="color:#1e293b;font-weight:700;">Initial Password</label>
-                <div class="input-wrapper">
-                    <input type="password" id="userPass" placeholder="Set temporary password" style="background:#f8fafc;border:1px solid #e2e8f0;color:#1e293b;width:100%;padding:1rem;border-radius:10px;">
+            </div>
+            <div class="modal-footer" style="display:flex;justify-content:space-between;">
+                <button type="button" class="btn btn-outline" id="btnWizardBack" style="visibility:hidden;">Back</button>
+                <div style="display:flex;gap:1rem;">
+                    <button type="button" class="btn btn-outline" id="btnWizardCancel" style="display:none;">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnWizardNext">Next</button>
+                    <button type="submit" class="btn btn-success" id="btnWizardSubmit" style="display:none;background:#10b981;border-color:#10b981;">Create User</button>
                 </div>
-            </div>
-
-            <div style="display:flex;gap:1rem;margin-top:3rem;">
-                <button type="button" class="login-btn" id="btnCancel" style="background:#f1f5f9;color:#64748b;margin-top:0;box-shadow:none;flex:1;">Cancel</button>
-                <button type="submit" class="login-btn" style="margin-top:0;flex:2;">Confirm & Save</button>
             </div>
         </form>
     </div>
@@ -184,7 +523,6 @@
 
 <script src="../../js/config.js"></script>
 <script src="../../js/components.js"></script>
-<script src="../../js/decision-engine.js"></script>
 <script src="js/users.js"></script>
 </body>
 </html>

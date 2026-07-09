@@ -32,9 +32,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const overdueBadge = document.getElementById('overdueBadge');
             if (overdueBadge) overdueBadge.textContent = `${data.kpis.urgentAlerts} Overdue`;
 
-            // Render Pipeline
-            renderPipelineView(data.funnel);
-
             // Render Urgent Mission Panel
             renderUrgentPanel(data.urgentTasks);
 
@@ -47,32 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function renderPipelineView(funnel) {
-        const panel = document.getElementById('pipelineMiniView');
-        if (!panel) return;
 
-        const stages = [
-            { id: 'new', label: 'New Lead', color: '#3b82f6' },
-            { id: 'contacted', label: 'Contacted', color: '#8b5cf6' },
-            { id: 'interested', label: 'Interested', color: '#f59e0b' },
-            { id: 'converted', label: 'Converted', color: '#10b981' }
-        ];
-
-        panel.innerHTML = stages.map(stage => {
-            const found = funnel.find(f => f.status === stage.id) || { count: 0 };
-            return `
-                <div class="pipeline-item" style="margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span style="font-size: 0.75rem; font-weight: 600; color: #475569;">${stage.label}</span>
-                        <span style="font-size: 0.75rem; font-weight: 800; color: #1e293b;">${found.count}</span>
-                    </div>
-                    <div style="height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden;">
-                        <div style="height: 100%; width: ${Math.min((found.count / 10) * 100, 100)}%; background: ${stage.color};"></div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
 
     function renderUrgentPanel(tasks) {
         const panel = document.getElementById('urgentPanel');

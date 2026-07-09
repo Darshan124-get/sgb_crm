@@ -37,7 +37,7 @@ const receiveMessage = async (req, res) => {
     for (const entry of body.entry) {
       for (const change of (entry.changes || [])) {
         const value = change.value;
-        
+
         // Handle message statuses (sent, delivered, read)
         if (value.statuses) {
           for (const statusObj of value.statuses) {
@@ -56,7 +56,7 @@ const receiveMessage = async (req, res) => {
         for (const msg of value.messages) {
           const fromNumber = normalizePhone(msg.from);
           const timestamp = msg.timestamp;
-          
+
           let inputText = '';
           let mediaBuffer = null;
           let mimeType = null;
@@ -71,7 +71,7 @@ const receiveMessage = async (req, res) => {
             const mediaId = msg[msg.type].id;
             const caption = msg[msg.type].caption || '';
             inputText = caption || `Sent a ${msg.type}`;
-            
+
             try {
               const media = await whatsappService.downloadMedia(mediaId);
               mediaBuffer = media.buffer;
@@ -86,13 +86,13 @@ const receiveMessage = async (req, res) => {
           try {
             // 2. Store as Lead (Requirement: Any message creates/updates a lead)
             await messageService.storeMessageAsLead(fromNumber, inputText);
-            
+
             // 3. Log to Chat History
             await messageService.logChatMessage(fromNumber, 'incoming', msg.type, inputText, mediaBuffer, mimeType);
 
             // 4. Bot actions skipped as per requirement
             logger.info(`Message received from ${fromNumber}: ${inputText}`);
-            
+
           } catch (err) {
             logger.error(`Error processing message from ${fromNumber}:`, err.message);
           }
@@ -137,7 +137,7 @@ const getHistory = async (req, res) => {
  */
 const sendReply = async (req, res) => {
   const { phone, message, mediaData, mimeType } = req.body;
-  
+
   if (!phone || (!message && !mediaData)) {
     return res.status(400).json({ error: 'Phone and either message or media are required' });
   }
@@ -145,10 +145,10 @@ const sendReply = async (req, res) => {
   try {
     // 1. Handle Media Sending
     if (mediaData) {
-      const category = mimeType && mimeType.startsWith('image') ? 'image' : 
-                       mimeType && mimeType.startsWith('video') ? 'video' :
-                       mimeType && mimeType.startsWith('audio') ? 'audio' : 'document';
-                       
+      const category = mimeType && mimeType.startsWith('image') ? 'image' :
+        mimeType && mimeType.startsWith('video') ? 'video' :
+          mimeType && mimeType.startsWith('audio') ? 'audio' : 'document';
+
       let mediaId;
       if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
         mediaId = mediaData;
@@ -158,16 +158,16 @@ const sendReply = async (req, res) => {
         const buffer = Buffer.from(base64Data, 'base64');
         mediaId = await whatsappService.uploadMedia(buffer, mimeType, category, message || 'file');
       }
-      
+
       const waPhone = formatForWhatsApp(phone);
       const metaResponse = await whatsappService.sendMediaMessage(waPhone, mediaId, category, message);
       console.log('MEDIA META RESPONSE:', JSON.stringify(metaResponse));
       const metaMessageId = metaResponse?.messages?.[0]?.id || null;
       console.log('MEDIA META MESSAGE ID:', metaMessageId);
-      
+
       // Log to local Chat History (Use normalized number for DB)
       await messageService.logChatMessage(normalizePhone(phone), 'outgoing', category, message || '', mediaData, mimeType, req.user.id, metaMessageId, 'sent');
-    } 
+    }
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
@@ -177,7 +177,7 @@ const sendReply = async (req, res) => {
       logger.info('TEXT META MESSAGE ID:', metaMessageId);
       await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id, metaMessageId, 'sent');
     }
-    
+
     res.json({ success: true });
   } catch (err) {
     logger.error('API Error (sendReply):', err);
@@ -244,7 +244,7 @@ const saveQuickReply = async (req, res) => {
     if (!shortcut) {
       return res.status(400).json({ error: 'Shortcut is required' });
     }
-    
+
     let mediaUrl = null;
     let mediaType = null;
 
@@ -252,19 +252,19 @@ const saveQuickReply = async (req, res) => {
       const supabase = require('../config/supabase');
       const dataArray = Array.isArray(mediaData) ? mediaData : [mediaData];
       const typeArray = Array.isArray(mimeType) ? mimeType : [mimeType];
-      
+
       let uploadedUrls = [];
       let mappedTypes = [];
 
       for (let i = 0; i < dataArray.length; i++) {
         const mData = dataArray[i];
         const mType = typeArray[i] || 'application/octet-stream';
-        
+
         if (mData.startsWith('http')) {
           uploadedUrls.push(mData);
-          mappedTypes.push(mType.startsWith('image') ? 'image' : 
-                     mType.startsWith('video') ? 'video' :
-                     mType.startsWith('audio') ? 'audio' : 'document');
+          mappedTypes.push(mType.startsWith('image') ? 'image' :
+            mType.startsWith('video') ? 'video' :
+              mType.startsWith('audio') ? 'audio' : 'document');
           continue;
         }
 
@@ -283,15 +283,15 @@ const saveQuickReply = async (req, res) => {
           logger.error('Supabase upload error in quick replies:', error.message);
           throw error;
         }
-        
+
         const { data: urlData } = supabase.storage
           .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
           .getPublicUrl(fileName);
-          
+
         uploadedUrls.push(urlData.publicUrl);
-        mappedTypes.push(mType.startsWith('image') ? 'image' : 
-                    mType.startsWith('video') ? 'video' :
-                    mType.startsWith('audio') ? 'audio' : 'document');
+        mappedTypes.push(mType.startsWith('image') ? 'image' :
+          mType.startsWith('video') ? 'video' :
+            mType.startsWith('audio') ? 'audio' : 'document');
       }
 
       mediaUrl = JSON.stringify(uploadedUrls);
@@ -328,6 +328,17 @@ const deleteQuickReply = async (req, res) => {
   }
 };
 
+const markRead = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    await messageService.markMessagesAsRead(phone);
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Error in markRead:', err.message);
+    res.status(500).json({ error: 'Failed to mark messages as read' });
+  }
+};
+
 module.exports = {
   verifyWebhook,
   receiveMessage,
@@ -338,5 +349,6 @@ module.exports = {
   deleteMessage,
   getQuickReplies,
   saveQuickReply,
-  deleteQuickReply
+  deleteQuickReply,
+  markRead
 };

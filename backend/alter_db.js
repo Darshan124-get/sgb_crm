@@ -29,7 +29,18 @@ async function run() {
             ADD COLUMN IF NOT EXISTS lead_id INT NULL AFTER order_source
         `).catch(e => console.log('Orders lead_id alter skipped'));
 
-        
+        // Add super-admin role
+        await pool.query(`
+            INSERT INTO roles (name, description) VALUES ('super-admin', 'Master system access')
+            ON DUPLICATE KEY UPDATE name=VALUES(name);
+        `).catch(e => console.log('Super-admin role insert failed:', e.message));
+
+        // Elevate Admin user to Super Admin
+        await pool.query(`
+            UPDATE users SET role_id = (SELECT role_id FROM roles WHERE name = 'super-admin')
+            WHERE user_id = 1 OR email = 'admin@sgbagro.com'
+        `).catch(e => console.log('Admin elevation failed:', e.message));
+
         console.log('Database altered successfully.');
         process.exit(0);
     } catch (err) {

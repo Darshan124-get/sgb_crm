@@ -52,10 +52,11 @@
                 </div>
             </header>
 
-            <nav class="sidebar-tabs">
-                <div class="tab-item active" data-tab="open">Open</div>
-                <div class="tab-item" data-tab="assigned">Assigned</div>
-                <div class="tab-item" data-tab="closed">Closed</div>
+            <nav class="sidebar-tabs" id="sidebar-tabs-container">
+                <div class="tab-item active" data-tab="all">All</div>
+                <div class="tab-item" data-tab="unviewed">Unviewed <span id="unread-count" style="margin-left: 4px;">0</span></div>
+                <!-- Campaign tabs will be dynamically injected here -->
+                <div class="tab-item" data-tab="undefined">Undefined</div>
             </nav>
 
             <div id="customer-list" class="customer-list">

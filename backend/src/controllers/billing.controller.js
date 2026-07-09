@@ -139,6 +139,7 @@ const getOrderForBilling = async (req, res) => {
         order.customer_name = order.customer_name || order.lead_name || order.dealer_name || '';
         order.phone = order.phone || order.lead_phone || order.dealer_phone || '';
         order.address = order.address || order.lead_address || order.dealer_address || '';
+        order.village = order.village || order.lead_city || '';
         order.city = order.city || order.lead_city || order.dealer_city || '';
         order.state = order.state || order.lead_state || order.dealer_state || '';
         order.district = order.district || order.lead_district || '';

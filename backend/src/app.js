@@ -20,6 +20,8 @@ const scheduleRoutes = require('./routes/schedule.routes');
 const logRoutes = require('./routes/log.routes');
 const whatsappRoutes = require('./routes/whatsapp.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const campaignRoutes = require('./routes/campaign.routes');
+const departmentRoutes = require('./routes/department.routes');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -76,6 +78,8 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/departments', departmentRoutes);
 
 console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
 console.log('✅ WhatsApp Webhook: Mounted at /webhook');

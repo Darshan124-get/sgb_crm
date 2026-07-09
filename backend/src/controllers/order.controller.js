@@ -19,6 +19,14 @@ exports.getOrders = async (req, res) => {
         const conditions = [];
         const params = [];
 
+        const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'sales';
+        const isManagerOrAdmin = req.user && (req.user.is_manager || userRole === 'admin' || userRole === 'super-admin');
+
+        if (!isManagerOrAdmin && req.user) {
+            conditions.push("o.created_by = ?");
+            params.push(req.user.id);
+        }
+
         if (status) {
             conditions.push("o.order_status = ?");
             params.push(status);
@@ -70,8 +78,8 @@ exports.convertLeadToOrder = async (req, res) => {
     try {
         let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, items } = req.body;
         const [resOrder] = await pool.query(
-            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 1)",
-            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, (total_amount - advance_amount) || 0]
+            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)",
+            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, (total_amount - advance_amount) || 0, req.user ? req.user.id : 1]
         );
         const orderId = resOrder.insertId;
 

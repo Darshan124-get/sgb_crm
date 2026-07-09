@@ -8,7 +8,7 @@ const LEAD_API_BASE = `${window.API_URL}/leads`;
 const USER_API_BASE = `${window.API_URL}/users`; // Assuming there's a users endpoint for sales people
 // Auth Guard
 if (typeof window.requireAuth === 'function') {
-    if (!window.requireAuth(['admin', 'super-admin', 'sales', 'billing'])) {
+    if (!window.requireAuth(['admin', 'super-admin', 'sales', 'billing', 'whatsapp_manager'])) {
         // Redirect handled by requireAuth
     }
 }
@@ -18,8 +18,9 @@ const AUTH_HEADER = { 'Authorization': `Bearer ${localStorage.getItem('token')}`
 let activeCustomer = null;
 let currentHistory = [];
 let allCustomers = [];
-let currentTab = 'open';
+let currentTab = 'all';
 let salesUsers = [];
+let activeCampaigns = [];
 const activeUploads = new Map();
 
 // DOM Elements
@@ -94,10 +95,11 @@ function goToLeadDetails() {
  */
 document.addEventListener('DOMContentLoaded', () => {
     // Auth Guard
-    if (!window.requireAuth(['admin', 'sales'])) return;
+    if (!window.requireAuth(['admin', 'sales', 'whatsapp_manager'])) return;
 
     loadCustomers();
     loadSalesUsers();
+    loadCampaignsAndTabs();
 
     // 3-dot menu toggle logic
     const menuBtn = document.getElementById('sidebar-menu-btn');
@@ -142,15 +144,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Tab Switching Logic
-    document.querySelectorAll('.tab-item').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentTab = tab.dataset.tab;
-            renderCustomerList();
+    // Tab Switching Logic (initial setup if container is not dynamically loaded yet, but loadCampaignsAndTabs handles it)
+    const container = document.getElementById('sidebar-tabs-container');
+    if (container) {
+        container.querySelectorAll('.tab-item').forEach(tab => {
+            tab.addEventListener('click', () => {
+                container.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentTab = tab.dataset.tab;
+                renderCustomerList();
+            });
         });
-    });
+    }
 
     // Check for leadId in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -199,6 +204,55 @@ function getInitials(name) {
     return parts.map(n => n[0]).join('').toUpperCase().substring(0, 2);
 }
 
+function renderSidebarTabs() {
+    const container = document.getElementById('sidebar-tabs-container');
+    if (!container) return;
+    
+    const isResolved = (c) => ['converted', 'closed', 'lost'].includes(c.status);
+
+    // Calculate unread count
+    const unreadCount = (allCustomers || []).filter(c => {
+        if (isResolved(c)) return false;
+        return parseInt(c.unread_msg_count || 0) > 0;
+    }).length;
+    
+    let html = `
+        <div class="tab-item ${currentTab === 'all' ? 'active' : ''}" data-tab="all">All</div>
+        <div class="tab-item ${currentTab === 'unviewed' ? 'active' : ''}" data-tab="unviewed">Unviewed <span id="unread-count" style="margin-left: 4px;">${unreadCount}</span></div>
+    `;
+    
+    activeCampaigns.forEach(camp => {
+        html += `<div class="tab-item ${currentTab === camp.tag_line ? 'active' : ''}" data-tab="${camp.tag_line}">${camp.campaign_id}</div>`;
+    });
+    
+    html += `<div class="tab-item ${currentTab === 'undefined' ? 'active' : ''}" data-tab="undefined">Undefined</div>`;
+    html += `<div class="tab-item ${currentTab === 'resolved' ? 'active' : ''}" data-tab="resolved">Resolved</div>`;
+    
+    container.innerHTML = html;
+    
+    container.querySelectorAll('.tab-item').forEach(tab => {
+        tab.addEventListener('click', () => {
+            container.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentTab = tab.dataset.tab;
+            renderCustomerList();
+        });
+    });
+}
+
+async function loadCampaignsAndTabs() {
+    try {
+        const response = await fetch(`${window.API_URL}/campaigns`, { headers: AUTH_HEADER });
+        if (response.ok) {
+            const allCampaigns = await response.json();
+            activeCampaigns = allCampaigns.filter(c => c.status === 'active');
+            renderSidebarTabs();
+        }
+    } catch (err) {
+        console.error('Failed to load campaigns for tabs:', err);
+    }
+}
+
 /**
  * Fetch and Render Customer List
  */
@@ -209,6 +263,7 @@ async function loadCustomers() {
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
         allCustomers = await response.json();
+        renderSidebarTabs(); // update unread count
         renderCustomerList();
     } catch (err) {
         console.error('Failed to load customers:', err);
@@ -225,26 +280,27 @@ function renderCustomerList() {
         return;
     }
 
-    const user = window.getCurrentUser();
-    const userId = user.id;
-    const userRole = (user.role || '').toLowerCase();
-
     let filtered = allCustomers.filter(customer => {
-        const status = (customer.status || '').toLowerCase();
-        const assignedTo = customer.assigned_to;
+        const resolved = ['converted', 'closed', 'lost'].includes(customer.status);
 
-        if (currentTab === 'closed') {
-            return ['converted', 'lost', 'not_interested'].includes(status);
-        } else if (currentTab === 'assigned') {
-            return assignedTo === userId && !['converted', 'lost', 'not_interested'].includes(status);
+        if (currentTab === 'all') {
+            return !resolved;
+        } else if (currentTab === 'resolved') {
+            return resolved;
+        } else if (currentTab === 'unviewed') {
+            if (resolved) return false;
+            return parseInt(customer.unread_msg_count || 0) > 0;
+        } else if (currentTab === 'undefined') {
+            if (resolved) return false;
+            return !activeCampaigns.some(camp => camp.tag_line === customer.first_message);
         } else {
-            if (userRole === 'admin') return !['converted', 'lost', 'not_interested'].includes(status);
-            return (assignedTo === null || assignedTo === undefined) && !['converted', 'lost', 'not_interested'].includes(status);
+            if (resolved) return false;
+            return customer.first_message === currentTab;
         }
     });
 
     if (filtered.length === 0) {
-        customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">No ${currentTab} conversations.</div>`;
+        customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">No conversations in this tab.</div>`;
         return;
     }
 
@@ -362,6 +418,16 @@ async function selectCustomer(customer) {
         if (el.dataset.phone === customer.phone) el.classList.add('active');
         else el.classList.remove('active');
     });
+
+    if (parseInt(customer.unread_msg_count || 0) > 0) {
+        try {
+            fetch(`${API_BASE}/customers/${customer.phone}/read`, { method: 'PUT', headers: AUTH_HEADER }).catch(console.error);
+            customer.unread_msg_count = 0;
+            renderSidebarTabs();
+        } catch (err) {
+            console.error('Failed to mark as read:', err);
+        }
+    }
 
     await loadChatHistory(customer.phone);
 }

@@ -103,6 +103,50 @@
         border: 1px solid #e2e8f0;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     }
+    .product-select-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+    .product-select-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff;
+    }
+    .product-select-card:hover {
+        border-color: #94a3b8;
+        background: #f8fafc;
+    }
+    .product-select-card.selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+        box-shadow: 0 0 0 1px #2563eb;
+    }
+    .product-select-card .check-indicator {
+        opacity: 0;
+        color: #2563eb;
+        transition: opacity 0.2s;
+    }
+    .product-select-card.selected .check-indicator {
+        opacity: 1;
+    }
+    .product-select-card .product-name {
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+    }
+    .product-select-card .product-price {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
 </style>
 
 <div class="manual-wizard-container">
@@ -258,15 +302,15 @@
             <div id="m-de-sales-status-container">
                 <div class="form-group">
                     <label>Sales Decision Status</label>
-                    <select id="m-de-sales-status" class="form-control-premium"
-                        onchange="mHandleSalesStatusChange(this.value)">
-                        <option value="Ordered">Ordered</option>
-                        <option value="Hot/Very Interested">Hot / Very Interested</option>
-                        <option value="Mild/Later">Mild / Later</option>
-                        <option value="Cold/Not Interested">Cold / Not Interested</option>
-                        <option value="Old Purchased">Old Purchased</option>
-                        <option value="Dealer">Dealer Inquiry</option>
-                    </select>
+                    <div id="m-de-sales-status-wrapper" class="status-pill-grid selection-row">
+                        <button type="button" class="status-pill" data-value="Ordered">Ordered</button>
+                        <button type="button" class="status-pill" data-value="Hot/Very Interested">Hot / Very Interested</button>
+                        <button type="button" class="status-pill" data-value="Mild/Later">Mild / Later</button>
+                        <button type="button" class="status-pill" data-value="Cold/Not Interested">Cold / Not Interested</button>
+                        <button type="button" class="status-pill" data-value="Old Purchased">Old Purchased</button>
+                        <button type="button" class="status-pill" data-value="Dealer">Dealer Inquiry</button>
+                    </div>
+                    <input type="hidden" id="m-de-sales-status" value="">
                 </div>
 
                 <!-- Conditional Subforms (Non-Order) -->
@@ -314,9 +358,9 @@
         <div class="form-card-premium">
             <h3 class="form-section-title"><i class="fas fa-cubes"></i> Step 4: Product Selection</h3>
             <div class="form-group">
-                <label>Select Products (Multi-select)</label>
-                <select id="m-de-products" class="form-control-premium" multiple style="height: 180px;"></select>
-                <p class="text-xs text-slate-400 mt-2">Hold Ctrl/Cmd to select multiple products</p>
+                <label style="font-weight: 700; color: #1e293b;">Select Products (1-Click Selection)</label>
+                <div id="m-de-products-container" class="product-select-grid"></div>
+                <select id="m-de-products" class="form-control-premium" multiple style="display:none;"></select>
             </div>
 
             <!-- Conditional Subform (Order details moved here) -->

@@ -16,15 +16,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (res.status === 401) { window.doLogout(); return; }
         const data = await res.json();
 
-        document.getElementById('totalLeads').textContent    = data.kpis.leadsMTD ?? '—';
+        document.getElementById('totalLeads').textContent    = data.kpis.totalLeads ?? '—';
         document.getElementById('totalRevenue').textContent  = `₹${(data.kpis.revenueMTD || 0).toLocaleString()}`;
         document.getElementById('conversionRate').textContent = `${data.kpis.conversionRate ?? 0}%`;
         document.getElementById('overdueTasks').textContent  = data.kpis.urgentAlerts ?? 0;
-        document.getElementById('overdueBadge').textContent  = `${data.kpis.urgentAlerts ?? 0} Overdue`;
+        
         document.getElementById('notifBadge').textContent    = data.kpis.urgentAlerts ?? 0;
 
         renderPipeline(data.funnel);
-        renderUrgentPanel(data.urgentTasks);
+        initLocationPieChart(data.locationDistribution);
         initChart(data);
 
         // ─── Low Stock Alerts ───
@@ -87,22 +87,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    function renderUrgentPanel(tasks = []) {
-        const el = document.getElementById('urgentPanel');
-        if (!el) return;
-        if (!tasks.length) {
-            el.innerHTML = '<div style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-check-circle fa-2x"></i><p style="margin-top:0.5rem;">All caught up! No urgent tasks.</p></div>';
+    function initLocationPieChart(distribution = []) {
+        const ctx = document.getElementById('locationPieChart');
+        if (!ctx) return;
+        
+        const labels = distribution.map(d => d.city || 'Unknown');
+        const counts = distribution.map(d => d.count);
+        
+        if (counts.length === 0) {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['No Data'],
+                    datasets: [{ data: [1], backgroundColor: ['#e2e8f0'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' }
+            });
             return;
         }
-        el.innerHTML = tasks.map(t => `
-            <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <p style="font-weight:700;font-size:0.875rem;color:#1e293b;">${t.customer_name}</p>
-                    <p style="font-size:0.75rem;color:#ef4444;font-weight:600;"><i class="far fa-clock"></i> Due: ${new Date(t.followup_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</p>
-                    <p style="font-size:0.7rem;color:#64748b;">Assigned to: ${t.assigned_to_name || 'Unassigned'}</p>
-                </div>
-                <a href="leads.html?leadId=${t.lead_id}" style="padding:6px 14px;background:#3b82f6;color:white;border-radius:6px;font-size:0.7rem;font-weight:700;text-decoration:none;">View Lead</a>
-            </div>`).join('');
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, usePointStyle: true, padding: 20 } }
+                },
+                cutout: '70%'
+            }
+        });
     }
 
     function initChart(data) {

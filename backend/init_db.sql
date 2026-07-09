@@ -31,18 +31,23 @@ CREATE TABLE roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
     description TEXT,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    default_permissions JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20) UNIQUE,
-    email VARCHAR(100) UNIQUE,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    employee_id VARCHAR(50),
     password_hash VARCHAR(255) NOT NULL,
-    role_id INT,
-    language VARCHAR(50) DEFAULT 'EN',
+    role_id INT NOT NULL,
+    department_id INT, -- Added this to handle department linking
     status ENUM('active', 'inactive') DEFAULT 'active',
+    language VARCHAR(10) DEFAULT 'EN',
+    permissions JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE SET NULL
@@ -66,6 +71,7 @@ CREATE TABLE leads (
     reminders_enabled BOOLEAN DEFAULT TRUE,
     lost_reason VARCHAR(255) NULL,
     lost_notes TEXT NULL,
+    decision_engine_state JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -394,11 +400,11 @@ INSERT IGNORE INTO `whatsapp_quick_replies` (`shortcut`, `message`) VALUES
 
 -- SEED DATA
 INSERT INTO roles (name, description) VALUES 
+('super-admin', 'Master system access'),
 ('admin', 'Full system access'),
-('sales', 'Lead management and order creation'),
-('billing', 'Invoice generation and payment tracking'),
-('packing', 'Order packing module'),
-('shipment', 'Shipping and tracking management')
+('manager', 'Department head with full access to department panels'),
+('executive', 'Standard worker in assigned department'),
+('viewer', 'Read-only access to department panels')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
 -- Default Settings

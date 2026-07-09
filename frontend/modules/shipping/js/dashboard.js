@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const user = window.getCurrentUser();
-    if (!user || (user.role !== 'shipping' && user.role !== 'shipment')) {
+    const perms = user ? (typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions) : [];
+    const isSuper = user && (user.role === 'admin' || user.role === 'super-admin');
+    
+    if (!user || (!isSuper && !perms.includes('shipping_dashboard'))) {
         window.location.href = '../../index.html';
         return;
     }

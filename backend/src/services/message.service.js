@@ -158,10 +158,10 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
 
     // 3. Log Message
     const sender_type = (direction === 'incoming') ? 'user' : 'admin';
-    
+
     let mediaUrl = null;
     let buffer = null;
-    
+
     if (mediaData) {
       if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
         mediaUrl = mediaData;
@@ -189,7 +189,7 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
           const { data: urlData } = supabase.storage
             .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
             .getPublicUrl(filePath);
-          
+
           mediaUrl = urlData.publicUrl;
           logger.info(`[SUPABASE] File uploaded: ${mediaUrl}`);
         }
@@ -225,7 +225,7 @@ const getChatHistory = async (phoneInput, user = null) => {
     `;
     let params = [phone];
 
-    if (user && user.role.toLowerCase() === 'sales') {
+    if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
       query += " AND l.assigned_to = ?";
       params.push(user.id);
     }
@@ -249,6 +249,7 @@ const getAllChatCustomers = async (user = null) => {
       SELECT l.*, l.phone_number AS phone, u.name AS assigned_name,
        MAX(cm.timestamp) as last_message_at,
        MAX(CASE WHEN cm.sender_type = 'user' THEN cm.timestamp ELSE NULL END) as last_inbound_at,
+       SUM(CASE WHEN cm.sender_type = 'user' AND cm.status = 'sent' THEN 1 ELSE 0 END) as unread_msg_count,
        (SELECT message FROM chat_messages WHERE session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = l.lead_id) ORDER BY timestamp DESC LIMIT 1) as last_message
        FROM leads l
        LEFT JOIN chat_sessions cs ON l.lead_id = cs.lead_id
@@ -258,7 +259,7 @@ const getAllChatCustomers = async (user = null) => {
     `;
     let params = [];
 
-    if (user && user.role.toLowerCase() === 'sales') {
+    if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
       query += " AND l.assigned_to = ?";
       params.push(user.id);
     }
@@ -278,6 +279,28 @@ const getAllChatCustomers = async (user = null) => {
 
 const deleteChatMessage = async (chatId) => {
   await db.execute('DELETE FROM chat_messages WHERE chat_id = ?', [chatId]);
+};
+
+/**
+ * Marks incoming messages as read for a given phone number
+ */
+const markMessagesAsRead = async (phoneInput) => {
+  const phone = normalizePhone(phoneInput);
+  try {
+    const [leads] = await db.execute('SELECT lead_id FROM leads WHERE phone_number = ?', [phone]);
+    if (leads.length === 0) return;
+    const lead_id = leads[0].lead_id;
+
+    await db.execute(`
+      UPDATE chat_messages 
+      SET status = 'read' 
+      WHERE sender_type = 'user' 
+        AND status = 'sent' 
+        AND session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = ?)
+    `, [lead_id]);
+  } catch (err) {
+    logger.error('Error marking messages as read:', err.message);
+  }
 };
 
 /**
@@ -304,5 +327,6 @@ module.exports = {
   getChatHistory,
   getAllChatCustomers,
   deleteChatMessage,
+  markMessagesAsRead,
   updateMessageStatus
 };

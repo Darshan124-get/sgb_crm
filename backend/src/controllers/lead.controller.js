@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 exports.getLeads = async (req, res) => {
     const { status, language, assigned_to, is_today, is_unassigned, source, search } = req.query;
-    const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'sales';
+    const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
     try {
@@ -10,7 +10,7 @@ exports.getLeads = async (req, res) => {
         let params = [];
 
         // 🛡️ SECURITY: Role-Based Data Isolation
-        if (userRole === 'sales') {
+        if ((userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp')) {
             query += ' AND l.assigned_to = ?';
             params.push(userId);
         } else {
@@ -77,7 +77,7 @@ exports.getLeads = async (req, res) => {
 };
 
 exports.getLeadById = async (req, res) => {
-    const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'sales';
+    const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
     try {
@@ -89,8 +89,8 @@ exports.getLeadById = async (req, res) => {
 
         const lead = rows[0];
 
-        // 🛡️ SECURITY: Prevent Sales from viewing leads not assigned to them
-        if (userRole === 'sales' && lead.assigned_to !== userId) {
+        // 🛡️ SECURITY: Prevent Executive/Viewer from viewing leads not assigned to them
+        if ((userRole === 'executive' || userRole === 'viewer') && lead.assigned_to !== userId) {
             return res.status(403).json({ message: 'Access denied: Lead not assigned to you' });
         }
 
@@ -172,7 +172,9 @@ exports.createLead = async (req, res) => {
             `SELECT u.user_id 
              FROM users u 
              JOIN roles r ON u.role_id = r.role_id 
-             WHERE r.name = 'sales' 
+             JOIN departments d ON u.department_id = d.id
+             WHERE d.name LIKE '%sales%' 
+               AND r.name IN ('executive', 'manager')
                AND (FIND_IN_SET(?, u.language) > 0 OR u.language = 'General') 
                AND u.status = 'active'
              ORDER BY u.updated_at ASC LIMIT 1`,
@@ -391,7 +393,10 @@ exports.transferLead = async (req, res) => {
                 `SELECT u.user_id, u.name 
                  FROM users u 
                  JOIN roles r ON u.role_id = r.role_id 
-                 WHERE r.name = 'sales' AND u.language = ? AND u.status = 'active'
+                 JOIN departments d ON u.department_id = d.id
+                 WHERE d.name LIKE '%sales%' 
+                   AND r.name IN ('executive', 'manager')
+                   AND u.language = ? AND u.status = 'active'
                  ORDER BY u.updated_at ASC LIMIT 1`,
                 [target_language]
             );
@@ -434,14 +439,14 @@ exports.transferLead = async (req, res) => {
 };
 
 exports.getStats = async (req, res) => {
-    const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'sales';
+    const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
     try {
         let baseWhere = 'WHERE 1=1';
         let params = [];
 
-        if (userRole === 'sales') {
+        if (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') {
             baseWhere += ' AND assigned_to = ?';
             params.push(userId);
         }
@@ -523,7 +528,9 @@ exports.autoAssign = async (req, res) => {
                 `SELECT u.user_id, u.name 
                  FROM users u 
                  JOIN roles r ON u.role_id = r.role_id 
-                 WHERE r.name = 'sales' 
+                 JOIN departments d ON u.department_id = d.id
+                 WHERE d.name LIKE '%sales%' 
+                   AND r.name IN ('executive', 'manager')
                    AND (FIND_IN_SET(?, u.language) > 0 OR u.language = 'General') 
                    AND u.status = 'active'
                  ORDER BY u.updated_at ASC LIMIT 1`,
@@ -552,6 +559,26 @@ exports.autoAssign = async (req, res) => {
         try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('autoAssign Error:', err);
         res.status(500).json({ message: 'Database error' });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+exports.updateDecisionEngineState = async (req, res) => {
+    const { id } = req.params;
+    const { decision_engine_state } = req.body;
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        const stateValue = decision_engine_state ? JSON.stringify(decision_engine_state) : null;
+        await connection.query(
+            `UPDATE leads SET decision_engine_state = ? WHERE lead_id = ?`,
+            [stateValue, id]
+        );
+        res.json({ message: 'State updated successfully' });
+    } catch (error) {
+        console.error('Error updating decision engine state:', error);
+        res.status(500).json({ message: 'Database error', error: error.message });
     } finally {
         if (connection) connection.release();
     }

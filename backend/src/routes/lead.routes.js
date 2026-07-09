@@ -16,5 +16,6 @@ router.post('/:id/transfer', authenticateToken, isAdminOrSales, leadController.t
 router.delete('/:id', authenticateToken, isAdminOrSales, leadController.deleteLead);
 router.get('/:id/notes', authenticateToken, leadController.getLeadNotes);
 router.post('/:id/notes', authenticateToken, leadController.addLeadNote);
+router.put('/:id/de-state', authenticateToken, leadController.updateDecisionEngineState);
 
 module.exports = router;

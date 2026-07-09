@@ -23,8 +23,10 @@ exports.getSchedules = async (req, res) => {
         `;
         let params = [];
 
+        const isManagerOrAdmin = req.user && (req.user.is_manager || userRole === 'admin' || userRole === 'super-admin');
+
         // Role-based filtering
-        if (userRole === 'sales') {
+        if (!isManagerOrAdmin) {
             query += ' AND l.assigned_to = ?';
             params.push(userId);
         } else if (staff_id) {
@@ -81,7 +83,9 @@ exports.getScheduleStats = async (req, res) => {
         let baseWhere = 'FROM lead_followups f JOIN leads l ON f.lead_id = l.lead_id WHERE 1=1';
         let params = [];
 
-        if (userRole === 'sales') {
+        const isManagerOrAdmin = req.user && (req.user.is_manager || userRole === 'admin' || userRole === 'super-admin');
+
+        if (!isManagerOrAdmin) {
             baseWhere += ' AND l.assigned_to = ?';
             params.push(userId);
         }

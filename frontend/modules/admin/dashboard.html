@@ -42,7 +42,7 @@
             <div class="stats-grid" style="margin-bottom:2.5rem;">
                 <div class="stat-card premium-card" style="display:flex;align-items:center;gap:1.25rem;padding:1.5rem;border-bottom:3px solid #3b82f6;">
                     <div style="width:48px;height:48px;border-radius:12px;background:#eff6ff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:1.25rem;"><i class="fas fa-users"></i></div>
-                    <div><p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Total Leads (MTD)</p><p style="font-size:1.5rem;font-weight:800;" id="totalLeads">—</p></div>
+                    <div><p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Total Leads</p><p style="font-size:1.5rem;font-weight:800;" id="totalLeads">—</p></div>
                 </div>
                 <div class="stat-card premium-card" style="display:flex;align-items:center;gap:1.25rem;padding:1.5rem;border-bottom:3px solid #10b981;">
                     <div style="width:48px;height:48px;border-radius:12px;background:#ecfdf5;color:#10b981;display:flex;align-items:center;justify-content:center;font-size:1.25rem;"><i class="fas fa-wallet"></i></div>
@@ -59,27 +59,18 @@
             </div>
 
             <!-- Main Panels -->
-            <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:2rem;margin-bottom:2.5rem;">
-                <!-- Urgent Tasks -->
+            <div style="display:grid;grid-template-columns:1fr;gap:2rem;margin-bottom:2.5rem;">
+                <!-- Leads By Location -->
                 <div class="smart-panel premium-card" style="overflow:hidden;">
                     <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;">
                         <div>
-                            <h3 style="font-size:1rem;font-weight:700;color:#0f172a;">🚨 Urgent Follow-ups</h3>
-                            <p style="font-size:0.75rem;color:#64748b;">Team overdue tasks requiring immediate action.</p>
+                            <h3 style="font-size:1rem;font-weight:700;color:#0f172a;">📍 Leads By Location</h3>
+                            <p style="font-size:0.75rem;color:#64748b;">Distribution of leads across top cities.</p>
                         </div>
-                        <span id="overdueBadge" style="background:#fee2e2;color:#ef4444;font-weight:700;padding:4px 12px;border-radius:20px;font-size:0.75rem;">0 Overdue</span>
                     </div>
-                    <div id="urgentPanel" style="min-height:320px;">
-                        <div style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin fa-2x"></i></div>
+                    <div style="height:320px;padding:1.5rem;">
+                        <canvas id="locationPieChart"></canvas>
                     </div>
-                </div>
-
-                <!-- Pipeline Mini View -->
-                <div class="smart-panel premium-card" style="overflow:hidden;">
-                    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
-                        <h3 style="font-size:1rem;font-weight:700;color:#0f172a;">📊 Team Pipeline Stages</h3>
-                    </div>
-                    <div id="pipelineMiniView" style="padding:1.5rem;"></div>
                 </div>
             </div>
 

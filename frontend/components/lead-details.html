@@ -366,15 +366,15 @@
 
                 <div id="de-sales-status-container" class="form-group">
                     <label>Sales Status *</label>
-                    <select id="de-sales-status" class="form-control-premium" style="color:#000;">
-                        <option value="">-- Select Decision --</option>
-                        <option value="converted">Ordered</option>
-                        <option value="interested">Hot / Very Interested</option>
-                        <option value="followup">Mild / Later</option>
-                        <option value="not_interested">Cold / Not Interested</option>
-                        <option value="lost">Old Purchased</option>
-                        <option value="dealer">Dealer</option>
-                    </select>
+                    <div id="de-sales-status-wrapper" class="status-pill-grid selection-row">
+                        <button type="button" class="status-pill" data-value="converted">Ordered</button>
+                        <button type="button" class="status-pill" data-value="interested">Hot / Very Interested</button>
+                        <button type="button" class="status-pill" data-value="followup">Mild / Later</button>
+                        <button type="button" class="status-pill" data-value="not_interested">Cold / Not Interested</button>
+                        <button type="button" class="status-pill" data-value="lost">Old Purchased</button>
+                        <button type="button" class="status-pill" data-value="dealer">Dealer</button>
+                    </div>
+                    <input type="hidden" id="de-sales-status" value="">
                 </div>
 
                 <!-- DYNAMIC SUB-FORMS (Decision related) -->
@@ -486,17 +486,56 @@
                 <h3 style="font-size:1rem; margin-bottom:1rem; color:var(--text-main);">Step 4: Product Selection &
                     Order</h3>
 
+                <style>
+                    .product-select-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                        gap: 1rem;
+                        margin-top: 0.5rem;
+                    }
+                    .product-select-card {
+                        border: 1px solid #e2e8f0;
+                        border-radius: 0.75rem;
+                        padding: 1rem;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: #fff;
+                    }
+                    .product-select-card:hover {
+                        border-color: #94a3b8;
+                        background: #f8fafc;
+                    }
+                    .product-select-card.selected {
+                        border-color: #2563eb;
+                        background: #eff6ff;
+                        box-shadow: 0 0 0 1px #2563eb;
+                    }
+                    .product-select-card .check-indicator {
+                        opacity: 0;
+                        color: #2563eb;
+                        transition: opacity 0.2s;
+                    }
+                    .product-select-card.selected .check-indicator {
+                        opacity: 1;
+                    }
+                    .product-select-card .product-name {
+                        font-weight: 600;
+                        color: #1e293b;
+                        margin-bottom: 0.25rem;
+                        font-size: 0.9rem;
+                    }
+                    .product-select-card .product-price {
+                        font-size: 0.8rem;
+                        color: #64748b;
+                    }
+                </style>
                 <div id="de-product-selection-container" class="form-group">
-                    <label>Select Products (Multi-select)</label>
-                    <select id="de-products" class="form-control-premium" multiple style="height:120px; color:#000;">
-                        <option value="Brush Cutter Machine" data-id="1" data-price="12000">Brush Cutter Machine
-                        </option>
-                        <option value="Trolley" data-id="2" data-price="8500">Trolley</option>
-                        <option value="Dumper" data-id="3" data-price="15000">Dumper</option>
-                        <option value="Accessories" data-id="4" data-price="2000">Accessories</option>
-                    </select>
-                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Hold Ctrl (Windows) or
-                        Cmd (Mac) to select multiple.</p>
+                    <label style="font-weight: 700; color: #1e293b;">Select Products (1-Click Selection)</label>
+                    <div id="de-products-container" class="product-select-grid"></div>
+                    <select id="de-products" class="form-control-premium" multiple style="display:none;"></select>
                 </div>
 
                 <!-- 1A: ORDER FORM (Moved here from Decision) -->

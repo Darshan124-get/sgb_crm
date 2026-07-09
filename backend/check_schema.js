@@ -1,12 +1,7 @@
-const pool = require('./src/config/db');
-async function check() {
-    try {
-        const [rows] = await pool.query('DESCRIBE leads');
-        console.log(JSON.stringify(rows, null, 2));
-        process.exit(0);
-    } catch (err) {
-        console.error(err);
-        process.exit(1);
-    }
-}
-check();
+const sqlite3 = require('sqlite3').verbose();
+const db = new sqlite3.Database('database.sqlite');
+db.all("SELECT sql FROM sqlite_master WHERE type='table'", (err, rows) => {
+    if (err) console.error(err);
+    else rows.forEach(r => console.log(r.sql));
+    db.close();
+});

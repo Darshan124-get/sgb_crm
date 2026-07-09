@@ -4,35 +4,111 @@
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const user = window.getCurrentUser();
+    const role = (user.role || '').toLowerCase();
+    
     const sidebarContainer = document.getElementById('sidebar-container');
 
-    // ── Sidebar Injection ──
+    // ── Sidebar Injection & PBAC Dynamic Rendering ──
     if (sidebarContainer) {
-        const user = window.getCurrentUser();           // ← uses JWT decode as fallback
-        const role = (user.role || '').toLowerCase();
-
-        const sidebarMap = {
-            admin: 'sidebar-admin.html',
-            sales: 'sidebar-sales.html',
-            billing: 'sidebar-billing.html',
-            packing: 'sidebar-packing.html',
-            shipping: 'sidebar-shipping.html',
-            shipment: 'sidebar-shipping.html'
-        };
-
-        const sidebarFile = sidebarMap[role] || 'sidebar-sales.html'; // Default to sales if unknown
-
+        let userPermissions = [];
         try {
-            // ROOT_PATH is either '' or '../../' etc.
-            const response = await fetch(`${window.ROOT_PATH}components/${sidebarFile}`);
+            userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []);
+        } catch(e) {
+            userPermissions = [];
+        }
+
+        // Admins override
+        if (role === 'admin' || role === 'super-admin') {
+            userPermissions.push('ALL');
+        }
+        
+        try {
+            let sidebarFileName = 'sidebar-dynamic.html';
+            
+            // Admins and Super Admins always get the admin sidebar
+            if (role === 'admin' || role === 'super-admin') {
+                sidebarFileName = 'sidebar-admin.html';
+            } else if (role === 'whatsapp_management_executive') {
+                sidebarFileName = 'sidebar-whatsapp_management_executive.html';
+            } else if (role === 'billing_manager' || (role === 'manager' && userPermissions.includes('billing_billing'))) {
+                sidebarFileName = 'sidebar-billing_manager.html';
+            } else if (role === 'shipping_manager' || (role === 'manager' && userPermissions.includes('shipping_dashboard'))) {
+                sidebarFileName = 'sidebar-shipping_manager.html';
+            }
+            // If user has zero specific permissions, load their role's original default sidebar.
+            else if (userPermissions.length === 0 && role) {
+                const normalizedRole = role.trim().replace(/\s+/g, '_');
+                sidebarFileName = `sidebar-${normalizedRole}.html`;
+            }
+
+            let response = await fetch(`${window.ROOT_PATH}components/${sidebarFileName}`);
+            
+            // Fallback to dynamic sidebar if the role-specific file doesn't exist
+            if (!response.ok && sidebarFileName !== 'sidebar-dynamic.html') {
+                sidebarFileName = 'sidebar-dynamic.html';
+                response = await fetch(`${window.ROOT_PATH}components/${sidebarFileName}`);
+            }
+
             if (response.ok) {
                 sidebarContainer.innerHTML = await response.text();
+                
+                // 🔐 Filter Sidebar by Permissions 🔐
+                const navItems = sidebarContainer.querySelectorAll('.nav-item');
+                navItems.forEach(item => {
+                    const reqPerm = item.getAttribute('data-perm');
+                    if (reqPerm && !userPermissions.includes('ALL') && !userPermissions.includes(reqPerm)) {
+                        item.remove(); // Remove unauthorized module link
+                    }
+                });
+
+                // ── Cleanup Empty Group Titles ──
+                const groups = sidebarContainer.querySelectorAll('.nav-group-title');
+                groups.forEach(group => {
+                    let nextSibling = group.nextElementSibling;
+                    let hasItems = false;
+                    while (nextSibling && !nextSibling.classList.contains('nav-group-title')) {
+                        if (nextSibling.classList.contains('nav-item')) {
+                            hasItems = true;
+                            break;
+                        }
+                        nextSibling = nextSibling.nextElementSibling;
+                    }
+                    if (!hasItems) group.remove();
+                });
+
                 initSidebar(sidebarContainer.querySelectorAll('a'));
+                
+                // ── Update Sidebar Role Label ──
+                if (role === 'super-admin') {
+                    const sidebarLabel = document.getElementById('sidebar-role-label');
+                    if (sidebarLabel) sidebarLabel.textContent = 'SUPER ADMIN PORTAL';
+                } else if (role === 'manager' && userPermissions.includes('sales_dashboard')) {
+                    const sidebarLabel = document.getElementById('sidebar-role-label');
+                    if (sidebarLabel) sidebarLabel.textContent = 'SALES MANAGER PANEL';
+                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
+                    if (dashboardLabel) dashboardLabel.textContent = 'Sales Manager Dashboard';
+                } else if (role.includes('telecaller')) {
+                    const sidebarLabel = document.getElementById('sidebar-role-label');
+                    if (sidebarLabel) sidebarLabel.textContent = 'TELECOM PANEL';
+                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
+                    if (dashboardLabel) dashboardLabel.textContent = 'Telecom Dashboard';
+                } else if (role.includes('whatsapp')) {
+                    const sidebarLabel = document.getElementById('sidebar-role-label');
+                    if (sidebarLabel) sidebarLabel.textContent = 'WHATSAPP PANEL';
+                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
+                    if (dashboardLabel) dashboardLabel.textContent = 'WhatsApp Dashboard';
+                } else if (role === 'viewer') {
+                    const sidebarLabel = document.getElementById('sidebar-role-label');
+                    if (sidebarLabel) sidebarLabel.textContent = 'VIEWER PANEL';
+                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
+                    if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
+                }
             } else {
-                console.error(`Sidebar file not found: ${sidebarFile}`);
+                console.error(`Sidebar file not found: sidebar-dynamic.html`);
             }
         } catch (err) {
-            console.error('Failed to load sidebar:', err);
+            console.error('Failed to load dynamic sidebar:', err);
         }
     }
 
@@ -45,11 +121,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ── Global Search ──
     initGlobalSearch();
 
+    // ── Super Admin Read-Only UI Adjustments ──
+    if (role === 'super-admin') {
+        const path = window.location.pathname;
+        const isAccessControlPage = path.includes('users.html') || path.includes('departments.html') || path.includes('roles.html');
+        
+        const bannerText = isAccessControlPage 
+            ? 'SUPER ADMIN MODE: You have full modification access on this User Management page.' 
+            : 'MONITORING MODE: You have full read-only access to the system. Modifications are disabled.';
+            
+        const banner = document.createElement('div');
+        banner.innerHTML = `<div style="background: ${isAccessControlPage ? '#dcfce7' : '#fef3c7'}; border-bottom: 1px solid ${isAccessControlPage ? '#bbf7d0' : '#fde68a'}; color: ${isAccessControlPage ? '#166534' : '#92400e'}; text-align: center; padding: 0.5rem; font-weight: 700; font-size: 0.85rem; position: sticky; top: 0; z-index: 10000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <i class="fa-solid ${isAccessControlPage ? 'fa-users-gear' : 'fa-eye'}" style="margin-right: 5px;"></i> ${bannerText}
+        </div>`;
+        document.body.prepend(banner);
+
+        if (!isAccessControlPage) {
+            const style = document.createElement('style');
+            style.innerHTML = `
+                /* Attempt to hide obvious creation/deletion action buttons */
+                .btn-primary, .btn-danger, .btn-success, .btn-add-lead, [onclick*="delete"], [onclick*="save"], [onclick*="create"], [onclick*="add"], [onclick*="mark"], [onclick*="convert"], [onclick*="ship"], [onclick*="verify"], [onclick*="approve"], [onclick*="reject"] {
+                    opacity: 0.5;
+                    pointer-events: none !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    // ── Viewer Read-Only UI Adjustments ──
+    if (role === 'viewer') {
+        const bannerText = 'VIEWER MODE: You have read-only access to the system. Modifications are disabled.';
+        const banner = document.createElement('div');
+        banner.innerHTML = `<div style="background: #fef3c7; border-bottom: 1px solid #fde68a; color: #92400e; text-align: center; padding: 0.5rem; font-weight: 700; font-size: 0.85rem; position: sticky; top: 0; z-index: 10000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <i class="fa-solid fa-eye" style="margin-right: 5px;"></i> ${bannerText}
+        </div>`;
+        document.body.prepend(banner);
+
+        const style = document.createElement('style');
+        style.innerHTML = `
+            /* Hide obvious creation/deletion action buttons */
+            .btn-primary, .btn-danger, .btn-success, .btn-add-lead, #bulkActionsBar, [onclick*="delete"], [onclick*="save"], [onclick*="create"], [onclick*="add"], [onclick*="openAddLeadModal"], [onclick*="mark"], [onclick*="convert"], [onclick*="ship"], [onclick*="verify"], [onclick*="approve"], [onclick*="reject"] {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     // ── Update Profile Name ──
-    const user = window.getCurrentUser();
     const profileNameEl = document.getElementById('profileName');
     if (profileNameEl && user.name) {
-        profileNameEl.textContent = user.name;
+        let displayName = user.name;
+        if (role === 'super-admin' && displayName.toLowerCase() === 'admin') {
+            displayName = 'Super Admin';
+        }
+        profileNameEl.textContent = displayName;
     }
 });
 
@@ -159,7 +285,7 @@ async function updateLeadStats() {
         const response = await fetch(`${API_URL}/leads/stats`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (response.status === 401 || response.status === 403) { handleAuthError(); return; }
+        if (response.status === 401 || response.status === 403) { window.doLogout(); return; }
         if (response.ok) {
             const stats = await response.json();
             const badgeMap = {
@@ -414,11 +540,12 @@ window.clearSelection = function () {
 window.openBulkAssignModal = async function () {
     const token = localStorage.getItem('token');
     try {
-        // Fetch sales staff to choose from
-        const response = await fetch(`${API_URL}/users?role=sales`, {
+        // Fetch staff to choose from
+        const response = await fetch(`${API_URL}/users`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        const users = await response.json();
+        const allUsers = await response.json();
+        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
 
         const content = `
             <div style="padding: 1.5rem; background: #fff;">
@@ -990,10 +1117,11 @@ window.changeAssigneeFromDetails = async function () {
 
     const token = localStorage.getItem('token');
     try {
-        const response = await fetch(`${API_URL}/users?role=sales`, {
+        const response = await fetch(`${API_URL}/users`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        const users = await response.json();
+        const allUsers = await response.json();
+        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
 
         const content = `
             <div style="padding: 1rem;">

@@ -23,6 +23,12 @@ async function loadSettings() {
         document.getElementById('s-auto-tax').checked = data.auto_tax_switch === 'true';
         document.getElementById('s-invoice-prefix').value = data.invoice_prefix || 'SGB';
         document.getElementById('s-last-invoice').value = data.last_invoice_num || 0;
+        
+        const postInput = document.getElementById('s-post-tracking');
+        if (postInput) postInput.value = data.post_tracking_url || 'https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx';
+        
+        const vrlInput = document.getElementById('s-vrl-tracking');
+        if (vrlInput) vrlInput.value = data.vrl_tracking_url || 'https://www.vrlgroup.in/track_consignment.aspx';
 
     } catch (err) {
         showToast('Failed to load settings', true);
@@ -37,6 +43,12 @@ async function saveSettings() {
         invoice_prefix: document.getElementById('s-invoice-prefix').value,
         last_invoice_num: document.getElementById('s-last-invoice').value
     };
+
+    const postInput = document.getElementById('s-post-tracking');
+    if (postInput) payload.post_tracking_url = postInput.value;
+
+    const vrlInput = document.getElementById('s-vrl-tracking');
+    if (vrlInput) payload.vrl_tracking_url = vrlInput.value;
 
     try {
         const token = localStorage.getItem('token');

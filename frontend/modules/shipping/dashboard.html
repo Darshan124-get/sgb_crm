@@ -19,7 +19,7 @@
         }
 
         .dashboard-wrapper { display: flex; min-height: 100vh; background: #f8fafc; }
-        .main-content { flex: 1; padding: 1.5rem; overflow-y: auto; }
+        .main-content { flex: 1; padding: 1.5rem; overflow-y: auto; overflow-x: hidden; min-width: 0; }
 
         .dashboard-header {
             display: flex;
@@ -32,9 +32,18 @@
         .welcome-section p { color: #64748b; font-size: 0.85rem; }
 
         /* KPI Grid */
+        .kpi-section-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #1e293b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
@@ -42,60 +51,59 @@
         .kpi-card {
             background: white;
             padding: 1.25rem;
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid #f1f5f9;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
             display: flex;
-            align-items: center;
-            gap: 1.25rem;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
+            min-width: 0; /* Prevents overflow from large content */
         }
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
 
-        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06); }
+        .kpi-card.blue { border: 1px solid #bfdbfe; }
+        .kpi-card.orange { border: 1px solid #fed7aa; }
+        .kpi-card.green { border: 1px solid #bbf7d0; }
+        .kpi-card.purple { border: 1px solid #e9d5ff; }
+        .kpi-card.red { border: 1px solid #fecaca; }
+        .kpi-card.teal { border: 1px solid #99f6e4; }
 
         .kpi-icon-wrapper {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.25rem;
+            font-size: 1.15rem;
         }
 
-        .icon-blue { background: #eff6ff; color: #3b82f6; }
-        .icon-green { background: #ecfdf5; color: #10b981; }
-        .icon-orange { background: #fff7ed; color: #f59e0b; }
+        .kpi-icon-wrapper.blue { background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; }
+        .kpi-icon-wrapper.orange { background: #fff7ed; color: #f97316; border: 1px solid #fed7aa; }
+        .kpi-icon-wrapper.green { background: #f0fdf4; color: #22c55e; border: 1px solid #bbf7d0; }
+        .kpi-icon-wrapper.purple { background: #faf5ff; color: #a855f7; border: 1px solid #e9d5ff; }
+        .kpi-icon-wrapper.red { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+        .kpi-icon-wrapper.teal { background: #f0fdfa; color: #14b8a6; border: 1px solid #99f6e4; }
 
-        .kpi-info h3 { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0.1rem 0; }
-        .kpi-info span { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-size: 0.7rem;
+        .kpi-info {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            overflow: hidden;
+        }
+        .kpi-info h3 { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kpi-info span { font-size: 0.75rem; font-weight: 600; color: #475569; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .kpi-link {
+            font-size: 0.75rem;
             font-weight: 700;
-            padding: 0.2rem 0.6rem;
-            border-radius: 100px;
-            margin-top: 0.25rem;
+            color: #3b82f6;
+            text-decoration: none;
+            margin-top: 0.5rem;
+            cursor: pointer;
         }
-        .status-pending { background: #eff6ff; color: #3b82f6; }
-        .status-shipped { background: #ecfdf5; color: #10b981; }
-
-        .pulse-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 currentColor; }
-            70% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 currentColor; }
-        }
+        .kpi-link:hover { text-decoration: underline; }
 
         /* Charts Layout */
         .charts-container {
@@ -110,6 +118,7 @@
             border-radius: 20px;
             box-shadow: var(--card-shadow);
             border: 1px solid #f1f5f9;
+            min-width: 0;
         }
 
         .chart-header {
@@ -138,14 +147,13 @@
         .refresh-btn:hover { background: #f1f5f9; transform: scale(1.02); }
 
         /* Responsiveness */
-        @media (max-width: 1200px) {
+        @media (max-width: 1024px) {
             .charts-container { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 768px) {
             .dashboard-wrapper { flex-direction: column; }
             .main-content { padding: 1rem; }
-            .kpi-grid { grid-template-columns: 1fr; }
             .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
         }
     </style>
@@ -166,44 +174,78 @@
             </div>
 
             <!-- KPI Cards -->
+            <div class="kpi-section-title">KPI Management</div>
             <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-icon-wrapper icon-blue">
-                        <i class="fas fa-box-open"></i>
+                <!-- Pending Orders -->
+                <div class="kpi-card blue">
+                    <div class="kpi-icon-wrapper blue">
+                        <i class="fas fa-truck"></i>
                     </div>
                     <div class="kpi-info">
-                        <span>Ready to Ship</span>
-                        <h3 id="pendingShipCount">0</h3>
-                        <div class="status-badge status-pending">
-                            <span class="pulse-dot"></span> Awaiting Dispatch
-                        </div>
+                        <h3 id="pendingOrdersCount">0</h3>
+                        <span>Pending Orders</span>
                     </div>
+                    <a class="kpi-link">View All</a>
                 </div>
 
-                <div class="kpi-card">
-                    <div class="kpi-icon-wrapper icon-green">
+                <!-- In-Transit Orders -->
+                <div class="kpi-card orange">
+                    <div class="kpi-icon-wrapper orange">
                         <i class="fas fa-truck-fast"></i>
                     </div>
                     <div class="kpi-info">
-                        <span>Today's Dispatched</span>
-                        <h3 id="todayShippedCount">0</h3>
-                        <div class="status-badge status-shipped">
-                            <span class="pulse-dot" style="background:#10b981"></span> Out for Delivery
-                        </div>
+                        <h3 id="inTransitOrdersCount">0</h3>
+                        <span>In-Transit Orders</span>
                     </div>
+                    <a class="kpi-link">View All</a>
                 </div>
 
-                <div class="kpi-card">
-                    <div class="kpi-icon-wrapper icon-orange">
-                        <i class="fas fa-route"></i>
+                <!-- Pay Check on Post -->
+                <div class="kpi-card green">
+                    <div class="kpi-icon-wrapper green">
+                        <i class="fas fa-money-check"></i>
                     </div>
                     <div class="kpi-info">
-                        <span>Active In-Transit</span>
-                        <h3 id="inTransitCount">0</h3>
-                        <div class="status-badge" style="background: #fff7ed; color: #f59e0b;">
-                            <i class="fas fa-location-dot"></i> Live Tracking
-                        </div>
+                        <h3 id="payCheckCount">0</h3>
+                        <span>Pay Check on Post</span>
                     </div>
+                    <a class="kpi-link">View All</a>
+                </div>
+
+                <!-- Completed / Delivered -->
+                <div class="kpi-card purple">
+                    <div class="kpi-icon-wrapper purple">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="completedCount">0</h3>
+                        <span>Completed / Delivered</span>
+                    </div>
+                    <a class="kpi-link">View All</a>
+                </div>
+
+                <!-- Total COD Amount -->
+                <div class="kpi-card red">
+                    <div class="kpi-icon-wrapper red">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="totalCodAmount">₹ 0</h3>
+                        <span>Total COD Amount</span>
+                    </div>
+                    <a class="kpi-link">View Details</a>
+                </div>
+
+                <!-- COD Received -->
+                <div class="kpi-card teal">
+                    <div class="kpi-icon-wrapper teal">
+                        <i class="fas fa-hand-holding-dollar"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="codReceived">₹ 0</h3>
+                        <span>COD Received</span>
+                    </div>
+                    <a class="kpi-link">View Details</a>
                 </div>
             </div>
 

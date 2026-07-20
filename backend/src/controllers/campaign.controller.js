@@ -1,15 +1,62 @@
 const db = require('../config/db');
+const supabase = require('../config/supabase');
+const logger = require('../utils/whatsappLogger');
+
+const processAutoReplies = async (campaign_id, auto_replies) => {
+    if (!auto_replies || !Array.isArray(auto_replies)) return null;
+
+    const processed = [];
+    for (let i = 0; i < auto_replies.length; i++) {
+        let reply = { ...auto_replies[i] };
+        
+        if (reply.mediaData && reply.mimeType) {
+            try {
+                const buffer = Buffer.from(reply.mediaData.split(',')[1], 'base64');
+                const extension = reply.mimeType.split('/')[1] || 'bin';
+                const fileName = `campaigns/${campaign_id}/auto-reply-${Date.now()}-${i}.${extension}`;
+                
+                const { error } = await supabase.storage
+                  .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
+                  .upload(fileName, buffer, {
+                    contentType: reply.mimeType,
+                    upsert: true
+                  });
+
+                if (error) {
+                    logger.error('Supabase upload error for campaign auto_reply:', error.message);
+                    throw error;
+                }
+
+                const { data: urlData } = supabase.storage
+                  .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
+                  .getPublicUrl(fileName);
+
+                reply.url = urlData.publicUrl;
+                delete reply.mediaData; // Remove large base64 payload before saving
+                delete reply.mimeType;
+            } catch (err) {
+                logger.error('Error processing media for campaign:', err.message);
+                // Can decide whether to throw or skip this media. Throwing ensures consistency.
+                throw err; 
+            }
+        }
+        processed.push(reply);
+    }
+    return JSON.stringify(processed);
+};
 
 exports.createCampaign = async (req, res) => {
     try {
-        const { campaign_id, tag_line, ad_spend } = req.body;
+        const { campaign_id, tag_line, ad_spend, auto_replies } = req.body;
         if (!campaign_id || !tag_line) {
             return res.status(400).json({ error: 'campaign_id and tag_line are required' });
         }
         
+        const processedReplies = await processAutoReplies(campaign_id, auto_replies);
+
         const [result] = await db.query(
-            'INSERT INTO campaigns (campaign_id, tag_line, ad_spend) VALUES (?, ?, ?)',
-            [campaign_id, tag_line, ad_spend || 0.00]
+            'INSERT INTO campaigns (campaign_id, tag_line, ad_spend, auto_replies) VALUES (?, ?, ?, ?)',
+            [campaign_id, tag_line, ad_spend || 0.00, processedReplies]
         );
         
         res.status(201).json({ message: 'Campaign created', id: result.insertId });
@@ -35,11 +82,13 @@ exports.getCampaigns = async (req, res) => {
 exports.updateCampaign = async (req, res) => {
     try {
         const { id } = req.params;
-        const { campaign_id, tag_line, status, ad_spend } = req.body;
+        const { campaign_id, tag_line, status, ad_spend, auto_replies } = req.body;
         
+        const processedReplies = await processAutoReplies(campaign_id, auto_replies);
+
         const [result] = await db.query(
-            'UPDATE campaigns SET campaign_id = ?, tag_line = ?, status = ?, ad_spend = ? WHERE id = ?',
-            [campaign_id, tag_line, status, ad_spend || 0.00, id]
+            'UPDATE campaigns SET campaign_id = ?, tag_line = ?, status = ?, ad_spend = ?, auto_replies = ? WHERE id = ?',
+            [campaign_id, tag_line, status, ad_spend || 0.00, processedReplies, id]
         );
         
         if (result.affectedRows === 0) {

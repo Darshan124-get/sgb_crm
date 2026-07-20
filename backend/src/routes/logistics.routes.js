@@ -7,5 +7,7 @@ router.post('/packing', authenticateToken, hasPermission('packing_packing'), log
 router.post('/ship', authenticateToken, hasPermission('shipping_shipping'), logisticsController.shipOrder);
 router.get('/dashboard-stats', authenticateToken, logisticsController.getDashboardStats); // Dashboard handles both, so keep generic or protect appropriately
 router.get('/ship', authenticateToken, hasPermission('shipping_shipping'), logisticsController.getShippingOrders);
+router.patch('/shipments/:id/status', authenticateToken, hasPermission('shipping_shipping'), logisticsController.updateShipmentStatus);
+router.patch('/shipments/:id/check_received', authenticateToken, hasPermission('shipping_shipping'), logisticsController.updateCheckReceived);
 
 module.exports = router;

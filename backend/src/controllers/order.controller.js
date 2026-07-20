@@ -10,11 +10,19 @@ exports.getOrders = async (req, res) => {
                 oi.quantity, 
                 oi.price, 
                 oi.total_price as item_total,
-                pk.packed_at
+                pk.packed_at,
+                s.shipment_id, 
+                s.courier_name, 
+                s.tracking_id, 
+                s.shipped_at, 
+                s.status as shipment_status, 
+                s.delivery_date, 
+                s.check_received_date
             FROM orders o
             LEFT JOIN order_items oi ON o.order_id = oi.order_id
             LEFT JOIN products p ON oi.product_id = p.product_id
             LEFT JOIN packing pk ON o.order_id = pk.order_id AND pk.status = 'packed'
+            LEFT JOIN shipments s ON o.order_id = s.order_id
         `;
         const conditions = [];
         const params = [];
@@ -76,10 +84,10 @@ exports.getOrders = async (req, res) => {
 
 exports.convertLeadToOrder = async (req, res) => {
     try {
-        let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, items } = req.body;
+        let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, discount, items } = req.body;
         const [resOrder] = await pool.query(
-            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)",
-            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, (total_amount - advance_amount) || 0, req.user ? req.user.id : 1]
+            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, discount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)",
+            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, ((total_amount || 0) - (discount || 0) - (advance_amount || 0)), discount || 0, req.user ? req.user.id : 1]
         );
         const orderId = resOrder.insertId;
 

@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = isEdit ? 'Edit Campaign' : 'Create a Campaign';
         
         const html = `
-            <div class="modal-content premium-card" style="max-width: 500px; width: 100%; padding: 2rem;">
+            <div class="modal-content premium-card" style="max-width: 800px; width: 100%; padding: 2rem; max-height: 90vh; overflow-y: auto;">
                 <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
                     <h2 style="font-size:1.5rem; font-weight:800; color:#1e293b; margin:0;">${title}</h2>
                     <span class="close-btn" onclick="window.closeModal()" style="cursor:pointer; font-size:1.5rem; color:#64748b;">&times;</span>
@@ -107,6 +107,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             </select>
                         </div>
                         ` : ''}
+                        
+                        <div class="form-group" style="margin-bottom: 1rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <label style="font-weight:600; font-size:0.875rem;">Auto Replies Sequence</label>
+                                <button type="button" class="btn btn-outline" onclick="window.addAutoReplyBlock()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"><i class="fas fa-plus"></i> Add Reply</button>
+                            </div>
+                            <div id="autoRepliesContainer" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                <!-- Blocks injected here -->
+                            </div>
+                        </div>
+                        
                         <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
                             <button type="button" class="btn btn-outline" onclick="window.closeModal()" style="padding:0.75rem 1.5rem; border-radius:0.5rem; border:none; background:#f1f5f9; color:#64748b; font-weight:600; cursor:pointer;">Cancel</button>
                             <button type="submit" class="btn" style="padding:0.75rem 1.5rem; border-radius:0.5rem; border:none; background:var(--primary-color); color:white; font-weight:600; cursor:pointer;">Save</button>
@@ -129,8 +140,132 @@ document.addEventListener('DOMContentLoaded', () => {
         globalModal.classList.remove('show');
     };
 
-    window.editCampaign = function(id, campaign_id, tag_line, status, ad_spend) {
-        openCampaignModal({ id, campaign_id, tag_line, status, ad_spend });
+    window.editCampaign = async function(id, campaign_id, tag_line, status, ad_spend) {
+        // Fetch full campaign details to get auto_replies
+        let autoReplies = [];
+        try {
+            const res = await fetch(`${window.API_URL}/campaigns`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if(res.ok) {
+                const data = await res.json();
+                const camp = data.find(c => c.id === id);
+                if(camp && camp.auto_replies) {
+                    autoReplies = typeof camp.auto_replies === 'string' ? JSON.parse(camp.auto_replies) : camp.auto_replies;
+                }
+            }
+        } catch(e) { console.error('Failed to fetch full campaign details for edit'); }
+        
+        openCampaignModal({ id, campaign_id, tag_line, status, ad_spend, auto_replies: autoReplies });
+        renderAutoReplies(autoReplies);
+    };
+
+    window.currentAutoReplies = [];
+    
+    function renderAutoReplies(replies) {
+        window.currentAutoReplies = replies || [];
+        drawAutoReplies();
+    }
+    
+    window.addAutoReplyBlock = function() {
+        window.currentAutoReplies.push({ type: 'text', content: '' });
+        drawAutoReplies();
+    };
+    
+    window.removeAutoReply = function(index) {
+        window.currentAutoReplies.splice(index, 1);
+        drawAutoReplies();
+    };
+    
+    window.moveAutoReply = function(index, dir) {
+        if(dir === -1 && index > 0) {
+            const temp = window.currentAutoReplies[index];
+            window.currentAutoReplies[index] = window.currentAutoReplies[index-1];
+            window.currentAutoReplies[index-1] = temp;
+        } else if (dir === 1 && index < window.currentAutoReplies.length - 1) {
+            const temp = window.currentAutoReplies[index];
+            window.currentAutoReplies[index] = window.currentAutoReplies[index+1];
+            window.currentAutoReplies[index+1] = temp;
+        }
+        drawAutoReplies();
+    };
+    
+    window.updateReplyType = function(index, type) {
+        window.currentAutoReplies[index].type = type;
+        drawAutoReplies();
+    }
+    
+    function drawAutoReplies() {
+        const container = document.getElementById('autoRepliesContainer');
+        if(!container) return;
+        
+        container.innerHTML = window.currentAutoReplies.map((reply, index) => {
+            let inputHtml = '';
+            if (reply.type === 'text') {
+                inputHtml = `<textarea placeholder="Enter message text" oninput="window.currentAutoReplies[${index}].content = this.value" class="form-control-premium" style="width:100%; padding:0.75rem; border-radius:0.5rem; font-size:0.875rem; min-height:80px; resize:vertical; font-family:inherit; border:1px solid #cbd5e1; outline:none;">${reply.content || ''}</textarea>`;
+            } else {
+                // Media type
+                inputHtml = `
+                    <div style="display:flex; flex-direction: column; gap:0.75rem; background:#fff; padding:1rem; border-radius:0.5rem; border:1px dashed #cbd5e1;">
+                        <input type="file" accept="${reply.type === 'image' ? 'image/*' : 'video/*'}" onchange="window.handleAutoReplyFile(event, ${index})" style="font-size:0.875rem;">
+                        ${reply.url ? `<a href="${reply.url}" target="_blank" style="font-size:0.875rem; color:var(--primary-color); font-weight:500; text-decoration:none;"><i class="fas fa-external-link-alt"></i> View Current Media</a>` : ''}
+                        ${reply.mediaData ? `<span style="font-size:0.875rem; color:#10b981; font-weight:500;"><i class="fas fa-check-circle"></i> New file selected</span>` : ''}
+                        <input type="text" placeholder="Caption (optional)" oninput="window.currentAutoReplies[${index}].caption = this.value" value="${reply.caption || ''}" class="form-control-premium" style="width:100%; padding:0.75rem; border-radius:0.5rem; font-size:0.875rem; border:1px solid #cbd5e1; outline:none;">
+                    </div>
+                `;
+            }
+            
+            return `
+            <div style="border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #f8fafc; overflow: hidden; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <!-- Header of the reply block -->
+                <div style="background: #f1f5f9; padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Step ${index + 1}</span>
+                        <select onchange="window.updateReplyType(${index}, this.value)" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; border: 1px solid #cbd5e1; outline:none;">
+                            <option value="text" ${reply.type === 'text' ? 'selected' : ''}>Text Message</option>
+                            <option value="image" ${reply.type === 'image' ? 'selected' : ''}>Image Message</option>
+                            <option value="video" ${reply.type === 'video' ? 'selected' : ''}>Video Message</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button type="button" onclick="window.confirmAutoReply(this, ${index})" style="cursor:pointer; background:#fff; border:1px solid #10b981; border-radius:0.25rem; width:28px; height:28px; color:#10b981; display:flex; align-items:center; justify-content:center; margin-left:0.5rem;" title="Confirm Reply"><i class="fas fa-check"></i></button>
+                        <button type="button" onclick="window.moveAutoReply(${index}, -1)" ${index === 0 ? 'disabled' : ''} style="cursor:${index === 0 ? 'not-allowed' : 'pointer'}; background:#fff; border:1px solid #e2e8f0; border-radius:0.25rem; width:28px; height:28px; color:${index === 0 ? '#cbd5e1' : '#64748b'}; display:flex; align-items:center; justify-content:center; margin-left:0.5rem;" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                        <button type="button" onclick="window.moveAutoReply(${index}, 1)" ${index === window.currentAutoReplies.length - 1 ? 'disabled' : ''} style="cursor:${index === window.currentAutoReplies.length - 1 ? 'not-allowed' : 'pointer'}; background:#fff; border:1px solid #e2e8f0; border-radius:0.25rem; width:28px; height:28px; color:${index === window.currentAutoReplies.length - 1 ? '#cbd5e1' : '#64748b'}; display:flex; align-items:center; justify-content:center; margin-left:0.25rem;" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                        <button type="button" onclick="window.removeAutoReply(${index})" style="cursor:pointer; background:#fff; border:1px solid #fee2e2; border-radius:0.25rem; width:28px; height:28px; color:#ef4444; display:flex; align-items:center; justify-content:center; margin-left:0.5rem;" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+                <!-- Body of the reply block -->
+                <div style="padding: 1rem;">
+                    ${inputHtml}
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    
+    window.handleAutoReplyFile = function(event, index) {
+        const file = event.target.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            window.currentAutoReplies[index].mediaData = e.target.result;
+            window.currentAutoReplies[index].mimeType = file.type;
+            drawAutoReplies();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    window.confirmAutoReply = function(btnEl, index) {
+        // Visual feedback only, as state is saved via oninput
+        btnEl.style.background = '#10b981';
+        btnEl.style.color = '#fff';
+        btnEl.innerHTML = '<i class="fas fa-check-double"></i>';
+        setTimeout(() => {
+            btnEl.style.background = '#fff';
+            btnEl.style.color = '#10b981';
+            btnEl.innerHTML = '<i class="fas fa-check"></i>';
+        }, 1500);
     };
 
     window.toggleCampaignStatus = async function(id, campaign_id, tag_line, currentStatus) {
@@ -174,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const ad_spend = parseFloat(document.getElementById('c_ad_spend').value) || 0;
         const status = isEdit ? document.getElementById('c_status').value : 'active';
 
-        const payload = { campaign_id, tag_line, ad_spend, status };
+        const payload = { campaign_id, tag_line, ad_spend, status, auto_replies: window.currentAutoReplies };
         const url = isEdit ? `${window.API_URL}/campaigns/${id}` : `${window.API_URL}/campaigns`;
         const method = isEdit ? 'PUT' : 'POST';
 

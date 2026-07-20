@@ -197,8 +197,8 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     }
 
     await db.execute(
-      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message, media_data, media_url, mime_type, message_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      mapParams([session_id, sender_type, senderId, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status])
+      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message_type, message, media_data, media_url, mime_type, message_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      mapParams([session_id, sender_type, senderId, messageType, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status])
     );
   } catch (err) {
     logger.error('Chat logging error:', err);

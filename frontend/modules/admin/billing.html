@@ -344,6 +344,30 @@
         </div>
     </div>
 
+    <!-- POST-BILLING COPY MODAL -->
+    <div id="finalizeCopyModal" class="modal finalize-copy-modal">
+        <div class="modal-content finalize-copy-content" style="max-width: 600px; padding: 2rem; border-radius: 24px; animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);">
+            <div class="finalize-copy-header" style="text-align: center; margin-bottom: 2rem;">
+                <i class="fa-solid fa-circle-check" style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;"></i>
+                <h2 style="font-size: 1.75rem; color: #0f172a; margin-bottom: 0.5rem;">Billing Finalized!</h2>
+                <p style="color: #64748b; font-weight: 500;">The order has been moved to packing. Copy the details below for logistics.</p>
+            </div>
+
+            <div id="finalizeCopyData" class="copy-data-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.5rem; font-family: 'Inter', monospace; font-size: 0.9rem; line-height: 1.6; color: #1e293b; max-height: 400px; overflow-y: auto; margin-bottom: 2rem; white-space: pre-wrap;">
+                <!-- Data will be injected here -->
+            </div>
+
+            <div class="copy-actions" style="display: flex; gap: 1rem;">
+                <button class="btn-finalize-copy primary" onclick="copyFinalizeData()" style="flex: 1; padding: 1rem; border-radius: 12px; font-weight: 700; font-size: 1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.75rem; transition: all 0.2s; background: var(--billing-primary); color: white;">
+                    <i class="fa-solid fa-copy"></i> Copy Information
+                </button>
+                <button class="btn-finalize-copy secondary" onclick="closeFinalizeCopyModal()" style="flex: 1; padding: 1rem; border-radius: 12px; font-weight: 700; font-size: 1rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.75rem; transition: all 0.2s; background: #f1f5f9; color: #475569;">
+                    <i class="fa-solid fa-xmark"></i> Close & Continue
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
     <script src="js/billing.js"></script>

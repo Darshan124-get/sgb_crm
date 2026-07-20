@@ -28,9 +28,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await response.json();
             
             if (response.ok) {
-                document.getElementById('pendingShipCount').textContent = data.pendingCount;
-                document.getElementById('todayShippedCount').textContent = data.todayCount;
-                document.getElementById('inTransitCount').textContent = data.transitCount;
+                if (document.getElementById('pendingOrdersCount')) document.getElementById('pendingOrdersCount').textContent = data.pendingCount || 0;
+                if (document.getElementById('inTransitOrdersCount')) document.getElementById('inTransitOrdersCount').textContent = data.transitCount || 0;
+                if (document.getElementById('payCheckCount')) document.getElementById('payCheckCount').textContent = data.payCheckCount || 0;
+                if (document.getElementById('completedCount')) document.getElementById('completedCount').textContent = data.completedCount || 0;
+                if (document.getElementById('totalCodAmount')) document.getElementById('totalCodAmount').textContent = '₹ ' + (data.totalCodAmount ? data.totalCodAmount.toLocaleString() : '0');
+                if (document.getElementById('codReceived')) document.getElementById('codReceived').textContent = '₹ ' + (data.codReceived ? data.codReceived.toLocaleString() : '0');
 
                 initCharts(data.trends, data.carriers);
             }

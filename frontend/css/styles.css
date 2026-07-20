@@ -2760,3 +2760,13 @@ body.modal-open {
 .sidebar-overlay.active {
     display: block;
 }
+
+/* Hide Spinners for Specific Number Inputs */
+#editableDiscount::-webkit-inner-spin-button,
+#editableDiscount::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+#editableDiscount {
+    -moz-appearance: textfield; /* Firefox */
+}

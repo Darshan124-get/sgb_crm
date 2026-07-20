@@ -45,21 +45,53 @@ window.formatFullAddress = function() {
     return str;
 };
 
+window.updateZohoBill = function(val) {
+    if (!currentOrder) return;
+    currentOrder.zoho_bill_number = val;
+};
+
+window.updateDiscount = function(val) {
+    if (!currentOrder) return;
+    currentOrder.discount = parseFloat(val) || 0;
+    
+    const subtotal = currentOrder.items.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity, 10)), 0);
+    const grandTotal = subtotal - (parseFloat(currentOrder.discount) || 0) + (parseFloat(currentOrder.shipping_charges) || 0) + (parseFloat(currentOrder.extra_charges) || 0);
+    const verifiedTotal = (currentOrder.payments || []).reduce((sum, p) => {
+        if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
+        return sum;
+    }, 0);
+    const advancePaid = Math.max(verifiedTotal, parseFloat(currentOrder.advance_amount) || 0);
+    const balanceDue = Math.max(0, grandTotal - advancePaid);
+    
+    currentOrder.grandTotal = grandTotal;
+    currentOrder.balanceDue = balanceDue;
+
+    const displayGrand = document.getElementById('displayGrandTotal');
+    if (displayGrand) displayGrand.textContent = '₹' + grandTotal.toLocaleString();
+    
+    const displayDue = document.getElementById('displayBalanceDue');
+    if (displayDue) {
+        displayDue.textContent = '₹' + balanceDue.toLocaleString();
+        displayDue.style.color = balanceDue > 0 ? '#ef4444' : '#10b981';
+    }
+};
+
 window.renderWorkstation = function() {
     const modalBody = document.getElementById('modalBody');
     const data = currentOrder;
     
-    const subtotal = data.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-    const grandTotal = subtotal - (data.discount || 0) + (data.shipping_charges || 0) + (data.extra_charges || 0);
+    const subtotal = data.items.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity, 10)), 0);
+    const grandTotal = subtotal - (parseFloat(data.discount) || 0) + (parseFloat(data.shipping_charges) || 0) + (parseFloat(data.extra_charges) || 0);
     const verifiedTotal = (data.payments || []).reduce((sum, p) => {
         if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
         return sum;
     }, 0);
-    const balanceDue = Math.max(0, grandTotal - verifiedTotal);
+    const advancePaid = Math.max(verifiedTotal, parseFloat(data.advance_amount) || 0);
+    const balanceDue = Math.max(0, grandTotal - advancePaid);
     
     data.grandTotal = grandTotal;
     data.balanceDue = balanceDue;
-    data.advance_amount = verifiedTotal;
+    data.advance_amount = advancePaid;
 
     modalBody.innerHTML = `
         <div class="workstation-body" style="padding: 1.5rem; background: #f8fafc; max-height: 80vh; overflow-y: auto;">
@@ -176,18 +208,31 @@ window.renderWorkstation = function() {
                     </table>
                 </div>
 
-                <div style="display: flex; justify-content: flex-end; gap: 3rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: flex-end; gap: 3rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Zoho Bill No.</div>
+                        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
+                            <input type="text" id="editableZohoBill" value="${data.zoho_bill_number || ''}" oninput="updateZohoBill(this.value)" placeholder="Enter bill no." style="width: 140px; padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 800; font-size: 1.1rem; text-align: right; color: #3b82f6;">
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Discount</div>
+                        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
+                            <span style="font-weight: 800; color: #0f172a;">₹</span>
+                            <input type="number" id="editableDiscount" value="${data.discount || 0}" oninput="updateDiscount(this.value)" style="width: 100px; padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 800; font-size: 1.1rem; text-align: right; color: #ef4444;">
+                        </div>
+                    </div>
                     <div style="text-align: right;">
                         <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Amount</div>
-                        <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">₹${grandTotal.toLocaleString()}</div>
+                        <div id="displayGrandTotal" style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">₹${grandTotal.toLocaleString()}</div>
                     </div>
                     <div style="text-align: right;">
                         <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Advance Paid</div>
-                        <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">₹${verifiedTotal.toLocaleString()}</div>
+                        <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">₹${advancePaid.toLocaleString()}</div>
                     </div>
                     <div style="text-align: right;">
                         <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Due Amount</div>
-                        <div style="font-size: 1.5rem; font-weight: 900; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">₹${balanceDue.toLocaleString()}</div>
+                        <div id="displayBalanceDue" style="font-size: 1.5rem; font-weight: 900; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">₹${balanceDue.toLocaleString()}</div>
                     </div>
                 </div>
                 
@@ -228,6 +273,22 @@ async function generateFinalInvoice() {
     if (!confirm('Are you sure you want to mark this order as Billed and send it to packing?')) return;
 
     try {
+        // Save any changes made (like discount) before finalizing
+        const updateRes = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(currentOrder)
+        });
+
+        if (!updateRes.ok) {
+            const err = await updateRes.json();
+            alert('Failed to save changes: ' + err.message);
+            return;
+        }
+
         const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/invoice`, {
             method: 'POST',
             headers: {
@@ -235,7 +296,10 @@ async function generateFinalInvoice() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                status: 'finalized'
+                status: 'finalized',
+                discount: currentOrder.discount,
+                shipping_charges: currentOrder.shipping_charges,
+                extra_charges: currentOrder.extra_charges
             })
         });
 

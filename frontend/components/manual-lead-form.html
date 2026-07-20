@@ -114,38 +114,93 @@
         border-radius: 0.75rem;
         padding: 1rem;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
+        justify-content: flex-start;
         background: #fff;
+        position: relative;
+        overflow: hidden;
     }
     .product-select-card:hover {
         border-color: #94a3b8;
         background: #f8fafc;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
     .product-select-card.selected {
         border-color: #2563eb;
         background: #eff6ff;
-        box-shadow: 0 0 0 1px #2563eb;
+        box-shadow: 0 0 0 2px #2563eb, 0 4px 12px rgba(37, 99, 235, 0.1);
     }
     .product-select-card .check-indicator {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
         opacity: 0;
         color: #2563eb;
-        transition: opacity 0.2s;
+        transition: all 0.2s;
+        transform: scale(0.8);
     }
     .product-select-card.selected .check-indicator {
         opacity: 1;
+        transform: scale(1.2);
     }
     .product-select-card .product-name {
-        font-weight: 600;
+        font-weight: 700;
         color: #1e293b;
-        margin-bottom: 0.25rem;
-        font-size: 0.9rem;
+        margin-bottom: 0.35rem;
+        font-size: 0.95rem;
+        padding-right: 1.5rem;
     }
     .product-select-card .product-price {
-        font-size: 0.8rem;
-        color: #64748b;
+        font-size: 0.85rem;
+        color: #059669;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+    .product-select-card .quantity-controls {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        margin-top: auto;
+        width: 100%;
+        transition: all 0.2s;
+    }
+    .product-select-card.selected .quantity-controls {
+        display: flex;
+        animation: slideUpFade 0.3s ease-out forwards;
+    }
+    @keyframes slideUpFade {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .qty-btn {
+        background: #f1f5f9;
+        border: none;
+        color: #475569;
+        padding: 0.4rem 1rem;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .qty-btn:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+    .qty-btn:active {
+        background: #cbd5e1;
+    }
+    .qty-val {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 1rem;
+        padding: 0 0.5rem;
     }
 </style>
 

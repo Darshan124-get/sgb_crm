@@ -161,7 +161,7 @@ const updateOrderItems = async (req, res) => {
     const { id } = req.params;
     const {
         items, discount, shipping_charges, extra_charges,
-        customer_name, phone, address, village, district, pincode, state, dispatch_through
+        customer_name, phone, address, village, district, pincode, state, dispatch_through, zoho_bill_number
     } = req.body;
     const connection = await pool.getConnection();
 
@@ -247,11 +247,13 @@ const updateOrderItems = async (req, res) => {
                 pincode = ?,
                 state = ?,
                 dispatch_through = ?,
+                zoho_bill_number = ?,
                 order_status = "in_review" 
             WHERE order_id = ?
         `, [
             finalSubtotal, discount || 0, shipping_charges || 0, extra_charges || 0,
             customer_name, phone, address, village, district, pincode, state, dispatch_through || '',
+            zoho_bill_number || null,
             id
         ]);
 

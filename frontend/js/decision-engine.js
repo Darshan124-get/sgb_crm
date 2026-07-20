@@ -221,19 +221,49 @@ function toggleOtherDelivery(val, wrapperId) {
 
 window.toggleProductSelection = function(element, prefix) {
     element.classList.toggle('selected');
+    if (!element.classList.contains('selected')) {
+        const qtyVal = element.querySelector('.qty-val');
+        if (qtyVal) qtyVal.textContent = '1';
+    }
     calculateOrderAmounts(prefix);
+};
+
+window.updateProductQuantity = function(event, button, change, prefix) {
+    event.stopPropagation();
+    
+    const card = button.closest('.product-select-card');
+    if (!card) return;
+    
+    const qtySpan = card.querySelector('.qty-val');
+    if (!qtySpan) return;
+    
+    let currentQty = parseInt(qtySpan.textContent) || 1;
+    let newQty = currentQty + change;
+    
+    if (newQty < 1) newQty = 1; // Minimum quantity 1
+    
+    qtySpan.textContent = newQty;
+    
+    // Recalculate if the card is already selected
+    if (card.classList.contains('selected')) {
+        calculateOrderAmounts(prefix);
+    }
 };
 
 function getSelectedProducts(prefix = '') {
     const productContainer = document.getElementById(prefix + 'de-products-container');
     if (productContainer) {
         const selectedCards = productContainer.querySelectorAll('.product-select-card.selected');
-        return Array.from(selectedCards).map(card => ({
-            product_id: parseInt(card.getAttribute('data-id')) || card.getAttribute('data-id'),
-            quantity: 1,
-            price: parseFloat(card.getAttribute('data-price')) || 0,
-            name: card.getAttribute('data-name')
-        }));
+        return Array.from(selectedCards).map(card => {
+            const qtySpan = card.querySelector('.qty-val');
+            const qty = qtySpan ? parseInt(qtySpan.textContent) || 1 : 1;
+            return {
+                product_id: parseInt(card.getAttribute('data-id')) || card.getAttribute('data-id'),
+                quantity: qty,
+                price: parseFloat(card.getAttribute('data-price')) || 0,
+                name: card.getAttribute('data-name')
+            };
+        });
     }
     
     // Fallback to select
@@ -278,7 +308,12 @@ async function loadProductsForEngine(prefix = '') {
                                 <div class="product-name">${p.name}</div>
                                 <div class="product-price">₹${p.selling_price || 0}</div>
                             </div>
-                            <div class="check-indicator"><i class="fas fa-check"></i></div>
+                            <div class="quantity-controls" onclick="event.stopPropagation();">
+                                <button type="button" class="qty-btn" onclick="updateProductQuantity(event, this, -1, '${prefix}')">-</button>
+                                <span class="qty-val">1</span>
+                                <button type="button" class="qty-btn" onclick="updateProductQuantity(event, this, 1, '${prefix}')">+</button>
+                            </div>
+                            <div class="check-indicator"><i class="fas fa-check-circle"></i></div>
                         </div>
                     `).join('');
                 }
@@ -295,8 +330,8 @@ function calculateOrderAmounts(prefix = '') {
 
     const items = getSelectedProducts(prefix);
     items.forEach(item => {
-        total += item.price;
-        selectedNames.push(item.name);
+        total += item.price * item.quantity;
+        selectedNames.push(item.quantity > 1 ? `${item.name} (x${item.quantity})` : item.name);
     });
 
     // Update product display list
@@ -321,7 +356,7 @@ function calculateOrderAmounts(prefix = '') {
     }
     const mCountSpan = document.getElementById(prefix + 'de-summary-count');
     if (mCountSpan) {
-        mCountSpan.textContent = selectedNames.length;
+        mCountSpan.textContent = items.reduce((sum, item) => sum + item.quantity, 0);
     }
 
     updateFinalAndDue(prefix);
@@ -841,7 +876,7 @@ async function submitDecisionEngine() {
         const pincode = document.getElementById('de-pincode').value;
         const state = document.getElementById('de-state').value;
 
-        if (salesStatus === 'Ordered' && leadPath !== 'not_connected') {
+        if ((salesStatus === 'Ordered' || salesStatus === 'converted') && leadPath !== 'not_connected') {
             const items = getSelectedProducts('');
 
             // Frontend Validation
@@ -849,40 +884,6 @@ async function submitDecisionEngine() {
             if (!customerName || customerName === '-') return window.showAlert("Required Field", "Customer Name is required for order conversion.", "error");
             if (!phone || phone === '-') return window.showAlert("Required Field", "Phone Number is required for order conversion.", "error");
             if (items.length === 0) return window.showAlert("Selection Error", "Please select at least one product in Step 3.", "error");
-
-            const formData = new FormData();
-            const deliveryTypeVal = document.getElementById('de-delivery-type').value;
-            const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('de-delivery-other').value : deliveryTypeVal;
-
-            formData.append('lead_id', leadId);
-            formData.append('customer_name', customerName);
-            formData.append('phone', phone);
-            formData.append('city', village);
-            formData.append('village', village);
-            formData.append('district', district);
-            formData.append('pincode', pincode);
-            formData.append('state', state);
-            formData.append('delivery_type', deliveryType);
-            formData.append('total_amount', document.getElementById('de-order-total').value);
-            formData.append('advance_amount', document.getElementById('de-order-advance').value);
-            formData.append('items', JSON.stringify(items));
-
-            const fileInput = document.getElementById('de-order-screenshot');
-            if (fileInput.files[0]) {
-                formData.append('screenshot', fileInput.files[0]);
-            }
-
-            const orderRes = await fetch(`${window.API_URL}/orders/convert`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-
-            if (!orderRes.ok) {
-                const errDetail = await orderRes.json();
-                const errorMsg = errDetail.error ? `${errDetail.message}: ${errDetail.error}` : (errDetail.message || 'Failed to create order');
-                throw new Error(errorMsg);
-            }
         }
 
         // 2. Log Interaction / Update Lead Info
@@ -992,27 +993,31 @@ async function submitDecisionEngine() {
 
             const deliveryTypeVal = document.getElementById('de-delivery-type').value;
             const deliveryType = deliveryTypeVal === 'other' ? document.getElementById('de-delivery-other').value : deliveryTypeVal;
-
-            const orderPayload = {
-                lead_id: leadId,
-                customer_name: customerName,
-                phone: phone,
-                address: village,
-                city: village,
-                village: village,
-                district: district,
-                pincode: pincode,
-                state: state,
-                delivery_type: deliveryType,
-                total_amount: totalAmt,
-                advance_amount: advAmt,
-                items: items
-            };
+            
+            const formData = new FormData();
+            formData.append('lead_id', leadId);
+            formData.append('customer_name', customerName);
+            formData.append('phone', phone);
+            formData.append('city', village);
+            formData.append('village', village);
+            formData.append('district', district);
+            formData.append('pincode', pincode);
+            formData.append('state', state);
+            formData.append('delivery_type', deliveryType);
+            formData.append('total_amount', totalAmt);
+            formData.append('advance_amount', advAmt);
+            formData.append('discount', document.getElementById('de-order-discount')?.value || 0);
+            formData.append('items', JSON.stringify(items));
+            
+            const fileInput = document.getElementById('de-order-screenshot');
+            if (fileInput && fileInput.files[0]) {
+                formData.append('screenshot', fileInput.files[0]);
+            }
 
             const orderRes = await fetch(`${window.API_URL}/orders/convert`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(orderPayload)
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
             });
 
             if (!orderRes.ok) {
@@ -1333,6 +1338,7 @@ async function submitManualLeadWizard() {
             formData.append('delivery_type', deliveryType);
             formData.append('total_amount', document.getElementById('m-de-order-total').value);
             formData.append('advance_amount', document.getElementById('m-de-order-advance').value);
+            formData.append('discount', document.getElementById('m-de-order-discount').value || 0);
             formData.append('items', JSON.stringify(items));
 
             const orderRes = await fetch(`${window.API_URL}/orders/convert`, {

@@ -1,0 +1,30 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "changes": [
+        {
+          "value": {
+            "contacts": [
+              {
+                "wa_id": "916364594854"
+              }
+            ],
+            "messages": [
+              {
+                "from": "916364594854",
+                "id": "fake",
+                "timestamp": "123",
+                "type": "text",
+                "text": {
+                  "body": "test"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+

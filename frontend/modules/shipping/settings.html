@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping Settings - SGB Agro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/dashboard.css">
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <style>
+        .settings-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
+        .settings-card h3 {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: #1e293b;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #475569;
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .btn-save {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-save:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+        .btn-save:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        
+        <main class="main-content">
+            <div class="page-header">
+                <div class="header-title">
+                    <h1>Shipping Settings</h1>
+                    <p>Configure logistics and tracking URLs</p>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <h3><i class="fas fa-truck-fast text-blue-500"></i> Logistics & Tracking URLs</h3>
+                <p style="color: #64748b; margin-bottom: 1.5rem; font-size: 0.9rem;">
+                    Configure the base tracking URLs for your courier services. The system will automatically append the tracking ID when clicking "Track" in the Shipping Center.
+                </p>
+                <form id="trackingForm">
+                    <div class="form-group">
+                        <label>India Post Tracking URL</label>
+                        <input type="url" id="postTrackingUrl" class="form-control" placeholder="https://www.indiapost.gov.in/..." required>
+                    </div>
+                    <div class="form-group">
+                        <label>VRL Tracking URL</label>
+                        <input type="url" id="vrlTrackingUrl" class="form-control" placeholder="https://www.vrlgroup.in/..." required>
+                    </div>
+                    <!-- Future addition for Other Transport if needed -->
+                    <div class="form-group" style="margin-top: 2rem;">
+                        <button type="submit" class="btn-save" id="btnSaveTracking">
+                            <i class="fas fa-save"></i> Save Tracking Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="js/settings.js"></script>
+</body>
+</html>

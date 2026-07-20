@@ -18,8 +18,8 @@ exports.updateSettings = async (req, res) => {
         await connection.beginTransaction();
         for (const [key, val] of Object.entries(settings)) {
             await connection.query(
-                'UPDATE settings SET setting_value = ? WHERE setting_key = ?',
-                [String(val), key]
+                'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
+                [key, String(val), String(val)]
             );
         }
         await connection.commit();

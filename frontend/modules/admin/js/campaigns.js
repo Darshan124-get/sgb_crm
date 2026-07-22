@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshDataBtn = document.getElementById('refreshDataBtn');
     const globalModal = document.getElementById('globalModal');
     const campaignTableBody = document.getElementById('campaignTableBody');
+    let campaignsList = [];
 
     // Load Data
     loadCampaigns();
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Failed to fetch campaigns');
             
             const data = await res.json();
+            campaignsList = data;
             renderTable(data);
         } catch (error) {
             console.error('Error:', error);
@@ -55,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         campaignTableBody.innerHTML = campaigns.map(c => `
             <tr>
                 <td style="font-weight: 600; color: #1e293b;">${c.campaign_id}</td>
-                <td>${c.tag_line}</td>
+                <td>${c.tag_line || ''}</td>
                 <td style="font-weight: 500;">₹${parseFloat(c.ad_spend || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>
                     <span class="badge badge-${c.status}">
@@ -63,8 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                 </td>
                 <td class="action-btns">
-                    <button onclick="window.editCampaign(${c.id}, '${c.campaign_id}', '${c.tag_line.replace(/'/g, "\\'")}', '${c.status}', ${c.ad_spend || 0})" title="Edit"><i class="fas fa-edit"></i></button>
-                    <button onclick="window.toggleCampaignStatus(${c.id}, '${c.campaign_id}', '${c.tag_line.replace(/'/g, "\\'")}', '${c.status}')" title="${c.status === 'active' ? 'Deactivate' : 'Activate'}">
+                    <button onclick="window.editCampaign(${c.id})" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button onclick="window.toggleCampaignStatus(${c.id})" title="${c.status === 'active' ? 'Deactivate' : 'Activate'}">
                         <i class="fas ${c.status === 'active' ? 'fa-ban' : 'fa-check'}"></i>
                     </button>
                     <button onclick="window.goToCampaignAnalytics(${c.id})" title="Analytics" style="color:#3b82f6;"><i class="fas fa-chart-pie"></i></button>
@@ -140,7 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
         globalModal.classList.remove('show');
     };
 
-    window.editCampaign = async function(id, campaign_id, tag_line, status, ad_spend) {
+    window.editCampaign = async function(id) {
+        const camp = campaignsList.find(c => c.id === id);
+        if (!camp) return;
+        
         // Fetch full campaign details to get auto_replies
         let autoReplies = [];
         try {
@@ -149,14 +154,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if(res.ok) {
                 const data = await res.json();
-                const camp = data.find(c => c.id === id);
-                if(camp && camp.auto_replies) {
-                    autoReplies = typeof camp.auto_replies === 'string' ? JSON.parse(camp.auto_replies) : camp.auto_replies;
+                const fullCamp = data.find(c => c.id === id);
+                if(fullCamp && fullCamp.auto_replies) {
+                    autoReplies = typeof fullCamp.auto_replies === 'string' ? JSON.parse(fullCamp.auto_replies) : fullCamp.auto_replies;
                 }
             }
         } catch(e) { console.error('Failed to fetch full campaign details for edit'); }
         
-        openCampaignModal({ id, campaign_id, tag_line, status, ad_spend, auto_replies: autoReplies });
+        openCampaignModal({ ...camp, auto_replies: autoReplies });
         renderAutoReplies(autoReplies);
     };
 
@@ -268,8 +273,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     };
 
-    window.toggleCampaignStatus = async function(id, campaign_id, tag_line, currentStatus) {
-        const newStatus = currentStatus === 'active' ? 'deactive' : 'active';
+    window.toggleCampaignStatus = async function(id) {
+        const camp = campaignsList.find(c => c.id === id);
+        if (!camp) return;
+        const newStatus = camp.status === 'active' ? 'deactive' : 'active';
         if(confirm(`Are you sure you want to ${newStatus === 'active' ? 'activate' : 'deactivate'} this campaign?`)) {
             try {
                 const res = await fetch(`${window.API_URL}/campaigns/${id}`, {
@@ -279,8 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        campaign_id,
-                        tag_line,
+                        campaign_id: camp.campaign_id,
+                        tag_line: camp.tag_line,
                         status: newStatus
                     })
                 });

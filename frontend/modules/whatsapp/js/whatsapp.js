@@ -932,11 +932,13 @@ function renderMessages(history) {
             <i class="fas fa-trash"></i>
         </div>`;
 
-        if (msg.mime_type) {
+        const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : (msg.message_type === 'audio' ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
+
+        if (effectiveMimeType) {
             let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
             let mediaUrl = msg.media_url || proxyUrl;
 
-            if (msg.mime_type.startsWith('image')) {
+            if (effectiveMimeType.startsWith('image')) {
                 msgEl.classList.add('has-media');
                 contentHtml = `
                     <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
@@ -945,21 +947,21 @@ function renderMessages(history) {
                              onerror="if(this.src !== '${proxyUrl}') { console.log('Supabase load failed, falling back to proxy'); this.src='${proxyUrl}'; } else { this.src='https://placehold.co/200?text=Image+Not+Available'; }">
                         ${msg.body && msg.body !== 'Sent a image' && !msg.body.includes('http') ? `<div class="message-content">${msg.body}</div>` : ''}
                     </div>`;
-            } else if (msg.mime_type.startsWith('video')) {
+            } else if (effectiveMimeType.startsWith('video')) {
                 msgEl.classList.add('has-media');
                 contentHtml = `
                     <div class="message-media">
                         <video controls style="max-width: 100%; border-radius: 8px;">
-                            <source src="${mediaUrl}" type="${msg.mime_type === 'video' ? 'video/mp4' : msg.mime_type}">
+                            <source src="${mediaUrl}" type="${effectiveMimeType === 'video' ? 'video/mp4' : effectiveMimeType}">
                             Your browser does not support the video tag.
                         </video>
                         ${msg.body && !msg.body.includes('http') ? `<div class="message-content">${msg.body}</div>` : ''}
                     </div>`;
-            } else if (msg.mime_type.startsWith('audio')) {
+            } else if (effectiveMimeType.startsWith('audio')) {
                 contentHtml = `
                     <div class="message-media" style="padding: 10px; background: #202c33; border-radius: 8px;">
                         <audio controls style="width: 100%;">
-                            <source src="${mediaUrl}" type="${msg.mime_type === 'audio' ? 'audio/mpeg' : msg.mime_type}">
+                            <source src="${mediaUrl}" type="${effectiveMimeType === 'audio' ? 'audio/mpeg' : effectiveMimeType}">
                         </audio>
                     </div>`;
             } else {

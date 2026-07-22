@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 
 exports.packOrder = async (req, res) => {
-    const { order_id, remarks } = req.body;
+    const { order_id, remarks, product_id, unit_no } = req.body;
     try {
         const connection = await pool.getConnection();
         try {
@@ -13,36 +13,69 @@ exports.packOrder = async (req, res) => {
                 throw new Error('Order must be billed before it can be packed.');
             }
 
-            // 2. Get items to deduct from inventory
-            const [items] = await connection.query('SELECT product_id, quantity FROM order_items WHERE order_id = ?', [order_id]);
-
-            for (const item of items) {
-                // Deduct from current_stock AND remove from reserved_stock
+            // 2. Get items to deduct from inventory or deduct specific product
+            if (product_id) {
+                // Deduct 1 unit for the specific product
                 await connection.query(
                     `UPDATE inventory 
-                     SET current_stock = current_stock - ?, 
-                         reserved_stock = GREATEST(0, reserved_stock - ?) 
+                     SET current_stock = current_stock - 1, 
+                         reserved_stock = GREATEST(0, reserved_stock - 1) 
                      WHERE product_id = ?`,
-                    [item.quantity, item.quantity, item.product_id]
+                    [product_id]
                 );
 
                 // Log actual deduction
                 await connection.query(
                     `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, reference_id, created_by) 
-                     VALUES (?, 'out', ?, 'packing', ?, ?)`,
-                    [item.product_id, -item.quantity, order_id, req.user.id]
+                     VALUES (?, 'out', -1, 'packing', ?, ?)`,
+                    [product_id, order_id, req.user.id]
                 );
+            } else {
+                // Original behavior for whole order packing
+                const [items] = await connection.query('SELECT product_id, quantity FROM order_items WHERE order_id = ?', [order_id]);
+
+                for (const item of items) {
+                    await connection.query(
+                        `UPDATE inventory 
+                         SET current_stock = current_stock - ?, 
+                             reserved_stock = GREATEST(0, reserved_stock - ?) 
+                         WHERE product_id = ?`,
+                        [item.quantity, item.quantity, item.product_id]
+                    );
+
+                    await connection.query(
+                        `INSERT INTO inventory_logs (product_id, type, quantity, reference_type, reference_id, created_by) 
+                         VALUES (?, 'out', ?, 'packing', ?, ?)`,
+                        [item.product_id, -item.quantity, order_id, req.user.id]
+                    );
+                }
             }
 
             // 3. Record packing
             await connection.query(
-                'INSERT INTO packing (order_id, packed_by, packed_at, status, remarks) VALUES (?, ?, CURRENT_TIMESTAMP, "packed", ?)',
-                [order_id, req.user.id, remarks || '']
+                'INSERT INTO packing (order_id, product_id, unit_no, packed_by, packed_at, status, remarks) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, "packed", ?)',
+                [order_id, product_id || null, unit_no || 1, req.user.id, remarks || '']
             );
-            await connection.query('UPDATE orders SET order_status = "packed" WHERE order_id = ?', [order_id]);
+
+            // Update main order status when all units are packed (or immediately for whole-order packing)
+            if (!product_id) {
+                await connection.query('UPDATE orders SET order_status = "packed" WHERE order_id = ?', [order_id]);
+            } else {
+                const [[{ total_qty }]] = await connection.query(
+                    'SELECT SUM(quantity) as total_qty FROM order_items WHERE order_id = ?',
+                    [order_id]
+                );
+                const [[{ packed_qty }]] = await connection.query(
+                    'SELECT COUNT(*) as packed_qty FROM packing WHERE order_id = ? AND status = "packed"',
+                    [order_id]
+                );
+                if (packed_qty >= total_qty) {
+                    await connection.query('UPDATE orders SET order_status = "packed" WHERE order_id = ?', [order_id]);
+                }
+            }
 
             await connection.commit();
-            res.status(201).json({ message: 'Order marked as packed and stock deducted' });
+            res.status(201).json({ message: 'Order unit marked as packed and stock deducted' });
         } catch (innerErr) {
             try { if (connection) await connection.rollback(); } catch (re) {}
             throw innerErr;
@@ -56,20 +89,47 @@ exports.packOrder = async (req, res) => {
 };
 
 exports.shipOrder = async (req, res) => {
-    const { order_id, courier_name, tracking_id } = req.body;
+    const { order_id, courier_name, tracking_id, product_id, unit_no } = req.body;
     try {
-        // Ensure order is packed before shipping
-        const [order] = await pool.query('SELECT order_status FROM orders WHERE order_id = ?', [order_id]);
-        if (!order.length || order[0].order_status !== 'packed') {
-            return res.status(400).json({ message: 'Order must be packed before it can be shipped.' });
+        // Ensure the specific unit is packed (or the order is packed for non-split orders)
+        if (product_id) {
+            const [packingRecord] = await pool.query(
+                'SELECT packing_id FROM packing WHERE order_id = ? AND product_id = ? AND unit_no = ? AND status = "packed"',
+                [order_id, product_id, unit_no]
+            );
+            if (!packingRecord.length) {
+                return res.status(400).json({ message: 'This package unit must be packed before it can be shipped.' });
+            }
+        } else {
+            const [order] = await pool.query('SELECT order_status FROM orders WHERE order_id = ?', [order_id]);
+            if (!order.length || order[0].order_status !== 'packed') {
+                return res.status(400).json({ message: 'Order must be packed before it can be shipped.' });
+            }
         }
 
         await pool.query(
-            'INSERT INTO shipments (order_id, courier_name, tracking_id, shipped_by, shipped_at, status) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, "shipped")',
-            [order_id, courier_name, tracking_id, req.user.id]
+            'INSERT INTO shipments (order_id, product_id, unit_no, courier_name, tracking_id, shipped_by, shipped_at, status) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, "shipped")',
+            [order_id, product_id || null, unit_no || 1, courier_name, tracking_id, req.user.id]
         );
-        await pool.query('UPDATE orders SET order_status = "shipped" WHERE order_id = ?', [order_id]);
-        res.status(201).json({ message: 'Order marked as shipped' });
+
+        // Update overall status if all items are shipped
+        if (!product_id) {
+            await pool.query('UPDATE orders SET order_status = "shipped" WHERE order_id = ?', [order_id]);
+        } else {
+            const [[{ total_qty }]] = await pool.query(
+                'SELECT SUM(quantity) as total_qty FROM order_items WHERE order_id = ?',
+                [order_id]
+            );
+            const [[{ shipped_qty }]] = await pool.query(
+                'SELECT COUNT(*) as shipped_qty FROM shipments WHERE order_id = ? AND status IN ("shipped", "in_transit", "delivered")',
+                [order_id]
+            );
+            if (shipped_qty >= total_qty) {
+                await pool.query('UPDATE orders SET order_status = "shipped" WHERE order_id = ?', [order_id]);
+            }
+        }
+
+        res.status(201).json({ message: 'Package unit marked as shipped' });
     } catch (err) {
         console.error('Shipping Error:', err);
         res.status(500).json({ message: 'Failed to record shipment' });

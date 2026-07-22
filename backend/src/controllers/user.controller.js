@@ -47,10 +47,10 @@ exports.getAllUsers = async (req, res) => {
 exports.getSalesTeam = async (req, res) => {
     try {
         const query = `
-            SELECT u.user_id, u.name, u.email, u.phone
+            SELECT u.user_id, u.name, u.email, u.phone, r.name as role_name, u.language
             FROM users u
             JOIN roles r ON u.role_id = r.role_id
-            WHERE (r.name LIKE '%telecaller%' OR r.name LIKE '%sales%') 
+            WHERE (r.name LIKE '%telecaller%' OR r.name LIKE '%sales%' OR r.name LIKE '%manager%' OR r.name LIKE '%viewer%' OR r.name LIKE '%executive%') 
             AND u.status = 'active'
             ORDER BY u.name ASC
         `;

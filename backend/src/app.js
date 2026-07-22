@@ -22,6 +22,7 @@ const whatsappRoutes = require('./routes/whatsapp.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const campaignRoutes = require('./routes/campaign.routes');
 const departmentRoutes = require('./routes/department.routes');
+const productSetRoutes = require('./routes/product-set.routes');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -80,6 +81,7 @@ app.use('/api/logs', logRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/product-sets', productSetRoutes);
 
 console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
 console.log('✅ WhatsApp Webhook: Mounted at /webhook');

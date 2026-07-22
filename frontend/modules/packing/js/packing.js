@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     document.getElementById('profileName').textContent = user.name || 'Packing Staff';
     fetchOrders();
+
+    // Auto-refresh packing list silently in the background every 8 seconds
+    setInterval(fetchOrdersSilent, 8000);
 });
 
 const API = window.API_URL;
@@ -13,6 +16,60 @@ let allOrders = [];
 let currentTab = 'pending';
 let printedOrders = new Set(); // Track printed orders locally for button conversion
 
+function transformOrders(rawOrders) {
+    const processed = [];
+    rawOrders.forEach(o => {
+        const isPost = (o.delivery_type || '').toLowerCase().includes('post');
+        if (isPost) {
+            o.items.forEach(item => {
+                const qty = item.quantity || 1;
+                for (let u = 1; u <= qty; u++) {
+                    // Check if this specific unit is packed
+                    const isPacked = (o.packing_records || []).some(
+                        pr => pr.product_id === item.product_id && pr.unit_no === u && pr.status === 'packed'
+                    );
+
+                    // Check if shipped
+                    const shipment = (o.shipments || []).find(
+                        s => s.product_id === item.product_id && s.unit_no === u
+                    );
+
+                    // Determine virtual status
+                    let virtualStatus = 'billed';
+                    if (isPacked) {
+                        virtualStatus = 'packed';
+                        if (shipment) {
+                            virtualStatus = shipment.shipment_status || 'shipped';
+                        }
+                    }
+
+                    processed.push({
+                        ...o,
+                        virtual_id: `${o.order_id}_${item.product_id}_${u}`,
+                        product_id: item.product_id,
+                        unit_no: u,
+                        items: [{ ...item, quantity: 1 }],
+                        order_status: virtualStatus,
+                        packed_at: isPacked ? ((o.packing_records || []).find(pr => pr.product_id === item.product_id && pr.unit_no === u) || {}).packed_at : null,
+                        
+                        shipment_id: shipment ? shipment.shipment_id : null,
+                        courier_name: shipment ? shipment.courier_name : null,
+                        tracking_id: shipment ? shipment.tracking_id : null,
+                        shipment_status: shipment ? shipment.shipment_status : null,
+                        delivery_date: shipment ? shipment.delivery_date : null,
+                        check_received_date: shipment ? shipment.check_received_date : null,
+                        
+                        unit_label: `(${item.product_name} - Qty 1 [${u}/${qty}])`
+                    });
+                }
+            });
+        } else {
+            processed.push(o);
+        }
+    });
+    return processed;
+}
+
 async function fetchOrders() {
     const token = localStorage.getItem('token');
     const tbody = document.getElementById('packingTableBody');
@@ -20,12 +77,26 @@ async function fetchOrders() {
 
     try {
         const res = await fetch(`${ORDERS_API}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        allOrders = await res.json();
+        const raw = await res.json();
+        allOrders = transformOrders(raw);
         
         updateCounts();
         renderTable();
     } catch (e) {
         tbody.innerHTML = '<tr><td colspan="5" style="padding:3rem;text-align:center;color:#ef4444;">Failed to load orders.</td></tr>';
+    }
+}
+
+async function fetchOrdersSilent() {
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`${ORDERS_API}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const raw = await res.json();
+        allOrders = transformOrders(raw);
+        updateCounts();
+        renderTable();
+    } catch (e) {
+        console.error('Silent refresh failed:', e);
     }
 }
 
@@ -62,16 +133,21 @@ function renderTable() {
     }
 
     tbody.innerHTML = filtered.map(o => {
-        const isPrinted = printedOrders.has(o.order_id);
+        const uniqueKey = o.virtual_id || o.order_id;
+        const isPrinted = printedOrders.has(uniqueKey);
         const actionBtn = currentTab === 'pending' 
-            ? (isPrinted 
-                ? `<button onclick="markAsPacked(${o.order_id})" class="login-btn" style="width:auto; padding:0.4rem 0.8rem; font-size:0.75rem; background:#10b981;">Mark Packed <i class="fas fa-check ml-1"></i></button>`
-                : `<button onclick="printAddress(${o.order_id})" class="login-btn btn-outline" style="width:auto; padding:0.4rem 0.8rem; font-size:0.75rem;">Print Address <i class="fas fa-print ml-1"></i></button>`)
+            ? `<div style="display:flex; gap:0.5rem;">
+                <button onclick="printAddress(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})" class="login-btn btn-outline" style="width:auto; padding:0.4rem 0.8rem; font-size:0.75rem;">Print Address <i class="fas fa-print ml-1"></i></button>
+                <button onclick="markAsPacked(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})" class="login-btn" style="width:auto; padding:0.4rem 0.8rem; font-size:0.75rem; background:#10b981;">Mark Packed <i class="fas fa-check ml-1"></i></button>
+               </div>`
             : `<span style="color:#10b981; font-weight:700; font-size:0.75rem;"><i class="fas fa-check-circle"></i> Packed</span>`;
 
         return `
-        <tr style="border-bottom:1px solid #f1f5f9; cursor:pointer;" onclick="if(!event.target.closest('button')) showOrderDetails(${o.order_id})">
-            <td style="padding:1rem 1.25rem; font-weight:700; color:#1e293b;">${window.formatOrderId(o.order_id, o.created_at)}</td>
+        <tr style="border-bottom:1px solid #f1f5f9; cursor:pointer;" onclick="if(!event.target.closest('button')) showOrderDetails(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})">
+            <td style="padding:1rem 1.25rem; font-weight:700; color:#1e293b; white-space: nowrap;">
+                ${window.formatOrderId(o.order_id, o.created_at)}
+                <div style="font-size:0.75rem; color:#8b5cf6; font-weight:600; margin-top:2px;">${o.unit_label || ''}</div>
+            </td>
             <td style="padding:1rem 1.25rem;">
                 <div style="font-weight:600; color:#1e293b;">${o.customer_name || o.firm_name || '—'}</div>
                 <div style="font-size:0.75rem; color:#64748b;">${o.village || ''}, ${o.district || ''}</div>
@@ -114,8 +190,8 @@ function filterOrders() {
     // ... same as renderTable mapping logic ...
 }
 
-function printAddress(orderId) {
-    const order = allOrders.find(o => o.order_id == orderId);
+function printAddress(orderId, productId, unitNo) {
+    const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     if (!order) return;
 
     const dateStr = new Date(order.created_at).toLocaleDateString('en-GB');
@@ -167,7 +243,7 @@ function printAddress(orderId) {
                         </tr>
                         <tr style="border-bottom: 1px solid #000;">
                             <td style="padding: 10px; font-weight: 800; background: #f8fafc;">ITEM</td>
-                            <td style="padding: 10px;">${itemsList}</td>
+                            <td style="padding: 10px;">${itemsList} ${order.unit_label || ''}</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #000;">
                             <td style="padding: 10px; font-weight: 800; background: #f8fafc;">QTY</td>
@@ -208,7 +284,7 @@ function printAddress(orderId) {
     
     window.print();
 
-    printedOrders.add(orderId);
+    printedOrders.add(order.virtual_id || order.order_id);
     renderTable();
     showToast("A5 Label generated! (2 per page ready)");
 }
@@ -236,13 +312,13 @@ function showConfirm(title, message) {
     });
 }
 
-async function markAsPacked(orderId) {
-    const order = allOrders.find(o => o.order_id == orderId);
+async function markAsPacked(orderId, productId, unitNo) {
+    const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     if (!order) return;
 
     const confirmed = await showConfirm(
         'Confirm Packing', 
-        `Mark Order ${window.formatOrderId(orderId, order.created_at)} as packed? This will deduct stock from inventory.`
+        `Mark Order ${window.formatOrderId(orderId, order.created_at)} ${order.unit_label || ''} as packed? This will deduct stock from inventory.`
     );
     
     if (!confirmed) return;
@@ -252,12 +328,12 @@ async function markAsPacked(orderId) {
         const res = await fetch(`${LOGISTICS_API}/packing`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: orderId, remarks: 'Packed' })
+            body: JSON.stringify({ order_id: orderId, remarks: 'Packed', product_id: productId, unit_no: unitNo })
         });
 
         if (res.ok) {
-            showToast(`Order marked as packed! ✅`);
-            printedOrders.delete(orderId);
+            showToast(`Order unit marked as packed! ✅`);
+            printedOrders.delete(order.virtual_id || order.order_id);
             fetchOrders();
         } else {
             const d = await res.json();
@@ -268,8 +344,8 @@ async function markAsPacked(orderId) {
     }
 }
 
-function showOrderDetails(orderId) {
-    const order = allOrders.find(o => o.order_id == orderId);
+function showOrderDetails(orderId, productId, unitNo) {
+    const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     if (!order) return;
 
     const modal = document.getElementById('orderDetailsModal');
@@ -282,6 +358,7 @@ function showOrderDetails(orderId) {
             </div>
             <div>
                 <h2 style="margin:0; font-size:1.5rem; font-weight:800;">Order ${window.formatOrderId(order.order_id, order.created_at)}</h2>
+                <div style="font-size:0.875rem; color:#8b5cf6; font-weight:600; margin-top:2px;">${order.unit_label || ''}</div>
                 <span style="background:#8b5cf620; color:#8b5cf6; padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:700; text-transform:uppercase;">${order.order_status}</span>
             </div>
         </div>
@@ -313,7 +390,7 @@ function showOrderDetails(orderId) {
 
         <div style="margin-top:2.5rem; display:flex; justify-content:flex-end; gap:1rem;">
             <button onclick="closeModal()" class="login-btn btn-outline" style="width:auto; padding:0.6rem 1.5rem;">Close</button>
-            ${order.order_status === 'billed' ? `<button onclick="printAddress(${order.order_id}); closeModal();" class="login-btn" style="width:auto; padding:0.6rem 1.5rem; background:#8b5cf6;">Print & Prepare</button>` : ''}
+            ${order.order_status === 'billed' ? `<button onclick="printAddress(${order.order_id}, ${order.virtual_id ? order.product_id : null}, ${order.virtual_id ? order.unit_no : null}); closeModal();" class="login-btn" style="width:auto; padding:0.6rem 1.5rem; background:#8b5cf6;">Print & Prepare</button>` : ''}
         </div>
     `;
 

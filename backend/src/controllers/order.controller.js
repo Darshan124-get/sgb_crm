@@ -6,6 +6,7 @@ exports.getOrders = async (req, res) => {
         let query = `
             SELECT 
                 o.*, 
+                oi.product_id,
                 p.name as product_name, 
                 oi.quantity, 
                 oi.price, 
@@ -64,10 +65,17 @@ exports.getOrders = async (req, res) => {
         const ordersMap = {};
         rows.forEach(row => {
             if (!ordersMap[row.order_id]) {
-                ordersMap[row.order_id] = { ...row, items: [] };
+                ordersMap[row.order_id] = { 
+                    ...row, 
+                    items: [],
+                    packing_records: [],
+                    shipments: []
+                };
             }
-            if (row.product_name || row.quantity) {
+            const itemExists = ordersMap[row.order_id].items.some(i => i.product_id === row.product_id);
+            if (!itemExists && (row.product_name || row.quantity)) {
                 ordersMap[row.order_id].items.push({
+                    product_id: row.product_id,
                     product_name: row.product_name || 'Generic Product',
                     quantity: row.quantity || 1,
                     price: row.price || 0,
@@ -76,6 +84,30 @@ exports.getOrders = async (req, res) => {
                 });
             }
         });
+
+        const orderIds = Object.keys(ordersMap);
+        if (orderIds.length > 0) {
+            const [packingRows] = await pool.query(
+                'SELECT * FROM packing WHERE order_id IN (?)',
+                [orderIds]
+            );
+            packingRows.forEach(pr => {
+                if (ordersMap[pr.order_id]) {
+                    ordersMap[pr.order_id].packing_records.push(pr);
+                }
+            });
+
+            const [shipmentRows] = await pool.query(
+                'SELECT s.*, s.status as shipment_status FROM shipments s WHERE order_id IN (?)',
+                [orderIds]
+            );
+            shipmentRows.forEach(sr => {
+                if (ordersMap[sr.order_id]) {
+                    ordersMap[sr.order_id].shipments.push(sr);
+                }
+            });
+        }
+
         res.json(Object.values(ordersMap));
     } catch (err) {
         res.status(500).json({ error: err.message });

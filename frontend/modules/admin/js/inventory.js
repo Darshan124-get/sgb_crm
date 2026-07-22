@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeTab: 'products',
         products: [],
         categories: [],
+        productSets: [],
         inventory: [],
         logs: [],
         filters: {
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await Promise.all([
             fetchProducts(),
             fetchCategories(),
+            fetchProductSets(),
             fetchInventory(),
             fetchLogs(),
             checkLowStock()
@@ -102,6 +104,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             state.categories = await res.json();
         } catch (e) { console.error('Error fetching categories:', e); }
+    }
+
+    async function fetchProductSets() {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${window.API_URL}/product-sets`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            state.productSets = await res.json();
+        } catch (e) { console.error('Error fetching product sets:', e); }
     }
 
     async function fetchInventory() {
@@ -154,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         switch(state.activeTab) {
             case 'products': renderProducts(); break;
             case 'categories': renderCategories(); break;
+            case 'fullsets': renderFullSets(); break;
             case 'stock': renderStock(); break;
             case 'logs': renderLogs(); break;
         }
@@ -759,4 +772,161 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (res.ok) refreshAll();
         } catch (e) { alert('Failed to delete product'); }
     };
+
+    function renderFullSets() {
+        const container = document.createElement('div');
+        container.className = 'inv-table-container premium-card';
+
+        const header = `
+            <div style="padding:1.25rem 1.5rem; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
+                <h3 style="font-size:1rem; font-weight:700;">Full Sets (Presets)</h3>
+                <button class="btn" onclick="openAddFullSetModal()" style="height:32px; font-size:0.75rem; background:var(--primary-color); color:white; padding:0 1rem;">
+                    <i class="fas fa-plus"></i> New Full Set
+                </button>
+            </div>
+        `;
+
+        const listHTML = state.productSets.map(set => {
+            let setTotal = 0;
+            const itemsHTML = (set.items || []).map(item => {
+                const totalItemPrice = item.selling_price * item.quantity;
+                setTotal += totalItemPrice;
+                return `<span class="item-tag" style="background:#ede9fe; color:#8b5cf6; padding:4px 8px; border-radius:8px; font-size:0.75rem; margin-right:4px; display:inline-block; margin-bottom:4px;">${item.product_name} x${item.quantity} (₹${item.selling_price})</span>`;
+            }).join('');
+
+            return `
+                <div class="cat-tree-item" style="padding:1.25rem 1.5rem; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h4 style="font-weight:700; color:#1e293b; margin:0 0 0.25rem 0;">${set.name}</h4>
+                        <p style="font-size:0.8rem; color:#64748b; margin:0 0 0.5rem 0;">${set.description || 'No description'}</p>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                            ${itemsHTML}
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1.5rem;">
+                        <div style="text-align:right;">
+                            <span style="font-size:0.7rem; color:#94a3b8; font-weight:600; text-transform:uppercase;">Set Total</span>
+                            <div style="font-weight:800; color:var(--primary-color); font-size:1.1rem;">₹${setTotal}</div>
+                        </div>
+                        <button onclick="deleteProductSet(${set.set_id})" class="btn-action" style="color:#ef4444;" title="Delete Set"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = header + (state.productSets.length ? listHTML : '<div style="padding:2rem;text-align:center;color:#94a3b8;">No full sets defined yet.</div>');
+        contentArea.appendChild(container);
+    }
+
+    function openAddFullSetModal() {
+        const productOptions = state.products.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; border-bottom:1px solid #f1f5f9;">
+                <label style="display:flex; align-items:center; gap:0.5rem; font-weight:600; font-size:0.875rem; cursor:pointer;">
+                    <input type="checkbox" class="set-product-check" data-id="${p.product_id}" data-price="${p.selling_price || 0}" onchange="calculateSetTotal()">
+                    ${p.name} (₹${p.selling_price || 0})
+                </label>
+                <input type="number" class="set-product-qty form-control-premium" data-id="${p.product_id}" value="1" min="1" style="width:70px; height:32px; padding:4px;" oninput="calculateSetTotal()">
+            </div>
+        `).join('');
+
+        const content = `
+            <form id="fullSetForm" style="padding:0.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+                <div>
+                    <label class="premium-label">Full Set Name</label>
+                    <input type="text" name="name" class="form-control-premium" required placeholder="e.g. Dumper & Trolley Set">
+                </div>
+                <div>
+                    <label class="premium-label">Description</label>
+                    <textarea name="description" class="form-control-premium" rows="2" placeholder="Describe the set..."></textarea>
+                </div>
+                <div>
+                    <label class="premium-label" style="font-weight:700;">Select Products to Include</label>
+                    <div style="max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:0.5rem; background:#fff;">
+                        ${productOptions || '<div style="padding:1rem; text-align:center; color:#94a3b8;">No products available.</div>'}
+                    </div>
+                </div>
+                <div style="background:#f8fafc; padding:0.75rem 1rem; border-radius:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:700; color:#475569;">Total Set Value:</span>
+                    <span id="set-total-price" style="font-weight:800; color:var(--primary-color); font-size:1.25rem;">₹0</span>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-outline" onclick="window.hideModal()">Cancel</button>
+                    <button type="submit" class="btn" style="background:var(--primary-color); color:white; padding:0 2rem;">Create Set</button>
+                </div>
+            </form>
+        `;
+
+        window.showModal({ title: 'Create Full Set Presets', content, hideFooter: true });
+
+        const form = document.getElementById('fullSetForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = form.name.value;
+                const description = form.description.value;
+                
+                const items = [];
+                document.querySelectorAll('.set-product-check:checked').forEach(cb => {
+                    const pid = cb.getAttribute('data-id');
+                    const qtyInput = document.querySelector(`.set-product-qty[data-id="${pid}"]`);
+                    const qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+                    items.push({ product_id: pid, quantity: qty });
+                });
+
+                if (items.length === 0) {
+                    alert('Please select at least one product for the set.');
+                    return;
+                }
+
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${window.API_URL}/product-sets`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, description, items })
+                    });
+                    if (res.ok) {
+                        window.hideModal();
+                        window.showAlert("Success", "Full set preset created!", "success");
+                        refreshAll();
+                    } else {
+                        const err = await res.json();
+                        window.showAlert("Error", err.message || "Failed to save", "error");
+                    }
+                } catch (err) {
+                    window.showAlert("Error", "Network connection failed", "error");
+                }
+            });
+        }
+    }
+
+    function calculateSetTotal() {
+        let total = 0;
+        document.querySelectorAll('.set-product-check:checked').forEach(cb => {
+            const price = parseFloat(cb.getAttribute('data-price')) || 0;
+            const pid = cb.getAttribute('data-id');
+            const qtyInput = document.querySelector(`.set-product-qty[data-id="${pid}"]`);
+            const qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+            total += price * qty;
+        });
+        const totalEl = document.getElementById('set-total-price');
+        if (totalEl) totalEl.textContent = `₹${total}`;
+    }
+
+    async function deleteProductSet(id) {
+        if (!confirm('Are you sure you want to delete this Full Set preset?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${window.API_URL}/product-sets/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) refreshAll();
+        } catch (e) { alert('Failed to delete set'); }
+    }
+
+    // Expose functions to window
+    window.openAddFullSetModal = openAddFullSetModal;
+    window.calculateSetTotal = calculateSetTotal;
+    window.deleteProductSet = deleteProductSet;
 });

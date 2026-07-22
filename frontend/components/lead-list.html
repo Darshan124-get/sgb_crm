@@ -295,6 +295,24 @@
         animation: pulse-ring 3s ease-in-out infinite;
         transform-origin: center;
     }
+
+    @media (max-width: 768px) {
+        .lead-table-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0.75rem !important;
+            padding: 1rem !important;
+        }
+
+        .lead-table-container {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        .lead-table {
+            min-width: 800px !important;
+        }
+    }
 </style>
 
 <div class="lead-table-container">

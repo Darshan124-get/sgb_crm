@@ -85,6 +85,60 @@ setInterval(() => {
     }
 }, 15000); // 15 seconds auto-refresh
 
+function transformOrders(rawOrders) {
+    const processed = [];
+    rawOrders.forEach(o => {
+        const isPost = (o.delivery_type || '').toLowerCase().includes('post');
+        if (isPost) {
+            o.items.forEach(item => {
+                const qty = item.quantity || 1;
+                for (let u = 1; u <= qty; u++) {
+                    // Check if this specific unit is packed
+                    const isPacked = (o.packing_records || []).some(
+                        pr => pr.product_id === item.product_id && pr.unit_no === u && pr.status === 'packed'
+                    );
+
+                    // Check if shipped
+                    const shipment = (o.shipments || []).find(
+                        s => s.product_id === item.product_id && s.unit_no === u
+                    );
+
+                    // Determine virtual status
+                    let virtualStatus = 'billed';
+                    if (isPacked) {
+                        virtualStatus = 'packed';
+                        if (shipment) {
+                            virtualStatus = shipment.shipment_status || 'shipped';
+                        }
+                    }
+
+                    processed.push({
+                        ...o,
+                        virtual_id: `${o.order_id}_${item.product_id}_${u}`,
+                        product_id: item.product_id,
+                        unit_no: u,
+                        items: [{ ...item, quantity: 1 }],
+                        order_status: virtualStatus,
+                        packed_at: isPacked ? ((o.packing_records || []).find(pr => pr.product_id === item.product_id && pr.unit_no === u) || {}).packed_at : null,
+                        
+                        shipment_id: shipment ? shipment.shipment_id : null,
+                        courier_name: shipment ? shipment.courier_name : null,
+                        tracking_id: shipment ? shipment.tracking_id : null,
+                        shipment_status: shipment ? shipment.shipment_status : null,
+                        delivery_date: shipment ? shipment.delivery_date : null,
+                        check_received_date: shipment ? shipment.check_received_date : null,
+                        
+                        unit_label: `(${item.product_name} - Qty 1 [${u}/${qty}])`
+                    });
+                }
+            });
+        } else {
+            processed.push(o);
+        }
+    });
+    return processed;
+}
+
 window.fetchOrders = async function(silent = false) {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -97,7 +151,8 @@ window.fetchOrders = async function(silent = false) {
         
         if (!response.ok) throw new Error('Failed to fetch');
         
-        allOrders = await response.json();
+        const raw = await response.json();
+        allOrders = transformOrders(raw);
         console.log('Fetched orders:', allOrders.length);
         
         updateCounts();
@@ -271,8 +326,11 @@ function renderTable() {
         
         if (currentTab === 'pending') {
             return `
-            <tr onclick="if(!event.target.closest('button') && !event.target.closest('select') && !event.target.closest('input')) showOrderDetails(${o.order_id})">
-                <td style="white-space: nowrap; font-weight: 600;">${o.order_id}</td>
+            <tr onclick="if(!event.target.closest('button') && !event.target.closest('select') && !event.target.closest('input')) showOrderDetails(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})">
+                <td style="white-space: nowrap; font-weight: 600;">
+                    ${o.order_id}
+                    <div style="font-size: 0.75rem; color: #8b5cf6; font-weight: 600; margin-top: 2px;">${o.unit_label || ''}</div>
+                </td>
                 <td style="white-space: nowrap; color: #475569; font-weight: 700;">${billNo}</td>
                 <td style="font-weight: 600; color: #1e293b;">${o.customer_name || o.firm_name || 'Walking Customer'}</td>
                 <td style="color: #475569; white-space: nowrap;">${o.phone || '—'}</td>
@@ -290,13 +348,13 @@ function renderTable() {
                     </span>
                 </td>
                 <td>
-                    <input type="text" id="trackId_${o.order_id}" class="form-input" style="padding: 0.4rem; font-size: 0.8rem; border-radius: 6px; min-width: 120px;" placeholder="Enter ID" ${o.order_status === 'billed' ? 'disabled' : ''}>
+                    <input type="text" id="trackId_${o.virtual_id || o.order_id}" class="form-input" style="padding: 0.4rem; font-size: 0.8rem; border-radius: 6px; min-width: 120px;" placeholder="Enter ID" ${o.order_status === 'billed' ? 'disabled' : ''}>
                 </td>
                 <td style="white-space: nowrap;">
                     ${o.order_status === 'packed' ? `
-                        <button class="action-btn btn-ship" onclick="submitInlineShip(${o.order_id})" style="padding: 0.4rem 1rem; font-size: 0.8rem;">Ship</button>
+                        <button class="action-btn btn-ship" onclick="submitInlineShip(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null}, '${o.virtual_id || ''}')" style="padding: 0.4rem 1rem; font-size: 0.8rem;">Ship</button>
                     ` : `
-                        <button class="action-btn" onclick="markAsPacked(${o.order_id})" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.4rem 1rem; font-size: 0.8rem;">Pack</button>
+                        <button class="action-btn" onclick="markAsPacked(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.4rem 1rem; font-size: 0.8rem;">Pack</button>
                     `}
                 </td>
             </tr>
@@ -316,7 +374,10 @@ function renderTable() {
                 return `
                 <tr>
                     <td style="font-size:0.85rem;">${dateStr}</td>
-                    <td style="font-weight:600;">${o.order_id}</td>
+                    <td style="font-weight:600;">
+                        ${o.order_id}
+                        <div style="font-size:0.75rem; color:#8b5cf6; font-weight:600; margin-top:2px;">${o.unit_label || ''}</div>
+                    </td>
                     <td style="font-weight:700; color:#475569;">${billNo}</td>
                     <td>
                         <div style="font-weight:600; color:#1e293b;">${customerName}</div>
@@ -382,7 +443,10 @@ function renderTable() {
             return `
             <tr>
                 <td style="font-size:0.85rem;">${dateStr}</td>
-                <td style="font-weight:600;">${o.order_id}</td>
+                <td style="font-weight:600;">
+                    ${o.order_id}
+                    <div style="font-size:0.75rem; color:#8b5cf6; font-weight:600; margin-top:2px;">${o.unit_label || ''}</div>
+                </td>
                 <td style="font-weight:700; color:#475569;">${billNo}</td>
                 <td style="font-size:0.85rem;">${o.delivery_date ? new Date(o.delivery_date).toLocaleDateString() : '-'}</td>
                 <td>
@@ -399,8 +463,11 @@ function renderTable() {
             `;
         } else if (currentTab === 'completed') {
             return `
-            <tr onclick="if(!event.target.closest('button')) showOrderDetails(${o.order_id})">
-                <td style="white-space: nowrap; font-weight: 600;">${o.order_id}</td>
+            <tr onclick="if(!event.target.closest('button')) showOrderDetails(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})">
+                <td style="white-space: nowrap; font-weight: 600;">
+                    ${o.order_id}
+                    <div style="font-size:0.75rem; color:#8b5cf6; font-weight:600; margin-top:2px;">${o.unit_label || ''}</div>
+                </td>
                 <td style="white-space: nowrap; color: #475569; font-weight: 700;">${billNo}</td>
                 <td colspan="2" style="font-weight: 600; color: #1e293b;">${o.customer_name || o.firm_name || 'Walking Customer'}</td>
                 <td colspan="3">
@@ -524,10 +591,11 @@ window.saveCheckDate = async function(shipmentId) {
     }
 }
 
-window.submitInlineShip = async function(orderId) {
-    const tracking = document.getElementById(`trackId_${orderId}`).value;
+window.submitInlineShip = async function(orderId, productId, unitNo, virtualId) {
+    const trackingInputId = virtualId ? `trackId_${virtualId}` : `trackId_${orderId}`;
+    const tracking = document.getElementById(trackingInputId).value;
     
-    const order = allOrders.find(o => o.order_id == orderId);
+    const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     let courier = order ? (order.delivery_type || 'Other') : 'Other';
     const dt = courier.toLowerCase();
     if (dt.includes('post')) courier = 'India Post';
@@ -545,14 +613,19 @@ window.submitInlineShip = async function(orderId) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}` 
             },
-            body: JSON.stringify({ order_id: orderId, courier_name: courier, tracking_id: tracking })
+            body: JSON.stringify({ 
+                order_id: orderId, 
+                courier_name: courier, 
+                tracking_id: tracking,
+                product_id: productId,
+                unit_no: unitNo
+            })
         });
 
         if (response.ok) {
             showToast("Order dispatched successfully!", "success");
             
             // AUTOMATED WHATSAPP NOTIFICATION
-            const order = allOrders.find(o => o.order_id == orderId);
             if (order && order.phone) {
                 const productNames = (order.items || []).map(i => i.product_name).join(', ');
                 const orderDate = new Date(order.created_at).toLocaleDateString('en-GB');
@@ -566,7 +639,8 @@ window.submitInlineShip = async function(orderId) {
                     trackingUrl = `\n\n*Track here:* ${trackingUrls.vrl}`;
                 }
 
-                const waMessage = `*Dispatch Notification - SGB Agro Industries*\n\nDear *${order.customer_name || order.firm_name}*,\nYour order *${formattedId}* has been dispatched successfully! 🚚\n\n*Order Details:*\n📦 Product: ${productNames}\n🗓️ Ordered on: ${orderDate}\n🚛 Logistics: ${courier}\n🆔 Tracking ID: *${tracking}*${trackingUrl}\n\nThank you for choosing *SGB Agro Industries*. Have a great day! 🌱`;
+                const labelSuffix = order.unit_label ? ` ${order.unit_label}` : "";
+                const waMessage = `*Dispatch Notification - SGB Agro Industries*\n\nDear *${order.customer_name || order.firm_name}*,\nYour package for order *${formattedId}*${labelSuffix} has been dispatched successfully! 🚚\n\n*Order Details:*\n📦 Product: ${productNames}\n🗓️ Ordered on: ${orderDate}\n🚛 Logistics: ${courier}\n🆔 Tracking ID: *${tracking}*${trackingUrl}\n\nThank you for choosing *SGB Agro Industries*. Have a great day! 🌱`;
 
                 fetch(`${window.API_URL}/whatsapp/send`, {
                     method: 'POST',
@@ -585,16 +659,28 @@ window.submitInlineShip = async function(orderId) {
     }
 };
 
-window.markAsPacked = async function(orderId) {
+window.markAsPacked = async function(orderId, productId, unitNo) {
     try {
-        const response = await fetch(`${window.API_URL}/orders/${orderId}/status`, {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}` 
-            },
-            body: JSON.stringify({ order_status: 'packed' })
-        });
+        let response;
+        if (productId) {
+            response = await fetch(`${window.API_URL}/logistics/packing`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                },
+                body: JSON.stringify({ order_id: orderId, remarks: 'Packed', product_id: productId, unit_no: unitNo })
+            });
+        } else {
+            response = await fetch(`${window.API_URL}/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                },
+                body: JSON.stringify({ order_status: 'packed' })
+            });
+        }
 
         if (response.ok) {
             showToast("Order marked as packed!", "success");
@@ -608,8 +694,8 @@ window.markAsPacked = async function(orderId) {
     }
 };
 
-window.showOrderDetails = function(orderId) {
-    const order = allOrders.find(o => o.order_id == orderId);
+window.showOrderDetails = function(orderId, productId, unitNo) {
+    const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     if (!order) return;
 
     const modal = document.getElementById('orderDetailsModal');
@@ -624,6 +710,7 @@ window.showOrderDetails = function(orderId) {
                 <div>
                     <h2 style="font-size: 1.25rem; font-weight: 800; color: #1e293b;">Order Details</h2>
                     <p style="font-size: 0.85rem; color: #64748b;">${window.formatOrderId(orderId, order.created_at)}</p>
+                    <div style="font-size:0.85rem; color:#8b5cf6; font-weight:600; margin-top:2px;">${order.unit_label || ''}</div>
                 </div>
             </div>
 
@@ -670,7 +757,7 @@ window.showOrderDetails = function(orderId) {
             </div>
             
             ${order.order_status === 'packed' ? `
-                <button class="action-btn btn-ship" style="width: 100%; padding: 1.25rem; margin-top: 2rem; border-radius: 16px; font-size: 1rem;" onclick="openShipModal(${order.order_id})">
+                <button class="action-btn btn-ship" style="width: 100%; padding: 1.25rem; margin-top: 2rem; border-radius: 16px; font-size: 1rem;" onclick="submitInlineShip(${order.order_id}, ${order.virtual_id ? order.product_id : null}, ${order.virtual_id ? order.unit_no : null}, '${order.virtual_id || ''}')">
                     <i class="fas fa-truck"></i> Proceed to Dispatch
                 </button>
             ` : ''}

@@ -168,6 +168,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.head.appendChild(style);
     }
 
+    // ── Inject Hamburger Menu Button for Mobile ──
+    const topbar = document.querySelector('.topbar');
+    if (topbar && !topbar.querySelector('.hamburger')) {
+        const hamburger = document.createElement('div');
+        hamburger.className = 'hamburger';
+        hamburger.onclick = () => {
+            if (typeof window.toggleMobileSidebar === 'function') {
+                window.toggleMobileSidebar();
+            }
+        };
+        hamburger.innerHTML = '<i class="fa-solid fa-bars"></i>';
+        topbar.prepend(hamburger);
+    }
+
     // ── Update Profile Name ──
     const profileNameEl = document.getElementById('profileName');
     if (profileNameEl && user.name) {
@@ -1117,7 +1131,7 @@ window.changeAssigneeFromDetails = async function () {
 
     const token = localStorage.getItem('token');
     try {
-        const response = await fetch(`${API_URL}/users`, {
+        const response = await fetch(`${API_URL}/users/sales`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const allUsers = await response.json();

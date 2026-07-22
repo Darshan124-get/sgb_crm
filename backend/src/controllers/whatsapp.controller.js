@@ -133,7 +133,17 @@ const receiveMessage = async (req, res) => {
                                      // sendMediaMessage supports sending a link directly if we pass it.
                                      const metaResponse = await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption);
                                      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-                                     await messageService.logChatMessage(fromNumber, 'outgoing', reply.type, reply.caption || '', reply.url, null, null, metaMessageId, 'sent');
+                                     await messageService.logChatMessage(
+                                         fromNumber, 
+                                         'outgoing', 
+                                         reply.type, 
+                                         reply.caption || '', 
+                                         reply.url, 
+                                         reply.mimeType || (reply.type === 'image' ? 'image/jpeg' : (reply.type === 'video' ? 'video/mp4' : null)), 
+                                         null, 
+                                         metaMessageId, 
+                                         'sent'
+                                     );
                                 }
                             }
                             

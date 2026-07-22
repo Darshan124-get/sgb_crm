@@ -254,16 +254,47 @@ function getSelectedProducts(prefix = '') {
     const productContainer = document.getElementById(prefix + 'de-products-container');
     if (productContainer) {
         const selectedCards = productContainer.querySelectorAll('.product-select-card.selected');
-        return Array.from(selectedCards).map(card => {
+        const finalItems = [];
+
+        selectedCards.forEach(card => {
+            const type = card.getAttribute('data-type') || 'product';
+            const id = card.getAttribute('data-id');
             const qtySpan = card.querySelector('.qty-val');
             const qty = qtySpan ? parseInt(qtySpan.textContent) || 1 : 1;
-            return {
-                product_id: parseInt(card.getAttribute('data-id')) || card.getAttribute('data-id'),
-                quantity: qty,
-                price: parseFloat(card.getAttribute('data-price')) || 0,
-                name: card.getAttribute('data-name')
-            };
+
+            if (type === 'set') {
+                const set = (window.loadedProductSets || []).find(s => s.set_id == id);
+                if (set) {
+                    (set.items || []).forEach(item => {
+                        const existing = finalItems.find(fi => fi.product_id === item.product_id);
+                        if (existing) {
+                            existing.quantity += item.quantity * qty;
+                        } else {
+                            finalItems.push({
+                                product_id: item.product_id,
+                                quantity: item.quantity * qty,
+                                price: parseFloat(item.selling_price) || 0,
+                                name: item.product_name
+                            });
+                        }
+                    });
+                }
+            } else {
+                const pid = parseInt(id);
+                const existing = finalItems.find(fi => fi.product_id === pid);
+                if (existing) {
+                    existing.quantity += qty;
+                } else {
+                    finalItems.push({
+                        product_id: pid,
+                        quantity: qty,
+                        price: parseFloat(card.getAttribute('data-price')) || 0,
+                        name: card.getAttribute('data-name')
+                    });
+                }
+            }
         });
+        return finalItems;
     }
     
     // Fallback to select
@@ -286,6 +317,18 @@ async function loadProductsForEngine(prefix = '') {
 
     try {
         const token = localStorage.getItem('token');
+        
+        // 1. Load Preset Full Sets
+        const setsResponse = await fetch(`${window.API_URL}/product-sets`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        let sets = [];
+        if (setsResponse.ok) {
+            sets = await setsResponse.json();
+            window.loadedProductSets = sets;
+        }
+
+        // 2. Load products
         const response = await fetch(`${window.API_URL}/products`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -293,7 +336,6 @@ async function loadProductsForEngine(prefix = '') {
         if (response.ok) {
             const products = await response.json();
             if (products && products.length > 0) {
-                // IMPORTANT: Using selling_price and name from DB schema
                 if (productSelect) {
                     productSelect.innerHTML = products.map(p => `
                         <option value="${p.name}" data-id="${p.product_id}" data-price="${p.selling_price || 0}">
@@ -302,8 +344,36 @@ async function loadProductsForEngine(prefix = '') {
                     `).join('');
                 }
                 if (productContainer) {
-                    productContainer.innerHTML = products.map(p => `
-                        <div class="product-select-card" data-name="${p.name}" data-id="${p.product_id}" data-price="${p.selling_price || 0}" onclick="toggleProductSelection(this, '${prefix}')">
+                    let setsHTML = '';
+                    if (sets.length > 0) {
+                        setsHTML = sets.map(s => {
+                            let setTotal = 0;
+                            (s.items || []).forEach(item => {
+                                setTotal += (item.selling_price || 0) * (item.quantity || 1);
+                            });
+                            const itemsListStr = (s.items || []).map(item => `${item.product_name} (x${item.quantity})`).join(', ');
+
+                            return `
+                                <div class="product-select-card" data-name="${s.name}" data-type="set" data-id="${s.set_id}" data-price="${setTotal}" onclick="toggleProductSelection(this, '${prefix}')" style="background:#faf5ff; border: 1px solid #d8b4fe;">
+                                    <div class="product-info">
+                                        <div style="font-size:0.65rem; font-weight:700; color:#8b5cf6; text-transform:uppercase; margin-bottom:2px;"><i class="fas fa-cubes"></i> FULL SET BUNDLE</div>
+                                        <div class="product-name" style="font-weight:700; color:#1e293b;">${s.name}</div>
+                                        <div class="product-price" style="color:#8b5cf6; font-weight:700;">₹${setTotal}</div>
+                                        <div style="font-size:0.7rem; color:#64748b; margin-top:4px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${itemsListStr}">${itemsListStr}</div>
+                                    </div>
+                                    <div class="quantity-controls" onclick="event.stopPropagation();">
+                                        <button type="button" class="qty-btn" onclick="updateProductQuantity(event, this, -1, '${prefix}')">-</button>
+                                        <span class="qty-val">1</span>
+                                        <button type="button" class="qty-btn" onclick="updateProductQuantity(event, this, 1, '${prefix}')">+</button>
+                                    </div>
+                                    <div class="check-indicator" style="color:#8b5cf6;"><i class="fas fa-check-circle"></i></div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+
+                    const productsHTML = products.map(p => `
+                        <div class="product-select-card" data-name="${p.name}" data-type="product" data-id="${p.product_id}" data-price="${p.selling_price || 0}" onclick="toggleProductSelection(this, '${prefix}')">
                             <div class="product-info">
                                 <div class="product-name">${p.name}</div>
                                 <div class="product-price">₹${p.selling_price || 0}</div>
@@ -316,11 +386,13 @@ async function loadProductsForEngine(prefix = '') {
                             <div class="check-indicator"><i class="fas fa-check-circle"></i></div>
                         </div>
                     `).join('');
+                    
+                    productContainer.innerHTML = setsHTML + productsHTML;
                 }
             }
         }
     } catch (err) {
-        console.error("Failed to load products for engine:", err);
+        console.error("Failed to load products/sets for engine:", err);
     }
 }
 

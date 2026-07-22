@@ -7,7 +7,7 @@ const BACKEND_PORT = 5000;
 const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
 // window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 // Set this to true if you want to use the local backend (localhost:5000)
-const USE_LOCAL_BACKEND = true;
+const USE_LOCAL_BACKEND = false;
 
 window.BASE_URL = USE_LOCAL_BACKEND ? `http://localhost:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 window.API_URL = `${window.BASE_URL}/api`;
@@ -48,19 +48,19 @@ window.ROLE_REDIRECTS = {
     whatsapp_manager: 'modules/whatsapp/whatsapp.html'
 };
 
-window.getHomeUrl = function(user) {
+window.getHomeUrl = function (user) {
     if (!user || !user.role) return 'index.html';
     const role = user.role.toLowerCase();
-    
+
     if (role === 'admin' || role === 'super-admin') {
         return window.ROLE_REDIRECTS[role];
     }
-    
+
     // Check if they have custom PBAC permissions
     let userPermissions = [];
     try {
         userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []);
-    } catch(e) {}
+    } catch (e) { }
 
     // Route based on department permissions injected by auth controller
     if (userPermissions.includes('sales_dashboard')) return 'modules/sales/dashboard.html';
@@ -91,9 +91,9 @@ window.getCurrentUser = function () {
                     .replace(/_/g, '/')
                     .padEnd(Math.ceil(token.split('.')[1].length / 4) * 4, '=');
                 const payload = JSON.parse(atob(b64));
-                user = { 
-                    id: payload.id, 
-                    name: payload.name, 
+                user = {
+                    id: payload.id,
+                    name: payload.name,
                     role: payload.role,
                     department_id: payload.department_id,
                     is_manager: payload.is_manager,
@@ -121,19 +121,19 @@ window.requireAuth = function (allowedRoles = []) {
     if (role === 'super-admin' && allowedRoles.includes('admin') && !allowedRoles.includes('super-admin')) {
         allowedRoles.push('super-admin');
     }
-    
+
     // PBAC Bypass: If the user has custom permissions or is a manager, allow them into unified folders 
     // Security is handled by the backend APIs and sidebar filtering.
     let userPermissions = [];
-    try { userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []); } catch(e){}
+    try { userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []); } catch (e) { }
     if (userPermissions.length > 0 || user.is_manager) {
-        return true; 
+        return true;
     }
 
     // Standard folder-based role restriction
     if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
         const home = window.getHomeUrl(user);
-        
+
         // Loop Breaker
         const targetPath = new URL(home, window.location.origin + window.location.pathname).pathname;
         if (window.location.pathname.includes(targetPath)) {
@@ -220,7 +220,7 @@ window.debounce = function (func, wait) {
     };
 };
 
-window.togglePasswordVisibility = function(inputId, button) {
+window.togglePasswordVisibility = function (inputId, button) {
     const input = document.getElementById(inputId);
     const icon = button.querySelector('i');
     if (input.type === 'password') {

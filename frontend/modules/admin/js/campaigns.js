@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="fas ${c.status === 'active' ? 'fa-ban' : 'fa-check'}"></i>
                     </button>
                     <button onclick="window.goToCampaignAnalytics(${c.id})" title="Analytics" style="color:#3b82f6;"><i class="fas fa-chart-pie"></i></button>
+                    <button onclick="window.deleteCampaign(${c.id})" title="Delete" style="color:#ef4444;"><i class="fas fa-trash-alt"></i></button>
                 </td>
             </tr>
         `).join('');
@@ -307,6 +308,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.goToCampaignAnalytics = function(id) {
         window.location.href = `reports.html?tab=campaign-analytics&campaign_id=${id}`;
+    };
+
+    window.deleteCampaign = async function(id) {
+        const camp = campaignsList.find(c => c.id === id);
+        if (!camp) return;
+        if (confirm(`Are you sure you want to delete campaign "${camp.campaign_id}"?`)) {
+            try {
+                const res = await fetch(`${window.API_URL}/campaigns/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (res.ok) {
+                    loadCampaigns();
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Failed to delete campaign');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Server error');
+            }
+        }
     };
 
     async function saveCampaign(isEdit) {

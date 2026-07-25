@@ -138,7 +138,7 @@ const logInteraction = async (phoneInput, action, data = {}) => {
 /**
  * Logs a message to the chat history (linked to CRM chat_sessions)
  */
-const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent') => {
+const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent', replyToChatId = null, isForwarded = 0) => {
   const phone = normalizePhone(phoneInput);
   try {
     // 1. Get Lead ID
@@ -197,8 +197,8 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     }
 
     await db.execute(
-      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message_type, message, media_data, media_url, mime_type, message_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      mapParams([session_id, sender_type, senderId, messageType, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status])
+      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message_type, message, media_data, media_url, mime_type, message_id, status, reply_to_chat_id, is_forwarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      mapParams([session_id, sender_type, senderId, messageType, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status, replyToChatId, isForwarded])
     );
   } catch (err) {
     logger.error('Chat logging error:', err);

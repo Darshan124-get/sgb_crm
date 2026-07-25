@@ -84,76 +84,85 @@ const receiveMessage = async (req, res) => {
           }
 
           try {
+            // Check if this incoming message is a reply to another message
+            let replyToChatId = null;
+            if (msg.context && msg.context.id) {
+              const [parentRows] = await pool.query('SELECT chat_id FROM chat_messages WHERE message_id = ?', [msg.context.id]);
+              if (parentRows.length > 0) {
+                replyToChatId = parentRows[0].chat_id;
+              }
+            }
+
             // 2. Store as Lead (Requirement: Any message creates/updates a lead)
             await messageService.storeMessageAsLead(fromNumber, inputText);
 
-            // 3. Log to Chat History
-            await messageService.logChatMessage(fromNumber, 'incoming', msg.type, inputText, mediaBuffer, mimeType);
+            // 3. Log to Chat History (pass msg.id as the messageId parameter, and replyToChatId)
+            await messageService.logChatMessage(fromNumber, 'incoming', msg.type, inputText, mediaBuffer, mimeType, null, msg.id, 'sent', replyToChatId);
 
             // 4. Campaign Auto-Replies Check
             logger.info(`Message received from ${fromNumber}: ${inputText}`);
-            
+
             const [campaigns] = await pool.query('SELECT * FROM campaigns WHERE status = "active" AND auto_replies IS NOT NULL AND auto_replies != \'[]\' ORDER BY id DESC');
             let matchedCampaign = null;
-            
+
             if (inputText) {
-                const normalizedInput = inputText.toLowerCase().trim();
-                for (const campaign of campaigns) {
-                    if (campaign.tag_line) {
-                        const tagLine = campaign.tag_line.toLowerCase().trim();
-                        // Check if the input contains the tag line or exactly matches
-                        if (tagLine && (normalizedInput.includes(tagLine) || normalizedInput === tagLine)) {
-                            matchedCampaign = campaign;
-                            break;
-                        }
-                    }
+              const normalizedInput = inputText.toLowerCase().trim();
+              for (const campaign of campaigns) {
+                if (campaign.tag_line) {
+                  const tagLine = campaign.tag_line.toLowerCase().trim();
+                  // Check if the input contains the tag line or exactly matches
+                  if (tagLine && (normalizedInput.includes(tagLine) || normalizedInput === tagLine)) {
+                    matchedCampaign = campaign;
+                    break;
+                  }
                 }
+              }
             }
 
             if (matchedCampaign && matchedCampaign.auto_replies) {
-                logger.info(`Matched campaign ${matchedCampaign.campaign_id} for number ${fromNumber}`);
-                let autoReplies = [];
-                try {
-                    autoReplies = typeof matchedCampaign.auto_replies === 'string' ? JSON.parse(matchedCampaign.auto_replies) : matchedCampaign.auto_replies;
-                } catch (e) {
-                    logger.error(`Error parsing auto_replies for campaign ${matchedCampaign.campaign_id}:`, e.message);
-                }
+              logger.info(`Matched campaign ${matchedCampaign.campaign_id} for number ${fromNumber}`);
+              let autoReplies = [];
+              try {
+                autoReplies = typeof matchedCampaign.auto_replies === 'string' ? JSON.parse(matchedCampaign.auto_replies) : matchedCampaign.auto_replies;
+              } catch (e) {
+                logger.error(`Error parsing auto_replies for campaign ${matchedCampaign.campaign_id}:`, e.message);
+              }
 
-                if (Array.isArray(autoReplies)) {
-                    for (const reply of autoReplies) {
-                        try {
-                            if (reply.type === 'text') {
-                                const metaResponse = await whatsappService.sendMessage(formatForWhatsApp(fromNumber), reply.content);
-                                const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-                                await messageService.logChatMessage(fromNumber, 'outgoing', 'text', reply.content, null, null, null, metaMessageId, 'sent');
-                            } else if (reply.type === 'image' || reply.type === 'video') {
-                                // For media, we assume reply.url holds the Supabase URL
-                                if (reply.url) {
-                                     // For Meta API we need a media ID or a link.
-                                     // sendMediaMessage supports sending a link directly if we pass it.
-                                     const metaResponse = await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption);
-                                     const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-                                     await messageService.logChatMessage(
-                                         fromNumber, 
-                                         'outgoing', 
-                                         reply.type, 
-                                         reply.caption || '', 
-                                         reply.url, 
-                                         reply.mimeType || (reply.type === 'image' ? 'image/jpeg' : (reply.type === 'video' ? 'video/mp4' : null)), 
-                                         null, 
-                                         metaMessageId, 
-                                         'sent'
-                                     );
-                                }
-                            }
-                            
-                            // Optional: Small delay between messages so they arrive in order
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        } catch (sendErr) {
-                            logger.error(`Error sending campaign auto-reply to ${fromNumber}:`, sendErr.message);
-                        }
+              if (Array.isArray(autoReplies)) {
+                for (const reply of autoReplies) {
+                  try {
+                    if (reply.type === 'text') {
+                      const metaResponse = await whatsappService.sendMessage(formatForWhatsApp(fromNumber), reply.content);
+                      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
+                      await messageService.logChatMessage(fromNumber, 'outgoing', 'text', reply.content, null, null, null, metaMessageId, 'sent');
+                    } else if (reply.type === 'image' || reply.type === 'video') {
+                      // For media, we assume reply.url holds the Supabase URL
+                      if (reply.url) {
+                        // For Meta API we need a media ID or a link.
+                        // sendMediaMessage supports sending a link directly if we pass it.
+                        const metaResponse = await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption);
+                        const metaMessageId = metaResponse?.messages?.[0]?.id || null;
+                        await messageService.logChatMessage(
+                          fromNumber,
+                          'outgoing',
+                          reply.type,
+                          reply.caption || '',
+                          reply.url,
+                          reply.mimeType || (reply.type === 'image' ? 'image/jpeg' : (reply.type === 'video' ? 'video/mp4' : null)),
+                          null,
+                          metaMessageId,
+                          'sent'
+                        );
+                      }
                     }
+
+                    // Optional: Small delay between messages so they arrive in order
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  } catch (sendErr) {
+                    logger.error(`Error sending campaign auto-reply to ${fromNumber}:`, sendErr.message);
+                  }
                 }
+              }
             }
 
           } catch (err) {
@@ -199,7 +208,7 @@ const getHistory = async (req, res) => {
  * Internal API: Send a manual reply from the agent (supports text and media)
  */
 const sendReply = async (req, res) => {
-  const { phone, message, mediaData, mimeType } = req.body;
+  const { phone, message, mediaData, mimeType, reply_to_chat_id, is_forwarded } = req.body;
 
   if (!phone || (!message && !mediaData)) {
     return res.status(400).json({ error: 'Phone and either message or media are required' });
@@ -229,7 +238,7 @@ const sendReply = async (req, res) => {
       console.log('MEDIA META MESSAGE ID:', metaMessageId);
 
       // Log to local Chat History (Use normalized number for DB)
-      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', category, message || '', mediaData, mimeType, req.user.id, metaMessageId, 'sent');
+      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', category, message || '', mediaData, mimeType, req.user.id, metaMessageId, 'sent', reply_to_chat_id, is_forwarded);
     }
     // 2. Handle Text Sending
     else if (message) {
@@ -238,7 +247,7 @@ const sendReply = async (req, res) => {
       logger.info('TEXT META RESPONSE:', metaResponse);
       const metaMessageId = metaResponse?.messages?.[0]?.id || null;
       logger.info('TEXT META MESSAGE ID:', metaMessageId);
-      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id, metaMessageId, 'sent');
+      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id, metaMessageId, 'sent', reply_to_chat_id, is_forwarded);
     }
 
     res.json({ success: true });

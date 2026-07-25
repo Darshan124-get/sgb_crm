@@ -70,7 +70,7 @@ const sendMediaMessage = async (to, mediaId, type, caption = '') => {
   try {
     const mediaObj = mediaId.startsWith('http') ? { link: mediaId } : { id: mediaId };
     if (caption) mediaObj.caption = caption;
-    
+
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',

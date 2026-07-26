@@ -167,6 +167,8 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
         mediaUrl = mediaData;
       } else if (typeof mediaData === 'string' && mediaData.startsWith('data:')) {
         buffer = Buffer.from(mediaData.split(',')[1], 'base64');
+      } else if (Buffer.isBuffer(mediaData)) {
+        buffer = mediaData;
       }
 
       if (buffer && Buffer.isBuffer(buffer)) {

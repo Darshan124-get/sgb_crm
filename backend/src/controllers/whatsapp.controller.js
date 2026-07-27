@@ -215,6 +215,15 @@ const sendReply = async (req, res) => {
   }
 
   try {
+    // Retrieve the Meta message ID to quote/reply to the message on WhatsApp
+    let replyToMessageId = null;
+    if (reply_to_chat_id) {
+      const [replyRows] = await pool.query('SELECT message_id FROM chat_messages WHERE chat_id = ?', [reply_to_chat_id]);
+      if (replyRows.length > 0) {
+        replyToMessageId = replyRows[0].message_id;
+      }
+    }
+
     // 1. Handle Media Sending
     if (mediaData) {
       const category = mimeType && mimeType.startsWith('image') ? 'image' :
@@ -232,7 +241,7 @@ const sendReply = async (req, res) => {
       }
 
       const waPhone = formatForWhatsApp(phone);
-      const metaResponse = await whatsappService.sendMediaMessage(waPhone, mediaId, category, message);
+      const metaResponse = await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId);
       console.log('MEDIA META RESPONSE:', JSON.stringify(metaResponse));
       const metaMessageId = metaResponse?.messages?.[0]?.id || null;
       console.log('MEDIA META MESSAGE ID:', metaMessageId);
@@ -243,7 +252,7 @@ const sendReply = async (req, res) => {
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
-      const metaResponse = await whatsappService.sendMessage(waPhone, message);
+      const metaResponse = await whatsappService.sendMessage(waPhone, message, replyToMessageId);
       logger.info('TEXT META RESPONSE:', metaResponse);
       const metaMessageId = metaResponse?.messages?.[0]?.id || null;
       logger.info('TEXT META MESSAGE ID:', metaMessageId);

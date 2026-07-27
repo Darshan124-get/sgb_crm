@@ -10,7 +10,7 @@ const phoneNumberId = process.env.PHONE_NUMBER_ID;
 /**
  * Sends a text message to a WhatsApp recipient
  */
-const sendMessage = async (to, text) => {
+const sendMessage = async (to, text, replyToMessageId = null) => {
   try {
     const data = {
       messaging_product: 'whatsapp',
@@ -19,6 +19,10 @@ const sendMessage = async (to, text) => {
       type: 'text',
       text: { body: text },
     };
+
+    if (replyToMessageId) {
+      data.context = { message_id: replyToMessageId };
+    }
 
     const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {
       headers: {
@@ -66,7 +70,7 @@ const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
 /**
  * Sends a media message using a media_id
  */
-const sendMediaMessage = async (to, mediaId, type, caption = '') => {
+const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null) => {
   try {
     const mediaObj = mediaId.startsWith('http') ? { link: mediaId } : { id: mediaId };
     if (caption) mediaObj.caption = caption;
@@ -78,6 +82,10 @@ const sendMediaMessage = async (to, mediaId, type, caption = '') => {
       type: type, // 'image', 'document', 'video', 'audio'
       [type]: mediaObj,
     };
+
+    if (replyToMessageId) {
+      data.context = { message_id: replyToMessageId };
+    }
 
     const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {
       headers: {

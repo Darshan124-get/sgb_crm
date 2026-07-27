@@ -2452,20 +2452,3 @@ if (modal && closeBtn && saveBtn && nameInput) {
         renderCustomerList();
     });
 }
-
-// Toggle three-dot sidebar menu
-const sidebarMenuBtn = document.getElementById('sidebar-menu-btn');
-const sidebarMenuContent = document.getElementById('sidebar-menu-content');
-if (sidebarMenuBtn && sidebarMenuContent) {
-    sidebarMenuBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const show = sidebarMenuContent.style.display === 'none' || sidebarMenuContent.style.display === '';
-        sidebarMenuContent.style.display = show ? 'block' : 'none';
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!sidebarMenuBtn.contains(e.target)) {
-            sidebarMenuContent.style.display = 'none';
-        }
-    });
-}

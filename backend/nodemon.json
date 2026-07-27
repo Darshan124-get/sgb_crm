@@ -1,0 +1,10 @@
+{
+  "ignore": [
+    "*.log",
+    "debug.log",
+    ".debug.log",
+    "webhook_payloads.log",
+    ".webhook_payloads.log",
+    "uploads/*"
+  ]
+}

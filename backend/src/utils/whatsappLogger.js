@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const logFile = path.join(__dirname, '../../debug.log');
+const logFile = path.join(__dirname, '../../.debug.log');
 
 const writeLog = (level, msg, ...args) => {
   try {

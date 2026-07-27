@@ -152,7 +152,7 @@
                     <div id="quick-replies-popover" style="position: absolute; bottom: 100%; left: 0; right: 0; max-height: 300px; background-color: var(--whatsapp-header); border-radius: 8px 8px 0 0; box-shadow: 0 -4px 15px rgba(0,0,0,0.15); overflow-y: auto; z-index: 1000; display: none; margin: 0 15px; border: 1px solid var(--whatsapp-border); border-bottom: none;">
                         <div style="padding: 12px 20px; border-bottom: 1px solid var(--whatsapp-border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--whatsapp-header);">
                             <span style="color: var(--whatsapp-text); font-weight: 600; font-size: 0.95rem;">Quick Replies</span>
-                            <button id="qr-popover-edit-btn" style="background: none; border: none; color: var(--whatsapp-green); cursor: pointer; font-size: 0.9rem;">Edit</button>
+                            <button type="button" id="qr-popover-edit-btn" style="background: none; border: none; color: var(--whatsapp-green); cursor: pointer; font-size: 0.9rem;">Edit</button>
                         </div>
                         <div id="qr-popover-list" style="display: flex; flex-direction: column;">
                             <!-- Populated dynamically -->
@@ -160,12 +160,12 @@
                     </div>
 
                     <div class="input-container">
-                        <button id="attach-btn" style="background: none; border: none; color: var(--whatsapp-secondary); font-size: 1.3rem; cursor: pointer; padding: 5px;">
+                        <button type="button" id="attach-btn" style="background: none; border: none; color: var(--whatsapp-secondary); font-size: 1.3rem; cursor: pointer; padding: 5px;">
                             <i class="fas fa-paperclip"></i>
                         </button>
                         <input type="file" id="media-input" class="hidden">
                         <textarea id="message-input" placeholder="Type a message..." rows="1" style="resize: none; font-family: inherit; width: 100%; border: none; outline: none; background: var(--input-bg); color: var(--whatsapp-text); border: 1px solid var(--whatsapp-border); padding: 12px 15px; border-radius: 8px; margin: 0 10px; max-height: 100px; overflow-y: auto;"></textarea>
-                        <button id="send-btn" class="send-btn">
+                        <button type="button" id="send-btn" class="send-btn">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -418,11 +418,6 @@
         </div>
     </div>
 
-            <div class="modal-footer">
-                <button id="confirm-transfer-btn" class="btn-primary" disabled>Transfer</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Create Custom List Modal -->
     <div id="custom-list-modal" class="modal hidden" style="z-index: 2000;">

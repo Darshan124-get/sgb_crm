@@ -119,8 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Refresh customer list every 30 seconds
-    setInterval(loadCustomers, 30000);
+    // Refresh customer list every 5 seconds
+    setInterval(loadCustomers, 5000);
 
     // Polling for new messages in active chat
     setInterval(() => {
@@ -498,15 +498,41 @@ async function loadCampaignsAndTabs() {
 /**
  * Fetch and Render Customer List
  */
+let currentCustomersJson = '';
+
 async function loadCustomers() {
     try {
         const response = await fetch(`${API_BASE}/customers`, { headers: AUTH_HEADER });
         if (response.status === 401) return window.doLogout();
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
-        allCustomers = await response.json();
+        const data = await response.json();
+        const dataJson = JSON.stringify(data);
+        if (dataJson === currentCustomersJson) {
+            // Even if data is unchanged, still check for pending phone selection on initial load
+            if (window._pendingPhone) {
+                const customer = data.find(c => c.phone === window._pendingPhone);
+                if (customer) {
+                    selectCustomer(customer);
+                }
+                delete window._pendingPhone;
+            }
+            return;
+        }
+        currentCustomersJson = dataJson;
+
+        allCustomers = data;
         renderSidebarTabs(); // update unread count
         renderCustomerList();
+
+        // Check if there is a pending phone to select on load/refresh
+        if (window._pendingPhone) {
+            const customer = allCustomers.find(c => c.phone === window._pendingPhone);
+            if (customer) {
+                selectCustomer(customer);
+            }
+            delete window._pendingPhone;
+        }
     } catch (err) {
         console.error('Failed to load customers:', err);
         customerListEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Connection error.</div>';
@@ -558,13 +584,8 @@ function renderCustomerList() {
         }
     });
 
-    // Sort so that unread messages come to the top, then sort by last_message_at DESC
+    // Sort strictly by last_message_at DESC (WhatsApp style)
     filtered.sort((a, b) => {
-        const aUnread = parseInt(a.unread_msg_count || 0) > 0;
-        const bUnread = parseInt(b.unread_msg_count || 0) > 0;
-        if (aUnread && !bUnread) return -1;
-        if (!aUnread && bUnread) return 1;
-
         const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
         const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
         return bTime - aTime;
@@ -646,11 +667,6 @@ function renderCustomerList() {
         `;
         item.onclick = () => selectCustomer(customer);
         customerListEl.appendChild(item);
-
-        if (window._pendingPhone === customer.phone) {
-            selectCustomer(customer);
-            delete window._pendingPhone;
-        }
     });
 }
 
@@ -661,6 +677,16 @@ async function selectCustomer(customer) {
     closeAllContextMenus();
     clearReplyPreview();
     activeCustomer = customer;
+    currentHistory = [];
+
+    // Clear message container immediately and show loading spinner
+    if (messageContainerEl) {
+        messageContainerEl.innerHTML = '<div class="loading-spinner" style="padding: 20px; text-align: center; color: var(--whatsapp-secondary);">Loading messages...</div>';
+    }
+
+    // Update URL query parameters without reloading
+    const newUrl = `${window.location.pathname}?phone=${customer.phone}`;
+    window.history.replaceState(null, '', newUrl);
 
     // UI Transitions
     chatWelcomeEl.classList.add('hidden');
@@ -861,6 +887,10 @@ async function handleResolve() {
         if (response.ok) {
             window.showAlert('Success', 'Conversation marked as resolved', 'success');
             activeCustomer = null;
+            
+            // Clear URL query parameters
+            window.history.replaceState(null, '', window.location.pathname);
+
             chatWindowEl.classList.add('hidden');
             detailsSidebarEl.classList.add('hidden');
             const resizerRight = document.getElementById('resizer-right');
@@ -1081,6 +1111,8 @@ async function handleSendMedia() {
                 // If they are still in the same chat, reload history to get the real message
                 if (activeCustomer && activeCustomer.phone === phone) {
                     loadChatHistory(phone);
+                    currentCustomersJson = '';
+                    loadCustomers();
                 }
             } else {
                 handleUploadError();
@@ -1511,6 +1543,11 @@ window.initForwardAndReplyEvents = function () {
 
 function renderMessages(history) {
     if (!messageContainerEl) return;
+
+    // Determine if we should scroll to bottom after rendering
+    const isAtBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight < 150;
+    const isFirstLoad = messageContainerEl.querySelector('.loading-spinner') !== null || messageContainerEl.innerHTML === '';
+
     messageContainerEl.innerHTML = '';
 
     let lastDateStr = null;
@@ -1669,7 +1706,9 @@ function renderMessages(history) {
         });
     }
 
-    messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    if (isFirstLoad || isAtBottom) {
+        messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    }
 }
 
 async function handleSend() {
@@ -1696,6 +1735,8 @@ async function handleSend() {
         if (response.ok) {
             clearReplyPreview();
             loadChatHistory(activeCustomer.phone);
+            currentCustomersJson = '';
+            loadCustomers();
         } else {
             window.showAlert('Error', 'Failed to send message', 'error');
         }

@@ -167,21 +167,29 @@ function updateCounts() {
     const pending = allOrders.filter(o => ['billed', 'packed'].includes(o.order_status)).length;
     
     const inTransit = allOrders.filter(o => {
-        if (o.order_status !== 'shipped') return false;
-        // Depending on courier
-        const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
-        if (dt.includes('post') && o.shipment_status === 'delivered') return false; // Post goes to Pay Check
-        if (dt.includes('post') && o.shipment_status === 'returned') return false;
-        return true; // Still in transit
+        if (!o.shipment_id) return false;
+        if (o.shipment_status === 'returned') return false;
+        return o.shipment_status !== 'delivered';
     }).length;
 
     const payCheck = allOrders.filter(o => {
-        if (o.order_status !== 'shipped') return false;
+        if (!o.shipment_id) return false;
         const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
         return dt.includes('post') && o.shipment_status === 'delivered' && !o.check_received_date;
     }).length;
 
-    const completed = allOrders.filter(o => o.order_status === 'delivered').length;
+    const completed = allOrders.filter(o => {
+        if (!o.shipment_id) return false;
+        if (o.shipment_status === 'returned') return true;
+        if (o.shipment_status === 'delivered') {
+            const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
+            if (dt.includes('post')) {
+                return !!o.check_received_date;
+            }
+            return true;
+        }
+        return false;
+    }).length;
     
     document.getElementById('pendingCount').textContent = pending;
     document.getElementById('inTransitCount').textContent = inTransit;
@@ -244,7 +252,7 @@ function renderTable() {
                 <th>Delivery Date</th><th>Status</th><th>Action</th>
             </tr>`;
             filtered = allOrders.filter(o => {
-                if (o.order_status !== 'shipped') return false;
+                if (!o.shipment_id) return false;
                 const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
                 return dt.includes('post') && o.shipment_status !== 'delivered' && o.shipment_status !== 'returned';
             });
@@ -255,9 +263,9 @@ function renderTable() {
                 <th>Delivery Date</th><th>Status</th><th>Action</th>
             </tr>`;
             filtered = allOrders.filter(o => {
-                if (o.order_status !== 'shipped') return false;
+                if (!o.shipment_id) return false;
                 const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
-                return dt.includes('vrl');
+                return dt.includes('vrl') && o.shipment_status !== 'delivered' && o.shipment_status !== 'returned';
             });
         } else {
             // Other transport
@@ -267,9 +275,9 @@ function renderTable() {
                 <th>Delivery Date</th><th>Status</th><th>Action</th>
             </tr>`;
             filtered = allOrders.filter(o => {
-                if (o.order_status !== 'shipped') return false;
+                if (!o.shipment_id) return false;
                 const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
-                return !dt.includes('post') && !dt.includes('vrl');
+                return !dt.includes('post') && !dt.includes('vrl') && o.shipment_status !== 'delivered' && o.shipment_status !== 'returned';
             });
         }
     } else if (currentTab === 'pay_check') {
@@ -278,7 +286,7 @@ function renderTable() {
             <th>Check Received Date</th><th>Tracking ID</th><th>COD Amount</th><th>Item</th><th>Qty</th><th>Action</th>
         </tr>`;
         filtered = allOrders.filter(o => {
-            if (o.order_status !== 'shipped') return false;
+            if (!o.shipment_id) return false;
             const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
             return dt.includes('post') && o.shipment_status === 'delivered' && !o.check_received_date;
         });
@@ -287,7 +295,18 @@ function renderTable() {
             <th>Order ID</th><th>Bill No.</th><th colspan="2">Customer Name</th>
             <th colspan="3">Items</th><th colspan="3">Tracking Details</th><th>Status</th>
         </tr>`;
-        filtered = allOrders.filter(o => o.order_status === 'delivered' || o.shipment_status === 'returned');
+        filtered = allOrders.filter(o => {
+            if (!o.shipment_id) return false;
+            if (o.shipment_status === 'returned') return true;
+            if (o.shipment_status === 'delivered') {
+                const dt = (o.courier_name || o.delivery_type || '').toLowerCase();
+                if (dt.includes('post')) {
+                    return !!o.check_received_date;
+                }
+                return true;
+            }
+            return false;
+        });
     }
 
     if (searchQuery) {
@@ -519,6 +538,95 @@ window.trackShipment = async function(type, trackingId) {
     }, 800);
 }
 
+function showDatePickerModal(title, defaultDate = '') {
+    return new Promise((resolve) => {
+        const oldModal = document.getElementById('customDatePickerModal');
+        if (oldModal) oldModal.remove();
+
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'customDatePickerModal';
+        modalDiv.style.position = 'fixed';
+        modalDiv.style.inset = '0';
+        modalDiv.style.background = 'rgba(15, 23, 42, 0.7)';
+        modalDiv.style.backdropFilter = 'blur(4px)';
+        modalDiv.style.display = 'flex';
+        modalDiv.style.alignItems = 'center';
+        modalDiv.style.justifyContent = 'center';
+        modalDiv.style.zIndex = '99999';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.style.background = 'white';
+        contentDiv.style.padding = '2rem';
+        contentDiv.style.borderRadius = '20px';
+        contentDiv.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+        contentDiv.style.width = '90%';
+        contentDiv.style.maxWidth = '400px';
+        contentDiv.style.display = 'flex';
+        contentDiv.style.flexDirection = 'column';
+        contentDiv.style.gap = '1.5rem';
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title;
+        titleEl.style.fontSize = '1.1rem';
+        titleEl.style.fontWeight = '800';
+        titleEl.style.color = '#1e293b';
+        titleEl.style.margin = '0';
+
+        const inputEl = document.createElement('input');
+        inputEl.type = 'date';
+        inputEl.value = defaultDate || new Date().toISOString().split('T')[0];
+        inputEl.style.width = '100%';
+        inputEl.style.padding = '0.75rem 1rem';
+        inputEl.style.border = '2px solid #e2e8f0';
+        inputEl.style.borderRadius = '12px';
+        inputEl.style.fontSize = '1rem';
+        inputEl.style.outline = 'none';
+        inputEl.style.fontFamily = 'inherit';
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.display = 'flex';
+        btnContainer.style.justifyContent = 'flex-end';
+        btnContainer.style.gap = '0.75rem';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.padding = '0.6rem 1.2rem';
+        cancelBtn.style.border = '1px solid #e2e8f0';
+        cancelBtn.style.background = 'white';
+        cancelBtn.style.color = '#64748b';
+        cancelBtn.style.borderRadius = '10px';
+        cancelBtn.style.fontWeight = '700';
+        cancelBtn.style.cursor = 'pointer';
+        cancelBtn.onclick = () => {
+            modalDiv.remove();
+            resolve(null);
+        };
+
+        const okBtn = document.createElement('button');
+        okBtn.textContent = 'OK';
+        okBtn.style.padding = '0.6rem 1.5rem';
+        okBtn.style.border = 'none';
+        okBtn.style.background = '#8b5cf6';
+        okBtn.style.color = 'white';
+        okBtn.style.borderRadius = '10px';
+        okBtn.style.fontWeight = '700';
+        okBtn.style.cursor = 'pointer';
+        okBtn.onclick = () => {
+            const val = inputEl.value;
+            modalDiv.remove();
+            resolve(val);
+        };
+
+        btnContainer.appendChild(cancelBtn);
+        btnContainer.appendChild(okBtn);
+        contentDiv.appendChild(titleEl);
+        contentDiv.appendChild(inputEl);
+        contentDiv.appendChild(btnContainer);
+        modalDiv.appendChild(contentDiv);
+        document.body.appendChild(modalDiv);
+    });
+}
+
 window.updateShipmentStatus = async function(shipmentId, status, type) {
     const deliveryDateEl = document.getElementById(`delDate_${shipmentId}`);
     let delivery_date = null;
@@ -527,10 +635,20 @@ window.updateShipmentStatus = async function(shipmentId, status, type) {
     }
 
     if (status === 'delivered' && !delivery_date) {
-        showToast('Please enter a delivery date', 'error');
-        // revert select
-        renderTable();
-        return;
+        const input = await showDatePickerModal("Select Delivery Date:");
+        if (!input) {
+            renderTable();
+            return;
+        }
+        delivery_date = input;
+    }
+    if (status === 'returned' && !delivery_date) {
+        const input = await showDatePickerModal("Select Return Date:");
+        if (!input) {
+            renderTable();
+            return;
+        }
+        delivery_date = input;
     }
 
     try {
@@ -737,6 +855,18 @@ window.showOrderDetails = function(orderId, productId, unitNo) {
                             <span style="color: #64748b;">Delivery Type:</span>
                             <span style="color: #f59e0b; font-weight: 700;">${order.delivery_type || 'General'}</span>
                         </div>
+                        ${order.delivery_date ? `
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                            <span style="color: #64748b;">Delivery Date:</span>
+                            <span style="color: #3b82f6; font-weight: 600;">${new Date(order.delivery_date).toLocaleDateString()}</span>
+                        </div>
+                        ` : ''}
+                        ${(order.delivery_type || '').toLowerCase().includes('post') && order.check_received_date ? `
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                            <span style="color: #64748b;">Check Date:</span>
+                            <span style="color: #8b5cf6; font-weight: 600;">${new Date(order.check_received_date).toLocaleDateString()}</span>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>

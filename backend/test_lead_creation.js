@@ -13,7 +13,7 @@ async function testLeadCreation() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                email: 'admin@sgbagro.com',
+                identifier: 'testadmin@sgbagro.com',
                 password: 'password123'
             })
         });

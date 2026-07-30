@@ -171,6 +171,10 @@ window.updateDiscount = function(val) {
         displayDue.style.color = balanceDue > 0 ? '#ef4444' : '#10b981';
     }
 };
+window.updateZohoBill = function(val) {
+    if (!currentOrder) return;
+    currentOrder.zoho_bill_number = val;
+};
 
 function renderWorkstation() {
     const container = document.getElementById('modalWorkstationBody');
@@ -309,6 +313,12 @@ function renderWorkstation() {
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; gap: 3rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Zoho Bill No.</div>
+                        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
+                            <input type="text" id="editableZohoBill" value="${data.zoho_bill_number || ''}" oninput="updateZohoBill(this.value)" placeholder="Enter bill no." style="width: 140px; padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 800; font-size: 1.1rem; text-align: right; color: #3b82f6;">
+                        </div>
+                    </div>
                     <div style="text-align: right;">
                         <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Discount</div>
                         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">

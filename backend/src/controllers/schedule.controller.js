@@ -54,7 +54,8 @@ exports.getSchedules = async (req, res) => {
 
         if (search) {
             query += ' AND (l.customer_name LIKE ? OR l.phone_number LIKE ? OR l.lead_id = ?)';
-            params.push(`%${search}%`, `%${search}%`, search);
+            const escapedSearch = search.replace(/[%_]/g, '\\$&');
+            params.push(`%${escapedSearch}%`, `%${escapedSearch}%`, search);
         }
 
         if (start_date && end_date) {

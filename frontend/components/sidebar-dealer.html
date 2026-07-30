@@ -1,0 +1,59 @@
+<aside class="sidebar dealer-sidebar">
+    <div class="sidebar-logo">
+        <img src="../../assets/logo.png" alt="SGB Agro Logo" style="height: 32px; width: auto; object-fit: contain;">
+        <span>SGB Agro <span
+                style="font-size:0.65rem;font-weight:600;color:#f59e0b;letter-spacing:0.05em;display:block;margin-top:-4px;" id="sidebar-role-label">DEALER
+                PANEL</span></span>
+    </div>
+    
+    <!-- Dealer Mode Toggle -->
+    <div class="sidebar-toggle-container" style="padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 0.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 0.4rem 0.6rem; border-radius: 0.375rem;">
+            <span style="font-size: 0.7rem; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.375rem;">
+                <i class="fa-solid fa-handshake"></i> Dealer Mode
+            </span>
+            <label class="switch" style="width: 32px; height: 18px;">
+                <input type="checkbox" id="dealerModeToggle" style="opacity: 0; width: 0; height: 0;">
+                <span class="slider" style="border-radius: 34px; background-color: #f59e0b; position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: .3s;"></span>
+            </label>
+        </div>
+    </div>
+
+    <nav class="nav-menu">
+        <div class="nav-group-title">Overview</div>
+        <div class="nav-item">
+            <a href="modules/admin/dashboard.html" class="nav-link" id="nav-dashboard">
+                <i class="fas fa-th-large"></i> <span class="nav-label">Dealer Dashboard</span>
+            </a>
+        </div>
+
+        <div class="nav-group-title">B2B Management</div>
+        <div class="nav-item">
+            <a href="modules/admin/dealers.html" class="nav-link" id="nav-dealers">
+                <i class="fas fa-handshake"></i> <span class="nav-label">Dealers List</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="modules/admin/orders.html" class="nav-link" id="nav-orders">
+                <i class="fas fa-shopping-cart"></i> <span class="nav-label">Dealer Orders</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="modules/admin/billing.html" class="nav-link" id="nav-billing">
+                <i class="fas fa-file-invoice-dollar"></i> <span class="nav-label">Dealer Billing</span>
+            </a>
+        </div>
+
+        <div class="nav-group-title">Administration</div>
+        <div class="nav-item">
+            <a href="modules/admin/settings.html" class="nav-link" id="nav-settings">
+                <i class="fas fa-cog"></i> <span class="nav-label">Dealer Settings</span>
+            </a>
+        </div>
+    </nav>
+    <div class="sidebar-footer">
+        <a href="#" class="nav-link logout-link" id="logoutBtn">
+            <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+        </a>
+    </div>
+</aside>

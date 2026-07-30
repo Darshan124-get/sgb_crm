@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Billing Panel | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap"
         rel="stylesheet">
@@ -656,33 +657,141 @@
                 </div>
             </header>
 
-            <div class="header-intro" style="margin-bottom: 2rem;">
-                <h1 style="font-size: 2rem; color: #0f172a; margin-bottom: 0.5rem;">Financial Console</h1>
-                <p style="color: #64748b; font-weight: 500;">Securely manage invoices, tax compliance, and revenue
-                    tracking.</p>
-            </div>
-
             <!-- DASHBOARD TAB -->
             <section id="dashboard" class="tab-content active">
-                <div class="stats-grid" id="statsGrid">
+                <!-- REDESIGNED DASHBOARD HEADER -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="font-size: 2rem; color: #0f172a; font-weight: 800; margin: 0; font-family: 'Outfit';">Billing Dashboard</h1>
+                        <p style="color: #64748b; font-size: 0.875rem; font-weight: 500; margin: 4px 0 0 0;">Dashboard &gt; Billing Dashboard</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button class="btn-billing" id="btnRefresh" style="width: auto; background: #4f46e5; color: white; padding: 0.625rem 1.25rem; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.15); border: none; cursor: pointer;" onclick="refreshDashboard()">
+                            <i class="fa-solid fa-rotate"></i> Refresh
+                        </button>
+                        <button class="btn-billing" id="btnExport" style="width: auto; background: white; color: #1e293b; border: 1px solid #e2e8f0; padding: 0.625rem 1.25rem; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.02); cursor: pointer;" onclick="exportReport()">
+                            <i class="fa-solid fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters Section -->
+                <div style="background: white; border-radius: 16px; padding: 1.25rem; border: 1px solid #e2e8f0; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(0,0,0,0.02);">
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 150px; flex: 1;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.35rem;">
+                            <i class="fa-solid fa-calendar" style="color: #6366f1;"></i> Date Range
+                        </label>
+                        <select id="dashDateRange" class="filter-input-v2" style="background: white; border-color: #e2e8f0;" onchange="refreshDashboard()">
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="last_7_days">Last 7 Days</option>
+                            <option value="this_month">This Month</option>
+                            <option value="this_year">This Year</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 150px; flex: 1;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.35rem;">
+                            <i class="fa-solid fa-user-gear" style="color: #6366f1;"></i> Billing User
+                        </label>
+                        <select id="dashBillingUser" class="filter-input-v2" style="background: white; border-color: #e2e8f0;" onchange="refreshDashboard()">
+                            <option value="">All Users</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 150px; flex: 1;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.35rem;">
+                            <i class="fa-solid fa-credit-card" style="color: #6366f1;"></i> Payment Status
+                        </label>
+                        <select id="dashPaymentStatus" class="filter-input-v2" style="background: white; border-color: #e2e8f0;" onchange="refreshDashboard()">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="verified">Verified</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 150px; flex: 1;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.35rem;">
+                            <i class="fa-solid fa-users" style="color: #6366f1;"></i> Customer Type
+                        </label>
+                        <select id="dashCustomerType" class="filter-input-v2" style="background: white; border-color: #e2e8f0;" onchange="refreshDashboard()">
+                            <option value="">All Types</option>
+                            <option value="dealer">Dealer</option>
+                            <option value="lead">Lead/Retail</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 150px; flex: 1;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.35rem;">
+                            <i class="fa-solid fa-user-tie" style="color: #6366f1;"></i> Sales Executive
+                        </label>
+                        <select id="dashSalesExecutive" class="filter-input-v2" style="background: white; border-color: #e2e8f0;" onchange="refreshDashboard()">
+                            <option value="">All Executives</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; justify-content: flex-end; height: 50px; min-width: 100px;">
+                        <button class="btn-billing primary" style="padding: 0.6rem 1.5rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; justify-content: center; height: 38px; border-radius: 10px; cursor: pointer;" onclick="refreshDashboard()">
+                            <i class="fa-solid fa-filter"></i> Filter
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5 KPI Cards Row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;" id="dashboardStatsRow">
                     <!-- Stats loaded dynamically -->
                 </div>
 
-                <div class="grid-2 main-content-split" style="grid-template-columns: 1.5fr 1fr; gap: 2rem;">
-                    <div class="premium-card" style="overflow: visible;">
-                        <h3 style="margin-bottom: 1.5rem;">Recent Activity</h3>
-                        <div id="recentActivity">
-                            <!-- Activity loaded dynamically -->
+                <!-- Graphs Section -->
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr 1.25fr; gap: 1.5rem; margin-bottom: 2rem;" class="main-content-split">
+                    <!-- Revenue Trend -->
+                    <div class="premium-card" style="padding: 1.5rem; border-radius: 20px; display: flex; flex-direction: column; background: white; border: 1px solid #e2e8f0; min-height: 380px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h3 style="font-size: 1.1rem; color: #0f172a; font-weight: 700; margin: 0; font-family: 'Outfit';">Revenue Trend</h3>
+                            <select id="trendTimeframe" class="filter-input-v2" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background: #f8fafc;" onchange="updateRevenueTrendChart()">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; position: relative;">
+                            <canvas id="revenueTrendChart" style="width: 100%; height: 100%; max-height: 280px;"></canvas>
                         </div>
                     </div>
-                    <div class="premium-card"
-                        style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
-                        <h3 style="color: white; margin-bottom: 1.5rem;">System Alerts</h3>
-                        <div id="systemAlerts">
-                            <p style="opacity: 0.7; font-size: 0.875rem;">All systems operational.</p>
+
+                    <!-- Billing Status Distribution -->
+                    <div class="premium-card" style="padding: 1.5rem; border-radius: 20px; display: flex; flex-direction: column; background: white; border: 1px solid #e2e8f0; min-height: 380px;">
+                        <h3 style="font-size: 1.1rem; color: #0f172a; font-weight: 700; margin: 0 0 1.5rem 0; font-family: 'Outfit';">Billing Status Distribution</h3>
+                        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; gap: 1.5rem;">
+                            <div style="width: 150px; height: 150px; position: relative; display: flex; align-items: center; justify-content: center;">
+                                <canvas id="statusDistributionChart" style="width: 150px; height: 150px;"></canvas>
+                                <div style="position: absolute; text-align: center; display: flex; flex-direction: column; align-items: center;">
+                                    <span style="font-size: 1.5rem; font-weight: 800; color: #0f172a; line-height: 1;" id="distributionTotal">0</span>
+                                    <span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-top: 2px;">Total</span>
+                                </div>
+                            </div>
+                            <div style="width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.725rem; color: #475569;" id="statusDistributionLegend">
+                                <!-- Loaded dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Revenue Overview -->
+                    <div class="premium-card" style="padding: 1.5rem; border-radius: 20px; display: flex; flex-direction: column; background: white; border: 1px solid #e2e8f0; min-height: 380px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h3 style="font-size: 1.1rem; color: #0f172a; font-weight: 700; margin: 0; font-family: 'Outfit';">Monthly Revenue Overview</h3>
+                            <select id="monthlyRevenueYear" class="filter-input-v2" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background: #f8fafc;" onchange="updateMonthlyRevenueChart()">
+                                <option value="this_year">This Year</option>
+                                <option value="last_year">Last Year</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; position: relative;">
+                            <canvas id="monthlyRevenueChart" style="width: 100%; height: 100%; max-height: 280px;"></canvas>
                         </div>
                     </div>
                 </div>
+
+                <!-- Bottom KPI Cards (4 Cards) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem;" id="dashboardBottomStatsRow">
+                    <!-- Stats loaded dynamically -->
+                </div>
+
+
             </section>
 
             <!-- PENDING BILLING TAB -->

@@ -25,10 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         try {
             let sidebarFileName = 'sidebar-dynamic.html';
+            const isDealerMode = localStorage.getItem('dealerMode') === 'true';
             
-            // Admins and Super Admins always get the admin sidebar
+            // Admins and Super Admins always get the admin sidebar or dealer sidebar
             if (role === 'admin' || role === 'super-admin') {
-                sidebarFileName = 'sidebar-admin.html';
+                sidebarFileName = isDealerMode ? 'sidebar-dealer.html' : 'sidebar-admin.html';
             } else if (role === 'whatsapp_management_executive') {
                 sidebarFileName = 'sidebar-whatsapp_management_executive.html';
             } else if (role === 'billing_manager' || (role === 'manager' && userPermissions.includes('billing_billing'))) {
@@ -103,6 +104,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (sidebarLabel) sidebarLabel.textContent = 'VIEWER PANEL';
                     const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
                     if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
+                }
+
+                // Initialize B2B Dealer Mode Toggle
+                const dealerModeToggle = document.getElementById('dealerModeToggle');
+                if (dealerModeToggle) {
+                    const isDealerMode = localStorage.getItem('dealerMode') === 'true';
+                    dealerModeToggle.checked = isDealerMode;
+                    dealerModeToggle.addEventListener('change', (e) => {
+                        localStorage.setItem('dealerMode', e.target.checked ? 'true' : 'false');
+                        window.location.reload();
+                    });
                 }
             } else {
                 console.error(`Sidebar file not found: sidebar-dynamic.html`);
@@ -235,6 +247,12 @@ function initSidebar(links) {
         try {
             const linkUrl = new URL(link.href);
             if (currentPath === linkUrl.pathname) {
+                // Hash-aware matching
+                const currentHash = window.location.hash || '#dashboard';
+                const linkHash = linkUrl.hash || '#dashboard';
+                if (linkUrl.hash && currentHash !== linkHash) {
+                    return;
+                }
                 link.classList.add('active');
                 const navItem = link.closest('.nav-item');
                 if (navItem) navItem.classList.add('active');
@@ -695,7 +713,7 @@ async function populateLeadDetails(leadId) {
                 leadDetailLanguageInfo: lead.language || 'English',
                 leadDetailAssigned: lead.assigned_to_name || 'Unassigned',
                 leadDetailAssignedId: lead.assigned_to || '',
-                topCustomerNameDisplay: lead.customer_name,
+                topCustomerNameDisplay: lead.first_message || lead.customer_name || 'No Message',
                 leadDetailSaleStatus: lead.status || 'New',
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailStatusSelect: lead.status || 'new',
@@ -728,6 +746,22 @@ async function populateLeadDetails(leadId) {
                     else el.textContent = val || '-';
                 }
             });
+
+            // Style and set Campaign Tag
+            const tagEl = document.getElementById('leadCampaignTag');
+            if (tagEl) {
+                if (lead.campaign_name) {
+                    tagEl.textContent = lead.campaign_name;
+                    tagEl.style.background = '#e0f2fe';
+                    tagEl.style.color = '#0369a1';
+                    tagEl.style.border = '1px solid #bae6fd';
+                } else {
+                    tagEl.textContent = 'Direct Lead';
+                    tagEl.style.background = '#f1f5f9';
+                    tagEl.style.color = '#475569';
+                    tagEl.style.border = '1px solid #e2e8f0';
+                }
+            }
 
             // ── Order Visibility ──
             const orderFields = document.querySelectorAll('.order-only');

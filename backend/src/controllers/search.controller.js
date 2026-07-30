@@ -6,7 +6,8 @@ exports.globalSearch = async (req, res) => {
         return res.json({ leads: [], products: [], users: [] });
     }
 
-    const searchTerm = `%${query}%`;
+    const escapedQuery = query.replace(/[%_]/g, '\\$&');
+    const searchTerm = `%${escapedQuery}%`;
     try {
         const [leads] = await pool.query(
             'SELECT lead_id as id, customer_name as name, phone_number, status FROM leads WHERE customer_name LIKE ? OR phone_number LIKE ? LIMIT 5',

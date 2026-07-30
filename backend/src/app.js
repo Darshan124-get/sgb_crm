@@ -37,8 +37,47 @@ app.use(helmet({
 }));
 app.use(compression());
 app.use(cors());
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Global Response Sanitizer Middleware (Mitigates raw SQL / DB Info Leakage)
+app.use((req, res, next) => {
+    const originalJson = res.json;
+    res.json = function (body) {
+        if (body && typeof body === 'object') {
+            if (body.error || body.message) {
+                let msg = body.error || body.message;
+                if (typeof msg === 'string' && (
+                    msg.includes('SQL') || 
+                    msg.includes('Database') || 
+                    msg.includes('connection') || 
+                    msg.includes('pool') ||
+                    msg.includes('syntax') ||
+                    msg.includes('SELECT') ||
+                    msg.includes('INSERT') ||
+                    msg.includes('UPDATE') ||
+                    msg.includes('DELETE') ||
+                    msg.includes('Table') ||
+                    msg.includes('table') ||
+                    msg.includes('Column') ||
+                    msg.includes('column') ||
+                    msg.includes('foreign key') ||
+                    msg.includes('unique key') ||
+                    msg.includes('ER_') ||
+                    msg.includes('sql')
+                )) {
+                    if (body.error) body.error = 'Internal database server error';
+                    if (body.message) body.message = 'Internal database server error';
+                }
+            }
+            if (body.stack) {
+                delete body.stack;
+            }
+        }
+        return originalJson.call(this, body);
+    };
+    next();
+});
 
 // Rate Limiting (General API)
 const apiLimiter = rateLimit({

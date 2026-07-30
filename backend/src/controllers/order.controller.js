@@ -50,7 +50,8 @@ exports.getOrders = async (req, res) => {
         }
         if (search) {
             conditions.push("(o.customer_name LIKE ? OR o.phone LIKE ? OR CAST(o.order_id AS CHAR) LIKE ?)");
-            const searchVal = `%${search}%`;
+            const escapedSearch = search.replace(/[%_]/g, '\\$&');
+            const searchVal = `%${escapedSearch}%`;
             params.push(searchVal, searchVal, searchVal);
         }
 
@@ -115,9 +116,12 @@ exports.getOrders = async (req, res) => {
 };
 
 exports.convertLeadToOrder = async (req, res) => {
+    const connection = await pool.getConnection();
     try {
+        await connection.beginTransaction();
+
         let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, discount, items } = req.body;
-        const [resOrder] = await pool.query(
+        const [resOrder] = await connection.query(
             "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, discount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)",
             [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, ((total_amount || 0) - (discount || 0) - (advance_amount || 0)), discount || 0, req.user ? req.user.id : 1]
         );
@@ -130,8 +134,8 @@ exports.convertLeadToOrder = async (req, res) => {
                 let dbPrice = parseFloat(item.price) || 0;
 
                 if (isNaN(pid) || dbPrice === 0) {
-                    // FIX: Using 'selling_price' instead of 'sale_price'
-                    const [pRows] = await pool.query("SELECT product_id, selling_price, dealer_price FROM products WHERE sku = ? OR name = ? OR name LIKE ? LIMIT 1", [item.product_id, item.product_id, `%${item.product_id}%`]);
+                    const escapedProductId = String(item.product_id || '').replace(/[%_]/g, '\\$&');
+                    const [pRows] = await connection.query("SELECT product_id, selling_price, dealer_price FROM products WHERE sku = ? OR name = ? OR name LIKE ? LIMIT 1", [item.product_id, item.product_id, `%${escapedProductId}%`]);
                     if (pRows[0]) {
                         pid = pRows[0].product_id;
                         if (dbPrice === 0) dbPrice = pRows[0].selling_price || pRows[0].dealer_price || 0;
@@ -139,8 +143,23 @@ exports.convertLeadToOrder = async (req, res) => {
                 }
 
                 if (pid && !isNaN(pid)) {
-                    const qty = item.quantity || 1;
-                    await pool.query(
+                    const qty = parseInt(item.quantity) || 1;
+
+                    // Lock inventory and check stock
+                    const [invRows] = await connection.query("SELECT current_stock, reserved_stock FROM inventory WHERE product_id = ? FOR UPDATE", [pid]);
+                    if (invRows.length === 0) {
+                        throw new Error(`Inventory record not found for product ID ${pid}`);
+                    }
+                    const availableStock = invRows[0].current_stock - invRows[0].reserved_stock;
+                    if (availableStock < qty) {
+                        throw new Error(`Insufficient stock for product ID ${pid}. Available: ${availableStock}, Requested: ${qty}`);
+                    }
+
+                    // Reserve stock
+                    await connection.query("UPDATE inventory SET reserved_stock = reserved_stock + ? WHERE product_id = ?", [qty, pid]);
+
+                    // Insert order item
+                    await connection.query(
                         "INSERT INTO order_items (order_id, product_id, quantity, price, total_price) VALUES (?, ?, ?, ?, ?)",
                         [orderId, pid, qty, dbPrice, qty * dbPrice]
                     );
@@ -148,12 +167,16 @@ exports.convertLeadToOrder = async (req, res) => {
             }
         }
 
-        await pool.query("UPDATE leads SET status = 'converted' WHERE lead_id = ?", [lead_id]);
+        await connection.query("UPDATE leads SET status = 'converted' WHERE lead_id = ?", [lead_id]);
+        await connection.commit();
         res.status(201).json({ success: true, orderId: orderId });
 
     } catch (err) {
+        if (connection) await connection.rollback();
         console.error(err);
         res.status(500).json({ success: false, message: err.message });
+    } finally {
+        if (connection) connection.release();
     }
 };
 
@@ -162,10 +185,72 @@ exports.getStats = async (req, res) => { res.json({ total: 0 }); };
 exports.updateStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
+
+    const VALID_TRANSITIONS = {
+        draft: ['in_review', 'billed', 'cancelled'],
+        in_review: ['billed', 'cancelled'],
+        billed: ['packed', 'cancelled'],
+        packed: ['shipped', 'cancelled'],
+        shipped: ['delivered', 'cancelled'],
+        delivered: ['cancelled'],
+        cancelled: []
+    };
+
+    const connection = await pool.getConnection();
     try {
-        await pool.query("UPDATE orders SET order_status = ? WHERE order_id = ?", [status, id]);
+        await connection.beginTransaction();
+
+        // 1. Fetch current status
+        const [orders] = await connection.query("SELECT order_status FROM orders WHERE order_id = ? FOR UPDATE", [id]);
+        if (orders.length === 0) {
+            throw new Error('Order not found');
+        }
+
+        const currentStatus = orders[0].order_status;
+
+        // If status is the same, no action needed
+        if (currentStatus === status) {
+            await connection.commit();
+            return res.json({ success: true, message: 'Order status is already ' + status });
+        }
+
+        // 2. Validate transition
+        const allowedTransitions = VALID_TRANSITIONS[currentStatus] || [];
+        if (!allowedTransitions.includes(status)) {
+            throw new Error(`Invalid status transition from ${currentStatus} to ${status}`);
+        }
+
+        // 3. Handle specific side effects (e.g., Cancellation)
+        if (status === 'cancelled') {
+            const [items] = await connection.query("SELECT product_id, quantity FROM order_items WHERE order_id = ?", [id]);
+            
+            if (['draft', 'in_review', 'billed'].includes(currentStatus)) {
+                for (const item of items) {
+                    await connection.query(
+                        "UPDATE inventory SET reserved_stock = GREATEST(0, reserved_stock - ?) WHERE product_id = ?",
+                        [item.quantity, item.product_id]
+                    );
+                }
+            } else if (['packed', 'shipped', 'delivered'].includes(currentStatus)) {
+                for (const item of items) {
+                    await connection.query(
+                        "UPDATE inventory SET current_stock = current_stock + ? WHERE product_id = ?",
+                        [item.quantity, item.product_id]
+                    );
+                }
+            }
+        }
+
+        // 4. Update status
+        await connection.query("UPDATE orders SET order_status = ? WHERE order_id = ?", [status, id]);
+
+        await connection.commit();
         res.json({ success: true, message: 'Order status updated successfully' });
     } catch (err) {
+        if (connection) await connection.rollback();
+        console.error(err);
         res.status(500).json({ success: false, message: err.message });
+    } finally {
+        if (connection) connection.release();
     }
 };

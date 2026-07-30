@@ -89,6 +89,7 @@ exports.getLowStockAlerts = async (req, res) => {
 exports.searchProducts = async (req, res) => {
     const { q } = req.query;
     try {
+        const escapedQ = q ? q.replace(/[%_]/g, '\\$&') : '';
         const query = `
             SELECT p.product_id, p.name, p.sku, p.hsn_code, p.selling_price as default_price, 
                    i.current_stock, i.reserved_stock
@@ -97,7 +98,7 @@ exports.searchProducts = async (req, res) => {
             WHERE p.name LIKE ? OR p.sku LIKE ?
             LIMIT 10
         `;
-        const [rows] = await pool.query(query, [`%${q}%`, `%${q}%`]);
+        const [rows] = await pool.query(query, [`%${escapedQ}%`, `%${escapedQ}%`]);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ message: 'Error searching products: ' + err.message });

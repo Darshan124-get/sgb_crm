@@ -52,7 +52,8 @@ exports.getLeads = async (req, res) => {
 
         if (search) {
             query += ' AND (l.customer_name LIKE ? OR l.phone_number LIKE ? OR l.first_message LIKE ?)';
-            const searchVal = `%${search}%`;
+            const escapedSearch = search.replace(/[%_]/g, '\\$&');
+            const searchVal = `%${escapedSearch}%`;
             params.push(searchVal, searchVal, searchVal);
         }
 
@@ -82,7 +83,13 @@ exports.getLeadById = async (req, res) => {
 
     try {
         const [rows] = await pool.query(
-            'SELECT l.*, u.name as assigned_to_name FROM leads l LEFT JOIN users u ON l.assigned_to = u.user_id WHERE l.lead_id = ?',
+            `SELECT l.*, u.name as assigned_to_name,
+                    (SELECT campaign_id FROM campaigns c 
+                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
+                     LIMIT 1) as campaign_name
+             FROM leads l
+             LEFT JOIN users u ON l.assigned_to = u.user_id
+             WHERE l.lead_id = ?`,
             [req.params.id]
         );
         if (rows.length === 0) return res.status(404).json({ message: 'Lead not found' });

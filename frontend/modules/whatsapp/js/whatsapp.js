@@ -131,17 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Search Filtering
     if (searchInputEl) {
-        searchInputEl.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            document.querySelectorAll('.customer-item').forEach(item => {
-                const name = item.querySelector('h3').innerText.toLowerCase();
-                const snippet = item.querySelector('.last-message-snippet').innerText.toLowerCase();
-                if (name.includes(term) || snippet.includes(term)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
+        searchInputEl.addEventListener('input', () => {
+            renderCustomerList();
         });
     }
 
@@ -548,44 +539,86 @@ function renderCustomerList() {
         return;
     }
 
+    const searchTerm = searchInputEl ? searchInputEl.value.toLowerCase().trim() : '';
+
     let filtered = allCustomers.filter(customer => {
         const resolved = ['converted', 'closed', 'lost'].includes(customer.status);
 
         // Check if currentTab matches a custom list ID
+        let matchesTab = false;
         const customLists = loadCustomLists();
         const activeList = customLists.find(l => l.id === currentTab);
         if (activeList) {
-            if (resolved) return false;
-            return activeList.phones.includes(customer.phone);
+            matchesTab = !resolved && activeList.phones.includes(customer.phone);
+        } else if (currentTab === 'all') {
+            matchesTab = !resolved;
+        } else if (currentTab === 'resolved') {
+            matchesTab = resolved;
+        } else if (currentTab === 'unviewed') {
+            matchesTab = !resolved && parseInt(customer.unread_msg_count || 0) > 0;
+        } else if (currentTab === 'undefined') {
+            if (resolved) {
+                matchesTab = false;
+            } else if (!customer.first_message) {
+                matchesTab = true;
+            } else {
+                const normalizedFirst = customer.first_message.toLowerCase().trim();
+                matchesTab = !activeCampaigns.some(camp => {
+                    if (!camp.tag_line) return false;
+                    const tag = camp.tag_line.toLowerCase().trim();
+                    return normalizedFirst.includes(tag) || normalizedFirst === tag;
+                });
+            }
+        } else {
+            if (resolved) {
+                matchesTab = false;
+            } else if (!customer.first_message || !currentTab) {
+                matchesTab = false;
+            } else {
+                const normalizedFirst = customer.first_message.toLowerCase().trim();
+                const normalizedTab = currentTab.toLowerCase().trim();
+                matchesTab = normalizedFirst.includes(normalizedTab) || normalizedFirst === normalizedTab;
+            }
         }
 
-        if (currentTab === 'all') {
-            return !resolved;
-        } else if (currentTab === 'resolved') {
-            return resolved;
-        } else if (currentTab === 'unviewed') {
-            if (resolved) return false;
-            return parseInt(customer.unread_msg_count || 0) > 0;
-        } else if (currentTab === 'undefined') {
-            if (resolved) return false;
-            if (!customer.first_message) return true;
-            const normalizedFirst = customer.first_message.toLowerCase().trim();
-            return !activeCampaigns.some(camp => {
-                if (!camp.tag_line) return false;
-                const tag = camp.tag_line.toLowerCase().trim();
-                return normalizedFirst.includes(tag) || normalizedFirst === tag;
-            });
-        } else {
-            if (resolved) return false;
-            if (!customer.first_message || !currentTab) return false;
-            const normalizedFirst = customer.first_message.toLowerCase().trim();
-            const normalizedTab = currentTab.toLowerCase().trim();
-            return normalizedFirst.includes(normalizedTab) || normalizedFirst === normalizedTab;
+        if (!matchesTab) return false;
+
+        // Apply search filter if search term is provided
+        if (searchTerm) {
+            const name = (customer.customer_name || '').toLowerCase();
+            const phone = (customer.phone || '').toLowerCase();
+            const lastMsg = (customer.last_message || '').toLowerCase();
+            return name.includes(searchTerm) || phone.includes(searchTerm) || lastMsg.includes(searchTerm);
         }
+
+        return true;
     });
 
-    // Sort strictly by last_message_at DESC (WhatsApp style)
+    // Sort by search relevance first, then by last_message_at DESC
     filtered.sort((a, b) => {
+        if (searchTerm) {
+            const aName = (a.customer_name || '').toLowerCase();
+            const aPhone = (a.phone || '').toLowerCase();
+            const bName = (b.customer_name || '').toLowerCase();
+            const bPhone = (b.phone || '').toLowerCase();
+
+            const aMatchNamePhone = aName.includes(searchTerm) || aPhone.includes(searchTerm);
+            const bMatchNamePhone = bName.includes(searchTerm) || bPhone.includes(searchTerm);
+
+            // Priority 1: Direct name or phone number matches come first
+            if (aMatchNamePhone && !bMatchNamePhone) return -1;
+            if (!aMatchNamePhone && bMatchNamePhone) return 1;
+
+            // Priority 1.5: If both match name/phone, prioritize starting matches
+            if (aMatchNamePhone && bMatchNamePhone) {
+                const aStarts = aName.startsWith(searchTerm) || aPhone.startsWith(searchTerm);
+                const bStarts = bName.startsWith(searchTerm) || bPhone.startsWith(searchTerm);
+                if (aStarts && !bStarts) return -1;
+                if (!aStarts && bStarts) return 1;
+            }
+        }
+
+        // Secondary / Default: Sort strictly by last_message_at DESC
         const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
         const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
         return bTime - aTime;

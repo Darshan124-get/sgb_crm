@@ -48,15 +48,24 @@ const sendMessage = async (to, text, replyToMessageId = null) => {
  */
 const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
   try {
-    const formData = new FormData();
-    const blob = new Blob([buffer], { type: mimeType });
-    formData.append('file', blob, fileName);
-    formData.append('messaging_product', 'whatsapp');
-    formData.append('type', category);
-
-    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/media`, formData, {
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+    
+    // Build the payload manually using Buffer to bypass missing FormData/Blob in older Node.js versions
+    const parts = [
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="messaging_product"\r\n\r\nwhatsapp\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\n${category}\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
+      buffer,
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ];
+    
+    const payload = Buffer.concat(parts);
+    
+    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/media`, payload, {
       headers: {
         Authorization: `Bearer ${whatsappToken}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': payload.length
       },
     });
 

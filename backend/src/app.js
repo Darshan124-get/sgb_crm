@@ -37,8 +37,8 @@ app.use(helmet({
 }));
 app.use(compression());
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ limit: '150mb', extended: true }));
 
 // Global Response Sanitizer Middleware (Mitigates raw SQL / DB Info Leakage)
 app.use((req, res, next) => {

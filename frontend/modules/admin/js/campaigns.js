@@ -253,6 +253,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = event.target.files[0];
         if(!file) return;
         
+        const MAX_SIZE_MB = 130;
+        const maxSizeBytes = MAX_SIZE_MB * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            alert(`File is too large. Please upload a file smaller than ${MAX_SIZE_MB} MB.`);
+            event.target.value = ''; // Reset file input
+            return;
+        }
+        
         const reader = new FileReader();
         reader.onload = function(e) {
             window.currentAutoReplies[index].mediaData = e.target.result;
@@ -289,19 +297,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         campaign_id: camp.campaign_id,
                         tag_line: camp.tag_line,
-                        status: newStatus
+                        status: newStatus,
+                        ad_spend: camp.ad_spend,
+                        auto_replies: typeof camp.auto_replies === 'string' ? JSON.parse(camp.auto_replies) : camp.auto_replies
                     })
                 });
                 
                 if (res.ok) {
                     loadCampaigns();
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('Success', `Campaign successfully ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
+                    } else {
+                        alert(`Campaign successfully ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
+                    }
                 } else {
-                    const err = await res.json();
-                    alert(err.error || 'Failed to update campaign');
+                    let errMsg = 'Failed to update campaign';
+                    try {
+                        const err = await res.json();
+                        errMsg = err.error || errMsg;
+                    } catch (jsonErr) {
+                        errMsg = `Server error (Status: ${res.status})`;
+                    }
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('Error', errMsg, 'error');
+                    } else {
+                        alert(errMsg);
+                    }
                 }
             } catch (error) {
                 console.error(error);
-                alert('Server error');
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert('Error', 'Server connection error', 'error');
+                } else {
+                    alert('Server connection error');
+                }
             }
         }
     };
@@ -324,13 +353,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (res.ok) {
                     loadCampaigns();
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('Success', 'Campaign deleted successfully', 'success');
+                    } else {
+                        alert('Campaign deleted successfully');
+                    }
                 } else {
-                    const err = await res.json();
-                    alert(err.error || 'Failed to delete campaign');
+                    let errMsg = 'Failed to delete campaign';
+                    try {
+                        const err = await res.json();
+                        errMsg = err.error || errMsg;
+                    } catch (jsonErr) {
+                        errMsg = `Server error (Status: ${res.status})`;
+                    }
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('Error', errMsg, 'error');
+                    } else {
+                        alert(errMsg);
+                    }
                 }
             } catch (error) {
                 console.error(error);
-                alert('Server error');
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert('Error', 'Server connection error', 'error');
+                } else {
+                    alert('Server connection error');
+                }
             }
         }
     };
@@ -359,13 +407,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 closeModal();
                 loadCampaigns();
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert('Success', isEdit ? 'Campaign updated successfully!' : 'Campaign created successfully!', 'success');
+                } else {
+                    alert(isEdit ? 'Campaign updated successfully!' : 'Campaign created successfully!');
+                }
             } else {
-                const err = await res.json();
-                alert(err.error || 'Failed to save campaign');
+                let errMsg = 'Failed to save campaign';
+                try {
+                    const err = await res.json();
+                    errMsg = err.error || errMsg;
+                } catch (jsonErr) {
+                    errMsg = `Server error (Status: ${res.status})`;
+                }
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert('Error', errMsg, 'error');
+                } else {
+                    alert(errMsg);
+                }
             }
         } catch (error) {
             console.error(error);
-            alert('Server error');
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('Error', 'Server connection error', 'error');
+            } else {
+                alert('Server connection error');
+            }
         }
     }
 });

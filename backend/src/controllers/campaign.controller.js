@@ -84,11 +84,28 @@ exports.updateCampaign = async (req, res) => {
         const { id } = req.params;
         const { campaign_id, tag_line, status, ad_spend, auto_replies } = req.body;
         
-        const processedReplies = await processAutoReplies(campaign_id, auto_replies);
+        // Fetch existing campaign to preserve values not sent in payload
+        const [existing] = await db.query('SELECT * FROM campaigns WHERE id = ?', [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+        const currentCampaign = existing[0];
+        
+        const finalCampaignId = campaign_id !== undefined ? campaign_id : currentCampaign.campaign_id;
+        const finalTagLine = tag_line !== undefined ? tag_line : currentCampaign.tag_line;
+        const finalStatus = status !== undefined ? status : currentCampaign.status;
+        const finalAdSpend = ad_spend !== undefined ? ad_spend : currentCampaign.ad_spend;
+        
+        let finalReplies;
+        if (auto_replies !== undefined) {
+            finalReplies = await processAutoReplies(finalCampaignId, auto_replies);
+        } else {
+            finalReplies = currentCampaign.auto_replies;
+        }
 
         const [result] = await db.query(
             'UPDATE campaigns SET campaign_id = ?, tag_line = ?, status = ?, ad_spend = ?, auto_replies = ? WHERE id = ?',
-            [campaign_id, tag_line, status, ad_spend || 0.00, processedReplies, id]
+            [finalCampaignId, finalTagLine, finalStatus, finalAdSpend, finalReplies, id]
         );
         
         if (result.affectedRows === 0) {

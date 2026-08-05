@@ -169,6 +169,27 @@ exports.convertLeadToOrder = async (req, res) => {
 
         await connection.query("UPDATE leads SET status = 'converted' WHERE lead_id = ?", [lead_id]);
         await connection.commit();
+
+        // Send push notification to Admins and Super Admins about the new draft order
+        try {
+            const notificationService = require('../services/notification.service');
+            const orderRef = `#SGB-Draft-${orderId}`;
+            await notificationService.sendToRole(
+                'admin',
+                'New Order Created',
+                `Order ${orderRef} has been created for customer "${customer_name || 'Generic Customer'}".`,
+                { orderId: String(orderId), type: 'order_created' }
+            );
+            await notificationService.sendToRole(
+                'super-admin',
+                'New Order Created',
+                `Order ${orderRef} has been created for customer "${customer_name || 'Generic Customer'}".`,
+                { orderId: String(orderId), type: 'order_created' }
+            );
+        } catch (notifErr) {
+            console.error('FCM Notification error (convertLeadToOrder):', notifErr.message);
+        }
+
         res.status(201).json({ success: true, orderId: orderId });
 
     } catch (err) {
@@ -241,10 +262,67 @@ exports.updateStatus = async (req, res) => {
             }
         }
 
+        // Get order details for notification
+        const [[orderInfo]] = await connection.query(
+            "SELECT created_by, customer_name, phone FROM orders WHERE order_id = ?",
+            [id]
+        );
+
         // 4. Update status
         await connection.query("UPDATE orders SET order_status = ? WHERE order_id = ?", [status, id]);
 
         await connection.commit();
+
+        // Send notifications based on the new status
+        try {
+            const notificationService = require('../services/notification.service');
+            const orderRef = `#SGB-${id}`;
+            const customer = orderInfo ? (orderInfo.customer_name || orderInfo.phone || 'Customer') : 'Customer';
+            const creatorId = orderInfo ? orderInfo.created_by : null;
+
+            switch (status) {
+                case 'in_review':
+                    // Notify Admins & Super Admins to review the order
+                    await notificationService.sendToRole('admin', 'Order Pending Review', `Order ${orderRef} for "${customer}" is pending approval.`, { orderId: String(id), type: 'order_in_review' });
+                    await notificationService.sendToRole('super-admin', 'Order Pending Review', `Order ${orderRef} for "${customer}" is pending approval.`, { orderId: String(id), type: 'order_in_review' });
+                    break;
+                case 'billed':
+                    // Notify Billing Department to process payment
+                    await notificationService.sendToDepartment('billing', 'Order Approved & Billed', `Order ${orderRef} has been approved. Billing complete.`, { orderId: String(id), type: 'order_billed' });
+                    // Notify Creator (Sales)
+                    if (creatorId) {
+                        await notificationService.sendToUser(creatorId, 'Your Order was Approved!', `Order ${orderRef} for "${customer}" has been approved.`, { orderId: String(id), type: 'order_billed' });
+                    }
+                    break;
+                case 'packed':
+                    // Notify Packing Department that they have a new packing job
+                    await notificationService.sendToDepartment('packing', 'New Packing Job', `Order ${orderRef} for "${customer}" is ready to be packed.`, { orderId: String(id), type: 'order_packed' });
+                    break;
+                case 'shipped':
+                    // Notify Shipping Department to send it out
+                    await notificationService.sendToDepartment('shipping', 'Ready for Shipment', `Order ${orderRef} is packed and ready for delivery.`, { orderId: String(id), type: 'order_shipped' });
+                    break;
+                case 'delivered':
+                    // Notify Admins & Creator
+                    await notificationService.sendToRole('admin', 'Order Delivered', `Order ${orderRef} for "${customer}" has been delivered.`, { orderId: String(id), type: 'order_delivered' });
+                    await notificationService.sendToRole('super-admin', 'Order Delivered', `Order ${orderRef} for "${customer}" has been delivered.`, { orderId: String(id), type: 'order_delivered' });
+                    if (creatorId) {
+                        await notificationService.sendToUser(creatorId, 'Order Delivered', `Your Order ${orderRef} has been successfully delivered.`, { orderId: String(id), type: 'order_delivered' });
+                    }
+                    break;
+                case 'cancelled':
+                    // Notify Admins & Creator
+                    await notificationService.sendToRole('admin', 'Order Cancelled', `Order ${orderRef} for "${customer}" has been cancelled.`, { orderId: String(id), type: 'order_cancelled' });
+                    await notificationService.sendToRole('super-admin', 'Order Cancelled', `Order ${orderRef} for "${customer}" has been cancelled.`, { orderId: String(id), type: 'order_cancelled' });
+                    if (creatorId) {
+                        await notificationService.sendToUser(creatorId, 'Order Cancelled', `Your Order ${orderRef} has been cancelled.`, { orderId: String(id), type: 'order_cancelled' });
+                    }
+                    break;
+            }
+        } catch (notifErr) {
+            console.error('FCM Notification error (updateStatus):', notifErr.message);
+        }
+
         res.json({ success: true, message: 'Order status updated successfully' });
     } catch (err) {
         if (connection) await connection.rollback();

@@ -141,8 +141,8 @@ const logInteraction = async (phoneInput, action, data = {}) => {
 const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent', replyToChatId = null, isForwarded = 0) => {
   const phone = normalizePhone(phoneInput);
   try {
-    // 1. Get Lead ID
-    const [leads] = await db.execute('SELECT lead_id FROM leads WHERE phone_number = ?', [phone]);
+    // 1. Get Lead ID and assignment details
+    const [leads] = await db.execute('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [phone]);
     if (leads.length === 0) return;
     const lead_id = leads[0].lead_id;
 
@@ -202,6 +202,23 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
       'INSERT INTO chat_messages (session_id, sender_type, sender_id, message_type, message, media_data, media_url, mime_type, message_id, status, reply_to_chat_id, is_forwarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       mapParams([session_id, sender_type, senderId, messageType, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status, replyToChatId, isForwarded])
     );
+
+    // 4. Send push notification to assigned executive if message is incoming
+    if (direction === 'incoming' && leads[0].assigned_to) {
+      try {
+        const notificationService = require('./notification.service');
+        const leadName = leads[0].customer_name || phoneInput;
+        const snippet = messageType === 'text' ? body : `Sent a ${messageType}`;
+        await notificationService.sendToUser(
+          leads[0].assigned_to,
+          `New Message from ${leadName}`,
+          snippet,
+          { leadId: String(lead_id), type: 'whatsapp_message' }
+        );
+      } catch (notifErr) {
+        logger.error('FCM Notification error (logChatMessage):', notifErr.message);
+      }
+    }
   } catch (err) {
     logger.error('Chat logging error:', err);
     throw err; // Re-throw so controller catches it

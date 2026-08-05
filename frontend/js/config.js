@@ -7,10 +7,11 @@ const BACKEND_PORT = 5000;
 const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
 // window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 // Set this to true if you want to use the local backend (localhost:5000)
-const USE_LOCAL_BACKEND = false;
+const USE_LOCAL_BACKEND = true;
 
-window.BASE_URL = USE_LOCAL_BACKEND ? `http://localhost:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
+window.BASE_URL = USE_LOCAL_BACKEND ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
 window.API_URL = `${window.BASE_URL}/api`;
+window.FCM_VAPID_KEY = 'BCt9SBycqLOQToZjMnZ9sRedn1Etk7-HtrCeCnPxAQEmgqCnMA87QtqPflx6Wi1PAOU2to8Rd6F_AeY1OEhTRE4';
 
 // ─── Root Path Computation ───────────────────────────────────
 // Computes how many levels deep we are from the frontend root.
@@ -149,6 +150,17 @@ window.requireAuth = function (allowedRoles = []) {
 
 // ─── Logout ──────────────────────────────────────────────────
 window.doLogout = function () {
+    const token = localStorage.getItem('token');
+    const fcmToken = localStorage.getItem('fcm_token');
+    
+    if (token && fcmToken) {
+        // Fire and forget FCM token cleanup on server so it doesn't block logout redirect
+        fetch(`${window.API_URL}/users/fcm-token?token=${encodeURIComponent(fcmToken)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(e => console.warn('FCM token cleanup failed:', e));
+    }
+
     localStorage.clear();
     window.location.href = `${window.ROOT_PATH}index.html`;
 };

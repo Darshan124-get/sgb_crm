@@ -13,10 +13,15 @@ router.post('/roles', authenticateToken, isAdmin, userController.createRole);
 router.put('/roles/:id', authenticateToken, isAdmin, userController.updateRole);
 router.delete('/roles/:id', authenticateToken, isAdmin, userController.deleteRole);
 
+// FCM Push Notification Token Management
+router.post('/fcm-token', authenticateToken, userController.registerFcmToken);
+router.delete('/fcm-token', authenticateToken, userController.deleteFcmToken);
+
 // User management allows managers to manage users (controller isolates them to their dept)
 router.get('/', authenticateToken, isManagerOrAdmin, userController.getAllUsers);
 router.post('/', authenticateToken, isManagerOrAdmin, userController.createUser);
 router.put('/:id', authenticateToken, isManagerOrAdmin, userController.updateUser);
+router.patch('/:id/status', authenticateToken, isManagerOrAdmin, userController.toggleUserStatus);
 router.patch('/:id/password', authenticateToken, isManagerOrAdmin, userController.resetPassword);
 router.delete('/:id', authenticateToken, isManagerOrAdmin, userController.deleteUser);
 

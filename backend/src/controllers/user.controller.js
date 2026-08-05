@@ -71,9 +71,6 @@ exports.getRoles = async (req, res) => {
         if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
             query += 'WHERE department_id = ? ';
             params.push(req.user.department_id);
-        } else {
-            // Admins see global roles (department_id IS NULL)
-            query += 'WHERE department_id IS NULL ';
         }
         
         query += 'ORDER BY name ASC';
@@ -239,3 +236,77 @@ exports.deleteUser = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+exports.registerFcmToken = async (req, res) => {
+    const { token, device_type } = req.body;
+    const userId = req.user.id;
+
+    if (!token) {
+        return res.status(400).json({ message: 'Token is required' });
+    }
+
+    try {
+        await db.execute(
+            `INSERT INTO user_fcm_tokens (user_id, fcm_token, device_type) 
+             VALUES (?, ?, ?) 
+             ON DUPLICATE KEY UPDATE user_id = VALUES(user_id)`,
+            [userId, token, device_type || 'web']
+        );
+        res.status(200).json({ message: 'FCM token registered successfully' });
+    } catch (err) {
+        console.error('Error registering FCM token:', err);
+        res.status(500).json({ message: 'Error registering FCM token' });
+    }
+};
+
+exports.deleteFcmToken = async (req, res) => {
+    const { token } = req.query;
+    const userId = req.user.id;
+
+    if (!token) {
+        return res.status(400).json({ message: 'Token is required' });
+    }
+
+    try {
+        await db.execute(
+            'DELETE FROM user_fcm_tokens WHERE fcm_token = ? AND user_id = ?',
+            [token, userId]
+        );
+        res.status(200).json({ message: 'FCM token deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting FCM token:', err);
+        res.status(500).json({ message: 'Error deleting FCM token' });
+    }
+};
+
+exports.toggleUserStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status || (status !== 'active' && status !== 'inactive')) {
+        return res.status(400).json({ success: false, message: 'Invalid status value. Must be active or inactive.' });
+    }
+
+    try {
+        // Fetch current row
+        const [[current]] = await db.execute(
+            'SELECT department_id FROM users WHERE user_id = ?', [id]
+        );
+
+        if (!current) return res.status(404).json({ success: false, message: 'User not found' });
+
+        // PBAC: If requester is a Manager, ensure they are only editing a user in their department
+        if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            if (current.department_id !== req.user.department_id) {
+                return res.status(403).json({ success: false, message: 'Unauthorized to edit this user' });
+            }
+        }
+
+        await db.execute('UPDATE users SET status = ? WHERE user_id = ?', [status, id]);
+        res.json({ success: true, message: `User status updated to ${status}` });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+

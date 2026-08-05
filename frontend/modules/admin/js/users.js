@@ -54,22 +54,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // User Filter Event Listeners
+    const userSearchInput = document.getElementById('userSearch');
+    const userFilterDeptSelect = document.getElementById('userFilterDept');
+    const userFilterRoleSelect = document.getElementById('userFilterRole');
+    const userFilterStatusSelect = document.getElementById('userFilterStatus');
+
+    if (userSearchInput) userSearchInput.addEventListener('input', applyUserFilters);
+    if (userFilterDeptSelect) userFilterDeptSelect.addEventListener('change', applyUserFilters);
+    if (userFilterRoleSelect) userFilterRoleSelect.addEventListener('change', applyUserFilters);
+    if (userFilterStatusSelect) userFilterStatusSelect.addEventListener('change', applyUserFilters);
 
     // ==========================================
     // DEPARTMENTS LOGIC
     // ==========================================
+    // DOM Elements & State
     const deptTbody = document.getElementById('departmentTableBody');
     const deptModal = document.getElementById('departmentModal');
     const deptForm = document.getElementById('departmentForm');
     const deptCountText = document.getElementById('deptCountText');
     const managerSelect = document.getElementById('deptManager');
 
+    const adminModal = document.getElementById('adminModal');
+    const adminForm = document.getElementById('adminForm');
+    const roleSelect = document.getElementById('adminRole');
+    const departmentSelect = document.getElementById('adminDepartment');
+
     let allDepartments = [];
     let allUsers = [];
-
-    // Initialize first tab
-    await fetchUsers();
-    await fetchDepartments();
+    let pbacUsersList = [];
+    let allRoles = [];
 
     // Modal Listeners
     document.getElementById('btnCreateDepartment').addEventListener('click', () => openDeptModal());
@@ -77,19 +91,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnCancelDeptModal').addEventListener('click', closeDeptModal);
     deptForm.addEventListener('submit', handleSaveDepartment);
 
-    // Admin/Manager Variables
-    const adminModal = document.getElementById('adminModal');
-    const adminForm = document.getElementById('adminForm');
-    const roleSelect = document.getElementById('adminRole');
-    const departmentSelect = document.getElementById('adminDepartment');
-
     document.getElementById('btnCreateAdmin').addEventListener('click', () => openAdminModal());
     document.getElementById('btnCloseAdminModal').addEventListener('click', closeAdminModal);
     document.getElementById('btnCancelAdminModal').addEventListener('click', closeAdminModal);
     adminForm.addEventListener('submit', handleSaveAdmin);
 
-    // Role Variables removed as roles are now fixed
-    let allRoles = [];
+    // Initialize first tab
+    await fetchUsers();
+    await fetchDepartments();
+    await fetchRoles();
 
     async function fetchUsers() {
         try {
@@ -131,6 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (data.success) {
                 allDepartments = data.departments;
                 renderDeptTable();
+                populateUserFilterDropdowns();
             } else {
                 window.showAlert('Error', data.message || 'Failed to load departments', 'error');
             }
@@ -313,6 +324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             renderRolesTable();
+            populateUserFilterDropdowns();
             
         } catch (e) {
             console.error('Failed to fetch roles:', e);
@@ -669,89 +681,201 @@ document.addEventListener('DOMContentLoaded', async () => {
             const usersList = Array.isArray(data) ? data : (data.users || []);
             
             if (res.ok) {
-                tbody.innerHTML = '';
-                if(usersList.length === 0) {
-                     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">No users found.</td></tr>';
-                     return;
-                }
-
-                const currentUser = window.getCurrentUser() || { role: 'admin' };
-                
-                let filteredUsers = usersList;
-                if (currentUser.is_manager && currentUser.role !== 'admin' && currentUser.role !== 'super-admin') {
-                    filteredUsers = usersList.filter(u => !u.role_name?.includes('manager') && u.role_name !== 'admin' && u.role_name !== 'super-admin');
-                }
-
-                if(filteredUsers.length === 0) {
-                     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">No users found.</td></tr>';
-                     return;
-                }
-
-                filteredUsers.forEach(user => {
-                    const isSystemAdmin = user.role_name === 'admin' || user.role_name === 'super-admin';
-                    const isManagerTarget = user.role_name?.includes('manager');
-                    const isSameDept = user.department_id == currentUser.department_id;
-                    
-                    const canEdit = currentUser.role === 'super-admin' 
-                        || currentUser.id == user.user_id 
-                        || (!isSystemAdmin && currentUser.role === 'admin')
-                        || (currentUser.is_manager && isSameDept && !isSystemAdmin && !isManagerTarget);
-
-                    const actionHtml = canEdit 
-                        ? `<button class="btn-edit-user" data-id="${user.user_id}" style="background:none;border:none;color:#3b82f6;cursor:pointer;padding:0.25rem;margin-right:0.5rem;"><i class="fas fa-edit"></i></button>
-                           <button class="btn-delete-user" data-id="${user.user_id}" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:0.25rem;"><i class="fas fa-trash"></i></button>`
-                        : `<span style="color:#94a3b8;font-size:0.8rem;"><i class="fas fa-lock"></i> Restricted</span>`;
-
-                    const tr = document.createElement('tr');
-                    const deptName = allDepartments.find(d => d.id == user.department_id)?.name || '-';
-                    const lastLogin = 'Never'; // Placeholder until implemented
-                    const badgeClass = user.status === 'active' ? 'active' : 'inactive';
-                    const badgeText = user.status === 'active' ? 'Active' : 'Inactive';
-                    
-                    tr.innerHTML = `
-                        <td>
-                            <div style="display:flex;align-items:center;gap:0.75rem;">
-                                <div style="width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:bold;">
-                                    ${user.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <div style="font-weight:600;color:#1e293b;">${user.name}</div>
-                                    <div style="font-size:0.8rem;color:#64748b;">${user.email}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>${user.employee_id || '-'}</td>
-                        <td>${deptName}</td>
-                        <td>${user.role_name?.replace('-',' ') || '-'}</td>
-                        <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
-                        <td>${lastLogin}</td>
-                        <td style="text-align:right;">
-                            ${actionHtml}
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-
-                document.querySelectorAll('.btn-edit-user').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const id = e.currentTarget.getAttribute('data-id');
-                        const user = usersList.find(u => u.user_id == id);
-                        if (user) openUserWizard(user);
-                    });
-                });
-
-                document.querySelectorAll('.btn-delete-user').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const id = e.currentTarget.getAttribute('data-id');
-                        if (confirm('Are you sure you want to delete this user?')) {
-                            handleDeleteUser(id);
-                        }
-                    });
-                });
+                pbacUsersList = usersList;
+                applyUserFilters();
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:red;">Error loading users</td></tr>';
             }
         } catch (e) {
             console.error(e);
             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:red;">Error loading users</td></tr>';
+        }
+    }
+
+    function populateUserFilterDropdowns() {
+        const deptSelect = document.getElementById('userFilterDept');
+        const roleSelect = document.getElementById('userFilterRole');
+
+        if (deptSelect) {
+            const currentValue = deptSelect.value;
+            deptSelect.innerHTML = '<option value="">All Departments</option>';
+            allDepartments.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = d.name;
+                deptSelect.appendChild(opt);
+            });
+            if (currentValue && allDepartments.some(d => d.id == currentValue)) {
+                deptSelect.value = currentValue;
+            }
+        }
+
+        if (roleSelect) {
+            const currentValue = roleSelect.value;
+            roleSelect.innerHTML = '<option value="">All Roles</option>';
+            const rolesToExclude = ['billing_manager', 'shipping', 'shipping_manager', 'viewer', 'whatsapp_manager'];
+            allRoles.forEach(r => {
+                if (rolesToExclude.includes(r.name.toLowerCase())) return;
+                const opt = document.createElement('option');
+                opt.value = r.role_id;
+                const formattedName = r.name.replace(/[-_]/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                opt.textContent = formattedName;
+                roleSelect.appendChild(opt);
+            });
+            if (currentValue && allRoles.some(r => r.role_id == currentValue)) {
+                roleSelect.value = currentValue;
+            }
+        }
+    }
+
+    function applyUserFilters() {
+        const query = (document.getElementById('userSearch')?.value || '').toLowerCase().trim();
+        const deptId = document.getElementById('userFilterDept')?.value || '';
+        const roleId = document.getElementById('userFilterRole')?.value || '';
+        const status = document.getElementById('userFilterStatus')?.value || '';
+
+        const filtered = pbacUsersList.filter(user => {
+            const matchesSearch = !query || 
+                (user.name && user.name.toLowerCase().includes(query)) ||
+                (user.email && user.email.toLowerCase().includes(query)) ||
+                (user.employee_id && user.employee_id.toLowerCase().includes(query));
+
+            const matchesDept = !deptId || user.department_id == deptId;
+            const matchesRole = !roleId || user.role_id == roleId;
+            const matchesStatus = !status || user.status === status;
+
+            return matchesSearch && matchesDept && matchesRole && matchesStatus;
+        });
+
+        renderPbacUsers(filtered);
+    }
+
+    function renderPbacUsers(filteredUsers) {
+        const tbody = document.getElementById('userTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        if (filteredUsers.length === 0) {
+             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">No users found.</td></tr>';
+             return;
+        }
+
+        const currentUser = window.getCurrentUser() || { role: 'admin' };
+        
+        let displayUsers = filteredUsers;
+        if (currentUser.is_manager && currentUser.role !== 'admin' && currentUser.role !== 'super-admin') {
+            displayUsers = filteredUsers.filter(u => !u.role_name?.includes('manager') && u.role_name !== 'admin' && u.role_name !== 'super-admin');
+        }
+
+        if (displayUsers.length === 0) {
+             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">No users found.</td></tr>';
+             return;
+        }
+
+        displayUsers.forEach(user => {
+            const isSystemAdmin = user.role_name === 'admin' || user.role_name === 'super-admin';
+            const isManagerTarget = user.role_name?.includes('manager');
+            const isSameDept = user.department_id == currentUser.department_id;
+            
+            const canEdit = currentUser.role === 'super-admin' 
+                || currentUser.id == user.user_id 
+                || (!isSystemAdmin && currentUser.role === 'admin')
+                || (currentUser.is_manager && isSameDept && !isSystemAdmin && !isManagerTarget);
+
+            let actionHtml = '';
+            if (canEdit) {
+                const statusColor = user.status === 'active' ? '#10b981' : '#94a3b8';
+                const statusIcon = user.status === 'active' ? 'fa-toggle-on' : 'fa-toggle-off';
+                const statusTitle = user.status === 'active' ? 'Deactivate User' : 'Activate User';
+
+                actionHtml = `
+                    <button class="btn-toggle-status" data-id="${user.user_id}" data-status="${user.status}" title="${statusTitle}" style="background:none;border:none;color:${statusColor};cursor:pointer;padding:0.25rem;margin-right:0.5rem;font-size:1.15rem;vertical-align:middle;">
+                        <i class="fas ${statusIcon}"></i>
+                    </button>
+                    <button class="btn-edit-user" data-id="${user.user_id}" title="Edit User" style="background:none;border:none;color:#3b82f6;cursor:pointer;padding:0.25rem;margin-right:0.5rem;font-size:1rem;vertical-align:middle;"><i class="fas fa-edit"></i></button>
+                    <button class="btn-delete-user" data-id="${user.user_id}" title="Delete User" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:0.25rem;font-size:1rem;vertical-align:middle;"><i class="fas fa-trash"></i></button>
+                `;
+            } else {
+                actionHtml = `<span style="color:#94a3b8;font-size:0.8rem;"><i class="fas fa-lock"></i> Restricted</span>`;
+            }
+
+            const tr = document.createElement('tr');
+            const deptName = allDepartments.find(d => d.id == user.department_id)?.name || '-';
+            const lastLogin = 'Never';
+            const badgeClass = user.status === 'active' ? 'active' : 'inactive';
+            const badgeText = user.status === 'active' ? 'Active' : 'Inactive';
+            
+            tr.innerHTML = `
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                        <div style="width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:bold;">
+                            ${user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <div style="font-weight:600;color:#1e293b;">${user.name}</div>
+                            <div style="font-size:0.8rem;color:#64748b;">${user.email}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>${user.employee_id || '-'}</td>
+                <td>${deptName}</td>
+                <td>${user.role_name ? user.role_name.replace(/[-_]/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '-'}</td>
+                <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+                <td>${lastLogin}</td>
+                <td style="text-align:right;">
+                    ${actionHtml}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.btn-edit-user').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                const user = pbacUsersList.find(u => u.user_id == id);
+                if (user) openUserWizard(user);
+            });
+        });
+
+        document.querySelectorAll('.btn-delete-user').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                if (confirm('Are you sure you want to delete this user?')) {
+                    handleDeleteUser(id);
+                }
+            });
+        });
+
+        document.querySelectorAll('.btn-toggle-status').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                const currentStatus = e.currentTarget.getAttribute('data-status');
+                const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+                handleToggleStatus(id, nextStatus);
+            });
+        });
+    }
+
+    async function handleToggleStatus(userId, nextStatus) {
+        try {
+            const res = await fetch(`${window.API_URL}/users/${userId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ status: nextStatus })
+            });
+            const data = await res.json();
+            if (res.ok || data.success) {
+                window.showAlert('Success', `User status updated to ${nextStatus}`, 'success');
+                fetchAllPbacUsers();
+            } else {
+                window.showAlert('Error', data.message || 'Failed to update user status', 'error');
+            }
+        } catch (error) {
+            console.error('Error toggling user status:', error);
+            window.showAlert('Error', 'Server connection failed', 'error');
         }
     }
 

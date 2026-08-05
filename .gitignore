@@ -1,0 +1,8 @@
+node_modules/
+.env
+backend/firebase-service-account.json
+backend/firebase-service-account.json.json
+backend/.debug.log
+backend/uploads/
+.zencoder/
+.zenflow/

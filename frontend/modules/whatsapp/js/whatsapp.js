@@ -551,7 +551,7 @@ function renderCustomerList() {
         if (activeList) {
             matchesTab = !resolved && activeList.phones.includes(customer.phone);
         } else if (currentTab === 'all') {
-            matchesTab = !resolved;
+            matchesTab = true;
         } else if (currentTab === 'resolved') {
             matchesTab = resolved;
         } else if (currentTab === 'unviewed') {

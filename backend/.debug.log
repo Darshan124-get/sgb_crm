@@ -21,3 +21,30 @@
 [2026-07-30T17:53:03.539Z] [INFO] Text message sent to 916364594854: 200 
 [2026-07-30T17:53:03.547Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSRDBGRDg2MkZBM0FCMzEwRDlCAA=="}]}
 [2026-07-30T17:53:03.559Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSRDBGRDg2MkZBM0FCMzEwRDlCAA==
+[2026-08-03T10:26:54.726Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-03T10:26:54.736Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-03T10:26:54.739Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-03T10:26:54.740Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-03T11:44:29.850Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-03T11:44:29.859Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-03T11:44:30.082Z] [ERROR] Error fetching quick replies: read ECONNRESET
+[2026-08-03T12:17:19.428Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-03T12:17:19.436Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-03T12:17:19.439Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-03T12:17:19.441Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-03T12:18:11.455Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:11.463Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:11.473Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:11.479Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:59.420Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:59.422Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:59.425Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:18:59.427Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:19:59.422Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:19:59.432Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:19:59.448Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:19:59.455Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:21:11.454Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:21:11.455Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:21:11.458Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-03T12:21:11.460Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io

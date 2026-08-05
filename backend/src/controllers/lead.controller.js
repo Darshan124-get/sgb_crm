@@ -336,6 +336,23 @@ exports.assignLead = async (req, res) => {
         await pool.query('UPDATE leads SET assigned_to = ?, status = "assigned" WHERE lead_id = ?', [assigned_to, req.params.id]);
         await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
             [req.params.id, req.user.id, `Lead assigned to user ID ${assigned_to}`]);
+
+        // Send push notification to the assigned user
+        try {
+            const notificationService = require('../services/notification.service');
+            const [leadRows] = await pool.query('SELECT customer_name, phone_number FROM leads WHERE lead_id = ?', [req.params.id]);
+            const leadName = leadRows[0]?.customer_name || leadRows[0]?.phone_number || 'New Lead';
+            
+            await notificationService.sendToUser(
+                assigned_to,
+                'New Lead Assigned',
+                `Lead "${leadName}" has been assigned to you.`,
+                { leadId: String(req.params.id), type: 'lead_assigned' }
+            );
+        } catch (notifErr) {
+            console.error('FCM Notification error (assignLead):', notifErr.message);
+        }
+
         res.json({ message: 'Lead assigned successfully' });
     } catch (err) {
         res.status(500).json({ message: 'Error assigning lead' });
@@ -435,6 +452,23 @@ exports.transferLead = async (req, res) => {
         await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [targetUser.user_id]);
 
         await connection.commit();
+
+        // Send push notification to target user after successful transaction commit
+        try {
+            const notificationService = require('../services/notification.service');
+            const [leadRows] = await pool.query('SELECT customer_name, phone_number FROM leads WHERE lead_id = ?', [leadId]);
+            const leadName = leadRows[0]?.customer_name || leadRows[0]?.phone_number || 'New Lead';
+            
+            await notificationService.sendToUser(
+                targetUser.user_id,
+                'Lead Transferred to You',
+                `Lead "${leadName}" has been transferred to you.`,
+                { leadId: String(leadId), type: 'lead_transferred' }
+            );
+        } catch (notifErr) {
+            console.error('FCM Notification error (transferLead):', notifErr.message);
+        }
+
         res.json({ message: 'Lead transferred successfully', target_user: targetUser.name });
     } catch (err) {
         try { if (connection) await connection.rollback(); } catch (re) { }
@@ -503,6 +537,20 @@ exports.bulkAssign = async (req, res) => {
         await connection.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES ?', [noteValues]);
 
         await connection.commit();
+
+        // Send push notification to target user for bulk assignment
+        try {
+            const notificationService = require('../services/notification.service');
+            await notificationService.sendToUser(
+                staffId,
+                'Multiple Leads Assigned',
+                `You have been bulk-assigned ${leadIds.length} new leads.`,
+                { type: 'lead_bulk_assigned' }
+            );
+        } catch (notifErr) {
+            console.error('FCM Notification error (bulkAssign):', notifErr.message);
+        }
+
         res.json({ message: 'Bulk assignment complete', count: result.affectedRows });
     } catch (err) {
         try { if (connection) await connection.rollback(); } catch (re) { }
@@ -524,6 +572,8 @@ exports.autoAssign = async (req, res) => {
         await connection.beginTransaction();
 
         let count = 0;
+        const assignedMap = {}; // staffId -> { name: string, count: number }
+
         for (const leadId of leadIds) {
             // Get Lead Language
             const [leadRows] = await connection.query('SELECT language FROM leads WHERE lead_id = ?', [leadId]);
@@ -556,11 +606,32 @@ exports.autoAssign = async (req, res) => {
                 // Note
                 await connection.query('INSERT INTO lead_notes (lead_id, note) VALUES (?, ?)',
                     [leadId, `System: Lead auto-assigned to ${staff.name} based on ${lang} language.`]);
+                
+                if (!assignedMap[staff.user_id]) {
+                    assignedMap[staff.user_id] = { name: staff.name, count: 0 };
+                }
+                assignedMap[staff.user_id].count++;
                 count++;
             }
         }
 
         await connection.commit();
+
+        // Send notifications
+        try {
+            const notificationService = require('../services/notification.service');
+            for (const [staffId, info] of Object.entries(assignedMap)) {
+                await notificationService.sendToUser(
+                    staffId,
+                    'New Auto-Assigned Leads',
+                    `You have been auto-assigned ${info.count} new lead(s).`,
+                    { type: 'lead_auto_assigned' }
+                );
+            }
+        } catch (notifErr) {
+            console.error('FCM Notification error (autoAssign):', notifErr.message);
+        }
+
         res.json({ message: 'Auto-assignment complete', count });
     } catch (err) {
         try { if (connection) await connection.rollback(); } catch (re) { }

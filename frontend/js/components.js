@@ -437,6 +437,7 @@ async function initLeadList(filters = {}) {
 
     const statusF = document.getElementById('leadStatusFilter');
     const scoreF = document.getElementById('leadScoreFilter');
+    const staffF = document.getElementById('leadStaffFilter');
     const dateF = document.getElementById('leadDateFilter');
     const btnAll = document.getElementById('btnFilterAll');
 
@@ -448,16 +449,62 @@ async function initLeadList(filters = {}) {
         scoreF.dataset.listenerSet = 'true';
         scoreF.onchange = () => initLeadList(window.currentBaseFilters);
     }
+    if (staffF && !staffF.dataset.listenerSet) {
+        staffF.dataset.listenerSet = 'true';
+        staffF.onchange = () => initLeadList(window.currentBaseFilters);
+
+        // Fetch staff list and populate options
+        (async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_URL}/users`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const allUsers = await response.json();
+                    const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
+                    
+                    const val = staffF.value;
+                    staffF.innerHTML = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
+                    users.forEach(u => {
+                        const opt = document.createElement('option');
+                        opt.value = u.user_id;
+                        opt.textContent = `${u.name} - ${u.language || 'General'}`;
+                        staffF.appendChild(opt);
+                    });
+                    staffF.value = val;
+                }
+            } catch (err) {
+                console.error('Failed to load staff list for filter:', err);
+            }
+        })();
+    }
     if (dateF && !dateF.dataset.listenerSet) {
         dateF.dataset.listenerSet = 'true';
-        dateF.onchange = () => initLeadList(window.currentBaseFilters);
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(dateF, {
+                mode: "range",
+                dateFormat: "Y-m-d",
+                onClose: function(selectedDates, dateStr, instance) {
+                    initLeadList(window.currentBaseFilters);
+                }
+            });
+        } else {
+            dateF.onchange = () => initLeadList(window.currentBaseFilters);
+        }
     }
     if (btnAll && !btnAll.dataset.listenerSet) {
         btnAll.dataset.listenerSet = 'true';
         btnAll.onclick = () => {
             if (statusF) statusF.value = 'all';
             if (scoreF) scoreF.value = 'all';
-            if (dateF) dateF.value = '';
+            if (staffF) staffF.value = 'all';
+            if (dateF) {
+                dateF.value = '';
+                if (dateF._flatpickr) {
+                    dateF._flatpickr.clear();
+                }
+            }
             initLeadList(window.currentBaseFilters);
         };
     }
@@ -474,6 +521,15 @@ async function initLeadList(filters = {}) {
     // Overlay with dynamic UI filters
     if (statusF && statusF.value !== 'all') params.set('status', statusF.value);
     if (scoreF && scoreF.value !== 'all') params.set('score', scoreF.value);
+    
+    if (staffF && staffF.value !== 'all') {
+        if (staffF.value === 'unassigned') {
+            params.set('is_unassigned', 'true');
+        } else {
+            params.set('assigned_to', staffF.value);
+        }
+    }
+
     if (dateF && dateF.value) params.set('date', dateF.value);
     if (searchInput && searchInput.value) params.set('search', searchInput.value);
 

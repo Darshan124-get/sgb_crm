@@ -266,14 +266,28 @@ const getAllChatCustomers = async (user = null) => {
   try {
     let query = `
       SELECT l.*, l.phone_number AS phone, u.name AS assigned_name,
-       MAX(cm.timestamp) as last_message_at,
-       MAX(CASE WHEN cm.sender_type = 'user' THEN cm.timestamp ELSE NULL END) as last_inbound_at,
-       SUM(CASE WHEN cm.sender_type = 'user' AND cm.status = 'sent' THEN 1 ELSE 0 END) as unread_msg_count,
-       (SELECT message FROM chat_messages WHERE session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = l.lead_id) ORDER BY timestamp DESC LIMIT 1) as last_message
+       agg.last_message_at,
+       agg.last_inbound_at,
+       agg.unread_msg_count,
+       (
+         SELECT cm.message 
+         FROM chat_messages cm
+         JOIN chat_sessions cs ON cm.session_id = cs.session_id
+         WHERE cs.lead_id = l.lead_id
+         ORDER BY cm.timestamp DESC, cm.chat_id DESC 
+         LIMIT 1
+       ) as last_message
        FROM leads l
-       LEFT JOIN chat_sessions cs ON l.lead_id = cs.lead_id
-       LEFT JOIN chat_messages cm ON cs.session_id = cm.session_id
        LEFT JOIN users u ON l.assigned_to = u.user_id
+       LEFT JOIN (
+         SELECT cs.lead_id,
+          MAX(cm.timestamp) as last_message_at,
+          MAX(CASE WHEN cm.sender_type = 'user' THEN cm.timestamp ELSE NULL END) as last_inbound_at,
+          SUM(CASE WHEN cm.sender_type = 'user' AND cm.status = 'sent' THEN 1 ELSE 0 END) as unread_msg_count
+         FROM chat_sessions cs
+         JOIN chat_messages cm ON cs.session_id = cm.session_id
+         GROUP BY cs.lead_id
+       ) agg ON l.lead_id = agg.lead_id
        WHERE 1=1
     `;
     let params = [];
@@ -284,8 +298,7 @@ const getAllChatCustomers = async (user = null) => {
     }
 
     query += `
-       GROUP BY l.lead_id
-       ORDER BY last_message_at DESC, l.created_at DESC
+       ORDER BY agg.last_message_at DESC, l.created_at DESC
     `;
 
     const [rows] = await db.execute(query, params);
@@ -322,6 +335,27 @@ const markMessagesAsRead = async (phoneInput) => {
   }
 };
 
+const markMessagesAsUnread = async (phoneInput) => {
+  const phone = normalizePhone(phoneInput);
+  try {
+    const [leads] = await db.execute('SELECT lead_id FROM leads WHERE phone_number = ?', [phone]);
+    if (leads.length === 0) return;
+    const lead_id = leads[0].lead_id;
+
+    // Change the status of the last message from the user back to 'sent'
+    await db.execute(`
+      UPDATE chat_messages 
+      SET status = 'sent' 
+      WHERE sender_type = 'user' 
+        AND session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = ?)
+      ORDER BY chat_id DESC 
+      LIMIT 1
+    `, [lead_id]);
+  } catch (err) {
+    logger.error('Error marking messages as unread:', err.message);
+  }
+};
+
 /**
  * Updates the delivery/read status of an outgoing message
  */
@@ -347,5 +381,6 @@ module.exports = {
   getAllChatCustomers,
   deleteChatMessage,
   markMessagesAsRead,
+  markMessagesAsUnread,
   updateMessageStatus
 };

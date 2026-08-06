@@ -67,7 +67,7 @@ const receiveMessage = async (req, res) => {
           } else if (msg.type === 'interactive') {
             const interactive = msg.interactive;
             inputText = interactive.button_reply?.title || interactive.list_reply?.title || 'Interactive response';
-          } else if (['image', 'document', 'audio', 'video', 'sticker'].includes(msg.type)) {
+          } else if (['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type)) {
             const mediaId = msg[msg.type].id;
             const caption = msg[msg.type].caption || '';
             inputText = caption || `Sent a ${msg.type}`;
@@ -420,6 +420,17 @@ const markRead = async (req, res) => {
   }
 };
 
+const markUnread = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    await messageService.markMessagesAsUnread(phone);
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Error in markUnread:', err.message);
+    res.status(500).json({ error: 'Failed to mark messages as unread' });
+  }
+};
+
 module.exports = {
   verifyWebhook,
   receiveMessage,
@@ -431,5 +442,6 @@ module.exports = {
   getQuickReplies,
   saveQuickReply,
   deleteQuickReply,
-  markRead
+  markRead,
+  markUnread
 };

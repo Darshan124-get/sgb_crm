@@ -1125,3 +1125,87 @@
     0%, 100% { background-color: inherit; }
     30%, 70% { background-color: #fff9c4 !important; }
 }
+
+/* Floating Scroll to Bottom Button */
+.scroll-to-bottom-btn {
+    position: absolute;
+    bottom: 85px; /* Positioned just above the footer input bar */
+    right: 20px;
+    width: 42px;
+    height: 42px;
+    background-color: var(--whatsapp-header);
+    color: #8696a0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 100;
+    transition: opacity 0.3s, transform 0.3s;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    border: none;
+    outline: none;
+}
+
+.scroll-to-bottom-btn.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.scroll-to-bottom-btn:hover {
+    background-color: #2a3942;
+    color: var(--whatsapp-text);
+}
+
+.scroll-to-bottom-btn i {
+    font-size: 1.1rem;
+}
+
+/* Scroll Unread Badge */
+.scroll-unread-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: var(--whatsapp-green);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border-radius: 50%;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.scroll-unread-badge.hidden {
+    display: none;
+}
+
+/* Chat Item Context Menu Trigger Hover Replacement */
+.chat-menu-trigger {
+    display: none;
+    color: var(--whatsapp-secondary);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.chat-menu-trigger:hover {
+    color: var(--whatsapp-text);
+}
+
+.customer-item:hover .chat-menu-trigger {
+    display: inline-block !important;
+}
+
+.customer-item:hover .customer-time {
+    display: none !important;
+}

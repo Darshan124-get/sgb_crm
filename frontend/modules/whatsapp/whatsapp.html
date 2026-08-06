@@ -13,13 +13,73 @@
     </style>
 </head>
 <body>
+    <!-- WhatsApp Loading Screen (Splash Screen) -->
+    <div id="whatsapp-loading-screen" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #111b21;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        transition: opacity 0.5s ease-out;
+        color: #e9edef;
+        font-family: inherit;
+    ">
+        <div style="display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 360px;">
+            <!-- WhatsApp Logo -->
+            <div style="font-size: 3.5rem; color: #8696a0; opacity: 0.5; margin-bottom: 40px; animation: pulse 2s infinite ease-in-out;">
+                <i class="fab fa-whatsapp"></i>
+            </div>
+            
+            <!-- Progress Bar Container -->
+            <div style="
+                width: 100%;
+                height: 3px;
+                background: #202c33;
+                border-radius: 2px;
+                overflow: hidden;
+                position: relative;
+                margin-bottom: 20px;
+            ">
+                <div id="whatsapp-loading-bar" style="
+                    width: 0%;
+                    height: 100%;
+                    background: #00a884;
+                    transition: width 0.1s ease-out;
+                "></div>
+            </div>
+            
+            <div style="font-size: 0.85rem; font-weight: 500; letter-spacing: 0.5px; color: #e9edef; margin-bottom: 5px;">WhatsApp</div>
+            <div id="whatsapp-loading-text" style="font-size: 0.75rem; color: #8696a0; min-height: 16px;">Connecting...</div>
+        </div>
+        
+        <!-- Encryption message at bottom -->
+        <div style="position: absolute; bottom: 40px; display: flex; align-items: center; gap: 8px; color: #667781; font-size: 0.75rem;">
+            <i class="fas fa-lock" style="font-size: 0.7rem;"></i> End-to-end encrypted
+        </div>
+    </div>
+    
+    <!-- Pulse keyframe animation -->
+    <style>
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 0.5; }
+        }
+    </style>
+
     <div class="dashboard-wrapper">
         <div id="sidebar-container"></div>
         <main class="main-content">
             <header class="topbar">
                 <div class="search-bar">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Search leads, orders, dealers...">
+                    <input type="text" id="topbar-search" name="topbar-search" aria-label="Search leads, orders, dealers" placeholder="Search leads, orders, dealers...">
                 </div>
                 <div class="profile-section">
                     <span class="profile-name" id="profileName">User</span>
@@ -64,7 +124,7 @@
                 </div>
                 <div class="search-box" style="margin-top: 15px; position: relative;">
                     <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--whatsapp-secondary);"></i>
-                    <input type="text" id="customer-search" placeholder="Search conversations..." 
+                    <input type="text" id="customer-search" name="customer-search" aria-label="Search conversations" placeholder="Search conversations..." 
                            style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 10px 10px 10px 40px; border-radius: 8px; color: var(--whatsapp-text); outline: none; transition: border-color 0.2s;">
                 </div>
             </header>
@@ -136,6 +196,12 @@
                     <!-- Messages will appear here -->
                 </div>
 
+                <!-- Floating Scroll to Bottom Button -->
+                <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" aria-label="Scroll to bottom">
+                    <i class="fas fa-chevron-down"></i>
+                    <span id="scroll-unread-badge" class="scroll-unread-badge hidden">0</span>
+                </button>
+
                 <footer class="chat-footer" style="position: relative;">
                     <!-- Reply Preview Panel -->
                     <div id="reply-preview-container" class="hidden" style="display: none;">
@@ -163,8 +229,8 @@
                         <button type="button" id="attach-btn" style="background: none; border: none; color: var(--whatsapp-secondary); font-size: 1.3rem; cursor: pointer; padding: 5px;">
                             <i class="fas fa-paperclip"></i>
                         </button>
-                        <input type="file" id="media-input" class="hidden">
-                        <textarea id="message-input" placeholder="Type a message..." rows="1" style="resize: none; font-family: inherit; width: 100%; border: none; outline: none; background: var(--input-bg); color: var(--whatsapp-text); border: 1px solid var(--whatsapp-border); padding: 12px 15px; border-radius: 8px; margin: 0 10px; max-height: 100px; overflow-y: auto;"></textarea>
+                        <input type="file" id="media-input" name="media-input" aria-label="Upload media file" class="hidden">
+                        <textarea id="message-input" name="message-input" aria-label="Type a message" placeholder="Type a message..." rows="1" style="resize: none; font-family: inherit; width: 100%; border: none; outline: none; background: var(--input-bg); color: var(--whatsapp-text); border: 1px solid var(--whatsapp-border); padding: 12px 15px; border-radius: 8px; margin: 0 10px; max-height: 100px; overflow-y: auto;"></textarea>
                         <button type="button" id="send-btn" class="send-btn">
                             <i class="fas fa-paper-plane"></i>
                         </button>
@@ -230,32 +296,32 @@
                 <!-- Edit Form (Hidden by default) -->
                 <div id="contact-info-edit" class="hidden">
                     <div class="form-group">
-                        <label>Full Name</label>
-                        <input type="text" id="edit-name" placeholder="Customer Name">
+                        <label for="edit-name">Full Name</label>
+                        <input type="text" id="edit-name" name="edit-name" placeholder="Customer Name">
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div class="form-group">
-                            <label>City/Village</label>
-                            <input type="text" id="edit-city">
+                            <label for="edit-city">City/Village</label>
+                            <input type="text" id="edit-city" name="edit-city">
                         </div>
                         <div class="form-group">
-                            <label>District</label>
-                            <input type="text" id="edit-district">
+                            <label for="edit-district">District</label>
+                            <input type="text" id="edit-district" name="edit-district">
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                         <div class="form-group">
-                            <label>State</label>
-                            <input type="text" id="edit-state">
+                            <label for="edit-state">State</label>
+                            <input type="text" id="edit-state" name="edit-state">
                         </div>
                         <div class="form-group">
-                            <label>Pincode</label>
-                            <input type="text" id="edit-pincode">
+                            <label for="edit-pincode">Pincode</label>
+                            <input type="text" id="edit-pincode" name="edit-pincode">
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 10px;">
-                        <label>Language Preference</label>
-                        <select id="edit-language">
+                        <label for="edit-language">Language Preference</label>
+                        <select id="edit-language" name="edit-language">
                             <option value="EN">English</option>
                             <option value="KN">Kannada</option>
                             <option value="HI">Hindi</option>
@@ -264,12 +330,12 @@
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                         <div class="form-group">
-                            <label>Current Crop</label>
-                            <input type="text" id="edit-crop" placeholder="e.g. Tomato">
+                            <label for="edit-crop">Current Crop</label>
+                            <input type="text" id="edit-crop" name="edit-crop" placeholder="e.g. Tomato">
                         </div>
                         <div class="form-group">
-                            <label>Acreage</label>
-                            <input type="number" step="0.1" id="edit-acreage" placeholder="e.g. 2.5">
+                            <label for="edit-acreage">Acreage</label>
+                            <input type="number" step="0.1" id="edit-acreage" name="edit-acreage" placeholder="e.g. 2.5">
                         </div>
                     </div>
                     <div class="form-actions" style="margin-top: 15px; display: flex; gap: 10px;">
@@ -332,7 +398,7 @@
                 </div>
             </div>
             <div class="preview-footer">
-                <input type="text" id="preview-caption" placeholder="Add a caption...">
+                <input type="text" id="preview-caption" name="preview-caption" aria-label="Add a caption" placeholder="Add a caption...">
                 <button id="send-media-btn" class="send-media-btn">
                     <i class="fas fa-paper-plane"></i>
                 </button>
@@ -350,7 +416,7 @@
             
             <div class="modal-body">
                 <div class="transfer-search">
-                    <input type="text" id="sales-search" placeholder="Search sales person...">
+                    <input type="text" id="sales-search" name="sales-search" aria-label="Search sales person" placeholder="Search sales person...">
                     <i class="fas fa-search"></i>
                 </div>
                 
@@ -387,21 +453,21 @@
             <div id="qr-edit-view" class="modal-body hidden" style="padding: 20px;">
                 <input type="hidden" id="qr-edit-index" value="-1">
                 <div class="form-group" style="margin-bottom: 20px;">
-                    <label style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Shortcut</label>
+                    <label for="qr-edit-shortcut" style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Shortcut</label>
                     <div style="display: flex; align-items: center; border-bottom: 2px solid var(--whatsapp-green);">
                         <span style="color: var(--whatsapp-secondary); font-size: 1.1rem; margin-right: 5px;">/</span>
-                        <input type="text" id="qr-edit-shortcut" placeholder="word" style="background: transparent; border: none; padding: 10px 0; font-size: 1rem; flex: 1; outline: none; margin-bottom: 0;">
+                        <input type="text" id="qr-edit-shortcut" name="qr-edit-shortcut" placeholder="word" style="background: transparent; border: none; padding: 10px 0; font-size: 1rem; flex: 1; outline: none; margin-bottom: 0;">
                     </div>
                     <small style="color: var(--whatsapp-secondary); font-size: 0.75rem; display: block; margin-top: 5px;">A word that will quickly retrieve this reply</small>
                 </div>
                 <div class="form-group">
-                    <label style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Reply message</label>
-                    <textarea id="qr-edit-message" placeholder="Enter text..." style="width: 100%; background: transparent; border: none; border-bottom: 2px solid var(--whatsapp-green); color: var(--whatsapp-text); padding: 10px 0; font-size: 1rem; outline: none; resize: none; min-height: 80px;"></textarea>
+                    <label for="qr-edit-message" style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Reply message</label>
+                    <textarea id="qr-edit-message" name="qr-edit-message" placeholder="Enter text..." style="width: 100%; background: transparent; border: none; border-bottom: 2px solid var(--whatsapp-green); color: var(--whatsapp-text); padding: 10px 0; font-size: 1rem; outline: none; resize: none; min-height: 80px;"></textarea>
                 </div>
                 <div class="form-group" style="margin-top: 15px;">
-                    <label style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Media (Optional)</label>
+                    <label for="qr-edit-media" style="color: var(--whatsapp-secondary); font-size: 0.8rem; text-transform: none;">Media (Optional)</label>
                     <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                        <input type="file" id="qr-edit-media" style="display: none;" accept="image/*,video/*,application/pdf" multiple>
+                        <input type="file" id="qr-edit-media" name="qr-edit-media" style="display: none;" accept="image/*,video/*,application/pdf" multiple>
                         <button id="qr-edit-media-btn" style="background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); color: var(--whatsapp-text); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;"><i class="fas fa-upload" style="margin-right: 5px;"></i> Upload Media</button>
                         <span id="qr-edit-media-name" style="color: var(--whatsapp-secondary); font-size: 0.85rem; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
                         <button id="qr-edit-media-remove" class="hidden" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.85rem;"><i class="fas fa-times"></i></button>
@@ -433,8 +499,8 @@
             <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
                 <!-- List Name with Green Underline on Focus -->
                 <div>
-                    <label style="color: var(--whatsapp-secondary); font-size: 0.82rem; display: block; margin-bottom: 5px;">List name</label>
-                    <input type="text" id="new-list-name" placeholder="List name" style="
+                    <label for="new-list-name" style="color: var(--whatsapp-secondary); font-size: 0.82rem; display: block; margin-bottom: 5px;">List name</label>
+                    <input type="text" id="new-list-name" name="new-list-name" placeholder="List name" style="
                         width: 100%;
                         background: transparent;
                         border: none;
@@ -472,7 +538,7 @@
                     <div id="contact-selector-container" class="hidden" style="margin-top: 15px;">
                         <div class="search-box" style="position: relative; margin-bottom: 10px; background: transparent; border: none; padding: 0;">
                             <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--whatsapp-secondary);"></i>
-                            <input type="text" id="list-contact-search" placeholder="Search contacts..." style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 8px 10px 8px 35px; border-radius: 8px; color: var(--whatsapp-text); outline: none;">
+                            <input type="text" id="list-contact-search" name="list-contact-search" aria-label="Search contacts" placeholder="Search contacts..." style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 8px 10px 8px 35px; border-radius: 8px; color: var(--whatsapp-text); outline: none;">
                         </div>
                         <div id="list-contacts-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--whatsapp-border); border-radius: 8px; padding: 10px; background: var(--whatsapp-sidebar);">
                             <!-- Dynamic checkboxes -->
@@ -511,7 +577,7 @@
             <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
                 <div class="search-box" style="position: relative; background: transparent; border: none; padding: 0; margin-bottom: 10px;">
                     <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--whatsapp-secondary);"></i>
-                    <input type="text" id="forward-contact-search" placeholder="Search contacts..." style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 8px 10px 8px 35px; border-radius: 8px; color: var(--whatsapp-text); outline: none;">
+                    <input type="text" id="forward-contact-search" name="forward-contact-search" aria-label="Search contacts" placeholder="Search contacts..." style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 8px 10px 8px 35px; border-radius: 8px; color: var(--whatsapp-text); outline: none;">
                   </div>
                 
                 <div id="forward-contacts-container" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--whatsapp-border); border-radius: 8px; padding: 10px; background: var(--whatsapp-sidebar); display: flex; flex-direction: column; gap: 8px;">

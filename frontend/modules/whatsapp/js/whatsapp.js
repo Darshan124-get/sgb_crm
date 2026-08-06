@@ -22,6 +22,111 @@ let currentTab = 'all';
 let salesUsers = [];
 let activeCampaigns = [];
 const activeUploads = new Map();
+const chatHistoryCache = new Map();
+const activeHistoryFetches = new Set();
+let scrollUnreadCount = 0;
+
+// Session Storage Persistence Helpers
+function saveCacheToSession() {
+    try {
+        const cacheObj = {};
+        chatHistoryCache.forEach((value, key) => {
+            cacheObj[key] = value;
+        });
+        sessionStorage.setItem('wa_chat_history_cache', JSON.stringify(cacheObj));
+    } catch (e) {
+        console.error('Failed to save chat cache to sessionStorage:', e);
+    }
+}
+
+function loadCacheFromSession() {
+    try {
+        const cachedData = sessionStorage.getItem('wa_chat_history_cache');
+        if (cachedData) {
+            const cacheObj = JSON.parse(cachedData);
+            for (const key in cacheObj) {
+                chatHistoryCache.set(key, cacheObj[key]);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load chat cache from sessionStorage:', e);
+    }
+}
+
+// Background sequential preloading of chat histories with progress bar
+async function preloadAllChatHistories(customers) {
+    const loadingScreen = document.getElementById('whatsapp-loading-screen');
+    const loadingBar = document.getElementById('whatsapp-loading-bar');
+    const loadingText = document.getElementById('whatsapp-loading-text');
+
+    // Filter customers who have actual message history (since we don't need to fetch empty history)
+    const activeChats = customers.filter(c => c.last_message_at);
+    
+    if (activeChats.length === 0) {
+        if (loadingBar) loadingBar.style.width = '100%';
+        if (loadingText) loadingText.innerText = 'Initializing...';
+        setTimeout(fadeOutLoadingScreen, 300);
+        return;
+    }
+
+    if (loadingText) loadingText.innerText = `Loading chats (0/${activeChats.length})...`;
+
+    let loadedCount = 0;
+    const CHUNK_SIZE = 5; // Fetch in chunks of 5 to avoid database congestion
+    
+    for (let i = 0; i < activeChats.length; i += CHUNK_SIZE) {
+        const chunk = activeChats.slice(i, i + CHUNK_SIZE);
+        
+        await Promise.all(chunk.map(async (customer) => {
+            await loadChatHistoryInBackground(customer.phone);
+            loadedCount++;
+            const percent = Math.min(Math.round((loadedCount / activeChats.length) * 100), 100);
+            if (loadingBar) loadingBar.style.width = `${percent}%`;
+            if (loadingText) loadingText.innerText = `Loading chats (${loadedCount}/${activeChats.length})...`;
+        }));
+        
+        // Brief delay between chunks to let connections finish cleanly
+        if (i + CHUNK_SIZE < activeChats.length) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+
+    if (loadingText) loadingText.innerText = 'Ready!';
+    setTimeout(fadeOutLoadingScreen, 400);
+}
+
+function fadeOutLoadingScreen() {
+    const loadingScreen = document.getElementById('whatsapp-loading-screen');
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+        }, 500);
+    }
+}
+
+async function loadChatHistoryInBackground(phone) {
+    if (chatHistoryCache.has(phone) || activeHistoryFetches.has(phone)) return;
+    activeHistoryFetches.add(phone);
+    try {
+        const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: AUTH_HEADER });
+        if (response.ok) {
+            const history = await response.json();
+            chatHistoryCache.set(phone, history);
+            saveCacheToSession();
+            
+            // If the user selected this chat while it was preloading, render it
+            if (activeCustomer && activeCustomer.phone === phone && (!currentHistory || currentHistory.length === 0)) {
+                currentHistory = history;
+                renderMessages(history);
+            }
+        }
+    } catch (err) {
+        console.error('Background preloading failed for:', phone, err);
+    } finally {
+        activeHistoryFetches.delete(phone);
+    }
+}
 
 // DOM Elements
 const appContainerEl = document.getElementById('app-container');
@@ -94,6 +199,9 @@ function goToLeadDetails() {
  * Initialize
  */
 document.addEventListener('DOMContentLoaded', () => {
+    // Restore cache from browser session storage
+    loadCacheFromSession();
+
     // Auth Guard
     if (!window.requireAuth(['admin', 'sales', 'whatsapp_manager'])) return;
 
@@ -516,6 +624,12 @@ async function loadCustomers() {
         renderSidebarTabs(); // update unread count
         renderCustomerList();
 
+        // Trigger background preloading of chat histories ONLY ONCE on initial load
+        if (!window._hasPreloadedHistories) {
+            window._hasPreloadedHistories = true;
+            preloadAllChatHistories(allCustomers);
+        }
+
         // Check if there is a pending phone to select on load/refresh
         if (window._pendingPhone) {
             const customer = allCustomers.find(c => c.phone === window._pendingPhone);
@@ -527,6 +641,7 @@ async function loadCustomers() {
     } catch (err) {
         console.error('Failed to load customers:', err);
         customerListEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Connection error.</div>';
+        fadeOutLoadingScreen();
     }
 }
 
@@ -686,7 +801,12 @@ function renderCustomerList() {
             <div class="customer-meta">
                 <div class="customer-meta-header">
                     <h3>${displayName}</h3>
-                    <div class="customer-time" style="color: ${timeColor}; ${timeWeight}">${lastTime}</div>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <div class="customer-time" style="color: ${timeColor}; ${timeWeight}">${lastTime}</div>
+                        <div class="chat-menu-trigger" onclick="event.stopPropagation(); window.showCustomerContextMenu(event, '${customer.phone}')">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
                     <p class="last-message-snippet" style="flex: 1; min-width: 0;">${lastMsg || customer.phone}</p>
@@ -698,6 +818,10 @@ function renderCustomerList() {
                 </div>
             </div>
         `;
+        item.oncontextmenu = (e) => {
+            e.preventDefault();
+            window.showCustomerContextMenu(e, customer.phone);
+        };
         item.onclick = () => selectCustomer(customer);
         customerListEl.appendChild(item);
     });
@@ -710,11 +834,27 @@ async function selectCustomer(customer) {
     closeAllContextMenus();
     clearReplyPreview();
     activeCustomer = customer;
-    currentHistory = [];
 
-    // Clear message container immediately and show loading spinner
-    if (messageContainerEl) {
-        messageContainerEl.innerHTML = '<div class="loading-spinner" style="padding: 20px; text-align: center; color: var(--whatsapp-secondary);">Loading messages...</div>';
+    // Reset scroll button state when changing chats
+    scrollUnreadCount = 0;
+    const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+    const scrollUnreadBadge = document.getElementById('scroll-unread-badge');
+    if (scrollToBottomBtn) scrollToBottomBtn.classList.remove('show');
+    if (scrollUnreadBadge) {
+        scrollUnreadBadge.textContent = '0';
+        scrollUnreadBadge.classList.add('hidden');
+    }
+
+    // Use cached history for instant display if available
+    const cached = chatHistoryCache.get(customer.phone);
+    if (cached) {
+        currentHistory = cached;
+        renderMessages(cached);
+    } else {
+        currentHistory = [];
+        if (messageContainerEl) {
+            messageContainerEl.innerHTML = '<div class="loading-spinner" style="padding: 20px; text-align: center; color: var(--whatsapp-secondary);">Loading messages...</div>';
+        }
     }
 
     // Update URL query parameters without reloading
@@ -1031,15 +1171,28 @@ async function handleTransfer() {
  * Load Chat History
  */
 async function loadChatHistory(phone, isPolling = false) {
+    if (activeHistoryFetches.has(phone)) return;
+    activeHistoryFetches.add(phone);
     try {
         const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: AUTH_HEADER });
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
         const history = await response.json();
-        if (isPolling && JSON.stringify(history) === JSON.stringify(currentHistory)) return;
-        currentHistory = history;
-        renderMessages(history);
+        
+        // Save to cache for future transitions
+        chatHistoryCache.set(phone, history);
+        saveCacheToSession();
+
+        // Update UI only if this is still the active customer chat
+        if (activeCustomer && activeCustomer.phone === phone) {
+            // Avoid re-rendering if history hasn't changed (for both polling and manual switching)
+            if (JSON.stringify(history) === JSON.stringify(currentHistory)) return;
+            currentHistory = history;
+            renderMessages(history);
+        }
     } catch (err) {
         console.error('Failed to load history:', err);
+    } finally {
+        activeHistoryFetches.delete(phone);
     }
 }
 
@@ -1441,7 +1594,7 @@ window.showContextMenu = function (event, chatId) {
     menu.className = 'whatsapp-context-menu';
     menu.id = 'whatsapp-msg-context-menu';
 
-    const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : (msg.message_type === 'audio' ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
+    const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : ((msg.message_type === 'audio' || msg.message_type === 'voice') ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
     const isMedia = !!effectiveMimeType;
 
     menu.innerHTML = `
@@ -1490,9 +1643,13 @@ window.showContextMenu = function (event, chatId) {
 };
 
 window.closeAllContextMenus = function () {
-    const existingMenu = document.getElementById('whatsapp-msg-context-menu');
-    if (existingMenu) {
-        existingMenu.remove();
+    const existingMsgMenu = document.getElementById('whatsapp-msg-context-menu');
+    if (existingMsgMenu) {
+        existingMsgMenu.remove();
+    }
+    const existingCustMenu = document.getElementById('whatsapp-customer-context-menu');
+    if (existingCustMenu) {
+        existingCustMenu.remove();
     }
     document.removeEventListener('click', closeAllContextMenus);
 };
@@ -1535,7 +1692,7 @@ window.initForwardAndReplyEvents = function () {
             const phones = Array.from(checkboxes).map(cb => cb.dataset.phone);
             let successCount = 0;
 
-            const effectiveMimeType = msgToForward.mime_type || (msgToForward.message_type === 'image' ? 'image/jpeg' : (msgToForward.message_type === 'video' ? 'video/mp4' : (msgToForward.message_type === 'audio' ? 'audio/mpeg' : (msgToForward.message_type === 'document' ? 'application/octet-stream' : null))));
+            const effectiveMimeType = msgToForward.mime_type || (msgToForward.message_type === 'image' ? 'image/jpeg' : (msgToForward.message_type === 'video' ? 'video/mp4' : ((msgToForward.message_type === 'audio' || msgToForward.message_type === 'voice') ? 'audio/mpeg' : (msgToForward.message_type === 'document' ? 'application/octet-stream' : null))));
             const mediaUrl = msgToForward.media_url || (effectiveMimeType ? `${API_BASE}/media/${msgToForward.chat_id}?token=${localStorage.getItem('token')}` : null);
 
             for (const phone of phones) {
@@ -1577,9 +1734,22 @@ window.initForwardAndReplyEvents = function () {
 function renderMessages(history) {
     if (!messageContainerEl) return;
 
+    const existingMessageCount = messageContainerEl.querySelectorAll('.message').length;
+
     // Determine if we should scroll to bottom after rendering
     const isAtBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight < 150;
     const isFirstLoad = messageContainerEl.querySelector('.loading-spinner') !== null || messageContainerEl.innerHTML === '';
+
+    // If new messages arrived while user was scrolled up, increment unread badge
+    if (history.length > existingMessageCount && !isAtBottom && !isFirstLoad) {
+        const diff = history.length - existingMessageCount;
+        scrollUnreadCount += diff;
+        const scrollUnreadBadge = document.getElementById('scroll-unread-badge');
+        if (scrollUnreadBadge) {
+            scrollUnreadBadge.textContent = scrollUnreadCount;
+            scrollUnreadBadge.classList.remove('hidden');
+        }
+    }
 
     messageContainerEl.innerHTML = '';
 
@@ -1655,7 +1825,7 @@ function renderMessages(history) {
             <i class="fas fa-chevron-down"></i>
         </div>`;
 
-        const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : (msg.message_type === 'audio' ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
+        const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : ((msg.message_type === 'audio' || msg.message_type === 'voice') ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
 
         if (effectiveMimeType) {
             let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
@@ -1682,9 +1852,9 @@ function renderMessages(history) {
                     </div>`;
             } else if (effectiveMimeType.startsWith('audio')) {
                 contentHtml = `
-                    <div class="message-media" style="padding: 10px; background: #202c33; border-radius: 8px;">
-                        <audio controls style="width: 100%;">
-                            <source src="${mediaUrl}" type="${effectiveMimeType === 'audio' ? 'audio/mpeg' : effectiveMimeType}">
+                    <div class="message-media" style="padding: 10px; background: #202c33; border-radius: 8px; min-width: 280px; width: 100%;">
+                        <audio controls style="width: 100%; display: block; outline: none;">
+                            <source src="${mediaUrl}" type="${effectiveMimeType === 'audio' || effectiveMimeType === 'voice' ? 'audio/mpeg' : effectiveMimeType}">
                         </audio>
                     </div>`;
             } else {
@@ -2485,3 +2655,103 @@ if (modal && closeBtn && saveBtn && nameInput) {
         renderCustomerList();
     });
 }
+
+// Scroll-to-bottom event listeners
+if (messageContainerEl) {
+    const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+    const scrollUnreadBadge = document.getElementById('scroll-unread-badge');
+
+    messageContainerEl.addEventListener('scroll', () => {
+        const threshold = 300; // Show if scrolled up by more than 300px
+        const distanceToBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight;
+        
+        if (distanceToBottom > threshold) {
+            if (scrollToBottomBtn) scrollToBottomBtn.classList.add('show');
+        } else {
+            if (scrollToBottomBtn) scrollToBottomBtn.classList.remove('show');
+            if (distanceToBottom < 50) {
+                scrollUnreadCount = 0;
+                if (scrollUnreadBadge) {
+                    scrollUnreadBadge.textContent = '0';
+                    scrollUnreadBadge.classList.add('hidden');
+                }
+            }
+        }
+    });
+
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.addEventListener('click', () => {
+            messageContainerEl.scrollTo({
+                top: messageContainerEl.scrollHeight,
+                behavior: 'smooth'
+            });
+            scrollUnreadCount = 0;
+            if (scrollUnreadBadge) {
+                scrollUnreadBadge.textContent = '0';
+                scrollUnreadBadge.classList.add('hidden');
+            }
+        });
+    }
+}
+
+// Customer List Right-click & Dropdown Context Menu logic
+window.showCustomerContextMenu = function (event, customerPhone) {
+    event.preventDefault();
+    closeAllContextMenus();
+
+    const menu = document.createElement('div');
+    menu.className = 'whatsapp-context-menu';
+    menu.id = 'whatsapp-customer-context-menu';
+
+    menu.innerHTML = `
+        <div class="context-menu-item" onclick="markCustomerAsUnread('${customerPhone}')">
+            <i class="fas fa-envelope" style="margin-right: 8px;"></i> Mark as unread
+        </div>
+    `;
+
+    document.body.appendChild(menu);
+
+    // Position the menu
+    const menuWidth = 160;
+    const menuHeight = 45;
+    let left = event.pageX;
+    let top = event.pageY;
+
+    if (left + menuWidth > window.innerWidth) {
+        left = window.innerWidth - menuWidth - 10;
+    }
+    if (top + menuHeight > window.innerHeight) {
+        top = window.innerHeight - menuHeight - 10;
+    }
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.display = 'block';
+
+    // Prevent propagation so document listener doesn't immediately close it
+    event.stopPropagation();
+
+    setTimeout(() => {
+        document.addEventListener('click', closeAllContextMenus);
+    }, 10);
+};
+
+window.markCustomerAsUnread = async function (phone) {
+    try {
+        const response = await fetch(`${API_BASE}/customers/${phone}/unread`, {
+            method: 'PUT',
+            headers: AUTH_HEADER
+        });
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        
+        // Update local memory and re-render sidebar view
+        const customer = allCustomers.find(c => c.phone === phone);
+        if (customer) {
+            customer.unread_msg_count = 1;
+            renderSidebarTabs();
+            renderCustomerList();
+        }
+    } catch (err) {
+        console.error('Failed to mark as unread:', err);
+    }
+};

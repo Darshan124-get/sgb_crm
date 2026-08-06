@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 // Protected Internal API Endpoints
 router.get('/customers', authenticateToken, whatsappController.getCustomers);
 router.put('/customers/:phone/read', authenticateToken, whatsappController.markRead);
+router.put('/customers/:phone/unread', authenticateToken, whatsappController.markUnread);
 router.get('/history/:phone', authenticateToken, whatsappController.getHistory);
 router.post('/send', authenticateToken, whatsappController.sendReply);
 router.get('/media/:chatId', authenticateToken, whatsappController.getMedia);

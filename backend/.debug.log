@@ -48,3 +48,862 @@
 [2026-08-03T12:21:11.455Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
 [2026-08-03T12:21:11.458Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
 [2026-08-03T12:21:11.460Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T05:44:08.960Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:44:08.972Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:44:43.911Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:44:43.913Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:44:46.906Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:44:46.908Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:44:47.120Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:44:47.122Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:44:47.304Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:44:47.306Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:44:52.109Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:44:52.111Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:46:21.634Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:46:21.636Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:46:21.646Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:46:21.650Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:47:38.576Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:47:38.577Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:47:41.949Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:47:41.951Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:51:50.283Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:51:50.286Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:51:50.380Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:51:50.381Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:52:04.147Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T05:52:04.153Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T05:52:04.159Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T05:52:04.175Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T05:52:09.153Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T05:52:09.157Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T05:52:09.163Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T05:52:09.166Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T05:52:14.148Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T05:52:14.152Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T05:52:14.157Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T05:52:14.159Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T05:53:31.555Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:53:31.558Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:53:31.623Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:53:31.624Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:53:31.676Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:53:31.677Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:53:31.886Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:53:31.890Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:55:22.574Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T05:55:22.579Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T05:55:22.583Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T05:55:22.584Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T05:56:16.159Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T05:56:16.163Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T05:56:16.166Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T05:56:16.167Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:00:20.942Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:00:20.952Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:00:20.956Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:00:20.959Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:01:22.860Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:01:22.862Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:01:22.892Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:01:22.895Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:15:16.146Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:15:16.149Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:15:16.409Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:15:16.412Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:16:31.991Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:16:31.995Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:16:31.998Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:16:32.000Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:17:19.140Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:17:19.147Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:17:19.155Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:17:19.156Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:18:45.464Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:18:45.471Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:18:45.477Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:18:45.481Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:18:45.747Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:18:45.750Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:18:45.755Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:18:45.759Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:18:48.425Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:18:48.427Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:18:48.432Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:18:48.433Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:19:05.519Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:05.526Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:05.531Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:19:05.535Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:19:05.783Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:05.785Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:05.794Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:19:05.800Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:19:08.447Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:08.450Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:08.454Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:19:08.456Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:19:25.571Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:25.572Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:25.576Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:25.578Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:25.822Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:19:25.824Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:19:25.839Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:25.840Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:28.471Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:19:28.474Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:19:28.478Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:19:28.480Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:19:57.180Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:19:57.184Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:19:57.186Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:19:57.187Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:21:00.588Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:21:00.592Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:21:00.609Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:21:00.612Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:22:16.817Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:22:16.823Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:22:16.826Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:22:16.828Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:23:04.976Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T06:23:04.980Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T06:23:04.983Z] [ERROR] Fetch chat history error: connect ETIMEDOUT
+[2026-08-06T06:23:04.984Z] [ERROR] API Error (getHistory): connect ETIMEDOUT
+[2026-08-06T06:24:36.630Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:24:36.634Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:24:36.805Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:24:36.809Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:24:55.561Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:24:55.566Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:24:59.760Z] [ERROR] API Error (getMedia): read ECONNRESET
+[2026-08-06T06:25:28.564Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:25:28.566Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:25:28.579Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:25:28.580Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:25:28.589Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:28.590Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:28.594Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:28.597Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:28.673Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:25:28.675Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:25:28.704Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:25:28.705Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:25:29.703Z] [ERROR] API Error (getMedia): read ECONNRESET
+[2026-08-06T06:25:29.796Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:25:29.797Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:25:31.012Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:31.016Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:31.123Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:31.124Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:31.126Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:31.127Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.485Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.487Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.489Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.496Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.496Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.497Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.498Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.754Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.761Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.762Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.955Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.960Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:36.963Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.153Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.156Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.157Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.351Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.359Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.362Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.549Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.551Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.553Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.749Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.758Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.759Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.950Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.954Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:37.956Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.154Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.160Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.164Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.363Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.366Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.367Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.563Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.569Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.571Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.759Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.762Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.763Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.953Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.974Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:38.980Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.161Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.167Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.169Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.367Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.377Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.380Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.555Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.558Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.561Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.758Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.774Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.777Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.969Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.977Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:39.979Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.172Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.189Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.191Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.387Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.389Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.393Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.594Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.614Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.616Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.805Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.806Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:40.810Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.003Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.020Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.021Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.149Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.150Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.151Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.152Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.208Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.215Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.341Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.411Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.425Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.534Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.602Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.604Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.747Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.819Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.821Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:41.945Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.018Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.023Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.154Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.228Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.231Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.357Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.421Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.424Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.567Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.630Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.632Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.789Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.832Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.835Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:42.993Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.035Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.039Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.195Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.233Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.237Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.399Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.420Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.422Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.610Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.618Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.620Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.817Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.825Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:43.830Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.030Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.035Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.039Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.240Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.254Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.256Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.447Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.449Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.459Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.662Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.682Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.684Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.930Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.933Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:44.936Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.137Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.154Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.156Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.334Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.338Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.340Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.549Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.561Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.565Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.749Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.751Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.755Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.955Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.965Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:45.970Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.156Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.157Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.162Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.162Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.163Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.165Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.337Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.353Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.365Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.541Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.543Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.546Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.747Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.758Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.764Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.944Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.950Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:46.951Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.140Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.146Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.147Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.344Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.348Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.349Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.543Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.553Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.555Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.728Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.733Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.738Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.917Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.922Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:47.925Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.128Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.136Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.138Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.324Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.335Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.338Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.531Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.532Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.533Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.730Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.737Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.740Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.934Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.938Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:48.939Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.133Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.138Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.141Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.341Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.349Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.351Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.539Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.547Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.548Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.744Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.745Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.748Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.933Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.939Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:49.941Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.133Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.135Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.136Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.335Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.339Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.343Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.525Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.526Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.529Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.715Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.721Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.723Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.908Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.909Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:50.914Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.095Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.103Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.104Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.125Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.126Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.128Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.128Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.350Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.356Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.371Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.549Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.552Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.556Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.739Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.742Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.743Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.924Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.928Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:51.930Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.111Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.115Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.116Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.299Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.306Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.310Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.491Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.496Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.498Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.661Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.668Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.670Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.853Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.857Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:52.860Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.042Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.048Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.050Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.246Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.248Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.249Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.447Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.453Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.455Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.705Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.707Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.708Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.903Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.912Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:53.914Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.103Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.105Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.106Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.305Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.310Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.314Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.508Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.513Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.514Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.712Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.718Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.719Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.917Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.923Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:54.925Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.103Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.112Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.113Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.291Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.296Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.298Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.481Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.499Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.502Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.681Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.687Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.690Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.867Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.873Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:55.876Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.072Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.077Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.079Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.138Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.138Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.140Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.140Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.260Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.267Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.335Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.463Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.466Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.510Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.665Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.673Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.694Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.868Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.874Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:56.875Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.076Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.078Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.079Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.275Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.279Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.281Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.471Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.477Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.480Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.675Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.676Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.680Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.878Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.883Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:57.887Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.106Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.110Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.111Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.303Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.308Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.310Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.511Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.515Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.517Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.711Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.716Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.718Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.913Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.918Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:58.922Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.116Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.120Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.124Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.322Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.324Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.326Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.523Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.529Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.548Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.712Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.715Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.718Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.901Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.906Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:25:59.909Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.106Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.110Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.111Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.305Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.311Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.312Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.493Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.498Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.499Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.682Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.689Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.692Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.871Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.874Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:00.876Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.072Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.079Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.081Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.136Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.136Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.137Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.138Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.275Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.280Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.334Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.464Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.470Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.521Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.664Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.668Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.709Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.857Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.860Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:01.896Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.057Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.058Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.067Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.267Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.268Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.271Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.463Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.466Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.468Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.666Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.674Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.678Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.868Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.873Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:02.874Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.070Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.078Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.080Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.275Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.278Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.279Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.477Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.485Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.494Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.680Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.683Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.684Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.879Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.885Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:03.888Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.081Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.087Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.089Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.283Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.289Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.294Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.474Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.475Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:04.479Z] [ERROR] API Error (getMedia): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T06:26:23.883Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:26:23.892Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:26:23.898Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:26:23.900Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:26:23.904Z] [ERROR] API Error (getMedia): read ECONNRESET
+[2026-08-06T06:27:11.427Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:27:11.429Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T06:27:11.557Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:27:11.558Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:27:37.098Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T06:27:37.106Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T06:27:37.116Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T06:27:37.124Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:07:02.836Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:02.838Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:02.843Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:02.849Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:56.137Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:56.139Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:56.141Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:07:56.141Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.344Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.346Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.349Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.350Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.621Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.623Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.632Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:42.635Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:47.622Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:47.625Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:47.629Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:47.630Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:52.639Z] [ERROR] Error fetching quick replies: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:52.644Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:52.647Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:57.112Z] [ERROR] Error fetching quick replies: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:57.138Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:08:57.142Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:02.108Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:02.110Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:07.124Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:07.126Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:12.123Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:12.126Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:17.116Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:17.122Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:22.112Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:22.114Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:27.113Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:27.115Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:32.108Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:32.111Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:37.130Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:37.134Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:42.105Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:42.106Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:47.108Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:47.111Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:52.104Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:52.106Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:57.106Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:09:57.108Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:07.008Z] [ERROR] Error fetching quick replies: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:07.036Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:07.037Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:12.025Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:12.027Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:17.037Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:17.039Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:22.026Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:22.030Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:27.031Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:27.032Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:32.039Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:32.041Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:37.125Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:37.126Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:42.123Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:42.126Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:57.932Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:11:57.934Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:02.140Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:02.141Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:07.141Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:07.143Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:12.143Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:12.144Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:17.134Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:17.136Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:22.138Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:22.139Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:27.126Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:27.127Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:32.133Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:32.134Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:56.137Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:12:56.138Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:21:03.786Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:21:03.792Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:21:03.795Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T07:21:03.799Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T07:22:37.514Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:22:37.519Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:22:44.165Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T07:22:44.166Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T07:22:44.341Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T07:22:44.342Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T07:23:07.439Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:23:07.445Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:23:07.548Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:23:07.549Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:23:07.552Z] [ERROR] Error fetching quick replies: read ECONNRESET
+[2026-08-06T07:23:07.556Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:23:07.557Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:23:19.586Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:19.592Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:19.597Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:19.603Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.623Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.629Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.634Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.638Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.641Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.643Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.653Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.657Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.665Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.669Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.676Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.676Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.687Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:31.689Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:33.133Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:33.137Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:50.144Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:23:50.149Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T07:24:16.149Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T07:24:16.155Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T07:25:00.222Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:00.224Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:00.238Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:00.243Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:00.247Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:00.251Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:00.257Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:00.260Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:12.927Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:12.928Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:20.831Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:20.837Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:20.840Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:20.842Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:28.549Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:28.555Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:54.944Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:54.947Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:58.996Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:58.998Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:25:59.567Z] [ERROR] Error fetching quick replies: read ECONNRESET
+[2026-08-06T07:25:59.574Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:25:59.578Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:04.540Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:04.542Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:20.055Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:20.061Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:20.109Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:20.111Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:20.118Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:20.119Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:23.774Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:23.775Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:29.740Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:29.741Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:34.894Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:34.899Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:40.438Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:40.439Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:45.405Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:45.407Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:49.535Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:49.540Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:26:54.679Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:26:54.684Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:27:06.556Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:27:06.562Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:27:06.571Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:27:06.574Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:27:10.837Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:27:10.839Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:27:24.295Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:27:24.301Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:27:30.579Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:27:30.583Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:27:32.391Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:27:32.397Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:28:27.531Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:28:27.532Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:29:17.072Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:29:17.077Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:55:24.965Z] [ERROR] Error fetching quick replies: connect ETIMEDOUT
+[2026-08-06T07:55:24.975Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T07:55:24.976Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T07:55:30.142Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T07:55:30.147Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T07:55:35.133Z] [ERROR] Fetch all chat customers error: connect ETIMEDOUT
+[2026-08-06T07:55:35.139Z] [ERROR] API Error (getCustomers): connect ETIMEDOUT
+[2026-08-06T07:56:28.014Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:56:28.018Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:56:28.022Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:56:28.026Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:56:28.031Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:56:28.035Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:56:28.037Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:56:28.038Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:56:28.041Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:56:28.044Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:56:28.047Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:56:28.049Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T07:57:58.040Z] [ERROR] Fetch chat history error: read ECONNRESET
+[2026-08-06T07:57:58.047Z] [ERROR] API Error (getHistory): read ECONNRESET
+[2026-08-06T07:57:59.876Z] [ERROR] Fetch all chat customers error: read ECONNRESET
+[2026-08-06T07:57:59.879Z] [ERROR] API Error (getCustomers): read ECONNRESET
+[2026-08-06T08:13:56.140Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:13:56.141Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:13:56.150Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:13:56.151Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:06.570Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:06.573Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:06.599Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:06.603Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:06.642Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:06.643Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:12.567Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:12.616Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:12.645Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:12.660Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:13.005Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:13.037Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:13.134Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:13.189Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:17.942Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:17.943Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:17.944Z] [ERROR] Fetch chat history error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:17.948Z] [ERROR] API Error (getHistory): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:21.205Z] [ERROR] Error fetching quick replies: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:21.315Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:21.328Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:23.716Z] [ERROR] Error fetching quick replies: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:23.751Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:23.759Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:29.124Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:29.125Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:34.134Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:34.136Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:39.127Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:39.129Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:45.812Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:45.815Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:49.125Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:49.126Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:54.130Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:54.132Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:59.121Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-06T08:39:59.122Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io

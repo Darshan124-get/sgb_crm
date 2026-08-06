@@ -60,8 +60,14 @@ exports.getLeads = async (req, res) => {
         if (is_today === 'true') {
             query += ' AND DATE(l.created_at) = CURDATE()';
         } else if (req.query.date) {
-            query += ' AND DATE(l.created_at) = ?';
-            params.push(req.query.date);
+            if (req.query.date.includes(' to ')) {
+                const [start, end] = req.query.date.split(' to ');
+                query += ' AND DATE(l.created_at) >= ? AND DATE(l.created_at) <= ?';
+                params.push(start, end);
+            } else {
+                query += ' AND DATE(l.created_at) = ?';
+                params.push(req.query.date);
+            }
         }
 
         if (req.query.is_open === 'true') {
@@ -206,18 +212,18 @@ exports.createLead = async (req, res) => {
             `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                phone_number, 
-                customer_name || null, 
-                first_message || null, 
-                language || 'EN', 
-                finalAddress, 
-                city || null, 
-                state || null, 
-                district || null, 
-                pincode || null, 
-                source || 'manual', 
-                status, 
-                assignedTo, 
+                phone_number,
+                customer_name || null,
+                first_message || null,
+                language || 'EN',
+                finalAddress,
+                city || null,
+                state || null,
+                district || null,
+                pincode || null,
+                source || 'manual',
+                status,
+                assignedTo,
                 delivery_type || null
             ]
         );
@@ -268,7 +274,7 @@ exports.updateLead = async (req, res) => {
         const finalState = state !== undefined ? state : currentLead.state;
         const finalDistrict = district !== undefined ? district : currentLead.district;
         const finalPincode = pincode !== undefined ? pincode : currentLead.pincode;
-        
+
         const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
         const finalAddress = address !== undefined ? address : combinedAddress;
 
@@ -280,24 +286,24 @@ exports.updateLead = async (req, res) => {
                 current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
             WHERE lead_id = ?`,
             [
-                phone_number || currentLead.phone_number, 
-                customer_name || currentLead.customer_name, 
-                first_message || currentLead.first_message, 
+                phone_number || currentLead.phone_number,
+                customer_name || currentLead.customer_name,
+                first_message || currentLead.first_message,
                 language || currentLead.language,
-                finalAddress, 
-                finalCity, 
-                finalState, 
-                finalDistrict, 
-                finalPincode, 
-                finalStatus, 
+                finalAddress,
+                finalCity,
+                finalState,
+                finalDistrict,
+                finalPincode,
+                finalStatus,
                 finalAssignedTo,
-                score || currentLead.score || 'cold', 
-                next_followup_date || currentLead.next_followup_date, 
-                lost_reason || currentLead.lost_reason, 
+                score || currentLead.score || 'cold',
+                next_followup_date || currentLead.next_followup_date,
+                lost_reason || currentLead.lost_reason,
                 lost_notes || currentLead.lost_notes,
-                current_crop || currentLead.current_crop, 
-                acreage || currentLead.acreage, 
-                delivery_type || currentLead.delivery_type, 
+                current_crop || currentLead.current_crop,
+                acreage || currentLead.acreage,
+                delivery_type || currentLead.delivery_type,
                 call_count !== undefined ? call_count : currentLead.call_count,
                 req.params.id
             ]
@@ -342,7 +348,7 @@ exports.assignLead = async (req, res) => {
             const notificationService = require('../services/notification.service');
             const [leadRows] = await pool.query('SELECT customer_name, phone_number FROM leads WHERE lead_id = ?', [req.params.id]);
             const leadName = leadRows[0]?.customer_name || leadRows[0]?.phone_number || 'New Lead';
-            
+
             await notificationService.sendToUser(
                 assigned_to,
                 'New Lead Assigned',
@@ -410,7 +416,7 @@ exports.transferLead = async (req, res) => {
                 return res.status(404).json({ message: 'Target sales person not found or inactive' });
             }
             targetUser = userRows[0];
-        } 
+        }
         // 2. Otherwise, find the best target Sales staff for the new language (Round Robin)
         else if (target_language) {
             const [salesStaff] = await connection.query(
@@ -458,7 +464,7 @@ exports.transferLead = async (req, res) => {
             const notificationService = require('../services/notification.service');
             const [leadRows] = await pool.query('SELECT customer_name, phone_number FROM leads WHERE lead_id = ?', [leadId]);
             const leadName = leadRows[0]?.customer_name || leadRows[0]?.phone_number || 'New Lead';
-            
+
             await notificationService.sendToUser(
                 targetUser.user_id,
                 'Lead Transferred to You',
@@ -606,7 +612,7 @@ exports.autoAssign = async (req, res) => {
                 // Note
                 await connection.query('INSERT INTO lead_notes (lead_id, note) VALUES (?, ?)',
                     [leadId, `System: Lead auto-assigned to ${staff.name} based on ${lang} language.`]);
-                
+
                 if (!assignedMap[staff.user_id]) {
                     assignedMap[staff.user_id] = { name: staff.name, count: 0 };
                 }

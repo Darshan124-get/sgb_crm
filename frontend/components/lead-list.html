@@ -339,9 +339,16 @@
                 <option value="cold">COLD</option>
             </select>
         </div>
+        <div class="filter-group" id="staffFilterGroup">
+            <span class="filter-label"><i class="fa-solid fa-user-tie"></i> STAFF</span>
+            <select id="leadStaffFilter" class="date-input">
+                <option value="all">All Staff</option>
+                <option value="unassigned">Unassigned</option>
+            </select>
+        </div>
         <div class="filter-group">
             <span class="filter-label"><i class="fa-solid fa-calendar-days"></i> DATE</span>
-            <input type="date" id="leadDateFilter" class="date-input">
+            <input type="text" id="leadDateFilter" class="date-input" placeholder="Select date range..." style="min-width: 190px;">
             <button id="btnFilterAll" class="btn-filter-secondary">ALL</button>
         </div>
         <button id="btnExportExcel" class="btn-filter-secondary" style="background: #10b981; color: white; border-color: #10b981; display: flex; align-items: center; gap: 0.5rem;" onclick="exportLeadsToExcel()">

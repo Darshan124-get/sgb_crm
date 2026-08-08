@@ -2304,12 +2304,12 @@ function filterAndShowPopover(searchTerm) {
         const item = document.createElement('div');
         item.style.padding = '12px 20px';
         item.style.cursor = 'pointer';
-        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-        item.onmouseover = () => item.style.backgroundColor = '#2a3942';
+        item.style.borderBottom = '1px solid var(--whatsapp-border)';
+        item.onmouseover = () => item.style.backgroundColor = 'var(--whatsapp-border)';
         item.onmouseout = () => item.style.backgroundColor = 'transparent';
         item.innerHTML = `
-            <div style="font-weight: 600; color: #e9edef; font-size: 0.95rem;">/${qr.shortcut}</div>
-            <div style="color: #8696a0; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;">
+            <div style="font-weight: 600; color: var(--whatsapp-text); font-size: 0.95rem;">/${qr.shortcut}</div>
+            <div style="color: var(--whatsapp-secondary); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;">
                 ${qr.media_url && qr.media_url !== '[]' ? '<i class="fas fa-paperclip" style="margin-right: 5px;"></i>' : ''}${qr.message || 'Media Reply'}
             </div>
         `;

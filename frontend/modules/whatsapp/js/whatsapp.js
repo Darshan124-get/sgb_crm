@@ -59,40 +59,9 @@ async function preloadAllChatHistories(customers) {
     const loadingBar = document.getElementById('whatsapp-loading-bar');
     const loadingText = document.getElementById('whatsapp-loading-text');
 
-    // Filter customers who have actual message history (since we don't need to fetch empty history)
-    const activeChats = customers.filter(c => c.last_message_at);
-    
-    if (activeChats.length === 0) {
-        if (loadingBar) loadingBar.style.width = '100%';
-        if (loadingText) loadingText.innerText = 'Initializing...';
-        setTimeout(fadeOutLoadingScreen, 300);
-        return;
-    }
-
-    if (loadingText) loadingText.innerText = `Loading chats (0/${activeChats.length})...`;
-
-    let loadedCount = 0;
-    const CHUNK_SIZE = 5; // Fetch in chunks of 5 to avoid database congestion
-    
-    for (let i = 0; i < activeChats.length; i += CHUNK_SIZE) {
-        const chunk = activeChats.slice(i, i + CHUNK_SIZE);
-        
-        await Promise.all(chunk.map(async (customer) => {
-            await loadChatHistoryInBackground(customer.phone);
-            loadedCount++;
-            const percent = Math.min(Math.round((loadedCount / activeChats.length) * 100), 100);
-            if (loadingBar) loadingBar.style.width = `${percent}%`;
-            if (loadingText) loadingText.innerText = `Loading chats (${loadedCount}/${activeChats.length})...`;
-        }));
-        
-        // Brief delay between chunks to let connections finish cleanly
-        if (i + CHUNK_SIZE < activeChats.length) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
-    }
-
+    if (loadingBar) loadingBar.style.width = '100%';
     if (loadingText) loadingText.innerText = 'Ready!';
-    setTimeout(fadeOutLoadingScreen, 400);
+    setTimeout(fadeOutLoadingScreen, 200);
 }
 
 function fadeOutLoadingScreen() {
@@ -227,15 +196,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Refresh customer list every 5 seconds
-    setInterval(loadCustomers, 5000);
-
-    // Polling for new messages in active chat
+    // Refresh customer list every 10 seconds if page is visible
     setInterval(() => {
-        if (activeCustomer) {
+        if (!document.hidden) {
+            loadCustomers();
+        }
+    }, 10000);
+
+    // Polling for new messages in active chat every 10 seconds if page is visible
+    setInterval(() => {
+        if (!document.hidden && activeCustomer) {
             loadChatHistory(activeCustomer.phone, true);
         }
-    }, 5000);
+    }, 10000);
 
     // Search Filtering
     if (searchInputEl) {
@@ -1951,10 +1924,34 @@ async function handleSend() {
     }
 }
 
-// Media Selection Handler
 function handleMediaSelect(e) {
     const file = e.target.files[0];
     if (!file || !activeCustomer) return;
+
+    // Enforce Meta file size limits
+    const fileSizeMB = file.size / (1024 * 1024);
+    let maxLimit = 16; // default 16MB for audio/video
+    let typeLabel = 'File';
+    
+    if (file.type.startsWith('image/')) {
+        maxLimit = 5;
+        typeLabel = 'Image';
+    } else if (file.type.startsWith('audio/')) {
+        maxLimit = 16;
+        typeLabel = 'Audio';
+    } else if (file.type.startsWith('video/')) {
+        maxLimit = 16;
+        typeLabel = 'Video';
+    } else {
+        maxLimit = 100; // documents
+        typeLabel = 'Document';
+    }
+
+    if (fileSizeMB > maxLimit) {
+        window.showAlert('Error', `${typeLabel} is too large. Max limit is ${maxLimit}MB.`, 'error');
+        e.target.value = '';
+        return;
+    }
 
     selectedFile = file;
 
@@ -2402,6 +2399,35 @@ if (qrEditMedia) {
     qrEditMedia.onchange = (e) => {
         const files = Array.from(e.target.files);
         if (files.length > 0) {
+            // Check file sizes against Meta limitations
+            for (const file of files) {
+                const fileSizeMB = file.size / (1024 * 1024);
+                let maxLimit = 16;
+                let typeLabel = 'File';
+                
+                if (file.type.startsWith('image/')) {
+                    maxLimit = 5;
+                    typeLabel = 'Image';
+                } else if (file.type.startsWith('audio/')) {
+                    maxLimit = 16;
+                    typeLabel = 'Audio';
+                } else if (file.type.startsWith('video/')) {
+                    maxLimit = 16;
+                    typeLabel = 'Video';
+                } else {
+                    maxLimit = 100;
+                    typeLabel = 'Document';
+                }
+
+                if (fileSizeMB > maxLimit) {
+                    window.showAlert('Error', `"${file.name}" (${typeLabel}) is too large. Max limit is ${maxLimit}MB.`, 'error');
+                    qrEditMedia.value = '';
+                    qrSelectedFiles = [];
+                    qrEditMediaName.innerText = '';
+                    qrEditMediaRemove.classList.add('hidden');
+                    return;
+                }
+            }
             qrSelectedFiles = files;
             qrEditMediaName.innerText = files.map(f => f.name).join(', ');
             qrEditMediaRemove.classList.remove('hidden');

@@ -716,6 +716,7 @@ async function initLeadList(filters = {}, page = 1) {
             const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const time = _dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
             const nameInitial = lead.customer_name ? lead.customer_name.charAt(0).toUpperCase() : '?';
+            const isChecked = window.currentSelectedLeadIds && window.currentSelectedLeadIds.includes(lead.lead_id) ? 'checked' : '';
 
             const callTag = lead.call_count >= 3 ? '<span class="call-tag tag-3">3rd Call</span>' :
                 (lead.call_count === 2 ? '<span class="call-tag tag-2">2nd Call</span>' :
@@ -745,7 +746,7 @@ async function initLeadList(filters = {}, page = 1) {
 
             return `
             <tr id="lead-row-${lead.lead_id}" onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
-                <td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
+                <td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" ${isChecked} onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
                 <td>
                     <div class="name-cell">
                         <div class="name-initial">${nameInitial}</div>
@@ -791,7 +792,8 @@ async function initLeadList(filters = {}, page = 1) {
         // Bind Select All
         const selectAll = document.getElementById('selectAllLeads');
         if (selectAll) {
-            selectAll.checked = false;
+            const allChecked = leads.length > 0 && leads.every(lead => window.currentSelectedLeadIds && window.currentSelectedLeadIds.includes(lead.lead_id));
+            selectAll.checked = allChecked;
             selectAll.onclick = (e) => selectAllLeadsToggle(e.target);
         }
         updateBulkActionsBar();

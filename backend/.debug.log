@@ -907,3 +907,9 @@
 [2026-08-06T08:39:54.132Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
 [2026-08-06T08:39:59.121Z] [ERROR] Fetch all chat customers error: getaddrinfo ENOTFOUND auth-db1666.hstgr.io
 [2026-08-06T08:39:59.122Z] [ERROR] API Error (getCustomers): getaddrinfo ENOTFOUND auth-db1666.hstgr.io
+[2026-08-09T11:08:01.289Z] [INFO] Text message sent to 918867724616: 200 
+[2026-08-09T11:08:01.305Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"918867724616","wa_id":"918867724616"}],"messages":[{"id":"wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSNDIxNzUzRkEzMEYyQjc5QkY0AA=="}]}
+[2026-08-09T11:08:01.327Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSNDIxNzUzRkEzMEYyQjc5QkY0AA==
+[2026-08-09T11:09:41.843Z] [INFO] Text message sent to 918867724616: 200 
+[2026-08-09T11:09:41.855Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"918867724616","wa_id":"918867724616"}],"messages":[{"id":"wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSQjBCQ0U3QTc1QjMyREI2QjhEAA=="}]}
+[2026-08-09T11:09:41.867Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSQjBCQ0U3QTc1QjMyREI2QjhEAA==

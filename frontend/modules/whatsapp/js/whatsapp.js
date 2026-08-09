@@ -746,6 +746,17 @@ function renderCustomerList() {
         item.dataset.phone = customer.phone;
 
         const lastMsg = customer.last_message || '';
+        let tickHtml = '';
+        if (customer.last_message_sender_type === 'admin') {
+            const status = (customer.last_message_status || 'sent').toLowerCase();
+            if (status === 'read') {
+                tickHtml = `<i class="fa-solid fa-check-double" style="color: #53bdeb; font-size: 0.85rem; margin-right: 4px;" title="Read"></i>`;
+            } else if (status === 'delivered') {
+                tickHtml = `<i class="fa-solid fa-check-double" style="color: #94a3b8; font-size: 0.85rem; margin-right: 4px;" title="Delivered"></i>`;
+            } else {
+                tickHtml = `<i class="fa-solid fa-check" style="color: #94a3b8; font-size: 0.85rem; margin-right: 4px;" title="Sent"></i>`;
+            }
+        }
         const scoreClass = (customer.score || 'cold').toLowerCase();
         const scoreLabel = customer.score ? customer.score.toUpperCase() : '';
 
@@ -782,7 +793,7 @@ function renderCustomerList() {
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                    <p class="last-message-snippet" style="flex: 1; min-width: 0;">${lastMsg || customer.phone}</p>
+                    <p class="last-message-snippet" style="flex: 1; min-width: 0;">${tickHtml}${lastMsg || customer.phone}</p>
                     ${hasUnread ? `<span class="unread-badge" style="background-color: var(--whatsapp-green); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">${customer.unread_msg_count}</span>` : ''}
                 </div>
                 <div class="customer-meta-footer">
@@ -837,9 +848,15 @@ async function selectCustomer(customer) {
     // UI Transitions
     chatWelcomeEl.classList.add('hidden');
     chatWindowEl.classList.remove('hidden');
-    detailsSidebarEl.classList.remove('hidden');
+    
     const resizerRight = document.getElementById('resizer-right');
-    if (resizerRight) resizerRight.classList.remove('hidden');
+    if (window._detailsCollapsed) {
+        detailsSidebarEl.classList.add('hidden');
+        if (resizerRight) resizerRight.classList.add('hidden');
+    } else {
+        detailsSidebarEl.classList.remove('hidden');
+        if (resizerRight) resizerRight.classList.remove('hidden');
+    }
     appContainerEl.classList.add('show-chat');
 
     // Reset edit state
@@ -2779,5 +2796,37 @@ window.markCustomerAsUnread = async function (phone) {
         }
     } catch (err) {
         console.error('Failed to mark as unread:', err);
+    }
+};
+
+// Sidebar Toggle States & Handlers
+window._sidebarLeftCollapsed = false;
+window._detailsCollapsed = true;
+
+window.toggleLeftSidebar = function () {
+    const sidebarLeft = document.querySelector('.chat-sidebar');
+    const resizerLeft = document.getElementById('resizer-left');
+    
+    if (sidebarLeft) {
+        const isCollapsed = sidebarLeft.classList.toggle('hidden');
+        if (resizerLeft) {
+            if (isCollapsed) resizerLeft.classList.add('hidden');
+            else resizerLeft.classList.remove('hidden');
+        }
+        window._sidebarLeftCollapsed = isCollapsed;
+    }
+};
+
+window.toggleRightSidebar = function () {
+    const sidebarRight = document.getElementById('details-sidebar');
+    const resizerRight = document.getElementById('resizer-right');
+    
+    if (sidebarRight) {
+        const isCollapsed = sidebarRight.classList.toggle('hidden');
+        if (resizerRight) {
+            if (isCollapsed) resizerRight.classList.add('hidden');
+            else resizerRight.classList.remove('hidden');
+        }
+        window._detailsCollapsed = isCollapsed;
     }
 };

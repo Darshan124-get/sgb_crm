@@ -1,12 +1,18 @@
 const pool = require('../config/db');
 
 exports.getLeads = async (req, res) => {
-    const { status, language, assigned_to, is_today, is_unassigned, source, search } = req.query;
+    const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
     try {
-        let query = 'SELECT l.*, u.name as assigned_to_name FROM leads l LEFT JOIN users u ON l.assigned_to = u.user_id WHERE 1=1';
+        let query = `
+            SELECT l.*, u.name as assigned_to_name, c.campaign_id as campaign_id_code 
+            FROM leads l 
+            LEFT JOIN users u ON l.assigned_to = u.user_id 
+            LEFT JOIN campaigns c ON TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', ''))
+            WHERE 1=1
+        `;
         let params = [];
 
         // 🛡️ SECURITY: Role-Based Data Isolation
@@ -50,6 +56,14 @@ exports.getLeads = async (req, res) => {
             params.push(source);
         }
 
+        if (req.query.campaign_id && req.query.campaign_id !== 'all') {
+            const [[campaign]] = await pool.query('SELECT tag_line FROM campaigns WHERE id = ? OR campaign_id = ?', [req.query.campaign_id, req.query.campaign_id]);
+            if (campaign) {
+                query += ' AND TRIM(REPLACE(REPLACE(l.first_message, \'\\n\', \'\'), \'\\r\', \'\')) = TRIM(REPLACE(REPLACE(?, \'\\n\', \'\'), \'\\r\', \'\'))';
+                params.push(campaign.tag_line);
+            }
+        }
+
         if (search) {
             query += ' AND (l.customer_name LIKE ? OR l.phone_number LIKE ? OR l.first_message LIKE ?)';
             const escapedSearch = search.replace(/[%_]/g, '\\$&');
@@ -74,9 +88,41 @@ exports.getLeads = async (req, res) => {
             query += " AND (l.status IS NULL OR l.status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))";
         }
 
+        // Count total matching leads (for pagination metadata)
+        const countQuery = 'SELECT COUNT(*) as total ' + query.substring(query.indexOf('FROM leads l'));
+        const [countResult] = await pool.query(countQuery, params);
+        const totalLeads = countResult[0].total;
+
+        // Apply Order
         query += ' ORDER BY l.created_at DESC';
+
+        // Check if client requested full export or non-paginated access
+        if (limit === 'all') {
+            const [rows] = await pool.query(query, params);
+            return res.json({
+                leads: rows || [],
+                totalLeads,
+                totalPages: 1,
+                currentPage: 1,
+                limit: 'all'
+            });
+        }
+
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 100;
+        const offset = (pageNum - 1) * limitNum;
+
+        // Concatenate limit and offset directly to avoid mysql2 query parsing quirks with LIMIT params
+        query += ` LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}`;
+
         const [rows] = await pool.query(query, params);
-        res.json(rows || []);
+        res.json({
+            leads: rows || [],
+            totalLeads,
+            totalPages: Math.ceil(totalLeads / limitNum),
+            currentPage: pageNum,
+            limit: limitNum
+        });
     } catch (err) {
         console.error('getLeads Error:', err);
         res.status(500).json({ message: 'Database error: ' + err.message });
@@ -197,12 +243,17 @@ exports.createLead = async (req, res) => {
         let assignedTo = null;
         let status = 'new';
 
-        if (salesStaff.length > 0) {
-            assignedTo = salesStaff[0].user_id;
-            status = 'assigned';
+        const creatorRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : '';
+        const isTelecallerOrSales = creatorRole === 'sales' || creatorRole.includes('telecaller') || creatorRole.includes('executive');
 
-            // Touch staff to ensure fair round-robin distribution
-            await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [assignedTo]);
+        if (isTelecallerOrSales && req.user && req.user.id) {
+            // Telecom Panel / Sales Agent: Assign directly to themselves
+            assignedTo = req.user.id;
+            status = 'assigned';
+        } else {
+            // Sales Manager Panel and Admin Panel: Leave as Unassigned
+            assignedTo = null;
+            status = 'new';
         }
 
         const combinedAddress = [city, district, state, pincode].filter(Boolean).join(', ');
@@ -561,6 +612,38 @@ exports.bulkAssign = async (req, res) => {
     } catch (err) {
         try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('bulkAssign Error:', err);
+        res.status(500).json({ message: 'Database error' });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+exports.bulkUnassign = async (req, res) => {
+    const { leadIds } = req.body;
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+        return res.status(400).json({ message: 'Missing or invalid leadIds' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Bulk Update Leads table (set assigned_to = NULL and status = 'new' if status is 'assigned')
+        const [result] = await connection.query(
+            'UPDATE leads SET assigned_to = NULL, status = CASE WHEN status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
+            [leadIds]
+        );
+
+        // 2. Add System Note to each lead
+        const noteValues = leadIds.map(id => [id, req.user.id, `System: Lead manually unassigned.`]);
+        await connection.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES ?', [noteValues]);
+
+        await connection.commit();
+
+        res.json({ message: 'Bulk unassignment complete', count: result.affectedRows });
+    } catch (err) {
+        try { if (connection) await connection.rollback(); } catch (re) { }
+        console.error('bulkUnassign Error:', err);
         res.status(500).json({ message: 'Database error' });
     } finally {
         if (connection) connection.release();

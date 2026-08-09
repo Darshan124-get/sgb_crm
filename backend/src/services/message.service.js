@@ -276,7 +276,23 @@ const getAllChatCustomers = async (user = null) => {
          WHERE cs.lead_id = l.lead_id
          ORDER BY cm.timestamp DESC, cm.chat_id DESC 
          LIMIT 1
-       ) as last_message
+       ) as last_message,
+       (
+         SELECT cm.sender_type 
+         FROM chat_messages cm
+         JOIN chat_sessions cs ON cm.session_id = cs.session_id
+         WHERE cs.lead_id = l.lead_id
+         ORDER BY cm.timestamp DESC, cm.chat_id DESC 
+         LIMIT 1
+       ) as last_message_sender_type,
+       (
+         SELECT cm.status 
+         FROM chat_messages cm
+         JOIN chat_sessions cs ON cm.session_id = cs.session_id
+         WHERE cs.lead_id = l.lead_id
+         ORDER BY cm.timestamp DESC, cm.chat_id DESC 
+         LIMIT 1
+       ) as last_message_status
        FROM leads l
        LEFT JOIN users u ON l.assigned_to = u.user_id
        LEFT JOIN (

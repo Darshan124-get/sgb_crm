@@ -6,6 +6,7 @@ const { authenticateToken, isAdminOrSales } = require('../middleware/auth.middle
 router.get('/', authenticateToken, leadController.getLeads);
 router.get('/stats', authenticateToken, leadController.getStats);
 router.post('/bulk-assign', authenticateToken, leadController.bulkAssign);
+router.post('/bulk-unassign', authenticateToken, leadController.bulkUnassign);
 router.post('/auto-assign', authenticateToken, leadController.autoAssign);
 
 router.get('/:id', authenticateToken, leadController.getLeadById);

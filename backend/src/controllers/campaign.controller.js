@@ -71,7 +71,23 @@ exports.createCampaign = async (req, res) => {
 
 exports.getCampaigns = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM campaigns ORDER BY created_at DESC');
+        const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
+        const userId = req.user ? req.user.id : null;
+
+        let rows;
+        if (userRole.includes('admin') || userRole.includes('manager') || userRole.includes('whatsapp')) {
+            // Admins and Managers see all campaigns
+            [rows] = await db.query('SELECT * FROM campaigns ORDER BY created_at DESC');
+        } else {
+            // Telecallers only see campaigns having leads assigned to them
+            [rows] = await db.query(`
+                SELECT DISTINCT c.*
+                FROM campaigns c
+                JOIN leads l ON TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', ''))
+                WHERE l.assigned_to = ?
+                ORDER BY c.created_at DESC
+            `, [userId]);
+        }
         res.json(rows);
     } catch (err) {
         console.error('Error fetching campaigns:', err);
@@ -135,3 +151,5 @@ exports.deleteCampaign = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+
+

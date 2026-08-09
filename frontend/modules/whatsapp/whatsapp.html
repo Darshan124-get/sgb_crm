@@ -176,6 +176,9 @@
                 <header class="chat-header">
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <button id="mobile-back-btn" class="mobile-only-btn" style="background: none; border: none; color: #8696a0; font-size: 1.2rem; display: none;"><i class="fas fa-arrow-left"></i></button>
+                        <button type="button" id="toggle-left-sidebar" onclick="window.toggleLeftSidebar()" style="background: none; border: none; color: #8696a0; font-size: 1.25rem; cursor: pointer; display: flex; align-items: center; padding: 0 5px; transition: opacity 0.2s; outline: none;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" title="Toggle Conversations List">
+                            <i class="fas fa-bars"></i>
+                        </button>
                         <div id="active-avatar" class="avatar" style="width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: #666;">?</div>
                         <div class="customer-info">
                             <h2 id="active-customer-name">Loading...</h2>
@@ -183,6 +186,9 @@
                         </div>
                     </div>
                     <div class="header-actions">
+                        <button type="button" id="toggle-right-sidebar" onclick="window.toggleRightSidebar()" class="action-link-btn" title="Toggle Details Panel" style="margin-right: 10px;">
+                            <i class="fas fa-info-circle"></i> Details
+                        </button>
                         <button id="transfer-btn" class="action-link-btn">
                             <i class="fas fa-exchange-alt"></i> Transfer
                         </button>

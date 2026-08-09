@@ -15,6 +15,10 @@
 
             <!-- Header Action Buttons -->
             <div style="display: flex; gap: 0.75rem;">
+                <button onclick="window.goBackToLeadsList()" class="login-btn btn-outline"
+                    style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; background: white; border: 1px solid #cbd5e1; color: #475569; border-radius: 0.375rem;">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
                 <a id="whatsappBtn" href="#" target="_blank" class="login-btn btn-whatsapp"
                     style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-size: 0.875rem;">
                     <i class="fab fa-whatsapp"></i> WhatsApp
@@ -228,7 +232,7 @@
                         <p style="font-size: 0.75rem; color: #60a5fa; margin: 0;">Current Owner</p>
                     </div>
                 </div>
-                <button onclick="changeAssigneeFromDetails()" class="login-btn btn-outline"
+                <button id="changeAssigneeBtn" onclick="changeAssigneeFromDetails()" class="login-btn btn-outline"
                     style="width: 100%; font-size: 0.875rem; margin-bottom: 0.5rem;">
                     Change Assignee
                 </button>
@@ -665,7 +669,7 @@
 
         </div>
     </div>
-</div> <button onclick="dePrevStep(3)" class="login-btn btn-outline"
+</div> <button onclick="window.goBackToLeadsList()" class="login-btn btn-outline"
     style="width:auto; padding: 0.75rem 1.5rem; border-radius:0.75rem;"><i class="fas fa-arrow-left mr-2"></i>
     Back</button>
 <button onclick="submitDecisionEngine()" id="de-submit-btn" class="login-btn"

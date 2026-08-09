@@ -3,10 +3,31 @@
 // Loaded on every protected page. Must come AFTER config.js.
 // ============================================================
 
+window.copyToClipboard = function (text) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        window.showAlert("Copied", "Phone number copied to clipboard!", "success");
+    }).catch(err => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            window.showAlert("Copied", "Phone number copied to clipboard!", "success");
+        } catch (copyErr) {
+            console.error('Fallback copy failed:', copyErr);
+        }
+        document.body.removeChild(textArea);
+    });
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
     const user = window.getCurrentUser();
     const role = (user.role || '').toLowerCase();
-    
+
     const sidebarContainer = document.getElementById('sidebar-container');
 
     // ── Sidebar Injection & PBAC Dynamic Rendering ──
@@ -14,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let userPermissions = [];
         try {
             userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []);
-        } catch(e) {
+        } catch (e) {
             userPermissions = [];
         }
 
@@ -22,11 +43,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (role === 'admin' || role === 'super-admin') {
             userPermissions.push('ALL');
         }
-        
+
         try {
             let sidebarFileName = 'sidebar-dynamic.html';
             const isDealerMode = localStorage.getItem('dealerMode') === 'true';
-            
+
             // Admins and Super Admins always get the admin sidebar or dealer sidebar
             if (role === 'admin' || role === 'super-admin') {
                 sidebarFileName = isDealerMode ? 'sidebar-dealer.html' : 'sidebar-admin.html';
@@ -44,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             let response = await fetch(`${window.ROOT_PATH}components/${sidebarFileName}`);
-            
+
             // Fallback to dynamic sidebar if the role-specific file doesn't exist
             if (!response.ok && sidebarFileName !== 'sidebar-dynamic.html') {
                 sidebarFileName = 'sidebar-dynamic.html';
@@ -53,7 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (response.ok) {
                 sidebarContainer.innerHTML = await response.text();
-                
+
                 // 🔐 Filter Sidebar by Permissions 🔐
                 const navItems = sidebarContainer.querySelectorAll('.nav-item');
                 navItems.forEach(item => {
@@ -79,7 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
 
                 initSidebar(sidebarContainer.querySelectorAll('a'));
-                
+
                 // ── Update Sidebar Role Label ──
                 if (role === 'super-admin') {
                     const sidebarLabel = document.getElementById('sidebar-role-label');
@@ -137,11 +158,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (role === 'super-admin') {
         const path = window.location.pathname;
         const isAccessControlPage = path.includes('users.html') || path.includes('departments.html') || path.includes('roles.html');
-        
-        const bannerText = isAccessControlPage 
-            ? 'SUPER ADMIN MODE: You have full modification access on this User Management page.' 
+
+        const bannerText = isAccessControlPage
+            ? 'SUPER ADMIN MODE: You have full modification access on this User Management page.'
             : 'MONITORING MODE: You have full read-only access to the system. Modifications are disabled.';
-            
+
         const banner = document.createElement('div');
         banner.innerHTML = `<div style="background: ${isAccessControlPage ? '#dcfce7' : '#fef3c7'}; border-bottom: 1px solid ${isAccessControlPage ? '#bbf7d0' : '#fde68a'}; color: ${isAccessControlPage ? '#166534' : '#92400e'}; text-align: center; padding: 0.5rem; font-weight: 700; font-size: 0.85rem; position: sticky; top: 0; z-index: 10000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <i class="fa-solid ${isAccessControlPage ? 'fa-users-gear' : 'fa-eye'}" style="margin-right: 5px;"></i> ${bannerText}
@@ -221,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <i class="far fa-bell" style="font-size: 1.2rem; color: #6b7280; transition: color 0.2s;"></i>
             <span id="notifBadge" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border-radius: 50%; width: 14px; height: 14px; font-size: 8px; display: none; align-items: center; justify-content: center; font-weight: 700; border: 1.5px solid white;">0</span>
         `;
-        
+
         // Hover styling
         const bellIcon = bellDiv.querySelector('i');
         bellDiv.onmouseenter = () => bellIcon.style.color = '#1e293b';
@@ -414,10 +435,101 @@ function initLeadNav() {
     }
 }
 
-// ─── Lead List Renderer ───────────────────────────────────────
-async function initLeadList(filters = {}) {
+window.goBackToLeadsList = async function () {
+    const contentArea = document.getElementById('lead-content-area');
+    if (contentArea) {
+        await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => {
+            initLeadList(window.currentFilters || window.currentBaseFilters || {});
+        });
+    }
+};
+
+window.initLeadList = initLeadList;
+async function initLeadList(filters = {}, page = 1) {
     const tbody = document.getElementById('leadsTableBody');
     if (!tbody) return;
+
+    // Inject pagination CSS if not present
+    if (!document.getElementById('leadsPaginationStyles')) {
+        const style = document.createElement('style');
+        style.id = 'leadsPaginationStyles';
+        style.innerHTML = `
+            .leads-pagination-bar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 1rem 1.5rem;
+                background: white;
+                border-top: 1px solid #f1f5f9;
+                font-family: 'Inter', sans-serif;
+                font-size: 0.875rem;
+                color: #64748b;
+            }
+            .leads-pagination-info {
+                font-weight: 500;
+            }
+            .leads-pagination-pages {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+            }
+            .leads-pagination-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 2rem;
+                height: 2rem;
+                padding: 0 0.5rem;
+                border: 1px solid #e2e8f0;
+                background: white;
+                color: #475569;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 0.85rem;
+                transition: all 0.2s;
+            }
+            .leads-pagination-btn:hover:not(:disabled) {
+                background: #f8fafc;
+                border-color: #cbd5e1;
+                color: #1e293b;
+            }
+            .leads-pagination-btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            .leads-pagination-btn.active {
+                background: #10b981;
+                border-color: #10b981;
+                color: white;
+            }
+            .leads-pagination-limit {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .leads-pagination-select {
+                padding: 0.35rem 1.75rem 0.35rem 0.75rem;
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #475569;
+                background: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+                background-position: right 0.5rem center;
+                background-repeat: no-repeat;
+                background-size: 1.25rem auto;
+                appearance: none;
+            }
+            .leads-pagination-select:focus {
+                outline: none;
+                border-color: #10b981;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 
     // ─── Filter Setup ───
     const searchInput = document.getElementById('leadSearch');
@@ -457,13 +569,13 @@ async function initLeadList(filters = {}) {
         (async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/users`, {
+                const response = await fetch(`${API_URL}/users/sales`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (response.ok) {
                     const allUsers = await response.json();
                     const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
-                    
+
                     const val = staffF.value;
                     staffF.innerHTML = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
                     users.forEach(u => {
@@ -479,13 +591,46 @@ async function initLeadList(filters = {}) {
             }
         })();
     }
+
+    const campaignF = document.getElementById('leadCampaignFilter');
+    if (campaignF && !campaignF.dataset.listenerSet) {
+        campaignF.dataset.listenerSet = 'true';
+        campaignF.onchange = () => initLeadList(window.currentBaseFilters);
+
+        // Fetch campaign list and populate options
+        (async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_URL}/campaigns`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const campaigns = await response.json();
+                    const val = campaignF.value;
+                    campaignF.innerHTML = '<option value="all">All Campaigns</option>';
+                    campaigns.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = `${c.campaign_id} - ${c.tag_line.substring(0, 30)}${c.tag_line.length > 30 ? '...' : ''}`;
+                        campaignF.appendChild(opt);
+                    });
+                    campaignF.value = val;
+                }
+            } catch (err) {
+                console.error('Failed to load campaigns list for filter:', err);
+            }
+        })();
+    }
+
+
+
     if (dateF && !dateF.dataset.listenerSet) {
         dateF.dataset.listenerSet = 'true';
         if (typeof flatpickr !== 'undefined') {
             flatpickr(dateF, {
                 mode: "range",
                 dateFormat: "Y-m-d",
-                onClose: function(selectedDates, dateStr, instance) {
+                onClose: function (selectedDates, dateStr, instance) {
                     initLeadList(window.currentBaseFilters);
                 }
             });
@@ -499,6 +644,7 @@ async function initLeadList(filters = {}) {
             if (statusF) statusF.value = 'all';
             if (scoreF) scoreF.value = 'all';
             if (staffF) staffF.value = 'all';
+            if (campaignF) campaignF.value = 'all';
             if (dateF) {
                 dateF.value = '';
                 if (dateF._flatpickr) {
@@ -512,6 +658,9 @@ async function initLeadList(filters = {}) {
     tbody.innerHTML = '<tr><td colspan="10" class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading leads...</td></tr>';
 
     window.currentBaseFilters = filters; // Original context (e.g. {assigned_to: NULL})
+    window.currentLeadsPage = page;
+    window.currentLeadsLimit = parseInt(localStorage.getItem('leadsPageSize')) || 100;
+
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
 
@@ -521,7 +670,8 @@ async function initLeadList(filters = {}) {
     // Overlay with dynamic UI filters
     if (statusF && statusF.value !== 'all') params.set('status', statusF.value);
     if (scoreF && scoreF.value !== 'all') params.set('score', scoreF.value);
-    
+    if (campaignF && campaignF.value !== 'all') params.set('campaign_id', campaignF.value);
+
     if (staffF && staffF.value !== 'all') {
         if (staffF.value === 'unassigned') {
             params.set('is_unassigned', 'true');
@@ -533,18 +683,31 @@ async function initLeadList(filters = {}) {
     if (dateF && dateF.value) params.set('date', dateF.value);
     if (searchInput && searchInput.value) params.set('search', searchInput.value);
 
+    // Apply pagination params
+    params.set('page', window.currentLeadsPage);
+    params.set('limit', window.currentLeadsLimit);
+
     try {
         const response = await fetch(`${API_URL}/leads?${params.toString()}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error('API Error');
-        const leads = await response.json();
+        const data = await response.json();
+
+        const leads = data.leads || [];
         window.currentLeadsList = leads; // For export
 
         if (!leads || leads.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No leads available.</td></tr>';
+            // Clear pagination controls if empty
+            const pagContainer = document.getElementById('leadsPagination');
+            if (pagContainer) pagContainer.style.display = 'none';
             return;
         }
+
+        const currentUser = window.getCurrentUser();
+        const currentUserRole = (currentUser.role || '').toLowerCase();
+        const isTelecomPanelUser = currentUserRole.includes('telecaller');
 
         tbody.innerHTML = leads.map(lead => {
             const statusClass = lead.status === 'assigned' ? 'badge-assigned' : (lead.status === 'new' ? 'badge-unassigned' : 'badge-state');
@@ -563,7 +726,7 @@ async function initLeadList(filters = {}) {
                 const fuDate = new Date(lead.next_followup_date);
                 const d = fuDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
                 const t = fuDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-                
+
                 // Smart color based on due date
                 const diffHrs = (fuDate - new Date()) / (1000 * 60 * 60);
                 let colorClass = '#10b981'; // Green (future)
@@ -581,19 +744,49 @@ async function initLeadList(filters = {}) {
             }
 
             return `
-            <tr onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
+            <tr id="lead-row-${lead.lead_id}" onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
                 <td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
-                <td><div class="name-cell"><div class="name-initial">${nameInitial}</div>${lead.customer_name || 'Unknown'} ${callTag}</div></td>
+                <td>
+                    <div class="name-cell">
+                        <div class="name-initial">${nameInitial}</div>
+                        <div>
+                            <div style="font-weight: 600; color: #1e293b;">${lead.customer_name || 'Unknown'} ${callTag}</div>
+                            ${lead.campaign_id_code ? (() => {
+                    const fullCode = lead.campaign_id_code;
+                    const shortCode = fullCode.length > 15 ? fullCode.substring(0, 12) + '...' : fullCode;
+                    return `<span class="campaign-tag" title="${fullCode}" style="display: inline-block; background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; cursor: help;">📣 ${shortCode}</span>`;
+                })() : ''}
+                        </div>
+                    </div>
+                </td>
                 <td><span class="${statusClass}">${lead.status}</span></td>
                 <td><span class="badge-score ${scoreClass}">${(lead.score || 'COLD').toUpperCase() === 'WARM' ? 'MILD' : (lead.score || 'COLD').toUpperCase()}</span></td>
                 <td>${lead.state || '-'}</td>
                 <td><span class="language-tag">${lead.language || 'EN'}</span></td>
-                <td onclick="event.stopPropagation()"><a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat"><i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}</a></td>
+                <td onclick="event.stopPropagation()">
+                    ${isTelecomPanelUser ? `
+                        <a href="javascript:void(0)" onclick="window.copyToClipboard('${lead.phone_number || ''}')" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Click to Copy Number">
+                            <i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}
+                        </a>
+                    ` : `
+                        <a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat">
+                            <i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}
+                        </a>
+                    `}
+                </td>
                 <td><div class="msg-trunk" title="${lead.first_message || ''}">${lead.first_message || '-'}</div></td>
                 <td>${dateHtml}</td>
                 <td>${lead.assigned_to_name || 'Unassigned'}</td>
             </tr>`;
         }).join('');
+
+        // Render Pagination Controls below the table
+        renderPaginationControls({
+            totalLeads: data.totalLeads || 0,
+            totalPages: data.totalPages || 1,
+            currentPage: data.currentPage || 1,
+            limit: data.limit || 100
+        });
 
         // Bind Select All
         const selectAll = document.getElementById('selectAllLeads');
@@ -602,10 +795,147 @@ async function initLeadList(filters = {}) {
             selectAll.onclick = (e) => selectAllLeadsToggle(e.target);
         }
         updateBulkActionsBar();
+
+        // Restore scroll position by focusing/scrolling the clicked lead row into view
+        if (window._lastClickedLeadId !== undefined) {
+            const targetRow = document.getElementById(`lead-row-${window._lastClickedLeadId}`);
+            delete window._lastClickedLeadId;
+            if (targetRow) {
+                setTimeout(() => {
+                    targetRow.scrollIntoView({ block: 'center', behavior: 'instant' });
+                    // Add a temporary highlight class so they can see which one they clicked!
+                    targetRow.style.backgroundColor = '#ecfdf5'; // light emerald green
+                    setTimeout(() => {
+                        targetRow.style.transition = 'background-color 1s ease';
+                        targetRow.style.backgroundColor = '';
+                    }, 1500);
+                }, 80);
+            } else if (window._savedScrollY !== undefined) {
+                const targetScroll = window._savedScrollY;
+                delete window._savedScrollY;
+                setTimeout(() => {
+                    const scrollContainer = document.querySelector('.main-content');
+                    if (scrollContainer) {
+                        scrollContainer.scrollTop = targetScroll;
+                    } else {
+                        window.scrollTo({ top: targetScroll, behavior: 'instant' });
+                    }
+                }, 80);
+            }
+        }
     } catch (err) {
         tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Failed to load leads.</td></tr>';
     }
 }
+
+// ─── Pagination Rendering and Handlers ───────────────────────
+window.renderPaginationControls = function ({ totalLeads, totalPages, currentPage, limit }) {
+    let pagContainer = document.getElementById('leadsPagination');
+    if (!pagContainer) {
+        pagContainer = document.createElement('div');
+        pagContainer.id = 'leadsPagination';
+        pagContainer.className = 'leads-pagination-bar';
+        const wrapper = document.querySelector('.lead-table-scroll-wrapper');
+        if (wrapper) {
+            wrapper.parentNode.insertBefore(pagContainer, wrapper.nextSibling);
+        }
+    }
+
+    if (totalLeads === 0) {
+        pagContainer.innerHTML = '';
+        pagContainer.style.display = 'none';
+        return;
+    }
+    pagContainer.style.display = 'flex';
+
+    // Calculate showing range
+    const startRange = (currentPage - 1) * limit + 1;
+    const endRange = Math.min(currentPage * limit, totalLeads);
+
+    // Build page buttons
+    let pageButtonsHtml = '';
+
+    // Prev button
+    pageButtonsHtml += `
+        <button class="leads-pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changeLeadsPage(${currentPage - 1})">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+    `;
+
+    // Smart visible pages range
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage < maxVisiblePages - 1) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    if (startPage > 1) {
+        pageButtonsHtml += `
+            <button class="leads-pagination-btn" onclick="changeLeadsPage(1)">1</button>
+        `;
+        if (startPage > 2) {
+            pageButtonsHtml += `<span style="padding: 0 0.25rem;">...</span>`;
+        }
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        pageButtonsHtml += `
+            <button class="leads-pagination-btn ${p === currentPage ? 'active' : ''}" onclick="changeLeadsPage(${p})">${p}</button>
+        `;
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pageButtonsHtml += `<span style="padding: 0 0.25rem;">...</span>`;
+        }
+        pageButtonsHtml += `
+            <button class="leads-pagination-btn" onclick="changeLeadsPage(${totalPages})">${totalPages}</button>
+        `;
+    }
+
+    // Next button
+    pageButtonsHtml += `
+        <button class="leads-pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changeLeadsPage(${currentPage + 1})">
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    `;
+
+    // Build limit selector
+    const limitOptions = [10, 20, 30, 100, 200, 500];
+    let limitSelectHtml = `
+        <div class="leads-pagination-limit">
+            <span>Rows per page:</span>
+            <select class="leads-pagination-select" onchange="changeLeadsLimit(this.value)">
+    `;
+    limitOptions.forEach(opt => {
+        limitSelectHtml += `<option value="${opt}" ${opt === limit ? 'selected' : ''}>${opt}</option>`;
+    });
+    limitSelectHtml += `
+            </select>
+        </div>
+    `;
+
+    pagContainer.innerHTML = `
+        <div class="leads-pagination-info">
+            Showing <strong style="color: #1e293b;">${startRange}-${endRange}</strong> of <strong style="color: #1e293b;">${totalLeads}</strong> leads
+        </div>
+        <div class="leads-pagination-pages">
+            ${pageButtonsHtml}
+        </div>
+        ${limitSelectHtml}
+    `;
+};
+
+window.changeLeadsPage = function (page) {
+    initLeadList(window.currentBaseFilters, page);
+};
+
+window.changeLeadsLimit = function (limit) {
+    localStorage.setItem('leadsPageSize', limit);
+    initLeadList(window.currentBaseFilters, 1);
+};
 
 // ─── Lead Selection Logic ─────────────────────────────────────
 window.currentSelectedLeadIds = [];
@@ -639,7 +969,7 @@ window.updateBulkActionsBar = function () {
     if (!bar) return;
 
     const user = window.getCurrentUser();
-    const canManageBulk = ['admin', 'super-admin', 'sales'].includes((user.role || '').toLowerCase());
+    const canManageBulk = ['admin', 'super-admin', 'sales', 'manager'].includes((user.role || '').toLowerCase());
 
     if (window.currentSelectedLeadIds.length > 0 && canManageBulk) {
         bar.style.display = 'flex';
@@ -664,7 +994,7 @@ window.openBulkAssignModal = async function () {
     const token = localStorage.getItem('token');
     try {
         // Fetch staff to choose from
-        const response = await fetch(`${API_URL}/users`, {
+        const response = await fetch(`${API_URL}/users/sales`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const allUsers = await response.json();
@@ -771,8 +1101,53 @@ window.performBulkAssign = async function () {
     }
 };
 
+window.bulkUnassignLeads = async function () {
+    if (!window.currentSelectedLeadIds || window.currentSelectedLeadIds.length === 0) {
+        return window.showAlert("No Selection", "Please select at least one lead.", "info");
+    }
+
+    if (!confirm(`Are you sure you want to unassign the selected ${window.currentSelectedLeadIds.length} leads?`)) {
+        return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`${API_URL}/leads/bulk-unassign`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                leadIds: window.currentSelectedLeadIds
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            window.currentSelectedLeadIds = [];
+            initLeadList(window.currentFilters || {});
+            updateLeadStats();
+            window.showAlert("Success", `Successfully unassigned ${result.count} leads.`, "success");
+        } else {
+            const err = await response.json();
+            window.showAlert("Error", `Failed to unassign leads: ${err.message}`, "error");
+        }
+    } catch (err) {
+        console.error('Bulk unassign error:', err);
+        window.showAlert("Error", "Failed to connect to server.", "error");
+    }
+};
+
+
+
 // ─── Lead Detail View ─────────────────────────────────────────
 async function viewLeadDetails(leadId) {
+    // Save scroll position of the .main-content scrollable container and last clicked lead ID before loading details
+    const scrollContainer = document.querySelector('.main-content');
+    window._savedScrollY = scrollContainer ? scrollContainer.scrollTop : (window.scrollY || window.pageYOffset);
+    window._lastClickedLeadId = leadId;
+
     if (window.currentViewingLeadId !== leadId) {
         window.timelineShowAll = false;
         window.historyShowAll = false;
@@ -780,7 +1155,15 @@ async function viewLeadDetails(leadId) {
     window.currentViewingLeadId = leadId;
     const contentArea = document.getElementById('lead-content-area');
     if (contentArea) {
-        await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-details.html`, () => populateLeadDetails(leadId));
+        await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-details.html`, async () => {
+            await populateLeadDetails(leadId);
+            const container = document.querySelector('.main-content');
+            if (container) {
+                container.scrollTop = 0;
+            } else {
+                window.scrollTo({ top: 0, behavior: 'instant' });
+            }
+        });
     }
 }
 
@@ -968,7 +1351,19 @@ async function populateLeadDetails(leadId) {
             }
 
             // ── Load Timeline ──
-            loadLeadTimeline(leadId);
+            await loadLeadTimeline(leadId);
+
+            // ── Hide Change Assignee for Telecaller Role ──
+            const user = window.getCurrentUser();
+            const role = (user.role || '').toLowerCase();
+            const changeAssigneeBtn = document.getElementById('changeAssigneeBtn');
+            if (changeAssigneeBtn) {
+                if (role.includes('telecaller')) {
+                    changeAssigneeBtn.style.display = 'none';
+                } else {
+                    changeAssigneeBtn.style.display = '';
+                }
+            }
         }
     } catch (err) { console.error('Lead detail error:', err); }
 }
@@ -1042,12 +1437,12 @@ window.saveLeadSection = async function (sectionId) {
         payload.district = document.getElementById('editDistrict').value;
         payload.pincode = document.getElementById('editPincode').value;
         payload.language = document.getElementById('editLanguage').value;
-        
+
         const cropEl = document.getElementById('editCrop');
-        if(cropEl) payload.current_crop = cropEl.value;
-        
+        if (cropEl) payload.current_crop = cropEl.value;
+
         const acreEl = document.getElementById('editAcreage');
-        if(acreEl) payload.acreage = acreEl.value ? parseFloat(acreEl.value) : null;
+        if (acreEl) payload.acreage = acreEl.value ? parseFloat(acreEl.value) : null;
     } else if (sectionId === 'requirementSection') {
         // Interests might need a specialized endpoint or array formatting
         payload.interests_raw = document.getElementById('editInterest') ? document.getElementById('editInterest').value : '';
@@ -1095,7 +1490,7 @@ window.rescheduleCallFromDetails = function () {
         </div>
     `;
     window.showModal({ title: 'Reschedule Follow-up', content, hideFooter: true });
-    
+
     setTimeout(() => {
         if (typeof flatpickr !== 'undefined') {
             const defaultDate = new Date();
@@ -1427,10 +1822,18 @@ window.hideModal = function () {
 
 window.openAddLeadModal = async function () {
     try {
-        const res = await fetch(`${window.ROOT_PATH}components/quick-lead-form.html`);
+        const url = `${window.ROOT_PATH}components/quick-lead-form.html`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            alert(`Error: Failed to fetch modal content from ${url} (status: ${res.status})`);
+            return;
+        }
         const text = await res.text();
         window.showModal({ title: 'Quick Lead Entry', content: text, hideFooter: true });
-    } catch (err) { console.error('Add lead modal error:', err); }
+    } catch (err) {
+        alert('Add lead modal error: ' + err.message);
+        console.error('Add lead modal error:', err);
+    }
 };
 
 window.submitQuickLead = async function () {
@@ -1497,9 +1900,76 @@ window.submitQuickLead = async function () {
 };
 
 // ─── Export Leads to Excel (CSV) ──────────────────────────────
-window.exportLeadsToExcel = function() {
-    if (!window.currentLeadsList || window.currentLeadsList.length === 0) {
-        if(window.showAlert) {
+window.exportLeadsToExcel = async function () {
+    // Determine which leads to export
+    let leadsToExport = [];
+
+    if (window.currentSelectedLeadIds && window.currentSelectedLeadIds.length > 0) {
+        // Export only checked leads
+        leadsToExport = window.currentLeadsList.filter(lead => window.currentSelectedLeadIds.includes(lead.lead_id));
+    } else {
+        // Fetch all matching leads from backend (limit=all) with current filters
+        const btn = document.getElementById('btnExportExcel');
+        const originalHtml = btn ? btn.innerHTML : 'Export Excel';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Exporting...';
+            btn.disabled = true;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const params = new URLSearchParams();
+
+            // Reconstruct current filters
+            if (window.currentBaseFilters) {
+                Object.entries(window.currentBaseFilters).forEach(([k, v]) => { if (v) params.append(k, v); });
+            }
+
+            const statusF = document.getElementById('leadStatusFilter');
+            const scoreF = document.getElementById('leadScoreFilter');
+            const staffF = document.getElementById('leadStaffFilter');
+            const dateF = document.getElementById('leadDateFilter');
+            const searchInput = document.getElementById('leadSearch');
+
+            if (statusF && statusF.value !== 'all') params.set('status', statusF.value);
+            if (scoreF && scoreF.value !== 'all') params.set('score', scoreF.value);
+            if (staffF && staffF.value !== 'all') {
+                if (staffF.value === 'unassigned') {
+                    params.set('is_unassigned', 'true');
+                } else {
+                    params.set('assigned_to', staffF.value);
+                }
+            }
+            if (dateF && dateF.value) params.set('date', dateF.value);
+            if (searchInput && searchInput.value) params.set('search', searchInput.value);
+
+            // Request full list
+            params.set('limit', 'all');
+
+            const response = await fetch(`${API_URL}/leads?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('API Error');
+            const result = await response.json();
+            leadsToExport = result.leads || [];
+        } catch (err) {
+            console.error('Export fetch error:', err);
+            window.showAlert("Export Failed", "Failed to retrieve matching leads from server", "error");
+            if (btn) {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+            return;
+        }
+
+        if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+
+    if (!leadsToExport || leadsToExport.length === 0) {
+        if (window.showAlert) {
             window.showAlert("Export Failed", "No leads available to export.", "info");
         } else {
             alert("No leads available to export.");
@@ -1507,16 +1977,10 @@ window.exportLeadsToExcel = function() {
         return;
     }
 
-    // Determine which leads to export
-    let leadsToExport = window.currentLeadsList;
-    if (window.currentSelectedLeadIds && window.currentSelectedLeadIds.length > 0) {
-        leadsToExport = window.currentLeadsList.filter(lead => window.currentSelectedLeadIds.includes(lead.lead_id));
-    }
-
     // Define CSV headers
     const headers = [
-        "Lead ID", "Customer Name", "Phone Number", "Status", "Score", 
-        "State", "District", "City/Village", "Pincode", "Language", 
+        "Lead ID", "Customer Name", "Phone Number", "Status", "Score",
+        "State", "District", "City/Village", "Pincode", "Language",
         "Crop", "Acreage", "First Message", "Next Follow-up", "Assigned Staff", "Created At"
     ];
 
@@ -1548,7 +2012,7 @@ window.exportLeadsToExcel = function() {
     // Create a Blob and trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
+
     // Get active tab name for filename
     let tabName = "Leads";
     const activeTab = document.querySelector('.nav-tab.active');

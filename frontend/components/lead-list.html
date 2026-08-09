@@ -7,6 +7,12 @@
         overflow: hidden;
     }
 
+    .lead-table-scroll-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .lead-table {
         width: 100%;
         border-collapse: collapse;
@@ -166,13 +172,18 @@
     }
 
     .lead-table-header {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        padding: 1rem 1.5rem;
-        background: #ffffff;
-        border-bottom: 1px solid #f1f5f9;
-        gap: 1rem;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        padding: 1rem 1.5rem !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        gap: 1rem !important;
+    }
+
+    #btnExportExcel {
+        margin-left: 0 !important;
     }
 
     .filter-group {
@@ -183,6 +194,7 @@
         padding: 0.4rem 0.75rem;
         border-radius: 0.75rem;
         border: 1px solid #e2e8f0;
+        flex-shrink: 0;
     }
 
     .filter-label {
@@ -218,6 +230,7 @@
         font-size: 0.75rem;
         font-weight: 600;
         color: #64748b;
+        flex-shrink: 0;
         cursor: pointer;
         transition: all 0.2s;
     }
@@ -347,6 +360,12 @@
             </select>
         </div>
         <div class="filter-group">
+            <span class="filter-label"><i class="fa-solid fa-bullhorn"></i> CAMPAIGN</span>
+            <select id="leadCampaignFilter" class="date-input">
+                <option value="all">All Campaigns</option>
+            </select>
+        </div>
+        <div class="filter-group">
             <span class="filter-label"><i class="fa-solid fa-calendar-days"></i> DATE</span>
             <input type="text" id="leadDateFilter" class="date-input" placeholder="Select date range..." style="min-width: 190px;">
             <button id="btnFilterAll" class="btn-filter-secondary">ALL</button>
@@ -368,6 +387,10 @@
                 style="background: #059669; color: white; border-radius: 8px; font-weight: 700;">
                 <i class="fas fa-user-plus"></i> Manual Assign to Staff
             </button>
+            <button onclick="bulkUnassignLeads()" class="btn-assign"
+                style="background: #ef4444; color: white; border-radius: 8px; font-weight: 700; border-color: #ef4444;">
+                <i class="fas fa-user-slash"></i> Unassign
+            </button>
             <button onclick="exportLeadsToExcel()" class="btn-assign"
                 style="background: #10b981; color: white; border-radius: 8px; font-weight: 700;">
                 <i class="fas fa-file-excel"></i> Export Selected
@@ -377,30 +400,31 @@
             style="background: none; border: none; color: #64748b; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Clear
             Selection</button>
     </div>
-
-    <table class="lead-table" id="leadsTable">
-        <thead>
-            <tr>
-                <th style="width: 40px; padding-right: 0;"><input type="checkbox" id="selectAllLeads"
-                        class="form-checkbox"></th>
-                <th>Farmer Name</th>
-                <th>Status</th>
-                <th>Score</th>
-                <th>State</th>
-                <th>Language</th>
-                <th>Phone Number</th>
-                <th>Message</th>
-                <th>Date / Follow-up</th>
-                <th>Assigned Staff</th>
-            </tr>
-        </thead>
-        <tbody id="leadsTableBody">
-            <tr id="leadsLoadingRow">
-                <td colspan="10" class="loading-state">
-                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                    <p>Loading leads...</p>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="lead-table-scroll-wrapper">
+        <table class="lead-table" id="leadsTable">
+            <thead>
+                <tr>
+                    <th style="width: 40px; padding-right: 0;"><input type="checkbox" id="selectAllLeads"
+                            class="form-checkbox"></th>
+                    <th>Farmer Name</th>
+                    <th>Status</th>
+                    <th>Score</th>
+                    <th>State</th>
+                    <th>Language</th>
+                    <th>Phone Number</th>
+                    <th>Message</th>
+                    <th>Date / Follow-up</th>
+                    <th>Assigned Staff</th>
+                </tr>
+            </thead>
+            <tbody id="leadsTableBody">
+                <tr id="leadsLoadingRow">
+                    <td colspan="10" class="loading-state">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <p>Loading leads...</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>

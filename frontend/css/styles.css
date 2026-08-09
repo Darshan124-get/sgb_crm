@@ -2863,7 +2863,8 @@ body.modal-open {
     }
 
     /* Table responsiveness */
-    .table-container {
+    .table-container,
+    .lead-table-scroll-wrapper {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
     }

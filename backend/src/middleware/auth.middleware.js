@@ -61,10 +61,10 @@ function isAdminOrSales(req, res, next) {
     if (!req.user || !req.user.role) return res.status(403).json({ message: 'Access denied' });
     
     const role = req.user.role.toLowerCase();
-    if (role === 'admin' || role === 'super-admin' || role === 'sales' || role.includes('executive') || role === 'manager') {
+    if (role === 'admin' || role === 'super-admin' || role === 'sales' || role.includes('executive') || role === 'manager' || role.includes('telecaller')) {
         next();
     } else {
-        res.status(403).json({ message: 'Access denied: Requires Admin, Manager or Sales/Executive role' });
+        res.status(403).json({ message: 'Access denied: Requires Admin, Manager, Sales/Executive, or Telecaller role' });
     }
 }
 

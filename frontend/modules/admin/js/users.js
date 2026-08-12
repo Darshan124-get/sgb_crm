@@ -903,8 +903,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (user.role_name && user.role_name.toLowerCase().includes('telecaller')) {
                 langGroup.style.display = 'block';
                 const userLangs = (user.language || 'EN').split(',');
+                const codeMap = {
+                    'kannada': ['kn', 'ka', 'kannada'],
+                    'english': ['en', 'english'],
+                    'hindi': ['hi', 'hindi'],
+                    'tamil': ['tn', 'ta', 'tamil'],
+                    'telugu': ['te', 'telugu'],
+                    'marathi': ['mr', 'marathi'],
+                    'malayalam': ['ml', 'malayalam']
+                };
                 document.querySelectorAll('input[name="wizardLanguages"]').forEach(cb => {
-                    cb.checked = userLangs.includes(cb.value);
+                    const cbValLower = cb.value.toLowerCase();
+                    const matchedCodes = codeMap[cbValLower] || [cbValLower];
+                    cb.checked = userLangs.some(lang => matchedCodes.includes(lang.trim().toLowerCase()));
                 });
             } else {
                 langGroup.style.display = 'none';

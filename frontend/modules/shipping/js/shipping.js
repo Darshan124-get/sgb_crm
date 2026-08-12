@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const user = window.getCurrentUser();
     const perms = user ? (typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions) : [];
     const isSuper = user && (user.role === 'admin' || user.role === 'super-admin');
-    
+
     if (!user || (!isSuper && !perms.includes('shipping_shipping'))) {
         window.location.href = '../../index.html';
         return;
@@ -37,9 +37,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         switchTab('pending');
     }
-    
+
     fetchOrders();
-    
+
     // Listen for hash changes
     window.addEventListener('hashchange', () => {
         const newHash = window.location.hash.replace('#', '');
@@ -120,14 +120,14 @@ function transformOrders(rawOrders) {
                         items: [{ ...item, quantity: 1 }],
                         order_status: virtualStatus,
                         packed_at: isPacked ? ((o.packing_records || []).find(pr => pr.product_id === item.product_id && pr.unit_no === u) || {}).packed_at : null,
-                        
+
                         shipment_id: shipment ? shipment.shipment_id : null,
                         courier_name: shipment ? shipment.courier_name : null,
                         tracking_id: shipment ? shipment.tracking_id : null,
                         shipment_status: shipment ? shipment.shipment_status : null,
                         delivery_date: shipment ? shipment.delivery_date : null,
                         check_received_date: shipment ? shipment.check_received_date : null,
-                        
+
                         unit_label: `(${item.product_name} - Qty 1 [${u}/${qty}])`
                     });
                 }
@@ -139,7 +139,7 @@ function transformOrders(rawOrders) {
     return processed;
 }
 
-window.fetchOrders = async function(silent = false) {
+window.fetchOrders = async function (silent = false) {
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -148,13 +148,13 @@ window.fetchOrders = async function(silent = false) {
         const response = await fetch(`${window.API_URL}/orders`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!response.ok) throw new Error('Failed to fetch');
-        
+
         const raw = await response.json();
         allOrders = transformOrders(raw);
         console.log('Fetched orders:', allOrders.length);
-        
+
         updateCounts();
         renderTable();
     } catch (error) {
@@ -165,7 +165,7 @@ window.fetchOrders = async function(silent = false) {
 
 function updateCounts() {
     const pending = allOrders.filter(o => ['billed', 'packed'].includes(o.order_status)).length;
-    
+
     const inTransit = allOrders.filter(o => {
         if (!o.shipment_id) return false;
         if (o.shipment_status === 'returned') return false;
@@ -190,21 +190,21 @@ function updateCounts() {
         }
         return false;
     }).length;
-    
+
     document.getElementById('pendingCount').textContent = pending;
     document.getElementById('inTransitCount').textContent = inTransit;
     document.getElementById('payCheckCount').textContent = payCheck;
     document.getElementById('completedCount').textContent = completed;
 }
 
-window.switchTab = function(tab) {
+window.switchTab = function (tab) {
     currentTab = tab;
-    
+
     // UI Update
     document.querySelectorAll('.shipping-tabs > .shipping-tab').forEach(el => el.classList.remove('active'));
     const tabEl = document.getElementById(`tab-${tab}`);
     if (tabEl) tabEl.classList.add('active');
-    
+
     const inTransitSubTabs = document.getElementById('inTransitSubTabs');
     if (tab === 'in_transit') {
         inTransitSubTabs.style.display = 'flex';
@@ -216,7 +216,7 @@ window.switchTab = function(tab) {
     }
 }
 
-window.switchSubTab = function(sub) {
+window.switchSubTab = function (sub) {
     currentSubTab = sub;
     document.querySelectorAll('#inTransitSubTabs .shipping-tab').forEach(el => el.classList.remove('active'));
     const tabEl = document.getElementById(`subtab-${sub}`);
@@ -224,7 +224,7 @@ window.switchSubTab = function(sub) {
     renderTable();
 }
 
-window.handleSearch = function() {
+window.handleSearch = function () {
     searchQuery = document.getElementById('searchInput').value.trim();
     renderTable();
 };
@@ -233,9 +233,9 @@ function renderTable() {
     const thead = document.getElementById('tableHeader');
     const tbody = document.getElementById('shippingTableBody');
     const emptyState = document.getElementById('emptyState');
-    
+
     let filtered = [];
-    
+
     // Headers setup
     if (currentTab === 'pending') {
         thead.innerHTML = `<tr>
@@ -312,7 +312,7 @@ function renderTable() {
     if (searchQuery) {
         const sq = searchQuery.toLowerCase();
         filtered = filtered.filter(o => {
-            const billNo = (o.zoho_bill_number || o.invoice_no || 'BILL'+o.order_id).toLowerCase();
+            const billNo = (o.zoho_bill_number || o.invoice_no || 'BILL' + o.order_id).toLowerCase();
             const customer = (o.customer_name || o.firm_name || '').toLowerCase();
             const track = (o.tracking_id || '').toLowerCase();
             const orderIdStr = String(o.order_id);
@@ -328,21 +328,21 @@ function renderTable() {
     }
 
     emptyState.style.display = 'none';
-    
+
     tbody.innerHTML = filtered.map(o => {
         const qty = (o.items || []).reduce((sum, i) => sum + i.quantity, 0);
         const itemStr = (o.items && o.items.length > 0) ? o.items[0].product_name : 'N/A';
-        const dateStr = new Date(o.created_at).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'});
-        const billNo = o.zoho_bill_number || o.invoice_no || 'BILL'+o.order_id;
-        
+        const dateStr = new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const billNo = o.zoho_bill_number || o.invoice_no || 'BILL' + o.order_id;
+
         let totalAmt = (parseFloat(o.total_amount) || 0) - (parseFloat(o.advance_amount) || 0); // Balance (COD)
         if (totalAmt < 0) totalAmt = 0;
         const totalAmtStr = totalAmt.toFixed(2);
-        
+
         const customerName = o.customer_name || o.firm_name || 'Walking Customer';
         const phone = o.phone || '—';
         const fullAddress = [o.address, o.city, o.district, o.state, o.pincode].filter(Boolean).join(', ');
-        
+
         if (currentTab === 'pending') {
             return `
             <tr onclick="if(!event.target.closest('button') && !event.target.closest('select') && !event.target.closest('input')) showOrderDetails(${o.order_id}, ${o.virtual_id ? o.product_id : null}, ${o.virtual_id ? o.unit_no : null})">
@@ -509,12 +509,12 @@ function renderTable() {
     }).join('');
 }
 
-window.trackShipment = async function(type, trackingId) {
+window.trackShipment = async function (type, trackingId) {
     if (!trackingId || trackingId === 'undefined' || trackingId === '-') {
         showToast('No Tracking ID available', 'error');
         return;
     }
-    
+
     // 1. Copy tracking ID to clipboard
     try {
         await navigator.clipboard.writeText(trackingId);
@@ -522,7 +522,7 @@ window.trackShipment = async function(type, trackingId) {
     } catch (err) {
         console.warn('Failed to copy to clipboard', err);
     }
-    
+
     // 2. Open the URL after a tiny delay so the user sees the toast
     setTimeout(() => {
         let url = type === 'post' ? trackingUrls.post : trackingUrls.vrl;
@@ -627,7 +627,7 @@ function showDatePickerModal(title, defaultDate = '') {
     });
 }
 
-window.updateShipmentStatus = async function(shipmentId, status, type) {
+window.updateShipmentStatus = async function (shipmentId, status, type) {
     const deliveryDateEl = document.getElementById(`delDate_${shipmentId}`);
     let delivery_date = null;
     if (deliveryDateEl && deliveryDateEl.value) {
@@ -654,13 +654,13 @@ window.updateShipmentStatus = async function(shipmentId, status, type) {
     try {
         const response = await fetch(`${window.API_URL}/logistics/shipments/${shipmentId}/status`, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({ status, delivery_date })
         });
-        
+
         if (response.ok) {
             showToast('Status updated successfully');
             fetchOrders();
@@ -674,29 +674,29 @@ window.updateShipmentStatus = async function(shipmentId, status, type) {
     }
 }
 
-window.markCompleted = async function(shipmentId) {
+window.markCompleted = async function (shipmentId) {
     // For non-post non-vrl, marking completed means delivered
     await updateShipmentStatus(shipmentId, 'delivered', 'other');
 }
 
-window.saveCheckDate = async function(shipmentId) {
+window.saveCheckDate = async function (shipmentId) {
     const checkDateEl = document.getElementById(`checkDate_${shipmentId}`);
     if (!checkDateEl || !checkDateEl.value) {
         showToast('Please enter a Check Received Date', 'error');
         return;
     }
     const check_received_date = checkDateEl.value;
-    
+
     try {
         const response = await fetch(`${window.API_URL}/logistics/shipments/${shipmentId}/check_received`, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({ check_received_date })
         });
-        
+
         if (response.ok) {
             showToast('Check Received Date saved! Order Completed.');
             fetchOrders();
@@ -709,31 +709,31 @@ window.saveCheckDate = async function(shipmentId) {
     }
 }
 
-window.submitInlineShip = async function(orderId, productId, unitNo, virtualId) {
+window.submitInlineShip = async function (orderId, productId, unitNo, virtualId) {
     const trackingInputId = virtualId ? `trackId_${virtualId}` : `trackId_${orderId}`;
     const tracking = document.getElementById(trackingInputId).value;
-    
+
     const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     let courier = order ? (order.delivery_type || 'Other') : 'Other';
     const dt = courier.toLowerCase();
     if (dt.includes('post')) courier = 'India Post';
     else if (dt.includes('vrl')) courier = 'VRL';
-    
+
     if (!tracking) {
         showToast("Please enter Tracking ID", "error");
         return;
     }
-    
+
     try {
         const response = await fetch(`${window.API_URL}/logistics/ship`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ 
-                order_id: orderId, 
-                courier_name: courier, 
+            body: JSON.stringify({
+                order_id: orderId,
+                courier_name: courier,
                 tracking_id: tracking,
                 product_id: productId,
                 unit_no: unitNo
@@ -742,13 +742,13 @@ window.submitInlineShip = async function(orderId, productId, unitNo, virtualId) 
 
         if (response.ok) {
             showToast("Order dispatched successfully!", "success");
-            
+
             // AUTOMATED WHATSAPP NOTIFICATION
             if (order && order.phone) {
                 const productNames = (order.items || []).map(i => i.product_name).join(', ');
                 const orderDate = new Date(order.created_at).toLocaleDateString('en-GB');
                 const formattedId = window.formatOrderId(orderId, order.created_at);
-                
+
                 let trackingUrl = "";
                 if (courier === 'India Post') {
                     const separator = trackingUrls.post.includes('?') ? '&' : '?';
@@ -767,7 +767,7 @@ window.submitInlineShip = async function(orderId, productId, unitNo, virtualId) 
                 }).catch(e => console.error('WA Notify Error:', e));
             }
 
-            fetchOrders(); 
+            fetchOrders();
         } else {
             const err = await response.json();
             showToast(err.message || "Failed to dispatch order", "error");
@@ -777,24 +777,24 @@ window.submitInlineShip = async function(orderId, productId, unitNo, virtualId) 
     }
 };
 
-window.markAsPacked = async function(orderId, productId, unitNo) {
+window.markAsPacked = async function (orderId, productId, unitNo) {
     try {
         let response;
         if (productId) {
             response = await fetch(`${window.API_URL}/logistics/packing`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({ order_id: orderId, remarks: 'Packed', product_id: productId, unit_no: unitNo })
             });
         } else {
             response = await fetch(`${window.API_URL}/orders/${orderId}/status`, {
                 method: 'PUT',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({ order_status: 'packed' })
             });
@@ -812,13 +812,13 @@ window.markAsPacked = async function(orderId, productId, unitNo) {
     }
 };
 
-window.showOrderDetails = function(orderId, productId, unitNo) {
+window.showOrderDetails = function (orderId, productId, unitNo) {
     const order = allOrders.find(o => o.order_id == orderId && (!productId || (o.product_id == productId && o.unit_no == unitNo)));
     if (!order) return;
 
     const modal = document.getElementById('orderDetailsModal');
     const content = document.getElementById('modalContent');
-    
+
     content.innerHTML = `
         <div style="padding: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
@@ -896,18 +896,18 @@ window.showOrderDetails = function(orderId, productId, unitNo) {
     modal.style.display = 'flex';
 };
 
-window.closeModal = function() {
+window.closeModal = function () {
     document.getElementById('orderDetailsModal').style.display = 'none';
 };
 
 function showToast(msg, type = "success") {
     const t = document.getElementById('toast');
     if (!t) return;
-    
+
     t.textContent = msg;
     t.style.borderLeftColor = type === "success" ? "#10b981" : "#ef4444";
     t.style.display = 'block';
-    
+
     setTimeout(() => {
         t.style.display = 'none';
     }, 4000);

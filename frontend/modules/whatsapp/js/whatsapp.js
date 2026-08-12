@@ -114,7 +114,6 @@ const mobileBackBtnEl = document.getElementById('mobile-back-btn');
 const searchInputEl = document.getElementById('customer-search');
 
 // Modal Elements
-const resolveBtnEl = document.getElementById('resolve-btn');
 const transferBtnEl = document.getElementById('transfer-btn');
 const transferModal = document.getElementById('transfer-modal');
 const closeTransferModalBtn = document.getElementById('close-transfer-modal');
@@ -1029,40 +1028,6 @@ async function handleSaveDetails() {
         }
     } catch (err) {
         console.error('Update error:', err);
-    }
-}
-
-/**
- * Handle Resolve
- */
-async function handleResolve() {
-    if (!activeCustomer) return;
-
-    if (!confirm('Mark this conversation as Resolved? This will move it to the Closed tab.')) return;
-
-    try {
-        const response = await fetch(`${LEAD_API_BASE}/${activeCustomer.lead_id}`, {
-            method: 'PUT',
-            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'converted' }) // or 'closed'
-        });
-
-        if (response.ok) {
-            window.showAlert('Success', 'Conversation marked as resolved', 'success');
-            activeCustomer = null;
-            
-            // Clear URL query parameters
-            window.history.replaceState(null, '', window.location.pathname);
-
-            chatWindowEl.classList.add('hidden');
-            detailsSidebarEl.classList.add('hidden');
-            const resizerRight = document.getElementById('resizer-right');
-            if (resizerRight) resizerRight.classList.add('hidden');
-            chatWelcomeEl.classList.remove('hidden');
-            loadCustomers();
-        }
-    } catch (err) {
-        console.error('Resolve error:', err);
     }
 }
 
@@ -2029,7 +1994,6 @@ function initEventListeners() {
     }
     if (salesSearchEl) salesSearchEl.oninput = (e) => renderSalesList(e.target.value);
     if (confirmTransferBtnEl) confirmTransferBtnEl.onclick = handleTransfer;
-    if (resolveBtnEl) resolveBtnEl.onclick = handleResolve;
 
     // Media Preview
     if (closePreviewBtn) {

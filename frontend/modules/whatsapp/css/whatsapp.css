@@ -255,16 +255,6 @@
     background-color: rgba(0, 168, 132, 0.1);
 }
 
-.btn-resolve {
-    background-color: #3b4a54;
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 6px;
-    font-weight: 700;
-    cursor: pointer;
-    font-size: 0.85rem;
-}
 
 /* Message List */
 .message-container {

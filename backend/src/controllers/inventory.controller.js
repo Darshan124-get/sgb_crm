@@ -47,7 +47,7 @@ exports.adjustStock = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Stock adjusted successfully' });
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) {}
+        try { if (connection) await connection.rollback(); } catch (re) { }
         res.status(500).json({ message: 'Error adjusting stock: ' + err.message });
     } finally {
         if (connection) connection.release();

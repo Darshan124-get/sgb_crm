@@ -5,7 +5,7 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (typeof window.requireAuth === 'function' && !window.requireAuth(['admin'])) return;
-    
+
     const state = {
         activeTab: 'products',
         products: [],
@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── Renderers ─────────────────────────────────────────────
     function renderActiveTab() {
         contentArea.innerHTML = '';
-        switch(state.activeTab) {
+        switch (state.activeTab) {
             case 'products': renderProducts(); break;
             case 'categories': renderCategories(); break;
             case 'fullsets': renderFullSets(); break;
@@ -174,11 +174,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderProducts() {
         const filtered = state.products.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(state.filters.search) || 
-                                (p.sku && p.sku.toLowerCase().includes(state.filters.search));
-            
+            const matchesSearch = p.name.toLowerCase().includes(state.filters.search) ||
+                (p.sku && p.sku.toLowerCase().includes(state.filters.search));
+
             const matchesCat = state.filters.category === 'all' || p.category_id == state.filters.category;
-            
+
             let matchesStatus = true;
             if (state.filters.status !== 'all') {
                 const stockStatus = p.current_stock > p.min_stock_alert ? 'in' : (p.current_stock > 0 ? 'low' : 'out');
@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderCategories() {
         const container = document.createElement('div');
         container.className = 'inv-table-container premium-card';
-        
+
         const renderLevel = (cats, level = 0) => {
             return cats.map(c => `
                 <div class="cat-tree-item" style="padding-left: ${level * 2}rem;">
@@ -255,15 +255,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </button>
             </div>
         `;
-        
+
         container.innerHTML = header + (state.categories.length ? renderLevel(state.categories) : '<div style="padding:2rem;text-align:center;color:#94a3b8;">No categories defined.</div>');
         contentArea.appendChild(container);
     }
 
     function renderStock() {
         const filtered = state.inventory.filter(i => {
-            return i.name.toLowerCase().includes(state.filters.search) || 
-                   i.sku.toLowerCase().includes(state.filters.search);
+            return i.name.toLowerCase().includes(state.filters.search) ||
+                i.sku.toLowerCase().includes(state.filters.search);
         });
 
         const tableHTML = `
@@ -281,8 +281,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </thead>
                     <tbody>
                         ${filtered.map(i => {
-                            const isLow = i.current_stock < i.min_stock_alert;
-                            return `
+            const isLow = i.current_stock < i.min_stock_alert;
+            return `
                                 <tr>
                                     <td>
                                         <div style="font-weight:700; color:#1e293b;">${i.name}</div>
@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     </td>
                                 </tr>
                             `;
-                        }).join('')}
+        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -327,11 +327,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </thead>
                     <tbody>
                         ${state.logs.map(l => {
-                            const date = new Date(l.created_at).toLocaleString();
-                            const typeEmoji = l.type === 'in' ? '➕' : (l.type === 'out' ? '➖' : '🔄');
-                            const qtyClass = l.type === 'in' ? 'color:#16a34a;' : (l.type === 'out' ? 'color:#dc2626;' : '');
-                            
-                            return `
+            const date = new Date(l.created_at).toLocaleString();
+            const typeEmoji = l.type === 'in' ? '➕' : (l.type === 'out' ? '➖' : '🔄');
+            const qtyClass = l.type === 'in' ? 'color:#16a34a;' : (l.type === 'out' ? 'color:#dc2626;' : '');
+
+            return `
                                 <tr>
                                     <td style="font-size:0.75rem; color:#64748b;">${date}</td>
                                     <td>
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <td><span class="user-pill" style="font-size:0.75rem; background:#f1f5f9; padding:2px 8px; border-radius:10px;">${l.user_name || 'System'}</span></td>
                                 </tr>
                             `;
-                        }).join('')}
+        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -423,19 +423,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         window.showModal({ title: 'Add New Product', content, hideFooter: true });
-        
+
         const form = document.getElementById('productForm');
         if (form) {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
-                
+
                 try {
                     const token = localStorage.getItem('token');
                     const res = await fetch(`${window.API_URL}/products`, {
                         method: 'POST',
-                        headers: { 
+                        headers: {
                             'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const err = await res.json();
                         window.showAlert("Error", err.message || "Failed to create product", "error");
                     }
-                } catch (err) { 
+                } catch (err) {
                     window.showAlert("Error", "Network connection failed", "error");
                 }
             });
@@ -482,14 +482,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             </form>
         `;
         window.showModal({ title: 'Manage Category', content, hideFooter: true });
-        
+
         const form = document.getElementById('categoryForm');
         if (form) {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
-                
+
                 try {
                     const token = localStorage.getItem('token');
                     const res = await fetch(`${window.API_URL}/categories`, {
@@ -505,7 +505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const err = await res.json();
                         window.showAlert("Error", err.message || "Failed to save category", "error");
                     }
-                } catch (err) { 
+                } catch (err) {
                     window.showAlert("Error", "Network connection failed", "error");
                 }
             });
@@ -547,7 +547,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </form>
         `;
         window.showModal({ title: 'Stock Adjustment', content, hideFooter: true });
-        
+
         const form = document.getElementById('adjustForm');
         if (form) {
             form.addEventListener('submit', async (e) => {
@@ -555,7 +555,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const type = document.getElementById('adjType').value;
                 let qty = parseInt(document.getElementById('adjQty').value);
                 const reason = document.getElementById('adjReason').value;
-                
+
                 if (type === 'out') qty = -Math.abs(qty);
 
                 try {
@@ -573,7 +573,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const err = await res.json();
                         window.showAlert("Error", err.message || "Failed to update stock", "error");
                     }
-                } catch (err) { 
+                } catch (err) {
                     window.showAlert("Error", "Network connection failed", "error");
                 }
             });
@@ -667,7 +667,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
-            
+
             try {
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${window.API_URL}/products/${id}`, {
@@ -728,12 +728,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             </form>
         `;
         window.showModal({ title: 'Edit Category', content, hideFooter: true });
-        
+
         document.getElementById('editCategoryForm').onsubmit = async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
-            
+
             try {
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${window.API_URL}/categories/${id}`, {
@@ -864,7 +864,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.preventDefault();
                 const name = form.name.value;
                 const description = form.description.value;
-                
+
                 const items = [];
                 document.querySelectorAll('.set-product-check:checked').forEach(cb => {
                     const pid = cb.getAttribute('data-id');

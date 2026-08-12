@@ -391,8 +391,12 @@ exports.assignLead = async (req, res) => {
     const { assigned_to } = req.body;
     try {
         await pool.query('UPDATE leads SET assigned_to = ?, status = "assigned" WHERE lead_id = ?', [assigned_to, req.params.id]);
+        
+        const [userRows] = await pool.query('SELECT name FROM users WHERE user_id = ?', [assigned_to]);
+        const userName = userRows[0] ? userRows[0].name : `user ID ${assigned_to}`;
+
         await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [req.params.id, req.user.id, `Lead assigned to user ID ${assigned_to}`]);
+            [req.params.id, req.user.id, `Lead assigned to ${userName}`]);
 
         // Send push notification to the assigned user
         try {

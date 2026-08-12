@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Check Auth
     if (!window.requireAuth(['admin', 'whatsapp_manager'])) return;
-    
+
     const token = localStorage.getItem('token');
     const user = window.getCurrentUser();
 
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) throw new Error('Failed to fetch campaigns');
-            
+
             const data = await res.json();
             campaignsList = data;
             renderTable(data);
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
                 <td style="font-weight: 600; color: #1e293b;">${c.campaign_id}</td>
                 <td>${c.tag_line || ''}</td>
-                <td style="font-weight: 500;">₹${parseFloat(c.ad_spend || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="font-weight: 500;">₹${parseFloat(c.ad_spend || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td>
                     <span class="badge badge-${c.status}">
                         ${c.status.toUpperCase()}
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openCampaignModal(campaign = null) {
         const isEdit = !!campaign;
         const title = isEdit ? 'Edit Campaign' : 'Create a Campaign';
-        
+
         const html = `
             <div class="modal-content premium-card" style="max-width: 800px; width: 100%; padding: 2rem; max-height: 90vh; overflow-y: auto;">
                 <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `;
-        
+
         globalModal.innerHTML = html;
         globalModal.classList.add('show');
 
@@ -139,72 +139,72 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.closeModal = function() {
+    window.closeModal = function () {
         globalModal.classList.remove('show');
     };
 
-    window.editCampaign = async function(id) {
+    window.editCampaign = async function (id) {
         const camp = campaignsList.find(c => c.id === id);
         if (!camp) return;
-        
+
         // Fetch full campaign details to get auto_replies
         let autoReplies = [];
         try {
             const res = await fetch(`${window.API_URL}/campaigns`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if(res.ok) {
+            if (res.ok) {
                 const data = await res.json();
                 const fullCamp = data.find(c => c.id === id);
-                if(fullCamp && fullCamp.auto_replies) {
+                if (fullCamp && fullCamp.auto_replies) {
                     autoReplies = typeof fullCamp.auto_replies === 'string' ? JSON.parse(fullCamp.auto_replies) : fullCamp.auto_replies;
                 }
             }
-        } catch(e) { console.error('Failed to fetch full campaign details for edit'); }
-        
+        } catch (e) { console.error('Failed to fetch full campaign details for edit'); }
+
         openCampaignModal({ ...camp, auto_replies: autoReplies });
         renderAutoReplies(autoReplies);
     };
 
     window.currentAutoReplies = [];
-    
+
     function renderAutoReplies(replies) {
         window.currentAutoReplies = replies || [];
         drawAutoReplies();
     }
-    
-    window.addAutoReplyBlock = function() {
+
+    window.addAutoReplyBlock = function () {
         window.currentAutoReplies.push({ type: 'text', content: '' });
         drawAutoReplies();
     };
-    
-    window.removeAutoReply = function(index) {
+
+    window.removeAutoReply = function (index) {
         window.currentAutoReplies.splice(index, 1);
         drawAutoReplies();
     };
-    
-    window.moveAutoReply = function(index, dir) {
-        if(dir === -1 && index > 0) {
+
+    window.moveAutoReply = function (index, dir) {
+        if (dir === -1 && index > 0) {
             const temp = window.currentAutoReplies[index];
-            window.currentAutoReplies[index] = window.currentAutoReplies[index-1];
-            window.currentAutoReplies[index-1] = temp;
+            window.currentAutoReplies[index] = window.currentAutoReplies[index - 1];
+            window.currentAutoReplies[index - 1] = temp;
         } else if (dir === 1 && index < window.currentAutoReplies.length - 1) {
             const temp = window.currentAutoReplies[index];
-            window.currentAutoReplies[index] = window.currentAutoReplies[index+1];
-            window.currentAutoReplies[index+1] = temp;
+            window.currentAutoReplies[index] = window.currentAutoReplies[index + 1];
+            window.currentAutoReplies[index + 1] = temp;
         }
         drawAutoReplies();
     };
-    
-    window.updateReplyType = function(index, type) {
+
+    window.updateReplyType = function (index, type) {
         window.currentAutoReplies[index].type = type;
         drawAutoReplies();
     }
-    
+
     function drawAutoReplies() {
         const container = document.getElementById('autoRepliesContainer');
-        if(!container) return;
-        
+        if (!container) return;
+
         container.innerHTML = window.currentAutoReplies.map((reply, index) => {
             let inputHtml = '';
             if (reply.type === 'text') {
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             }
-            
+
             return `
             <div style="border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #f8fafc; overflow: hidden; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <!-- Header of the reply block -->
@@ -248,11 +248,11 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }).join('');
     }
-    
-    window.handleAutoReplyFile = function(event, index) {
+
+    window.handleAutoReplyFile = function (event, index) {
         const file = event.target.files[0];
-        if(!file) return;
-        
+        if (!file) return;
+
         const MAX_SIZE_MB = 130;
         const maxSizeBytes = MAX_SIZE_MB * 1024 * 1024;
         if (file.size > maxSizeBytes) {
@@ -260,9 +260,9 @@ document.addEventListener('DOMContentLoaded', () => {
             event.target.value = ''; // Reset file input
             return;
         }
-        
+
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
             window.currentAutoReplies[index].mediaData = e.target.result;
             window.currentAutoReplies[index].mimeType = file.type;
             drawAutoReplies();
@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     };
 
-    window.confirmAutoReply = function(btnEl, index) {
+    window.confirmAutoReply = function (btnEl, index) {
         // Visual feedback only, as state is saved via oninput
         btnEl.style.background = '#10b981';
         btnEl.style.color = '#fff';
@@ -282,11 +282,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     };
 
-    window.toggleCampaignStatus = async function(id) {
+    window.toggleCampaignStatus = async function (id) {
         const camp = campaignsList.find(c => c.id === id);
         if (!camp) return;
         const newStatus = camp.status === 'active' ? 'deactive' : 'active';
-        if(confirm(`Are you sure you want to ${newStatus === 'active' ? 'activate' : 'deactivate'} this campaign?`)) {
+        if (confirm(`Are you sure you want to ${newStatus === 'active' ? 'activate' : 'deactivate'} this campaign?`)) {
             try {
                 const res = await fetch(`${window.API_URL}/campaigns/${id}`, {
                     method: 'PUT',
@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         auto_replies: typeof camp.auto_replies === 'string' ? JSON.parse(camp.auto_replies) : camp.auto_replies
                     })
                 });
-                
+
                 if (res.ok) {
                     loadCampaigns();
                     if (typeof window.showAlert === 'function') {
@@ -335,11 +335,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.goToCampaignAnalytics = function(id) {
+    window.goToCampaignAnalytics = function (id) {
         window.location.href = `reports.html?tab=campaign-analytics&campaign_id=${id}`;
     };
 
-    window.deleteCampaign = async function(id) {
+    window.deleteCampaign = async function (id) {
         const camp = campaignsList.find(c => c.id === id);
         if (!camp) return;
         if (confirm(`Are you sure you want to delete campaign "${camp.campaign_id}"?`)) {
@@ -350,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (res.ok) {
                     loadCampaigns();
                     if (typeof window.showAlert === 'function') {

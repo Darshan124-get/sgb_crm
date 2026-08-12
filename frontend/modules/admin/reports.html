@@ -22,248 +22,512 @@
                 </div>
             </header>
             <div class="content-body" id="pageContent">
-            <div class="reports-header"
-                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h1 style="font-size:1.75rem;font-weight:800;color:#0f172a; letter-spacing: -0.025em;">Campaign Analytics</h1>
-            </div>
-
-            <div class="tabs"
-                style="display: flex; gap: 1rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem;">
-                <button class="tab-btn active" data-target="general-reports"
-                    style="white-space: nowrap; padding: 0.75rem 1.5rem; border: none; background: none; font-weight: 600; color: #1e293b; border-bottom: 2px solid #3b82f6; cursor: pointer; transition: all 0.2s;">General</button>
-                <button class="tab-btn" data-target="campaign-analytics"
-                    style="white-space: nowrap; padding: 0.75rem 1.5rem; border: none; background: none; font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.2s;">Campaign Analytics</button>
-            </div>
-
-            <div id="general-reports" class="tab-content" style="display: block;">
-                <div style="background: white; border-radius: 1rem; padding: 3rem; text-align: center; border: 1px dashed #cbd5e1;">
-                    <i class="fa-solid fa-chart-line" style="font-size: 3rem; color: #94a3b8; margin-bottom: 1rem;"></i>
-                    <h3 style="font-size: 1.25rem; color: #1e293b; margin-bottom: 0.5rem;">General Reports</h3>
-                    <p style="color:#64748b;">This feature is coming soon.</p>
+                <div class="reports-header"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <h1 style="font-size:1.75rem;font-weight:800;color:#0f172a; letter-spacing: -0.025em;">Campaign
+                        Analytics</h1>
                 </div>
-            </div>
 
-            <div id="campaign-analytics" class="tab-content" style="display: none;">
-                
-                <style>
-                    /* Premium Styles for Analytics */
-                    .analytics-layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.5rem; align-items: start; }
-                    @media (max-width: 1024px) {
-                        .analytics-layout { grid-template-columns: 1fr; }
-                    }
-                    .glass-filter {
-                        display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 2rem;
-                        background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); padding: 1.5rem;
-                        border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-                        border: 1px solid rgba(255,255,255,0.5);
-                    }
-                    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-                    .kpi-card-new { background: white; padding: 1rem; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; position: relative; overflow: hidden; transition: transform 0.2s; }
-                    .kpi-card-new:hover { transform: translateY(-3px); }
-                    .kpi-icon-new { width: 36px; height: 36px; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; font-size: 1rem; margin-bottom: 0.75rem; }
-                    .kpi-card-new:last-child {
-                        grid-column: span 1;
-                    }
-                    .kpi-title { font-size: 0.75rem; color: #64748b; font-weight: 600; margin-bottom: 0.25rem; }
-                    .kpi-value { font-size: 1.25rem; font-weight: 800; color: #0f172a; line-height: 1.2; }
-                    .kpi-subtext { font-size: 0.7rem; color: #94a3b8; margin-top: 0.25rem; }
-                    .chart-card-new { background: white; padding: 1.25rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 1.5rem; min-width: 0; }
-                    .chart-title { font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-bottom: 1.25rem; }
-                    
-                    /* Table styling */
-                    .perf-table-wrap { overflow-x: auto; background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 2rem; }
-                    .perf-table { width: 100%; border-collapse: collapse; text-align: left; }
-                    .perf-table th { padding: 1rem; background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 1px solid #e2e8f0; }
-                    .perf-table td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; color: #1e293b; }
-                    
-                    /* Summary List */
-                    .summary-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
-                    .summary-item:last-child { border-bottom: none; }
-                    .summary-item .label { display: flex; align-items: center; gap: 0.75rem; }
-                    .summary-item .label i { width: 16px; color: #94a3b8; text-align: center; }
-                    .summary-item .value { font-weight: 600; color: #0f172a; }
-                    
-                    /* Toggle Switch */
-                    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-                    .switch input { opacity: 0; width: 0; height: 0; }
-                    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 34px; }
-                    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-                    input:checked + .slider { background-color: #3b82f6; }
-                    input:checked + .slider:before { transform: translateX(20px); }
-                </style>
-                <div class="glass-filter animate-fade-in">
-                            <div style="flex: 1; max-width: 280px; min-width: 200px;">
-                                <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;"><i class="fa-regular fa-calendar" style="margin-right:0.5rem;"></i>Date Range</label>
-                                <div style="position: relative; display: flex; align-items: center;">
-                                    <input type="text" id="dateRangeSelect" placeholder="Select Date Range" style="width: 100%; padding: 0.6rem 2rem 0.6rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; font-size: 0.95rem; color: #1e293b; outline: none;">
-                                    <button id="clearDateBtn" style="position: absolute; right: 0.5rem; background: none; border: none; color: #94a3b8; cursor: pointer; display: none;"><i class="fa-solid fa-circle-xmark"></i></button>
-                                </div>
-                            </div>
-                            <div style="flex: 1; max-width: 280px; min-width: 200px;">
-                                <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Campaign</label>
-                                <select id="campaignSelect" style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; font-size: 0.95rem; color: #1e293b; outline: none;">
-                                    <option value="all">All Campaigns</option>
-                                </select>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem;">
-                                <button style="padding: 0.6rem 1rem; background: white; color: #475569; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-filter"></i> Filters</button>
+                <div class="tabs"
+                    style="display: flex; gap: 1rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem;">
+                    <button class="tab-btn active" data-target="general-reports"
+                        style="white-space: nowrap; padding: 0.75rem 1.5rem; border: none; background: none; font-weight: 600; color: #1e293b; border-bottom: 2px solid #3b82f6; cursor: pointer; transition: all 0.2s;">General</button>
+                    <button class="tab-btn" data-target="campaign-analytics"
+                        style="white-space: nowrap; padding: 0.75rem 1.5rem; border: none; background: none; font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.2s;">Campaign
+                        Analytics</button>
+                </div>
+
+                <div id="general-reports" class="tab-content" style="display: block;">
+                    <div
+                        style="background: white; border-radius: 1rem; padding: 3rem; text-align: center; border: 1px dashed #cbd5e1;">
+                        <i class="fa-solid fa-chart-line"
+                            style="font-size: 3rem; color: #94a3b8; margin-bottom: 1rem;"></i>
+                        <h3 style="font-size: 1.25rem; color: #1e293b; margin-bottom: 0.5rem;">General Reports</h3>
+                        <p style="color:#64748b;">This feature is coming soon.</p>
+                    </div>
+                </div>
+
+                <div id="campaign-analytics" class="tab-content" style="display: none;">
+
+                    <style>
+                        /* Premium Styles for Analytics */
+                        .analytics-layout {
+                            display: grid;
+                            grid-template-columns: 1fr 280px;
+                            gap: 1.5rem;
+                            align-items: start;
+                        }
+
+                        @media (max-width: 1024px) {
+                            .analytics-layout {
+                                grid-template-columns: 1fr;
+                            }
+                        }
+
+                        .glass-filter {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 1rem;
+                            align-items: flex-end;
+                            margin-bottom: 2rem;
+                            background: rgba(255, 255, 255, 0.8);
+                            backdrop-filter: blur(12px);
+                            padding: 1.5rem;
+                            border-radius: 1rem;
+                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+                            border: 1px solid rgba(255, 255, 255, 0.5);
+                        }
+
+                        .kpi-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                            gap: 1rem;
+                            margin-bottom: 2rem;
+                        }
+
+                        .kpi-card-new {
+                            background: white;
+                            padding: 1rem;
+                            border-radius: 0.75rem;
+                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                            border: 1px solid #f1f5f9;
+                            position: relative;
+                            overflow: hidden;
+                            transition: transform 0.2s;
+                        }
+
+                        .kpi-card-new:hover {
+                            transform: translateY(-3px);
+                        }
+
+                        .kpi-icon-new {
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 0.5rem;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 1rem;
+                            margin-bottom: 0.75rem;
+                        }
+
+                        .kpi-card-new:last-child {
+                            grid-column: span 1;
+                        }
+
+                        .kpi-title {
+                            font-size: 0.75rem;
+                            color: #64748b;
+                            font-weight: 600;
+                            margin-bottom: 0.25rem;
+                        }
+
+                        .kpi-value {
+                            font-size: 1.25rem;
+                            font-weight: 800;
+                            color: #0f172a;
+                            line-height: 1.2;
+                        }
+
+                        .kpi-subtext {
+                            font-size: 0.7rem;
+                            color: #94a3b8;
+                            margin-top: 0.25rem;
+                        }
+
+                        .chart-card-new {
+                            background: white;
+                            padding: 1.25rem;
+                            border-radius: 1rem;
+                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                            border: 1px solid #f1f5f9;
+                            margin-bottom: 1.5rem;
+                            min-width: 0;
+                        }
+
+                        .chart-title {
+                            font-size: 0.95rem;
+                            font-weight: 700;
+                            color: #1e293b;
+                            margin-bottom: 1.25rem;
+                        }
+
+                        /* Table styling */
+                        .perf-table-wrap {
+                            overflow-x: auto;
+                            background: white;
+                            border-radius: 1rem;
+                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                            border: 1px solid #f1f5f9;
+                            margin-bottom: 2rem;
+                        }
+
+                        .perf-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            text-align: left;
+                        }
+
+                        .perf-table th {
+                            padding: 1rem;
+                            background: #f8fafc;
+                            font-size: 0.75rem;
+                            text-transform: uppercase;
+                            letter-spacing: 0.05em;
+                            color: #64748b;
+                            border-bottom: 1px solid #e2e8f0;
+                        }
+
+                        .perf-table td {
+                            padding: 1rem;
+                            border-bottom: 1px solid #f1f5f9;
+                            font-size: 0.875rem;
+                            color: #1e293b;
+                        }
+
+                        /* Summary List */
+                        .summary-item {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            padding: 0.75rem 0;
+                            border-bottom: 1px solid #f1f5f9;
+                        }
+
+                        .summary-item:last-child {
+                            border-bottom: none;
+                        }
+
+                        .summary-item .label {
+                            display: flex;
+                            align-items: center;
+                            gap: 0.75rem;
+                        }
+
+                        .summary-item .label i {
+                            width: 16px;
+                            color: #94a3b8;
+                            text-align: center;
+                        }
+
+                        .summary-item .value {
+                            font-weight: 600;
+                            color: #0f172a;
+                        }
+
+                        /* Toggle Switch */
+                        .switch {
+                            position: relative;
+                            display: inline-block;
+                            width: 44px;
+                            height: 24px;
+                        }
+
+                        .switch input {
+                            opacity: 0;
+                            width: 0;
+                            height: 0;
+                        }
+
+                        .slider {
+                            position: absolute;
+                            cursor: pointer;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background-color: #cbd5e1;
+                            transition: .4s;
+                            border-radius: 34px;
+                        }
+
+                        .slider:before {
+                            position: absolute;
+                            content: "";
+                            height: 18px;
+                            width: 18px;
+                            left: 3px;
+                            bottom: 3px;
+                            background-color: white;
+                            transition: .4s;
+                            border-radius: 50%;
+                        }
+
+                        input:checked+.slider {
+                            background-color: #3b82f6;
+                        }
+
+                        input:checked+.slider:before {
+                            transform: translateX(20px);
+                        }
+                    </style>
+                    <div class="glass-filter animate-fade-in">
+                        <div style="flex: 1; max-width: 280px; min-width: 200px;">
+                            <label
+                                style="display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;"><i
+                                    class="fa-regular fa-calendar" style="margin-right:0.5rem;"></i>Date Range</label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="dateRangeSelect" placeholder="Select Date Range"
+                                    style="width: 100%; padding: 0.6rem 2rem 0.6rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; font-size: 0.95rem; color: #1e293b; outline: none;">
+                                <button id="clearDateBtn"
+                                    style="position: absolute; right: 0.5rem; background: none; border: none; color: #94a3b8; cursor: pointer; display: none;"><i
+                                        class="fa-solid fa-circle-xmark"></i></button>
                             </div>
                         </div>
-                
-                <div id="analyticsResults" style="display: none; animation: fadeIn 0.4s ease-out;">
-                    <div class="analytics-layout">
-                        <div class="analytics-main" style="grid-column: 1; min-width: 0;">
-                            <div class="kpi-grid">
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-wallet"></i></div>
-                                    <div class="kpi-title">Ad Spend</div>
-                                    <div class="kpi-value" id="valAdSpend">₹0</div>
-                                    <div class="kpi-subtext">Total Spend</div>
-                                </div>
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-user-group"></i></div>
-                                    <div class="kpi-title">Leads Generated</div>
-                                    <div class="kpi-value" id="valLeads">0</div>
-                                    <div class="kpi-subtext">Total Leads</div>
-                                </div>
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #faf5ff; color: #a855f7;"><i class="fa-solid fa-bag-shopping"></i></div>
-                                    <div class="kpi-title">Sales (Qty)</div>
-                                    <div class="kpi-value" id="valSalesQty">0</div>
-                                    <div class="kpi-subtext">Total Quantity</div>
-                                </div>
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #fff7ed; color: #f97316;"><i class="fa-solid fa-indian-rupee-sign"></i></div>
-                                    <div class="kpi-title">Sales Amount</div>
-                                    <div class="kpi-value" id="valSalesAmount">₹0</div>
-                                    <div class="kpi-subtext">Total Revenue</div>
-                                </div>
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #eff6ff; color: #3b82f6;"><i class="fa-solid fa-bullseye"></i></div>
-                                    <div class="kpi-title">Cost Per Lead (CPL)</div>
-                                    <div class="kpi-value" id="valCpl">₹0</div>
-                                    <div class="kpi-subtext">Ad Spend / Leads</div>
-                                </div>
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #faf5ff; color: #a855f7;"><i class="fa-solid fa-user-tag"></i></div>
-                                    <div class="kpi-title">CAC</div>
-                                    <div class="kpi-value" id="valCac">₹0</div>
-                                    <div class="kpi-subtext">Ad Spend / Sales</div>
-                                </div>
-                                <div class="kpi-card-new">
-                                    <div class="kpi-icon-new" style="background: #ecfdf5; color: #10b981;"><i class="fa-solid fa-arrow-trend-up"></i></div>
-                                    <div class="kpi-title">Lead Conv. Rate</div>
-                                    <div class="kpi-value" id="valLeadConv">0%</div>
-                                    <div class="kpi-subtext">Sales / Leads * 100</div>
-                                </div>
-                            </div>
-
-                            <!-- Charts -->
-                            <style>
-                                .charts-row { display: grid; gap: 1.5rem; margin-bottom: 1.5rem; align-items: start; }
-                                .charts-row.top { grid-template-columns: 1fr 1fr; }
-                                .charts-row.bottom { grid-template-columns: 1fr 1fr; }
-                                @media (max-width: 1024px) {
-                                    .charts-row.top, .charts-row.bottom { grid-template-columns: 1fr; }
-                                }
-                            </style>
-                            
-                            <div class="charts-row top">
-                                <div class="chart-card-new" style="margin-bottom: 0;">
-                                    <h3 class="chart-title">Leads, Sales & Spend Overview</h3>
-                                    <div style="height: 250px; width: 100%; position: relative;">
-                                        <canvas id="overviewChart"></canvas>
-                                    </div>
-                                </div>
-
-                                <div class="chart-card-new" style="margin-bottom: 0;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-                                        <h3 class="chart-title" style="margin-bottom: 0;">Performance Over Time</h3>
-                                        <select style="padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.75rem; color: #1e293b; background: white;">
-                                            <option value="daily">Daily</option>
-                                        </select>
-                                    </div>
-                                    <div style="height: 250px; width: 100%; position: relative;">
-                                        <canvas id="performanceChart"></canvas>
-                                    </div>
-                                </div>
-                            </div>
+                        <div style="flex: 1; max-width: 280px; min-width: 200px;">
+                            <label
+                                style="display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Campaign</label>
+                            <select id="campaignSelect"
+                                style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; font-size: 0.95rem; color: #1e293b; outline: none;">
+                                <option value="all">All Campaigns</option>
+                            </select>
                         </div>
-                        
-                        <div class="analytics-sidebar" style="grid-column: 2;">
-                            <div style="background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: sticky; top: 1rem;">
-                                <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;">Report</h2>
-                                    <button style="background: none; border: none; color: #64748b; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
-                                </div>
-                                <div style="display: flex; border-bottom: 1px solid #e2e8f0;">
-                                    <button style="flex: 1; padding: 1rem; background: white; border: none; border-bottom: 2px solid #3b82f6; font-weight: 600; color: #3b82f6;">Campaign Report</button>
-                                    <button style="flex: 1; padding: 1rem; background: #f8fafc; border: none; font-weight: 600; color: #64748b; cursor: pointer;">Custom Report</button>
-                                </div>
-                                <div style="padding: 1.5rem;">
-                                    <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem;">Report Summary</h3>
-                                    <div id="reportSummaryList">
-                                        <!-- Injected by JS -->
-                                    </div>
-                                    
-                                    <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-top: 2rem; margin-bottom: 1rem;">Charts in Report</h3>
-                                    <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; color: #475569;">
-                                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"><input type="checkbox" checked style="accent-color: #3b82f6; width:16px; height:16px;"> Leads, Sales & Spend Overview</label>
-                                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"><input type="checkbox" checked style="accent-color: #3b82f6; width:16px; height:16px;"> Conversion Rate Trend</label>
-                                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"><input type="checkbox" checked style="accent-color: #3b82f6; width:16px; height:16px;"> Campaign Performance Table</label>
-                                    </div>
-                            
-                                    <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-top: 2rem; margin-bottom: 1rem;">Export Report</h3>
-                                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
-                                        <button id="btnExportPdf" style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white; color: #ef4444; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                                        <button id="btnExportExcel" style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white; color: #10b981; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><i class="fa-solid fa-file-excel"></i> Excel</button>
-                                        <button id="btnExportCsv" style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white; color: #3b82f6; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><i class="fa-solid fa-file-csv"></i> CSV</button>
-                                    </div>
-                                    <button id="btnGenerateReport" style="width: 100%; padding: 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 0.5rem; transition: background 0.2s;"><i class="fa-solid fa-file-lines"></i> Generate Report</button>
-                                </div>
-                            </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button
+                                style="padding: 0.6rem 1rem; background: white; color: #475569; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;"><i
+                                    class="fa-solid fa-filter"></i> Filters</button>
                         </div>
-                        
-                        <div class="charts-row bottom" style="grid-column: 1 / -1; width: 100%;">
-                            <div class="chart-card-new" style="margin-bottom: 0;">
-                                <h3 class="chart-title">Leads by Location</h3>
-                                <div style="height: 250px; width: 100%; display: flex; justify-content: center; position: relative;">
-                                    <canvas id="locationChart"></canvas>
-                                </div>
-                            </div>
+                    </div>
 
-                            <div class="chart-card-new" style="margin-bottom: 0;">
-                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-                                    <h3 class="chart-title" style="margin-bottom: 0;">Dynamic Analysis</h3>
-                                    <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
-                                        <select id="dynamicType" style="padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.75rem; color: #1e293b; background: white;">
-                                            <option value="bar">Bar Chart</option>
-                                            <option value="line">Line Chart</option>
-                                            <option value="pie">Pie Chart</option>
-                                            <option value="doughnut">Doughnut Chart</option>
-                                            <option value="radar">Radar Chart</option>
-                                        </select>
-                                        <div id="dynamicMetricContainer" style="display: flex; gap: 0.75rem; font-size: 0.75rem; color: #1e293b; flex-wrap: wrap; justify-content: flex-end;">
-                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input type="checkbox" value="leads" checked class="dyn-metric-chk" style="accent-color: #3b82f6;"> Leads</label>
-                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input type="checkbox" value="sales_qty" class="dyn-metric-chk" style="accent-color: #3b82f6;"> Sales</label>
-                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input type="checkbox" value="sales_amount" class="dyn-metric-chk" style="accent-color: #3b82f6;"> Revenue</label>
-                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input type="checkbox" value="ad_spend" class="dyn-metric-chk" style="accent-color: #3b82f6;"> Cost</label>
-                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input type="checkbox" value="cpl" class="dyn-metric-chk" style="accent-color: #3b82f6;"> CPL</label>
-                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input type="checkbox" value="cac" class="dyn-metric-chk" style="accent-color: #3b82f6;"> CAC</label>
+                    <div id="analyticsResults" style="display: none; animation: fadeIn 0.4s ease-out;">
+                        <div class="analytics-layout">
+                            <div class="analytics-main" style="grid-column: 1; min-width: 0;">
+                                <div class="kpi-grid">
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #eff6ff; color: #3b82f6;"><i
+                                                class="fa-solid fa-wallet"></i></div>
+                                        <div class="kpi-title">Ad Spend</div>
+                                        <div class="kpi-value" id="valAdSpend">₹0</div>
+                                        <div class="kpi-subtext">Total Spend</div>
+                                    </div>
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #ecfdf5; color: #10b981;"><i
+                                                class="fa-solid fa-user-group"></i></div>
+                                        <div class="kpi-title">Leads Generated</div>
+                                        <div class="kpi-value" id="valLeads">0</div>
+                                        <div class="kpi-subtext">Total Leads</div>
+                                    </div>
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #faf5ff; color: #a855f7;"><i
+                                                class="fa-solid fa-bag-shopping"></i></div>
+                                        <div class="kpi-title">Sales (Qty)</div>
+                                        <div class="kpi-value" id="valSalesQty">0</div>
+                                        <div class="kpi-subtext">Total Quantity</div>
+                                    </div>
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #fff7ed; color: #f97316;"><i
+                                                class="fa-solid fa-indian-rupee-sign"></i></div>
+                                        <div class="kpi-title">Sales Amount</div>
+                                        <div class="kpi-value" id="valSalesAmount">₹0</div>
+                                        <div class="kpi-subtext">Total Revenue</div>
+                                    </div>
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #eff6ff; color: #3b82f6;"><i
+                                                class="fa-solid fa-bullseye"></i></div>
+                                        <div class="kpi-title">Cost Per Lead (CPL)</div>
+                                        <div class="kpi-value" id="valCpl">₹0</div>
+                                        <div class="kpi-subtext">Ad Spend / Leads</div>
+                                    </div>
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #faf5ff; color: #a855f7;"><i
+                                                class="fa-solid fa-user-tag"></i></div>
+                                        <div class="kpi-title">CAC</div>
+                                        <div class="kpi-value" id="valCac">₹0</div>
+                                        <div class="kpi-subtext">Ad Spend / Sales</div>
+                                    </div>
+                                    <div class="kpi-card-new">
+                                        <div class="kpi-icon-new" style="background: #ecfdf5; color: #10b981;"><i
+                                                class="fa-solid fa-arrow-trend-up"></i></div>
+                                        <div class="kpi-title">Lead Conv. Rate</div>
+                                        <div class="kpi-value" id="valLeadConv">0%</div>
+                                        <div class="kpi-subtext">Sales / Leads * 100</div>
+                                    </div>
+                                </div>
+
+                                <!-- Charts -->
+                                <style>
+                                    .charts-row {
+                                        display: grid;
+                                        gap: 1.5rem;
+                                        margin-bottom: 1.5rem;
+                                        align-items: start;
+                                    }
+
+                                    .charts-row.top {
+                                        grid-template-columns: 1fr 1fr;
+                                    }
+
+                                    .charts-row.bottom {
+                                        grid-template-columns: 1fr 1fr;
+                                    }
+
+                                    @media (max-width: 1024px) {
+
+                                        .charts-row.top,
+                                        .charts-row.bottom {
+                                            grid-template-columns: 1fr;
+                                        }
+                                    }
+                                </style>
+
+                                <div class="charts-row top">
+                                    <div class="chart-card-new" style="margin-bottom: 0;">
+                                        <h3 class="chart-title">Leads, Sales & Spend Overview</h3>
+                                        <div style="height: 250px; width: 100%; position: relative;">
+                                            <canvas id="overviewChart"></canvas>
+                                        </div>
+                                    </div>
+
+                                    <div class="chart-card-new" style="margin-bottom: 0;">
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                                            <h3 class="chart-title" style="margin-bottom: 0;">Performance Over Time</h3>
+                                            <select
+                                                style="padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.75rem; color: #1e293b; background: white;">
+                                                <option value="daily">Daily</option>
+                                            </select>
+                                        </div>
+                                        <div style="height: 250px; width: 100%; position: relative;">
+                                            <canvas id="performanceChart"></canvas>
                                         </div>
                                     </div>
                                 </div>
-                                <div style="height: 250px; width: 100%; position: relative;">
-                                    <canvas id="dynamicChart"></canvas>
+                            </div>
+
+                            <div class="analytics-sidebar" style="grid-column: 2;">
+                                <div
+                                    style="background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: sticky; top: 1rem;">
+                                    <div
+                                        style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                                        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;">
+                                            Report</h2>
+                                        <button
+                                            style="background: none; border: none; color: #64748b; cursor: pointer;"><i
+                                                class="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                    <div style="display: flex; border-bottom: 1px solid #e2e8f0;">
+                                        <button
+                                            style="flex: 1; padding: 1rem; background: white; border: none; border-bottom: 2px solid #3b82f6; font-weight: 600; color: #3b82f6;">Campaign
+                                            Report</button>
+                                        <button
+                                            style="flex: 1; padding: 1rem; background: #f8fafc; border: none; font-weight: 600; color: #64748b; cursor: pointer;">Custom
+                                            Report</button>
+                                    </div>
+                                    <div style="padding: 1.5rem;">
+                                        <h3
+                                            style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem;">
+                                            Report Summary</h3>
+                                        <div id="reportSummaryList">
+                                            <!-- Injected by JS -->
+                                        </div>
+
+                                        <h3
+                                            style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-top: 2rem; margin-bottom: 1rem;">
+                                            Charts in Report</h3>
+                                        <div
+                                            style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; color: #475569;">
+                                            <label
+                                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"><input
+                                                    type="checkbox" checked
+                                                    style="accent-color: #3b82f6; width:16px; height:16px;"> Leads,
+                                                Sales & Spend Overview</label>
+                                            <label
+                                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"><input
+                                                    type="checkbox" checked
+                                                    style="accent-color: #3b82f6; width:16px; height:16px;"> Conversion
+                                                Rate Trend</label>
+                                            <label
+                                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"><input
+                                                    type="checkbox" checked
+                                                    style="accent-color: #3b82f6; width:16px; height:16px;"> Campaign
+                                                Performance Table</label>
+                                        </div>
+
+                                        <h3
+                                            style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-top: 2rem; margin-bottom: 1rem;">
+                                            Export Report</h3>
+                                        <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                                            <button id="btnExportPdf"
+                                                style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white; color: #ef4444; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><i
+                                                    class="fa-solid fa-file-pdf"></i> PDF</button>
+                                            <button id="btnExportExcel"
+                                                style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white; color: #10b981; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><i
+                                                    class="fa-solid fa-file-excel"></i> Excel</button>
+                                            <button id="btnExportCsv"
+                                                style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white; color: #3b82f6; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><i
+                                                    class="fa-solid fa-file-csv"></i> CSV</button>
+                                        </div>
+                                        <button id="btnGenerateReport"
+                                            style="width: 100%; padding: 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 0.5rem; transition: background 0.2s;"><i
+                                                class="fa-solid fa-file-lines"></i> Generate Report</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="chart-card-new" style="padding:0; overflow:hidden;" id="campaignTableContainer">
+
+                            <div class="charts-row bottom" style="grid-column: 1 / -1; width: 100%;">
+                                <div class="chart-card-new" style="margin-bottom: 0;">
+                                    <h3 class="chart-title">Leads by Location</h3>
+                                    <div
+                                        style="height: 250px; width: 100%; display: flex; justify-content: center; position: relative;">
+                                        <canvas id="locationChart"></canvas>
+                                    </div>
+                                </div>
+
+                                <div class="chart-card-new" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                                        <h3 class="chart-title" style="margin-bottom: 0;">Dynamic Analysis</h3>
+                                        <div
+                                            style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
+                                            <select id="dynamicType"
+                                                style="padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.75rem; color: #1e293b; background: white;">
+                                                <option value="bar">Bar Chart</option>
+                                                <option value="line">Line Chart</option>
+                                                <option value="pie">Pie Chart</option>
+                                                <option value="doughnut">Doughnut Chart</option>
+                                                <option value="radar">Radar Chart</option>
+                                            </select>
+                                            <div id="dynamicMetricContainer"
+                                                style="display: flex; gap: 0.75rem; font-size: 0.75rem; color: #1e293b; flex-wrap: wrap; justify-content: flex-end;">
+                                                <label
+                                                    style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input
+                                                        type="checkbox" value="leads" checked class="dyn-metric-chk"
+                                                        style="accent-color: #3b82f6;"> Leads</label>
+                                                <label
+                                                    style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input
+                                                        type="checkbox" value="sales_qty" class="dyn-metric-chk"
+                                                        style="accent-color: #3b82f6;"> Sales</label>
+                                                <label
+                                                    style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input
+                                                        type="checkbox" value="sales_amount" class="dyn-metric-chk"
+                                                        style="accent-color: #3b82f6;"> Revenue</label>
+                                                <label
+                                                    style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input
+                                                        type="checkbox" value="ad_spend" class="dyn-metric-chk"
+                                                        style="accent-color: #3b82f6;"> Cost</label>
+                                                <label
+                                                    style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input
+                                                        type="checkbox" value="cpl" class="dyn-metric-chk"
+                                                        style="accent-color: #3b82f6;"> CPL</label>
+                                                <label
+                                                    style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"><input
+                                                        type="checkbox" value="cac" class="dyn-metric-chk"
+                                                        style="accent-color: #3b82f6;"> CAC</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="height: 250px; width: 100%; position: relative;">
+                                        <canvas id="dynamicChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="chart-card-new" style="padding:0; overflow:hidden;" id="campaignTableContainer">
                                 <div style="padding: 1.5rem; border-bottom: 1px solid #f1f5f9;">
                                     <h3 class="chart-title" style="margin: 0;">Campaign Performance</h3>
                                 </div>
-                                <div class="perf-table-wrap" style="box-shadow:none; border:none; margin:0; border-radius:0;">
+                                <div class="perf-table-wrap"
+                                    style="box-shadow:none; border:none; margin:0; border-radius:0;">
                                     <table class="perf-table" id="campaignPerfTable">
                                         <thead>
                                             <tr>
@@ -284,10 +548,10 @@
                                     </table>
                                 </div>
                             </div>
+                        </div>
                     </div>
-                </div>
 
-            </div>
+                </div>
             </div>
         </main>
     </div>

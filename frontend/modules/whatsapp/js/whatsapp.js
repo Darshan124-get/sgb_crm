@@ -284,7 +284,6 @@ function renderSidebarTabs() {
 
     // Calculate unread count
     const unreadCount = (allCustomers || []).filter(c => {
-        if (isResolved(c)) return false;
         return parseInt(c.unread_msg_count || 0) > 0;
     }).length;
 
@@ -642,7 +641,7 @@ function renderCustomerList() {
         } else if (currentTab === 'resolved') {
             matchesTab = resolved;
         } else if (currentTab === 'unviewed') {
-            matchesTab = !resolved && parseInt(customer.unread_msg_count || 0) > 0;
+            matchesTab = parseInt(customer.unread_msg_count || 0) > 0;
         } else if (currentTab === 'undefined') {
             if (resolved) {
                 matchesTab = false;

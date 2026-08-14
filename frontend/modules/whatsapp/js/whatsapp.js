@@ -1172,6 +1172,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     sendMediaBtn.onclick = handleSendMedia;
 
+    // Allow sending media when pressing Enter inside the caption input
+    previewCaption.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSendMedia();
+        }
+    };
+
     // mediaInputEl onchange is bound in initEventListeners
 });
 
@@ -1950,6 +1958,11 @@ function handleMediaSelect(e) {
     mediaPreviewModal.classList.remove('hidden');
     mediaPreviewModal.classList.add('active');
     document.body.classList.add('modal-open');
+    
+    // Auto-focus caption input for immediate typing or sending
+    setTimeout(() => {
+        previewCaption.focus();
+    }, 50);
 
     // Reset file input so same file can be selected again
     e.target.value = '';

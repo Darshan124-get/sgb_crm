@@ -641,7 +641,7 @@ function renderCustomerList() {
         } else if (currentTab === 'resolved') {
             matchesTab = resolved;
         } else if (currentTab === 'unviewed') {
-            matchesTab = parseInt(customer.unread_msg_count || 0) > 0;
+            matchesTab = parseInt(customer.unread_msg_count || 0) > 0 || (activeCustomer && activeCustomer.phone === customer.phone);
         } else if (currentTab === 'undefined') {
             if (resolved) {
                 matchesTab = false;
@@ -893,11 +893,11 @@ async function selectCustomer(customer) {
             fetch(`${API_BASE}/customers/${customer.phone}/read`, { method: 'PUT', headers: AUTH_HEADER }).catch(console.error);
             customer.unread_msg_count = 0;
             renderSidebarTabs();
-            renderCustomerList();
         } catch (err) {
             console.error('Failed to mark as read:', err);
         }
     }
+    renderCustomerList();
 
     await loadChatHistory(customer.phone);
 }
@@ -2048,7 +2048,11 @@ function initEventListeners() {
     sendBtnEl.onclick = handleSend;
     attachBtnEl.onclick = () => mediaInputEl.click();
     mediaInputEl.onchange = handleMediaSelect;
-    mobileBackBtnEl.onclick = () => appContainerEl.classList.remove('show-chat');
+    mobileBackBtnEl.onclick = () => {
+        appContainerEl.classList.remove('show-chat');
+        activeCustomer = null;
+        renderCustomerList();
+    };
     messageInputEl.onkeydown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();

@@ -1205,21 +1205,54 @@ async function handleSendMedia() {
     msgEl.id = msgId;
 
     let mediaPreview = '';
+    const isVisual = mimeType.startsWith('image/') || mimeType.startsWith('video/');
+
     if (mimeType.startsWith('image/')) {
-        mediaPreview = `<img src="${URL.createObjectURL(file)}" alt="Uploading..." style="opacity: 0.6; border-radius: 8px;">`;
+        mediaPreview = `<img src="${URL.createObjectURL(file)}" alt="Uploading..." style="opacity: 0.6; border-radius: 8px; display: block; max-width: 100%;">`;
     } else if (mimeType.startsWith('video/')) {
-        mediaPreview = `<video src="${URL.createObjectURL(file)}" style="opacity: 0.6; max-width: 100%; border-radius: 8px;"></video>`;
+        mediaPreview = `<video src="${URL.createObjectURL(file)}" style="opacity: 0.6; max-width: 100%; border-radius: 8px; display: block;"></video>`;
     } else {
-        mediaPreview = `<div style="padding: 10px; background: rgba(0,0,0,0.1); border-radius: 8px;"><i class="fas fa-file"></i> ${fileName}</div>`;
+        mediaPreview = `<div style="padding: 12px; background: rgba(0,0,0,0.05); border-radius: 8px; display: flex; align-items: center; gap: 10px; font-weight: 500;"><i class="fas fa-file-alt" style="font-size: 1.5rem; color: #128C7E;"></i> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${fileName}</span></div>`;
+    }
+
+    let overlayHTML = '';
+    if (isVisual) {
+        overlayHTML = `
+            <div class="upload-overlay" style="position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(2px); transition: all 0.3s ease; border-radius: 8px;">
+                <div class="progress-container" style="position: relative; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
+                    <svg width="60" height="60" style="transform: rotate(-90deg);">
+                        <circle cx="30" cy="30" r="26" stroke="rgba(255,255,255,0.2)" stroke-width="4" fill="transparent" />
+                        <circle class="progress-ring-circle" cx="30" cy="30" r="26" stroke="#25D366" stroke-width="4" fill="transparent" 
+                                stroke-dasharray="163.36" stroke-dashoffset="163.36" style="transition: stroke-dashoffset 0.1s ease; stroke-linecap: round;" />
+                    </svg>
+                    <span class="upload-percent" style="position: absolute; color: white; font-size: 0.85rem; font-weight: 600; font-family: sans-serif;">0%</span>
+                </div>
+                <div class="upload-status" style="margin-top: 8px; color: rgba(255,255,255,0.9); font-size: 0.8rem; font-weight: 500; letter-spacing: 0.5px;">Uploading...</div>
+            </div>
+        `;
+    } else {
+        overlayHTML = `
+            <div class="upload-overlay" style="position: absolute; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: space-between; padding: 0 15px; z-index: 10; transition: all 0.3s ease; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px; color: white; font-size: 0.85rem; width: 100%;">
+                    <div class="progress-container" style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg width="32" height="32" style="transform: rotate(-90deg);">
+                            <circle cx="16" cy="16" r="13" stroke="rgba(255,255,255,0.2)" stroke-width="3" fill="transparent" />
+                            <circle class="progress-ring-circle" cx="16" cy="16" r="13" stroke="#25D366" stroke-width="3" fill="transparent" 
+                                    stroke-dasharray="81.68" stroke-dashoffset="81.68" style="transition: stroke-dashoffset 0.1s ease; stroke-linecap: round;" />
+                        </svg>
+                        <span class="upload-percent" style="position: absolute; color: white; font-size: 0.65rem; font-weight: 600; font-family: sans-serif;">0%</span>
+                    </div>
+                    <span class="upload-status" style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Uploading...</span>
+                </div>
+            </div>
+        `;
     }
 
     msgEl.innerHTML = `
-        <div class="message-media" style="position: relative;">
+        <div class="message-media" style="position: relative; overflow: hidden; border-radius: 8px;">
             ${mediaPreview}
-            <div class="upload-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.6); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 0.9rem; font-weight: bold;">
-                <span class="upload-percent">0%</span>
-            </div>
-            ${caption ? `<div class="message-content" style="opacity: 0.7;">${caption}</div>` : ''}
+            ${overlayHTML}
+            ${caption ? `<div class="message-content" style="opacity: 0.7; padding: 8px 12px; background: rgba(0,0,0,0.02); border-top: 1px solid rgba(0,0,0,0.05);">${caption}</div>` : ''}
         </div>
         <div class="message-time">Uploading...</div>
     `;
@@ -1248,8 +1281,25 @@ async function handleSendMedia() {
             if (e.lengthComputable) {
                 const percentComplete = Math.round((e.loaded / e.total) * 100);
                 const percentEl = msgEl.querySelector('.upload-percent');
+                const ringCircle = msgEl.querySelector('.progress-ring-circle');
+                const statusEl = msgEl.querySelector('.upload-status');
+                
+                if (ringCircle) {
+                    const circumference = isVisual ? 163.36 : 81.68;
+                    const offset = circumference - (percentComplete / 100) * circumference;
+                    ringCircle.style.strokeDashoffset = offset;
+                }
+                
                 if (percentEl) {
                     percentEl.innerText = `${percentComplete}%`;
+                }
+
+                if (statusEl) {
+                    if (percentComplete === 100) {
+                        statusEl.innerText = 'Processing...';
+                    } else {
+                        statusEl.innerText = 'Uploading...';
+                    }
                 }
             }
         };
@@ -1257,11 +1307,21 @@ async function handleSendMedia() {
         xhr.onload = () => {
             activeUploads.delete(msgId); // Remove from global tracking
             if (xhr.status >= 200 && xhr.status < 300) {
+                const overlay = msgEl.querySelector('.upload-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 300);
+                }
+                const timeEl = msgEl.querySelector('.message-time');
+                if (timeEl) timeEl.innerText = 'Sent';
+
                 // If they are still in the same chat, reload history to get the real message
                 if (activeCustomer && activeCustomer.phone === phone) {
-                    loadChatHistory(phone);
-                    currentCustomersJson = '';
-                    loadCustomers();
+                    setTimeout(() => {
+                        loadChatHistory(phone);
+                        currentCustomersJson = '';
+                        loadCustomers();
+                    }, 500);
                 }
             } else {
                 handleUploadError();
@@ -1276,7 +1336,23 @@ async function handleSendMedia() {
         function handleUploadError() {
             console.error('Media upload error');
             const overlay = msgEl.querySelector('.upload-overlay');
-            if (overlay) overlay.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ef4444; font-size: 1.2rem;"></i>';
+            if (overlay) {
+                if (isVisual) {
+                    overlay.innerHTML = `
+                        <div style="background: rgba(239, 68, 68, 0.15); padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid #ef4444; width: 48px; height: 48px;">
+                            <i class="fas fa-exclamation-triangle" style="color: #ef4444; font-size: 1.4rem;"></i>
+                        </div>
+                        <div style="margin-top: 8px; color: #ef4444; font-size: 0.8rem; font-weight: 600;">Upload Failed</div>
+                    `;
+                } else {
+                    overlay.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 8px; color: #ef4444; font-size: 0.85rem; font-weight: 600;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Upload Failed</span>
+                        </div>
+                    `;
+                }
+            }
             const timeEl = msgEl.querySelector('.message-time');
             if (timeEl) timeEl.innerText = 'Failed';
 

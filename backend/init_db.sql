@@ -3,6 +3,14 @@ USE u581231108_SGB_CRM_test1;
 
 -- DROP TABLES IN REVERSE ORDER OF DEPENDENCY
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS chatbot_audit_logs;
+DROP TABLE IF EXISTS chatbot_executions;
+DROP TABLE IF EXISTS chatbot_sessions;
+DROP TABLE IF EXISTS chatbot_edges;
+DROP TABLE IF EXISTS chatbot_nodes;
+DROP TABLE IF EXISTS chatbot_flow_versions;
+DROP TABLE IF EXISTS chatbot_flows;
+DROP TABLE IF EXISTS chatbot_settings;
 DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS chat_sessions;
 DROP TABLE IF EXISTS notifications;
@@ -430,3 +438,155 @@ INSERT INTO users (name, phone, email, password_hash, role_id, language, status)
 SELECT 'Admin', '0000000000', 'admin@sgbagro.com', '$2a$10$xp5204oZU8a6eHFQFTsMUOJLFBSM3E2lkPO7NVb6PC/fn1PxiC0tK', role_id, 'EN', 'active'
 FROM roles WHERE name = 'admin'
 ON DUPLICATE KEY UPDATE users.name=users.name;
+
+
+-- 11️⃣ CHATBOT SYSTEM TABLES
+CREATE TABLE chatbot_flows (
+    flow_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    description TEXT,
+    category VARCHAR(50) DEFAULT 'enquiry',
+    status ENUM('draft', 'active', 'paused', 'archived') DEFAULT 'draft',
+    active_version_id INT DEFAULT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_flow_versions (
+    version_id INT AUTO_INCREMENT PRIMARY KEY,
+    flow_id INT NOT NULL,
+    version_number DECIMAL(4,2) NOT NULL,
+    status ENUM('draft', 'published') DEFAULT 'draft',
+    published_at TIMESTAMP NULL,
+    published_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (flow_id) REFERENCES chatbot_flows(flow_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_nodes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    version_id INT NOT NULL,
+    node_key VARCHAR(100) NOT NULL,
+    node_type VARCHAR(50) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    position_x INT DEFAULT 0,
+    position_y INT DEFAULT 0,
+    config JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (version_id) REFERENCES chatbot_flow_versions(version_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_edges (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    version_id INT NOT NULL,
+    source_node_key VARCHAR(100) NOT NULL,
+    target_node_key VARCHAR(100) NOT NULL,
+    source_handle VARCHAR(150) DEFAULT NULL,
+    target_handle VARCHAR(150) DEFAULT NULL,
+    condition_key VARCHAR(100) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (version_id) REFERENCES chatbot_flow_versions(version_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_sessions (
+    session_id INT AUTO_INCREMENT PRIMARY KEY,
+    flow_id INT NOT NULL,
+    version_id INT NOT NULL,
+    lead_id INT DEFAULT NULL,
+    phone VARCHAR(20) NOT NULL,
+    current_node_key VARCHAR(100) DEFAULT 'node-start',
+    status ENUM('active', 'paused_for_human', 'completed', 'expired') DEFAULT 'active',
+    variables JSON DEFAULT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    paused_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    FOREIGN KEY (flow_id) REFERENCES chatbot_flows(flow_id) ON DELETE CASCADE,
+    FOREIGN KEY (version_id) REFERENCES chatbot_flow_versions(version_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_executions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    session_id INT NOT NULL,
+    node_key VARCHAR(100) NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    input TEXT,
+    output TEXT,
+    status VARCHAR(50) DEFAULT 'success',
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES chatbot_sessions(session_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ai_fallback_enabled BOOLEAN DEFAULT TRUE,
+    ai_model VARCHAR(50) DEFAULT 'gpt-4o-mini',
+    ai_temperature DECIMAL(2,1) DEFAULT 0.3,
+    default_fallback_msg TEXT NOT NULL,
+    max_fallback_attempts INT DEFAULT 2,
+    webhook_url VARCHAR(255) DEFAULT NULL,
+    webhook_token VARCHAR(255) DEFAULT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE chatbot_audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    flow_id INT NOT NULL,
+    version_id INT DEFAULT NULL,
+    user_id INT NULL,
+    action VARCHAR(100) NOT NULL,
+    metadata JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (flow_id) REFERENCES chatbot_flows(flow_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Seed default chatbot settings if empty
+INSERT INTO chatbot_settings (id, default_fallback_msg, webhook_url) VALUES 
+(1, 'I\'m sorry, I didn\'t quite catch that. Would you like to connect with a sales representative?', 'https://api.sgbagro.com/v1/webhooks/whatsapp')
+ON DUPLICATE KEY UPDATE default_fallback_msg=VALUES(default_fallback_msg);
+
+-- Seed default Flow: Full Set / Trolley Enquiry
+INSERT INTO chatbot_flows (flow_id, name, description, category, status, active_version_id) 
+VALUES (1, 'Full Set / Trolley Enquiry', 'WhatsApp flow to qualify machinery inquiries.', 'enquiry', 'active', 1);
+
+INSERT INTO chatbot_flow_versions (version_id, flow_id, version_number, status, published_at) 
+VALUES (1, 1, 1.0, 'published', NOW());
+
+INSERT INTO chatbot_nodes (version_id, node_key, node_type, name, position_x, position_y, config) VALUES 
+(1, 'node-start', 'start', 'Start', 80, 250, '{"triggerType": "Keyword", "keywords": "trolley, full set, machine"}'),
+(1, 'node-1', 'question', 'Step 1', 280, 250, '{"question": "Q: Sir do you need a full set or Trolley ?", "responseType": "buttons", "choices": ["Full Set", "Trolley"], "saveResponseTo": "product_interest", "options": [{"label": "Full Set", "value": "full_set", "nextNode": "node-2"}, {"label": "Trolley", "value": "trolley", "nextNode": "node-3"}]}'),
+(1, 'node-2', 'question', 'Step 2', 520, 100, '{"question": "Q: How much Acre land do you have sir ?\\n(Sir nimm jaaga estu ide ant gottu adra, navu machine suggest madtivi sir)", "responseType": "buttons", "choices": ["1. Below 2 Acre", "2. 2 - 5 Acre", "3. More than 5 Acre"], "saveResponseTo": "land_acres", "options": [{"label": "1. Below 2 Acre", "value": "below_2_acre", "nextNode": "node-4"}, {"label": "2. 2 - 5 Acre", "value": "2_5_acre", "nextNode": "node-5"}, {"label": "3. More than 5 Acre", "value": "more_5_acre", "nextNode": "node-6"}]}'),
+(1, 'node-3', 'question', 'Step: Brush Cutter', 520, 440, '{"question": "Q: Which brush cutter do you have sir?", "responseType": "buttons", "choices": ["1. Side pack 1", "2. Side pack 2", "3. Don\'t know"], "saveResponseTo": "brush_cutter_type", "options": [{"label": "1. Side pack 1", "value": "side_pack_1", "nextNode": "node-7"}, {"label": "2. Side pack 2", "value": "side_pack_2", "nextNode": "node-8"}, {"label": "3. Don\'t know", "value": "dont_know", "nextNode": "node-9"}]}'),
+(1, 'node-4', 'product', 'Send details of Machine 12K', 780, 40, '{"productId": 1, "product": "Machine 12K", "message": "Send details of Machine 12K", "nextNode": "node-10"}'),
+(1, 'node-5', 'product', 'Send details of Machine 16K & 21K', 780, 160, '{"productId": 2, "product": "Machine 16K & 21K", "message": "Send details of Machine 16K & 21K", "nextNode": "node-10"}'),
+(1, 'node-6', 'product', 'Send details of Machine 21K', 780, 280, '{"productId": 3, "product": "Machine 21K", "message": "Send details of Machine 21K", "nextNode": "node-10"}'),
+(1, 'node-7', 'product', 'Send details of Side Pack 1', 780, 400, '{"productId": 4, "product": "Side Pack 1", "message": "Send details of Side Pack 1", "nextNode": "node-10"}'),
+(1, 'node-8', 'product', 'Send details of Side Pack 2', 780, 520, '{"productId": 5, "product": "Side Pack 2", "message": "Send details of Side Pack 2", "nextNode": "node-10"}'),
+(1, 'node-9', 'message', 'Reply Message: Photo Request', 780, 640, '{"message": "Reply Message:\\nSir please send photo of your brush cutter", "inputType": "image", "nextNode": "node-10"}'),
+(1, 'node-10', 'question', 'Step 3', 1050, 280, '{"question": "Q: Right time to contact you ?\\n(sir nimage call madalu sariyada samaya?)", "responseType": "buttons", "choices": ["1. 9:30 - 1:00 PM", "2. 2:30 - 6:00 PM"], "saveResponseTo": "preferred_contact_time", "options": [{"label": "1. 9:30 - 1:00 PM", "value": "morning", "nextNode": "node-11"}, {"label": "2. 2:30 - 6:00 PM", "value": "evening", "nextNode": "node-11"}]}'),
+(1, 'node-11', 'text_input', 'Step 4', 1300, 280, '{"question": "Q: Please share your Name & Place\\n(Sir nimm hesaru mattu ooru tillisi)", "choices": ["Name & Place"], "saveResponseTo": "name_place", "options": [{"label": "Name & Place", "value": "name_place", "nextNode": "node-12"}], "nextNode": "node-12"}'),
+(1, 'node-12', 'create_lead', 'Create Lead', 1480, 280, '{"nextNode": "node-13"}'),
+(1, 'node-13', 'end', 'End', 1640, 280, '{"message": "Thank You!\\nOur team will contact you soon."}');
+
+INSERT INTO chatbot_edges (version_id, source_node_key, target_node_key, source_handle, target_handle) VALUES 
+(1, 'node-start', 'node-1', NULL, NULL),
+(1, 'node-1', 'node-2', 'Full Set', NULL),
+(1, 'node-1', 'node-3', 'Trolley', NULL),
+(1, 'node-2', 'node-4', '1. Below 2 Acre', NULL),
+(1, 'node-2', 'node-5', '2. 2 - 5 Acre', NULL),
+(1, 'node-2', 'node-6', '3. More than 5 Acre', NULL),
+(1, 'node-3', 'node-7', '1. Side pack 1', NULL),
+(1, 'node-3', 'node-8', '2. Side pack 2', NULL),
+(1, 'node-3', 'node-9', '3. Don\'t know', NULL),
+(1, 'node-4', 'node-10', NULL, NULL),
+(1, 'node-5', 'node-10', NULL, NULL),
+(1, 'node-6', 'node-10', NULL, NULL),
+(1, 'node-7', 'node-10', NULL, NULL),
+(1, 'node-8', 'node-10', NULL, NULL),
+(1, 'node-9', 'node-10', NULL, NULL),
+(1, 'node-10', 'node-11', '1. 9:30 - 1:00 PM', NULL),
+(1, 'node-10', 'node-11', '2. 2:30 - 6:00 PM', NULL),
+(1, 'node-11', 'node-12', NULL, NULL),
+(1, 'node-12', 'node-13', NULL, NULL);

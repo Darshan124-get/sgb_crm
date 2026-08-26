@@ -320,6 +320,37 @@ function initSidebar(links) {
         }
     });
 
+    // ── Dropdown Menu Toggling ──
+    const sidebarElement = document.querySelector('.sidebar');
+    if (sidebarElement) {
+        const dropdownToggles = sidebarElement.querySelectorAll('.dropdown-toggle');
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const navItem = toggle.closest('.nav-item.dropdown');
+                if (navItem) {
+                    // Close other dropdowns if any
+                    sidebarElement.querySelectorAll('.nav-item.dropdown').forEach(item => {
+                        if (item !== navItem) {
+                            item.classList.remove('open');
+                        }
+                    });
+                    navItem.classList.toggle('open');
+                }
+            });
+        });
+
+        // Automatically open dropdown if a child link is active
+        const activeSubLink = sidebarElement.querySelector('.nav-sub-bar a.active');
+        if (activeSubLink) {
+            const parentNavItem = activeSubLink.closest('.nav-item.dropdown');
+            if (parentNavItem) {
+                parentNavItem.classList.add('open');
+            }
+        }
+    }
+
     // Logout binding
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {

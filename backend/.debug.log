@@ -913,3 +913,31 @@
 [2026-08-09T11:09:41.843Z] [INFO] Text message sent to 918867724616: 200 
 [2026-08-09T11:09:41.855Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"918867724616","wa_id":"918867724616"}],"messages":[{"id":"wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSQjBCQ0U3QTc1QjMyREI2QjhEAA=="}]}
 [2026-08-09T11:09:41.867Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSQjBCQ0U3QTc1QjMyREI2QjhEAA==
+[2026-08-14T06:53:29.012Z] [INFO] [SUPABASE] File uploaded: https://poxjjdfjxidwvrtfjyxx.supabase.co/storage/v1/object/public/SGB/chats/6364594854/1786690406298-6364594854.mp4 
+[2026-08-14T06:59:09.912Z] [INFO] [SUPABASE] File uploaded: https://poxjjdfjxidwvrtfjyxx.supabase.co/storage/v1/object/public/SGB/chats/6364594854/1786690747175-6364594854.mp4 
+[2026-08-14T06:59:30.095Z] [ERROR] API Error (getMedia): connect ETIMEDOUT
+[2026-08-14T07:06:24.474Z] [INFO] [SUPABASE] File uploaded: https://poxjjdfjxidwvrtfjyxx.supabase.co/storage/v1/object/public/SGB/chats/6364594854/1786691180986-6364594854.mp4 
+[2026-08-14T07:09:59.765Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-14T07:09:59.769Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSRTFCODU0NjZCNUMyMDEwNjZCAA=="}]}
+[2026-08-14T07:09:59.789Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSRTFCODU0NjZCNUMyMDEwNjZCAA==
+[2026-08-14T07:10:10.328Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-14T07:10:10.329Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSM0I1OEUyMUVGMURDREIzRjk0AA=="}]}
+[2026-08-14T07:10:10.333Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSM0I1OEUyMUVGMURDREIzRjk0AA==
+[2026-08-14T10:25:55.755Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T10:25:58.020Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T10:25:59.639Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T10:59:41.597Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T10:59:43.817Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T10:59:45.431Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T11:07:32.225Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T11:07:34.629Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T11:07:36.653Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T11:09:18.539Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T11:09:20.982Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-14T11:09:22.612Z] [INFO] Text message sent to 9999999999: 200 
+[2026-08-26T07:29:35.346Z] [INFO] Text message sent to 8217286727: 200 
+[2026-08-26T07:30:03.953Z] [INFO] Text message sent to 918217286727: 200 
+[2026-08-26T07:41:33.308Z] [INFO] Text message sent to 918217286727: 200 
+[2026-08-26T07:41:44.994Z] [INFO] Text message sent to 918217286727: 200 
+[2026-08-26T07:59:25.607Z] [INFO] Text message sent to 918217286727: 200 
+[2026-08-26T08:08:57.817Z] [ERROR] Error sending WhatsApp text message: {"error":{"message":"Invalid OAuth access token - Cannot parse access token","type":"OAuthException","code":190,"fbtrace_id":"Acm4wO0lAHkZfe0N9wdSHLw"}}

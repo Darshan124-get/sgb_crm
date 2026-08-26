@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Templates | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="./css/templates-page.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Navigation Container (Loaded dynamically by components.js) -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main CRM Content Area -->
+        <main class="main-content">
+            <div class="flow-templates-wrapper">
+
+                <!-- Breadcrumb Nav -->
+                <div class="breadcrumb-nav">
+                    <span>Chatbot</span>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 8px; color: #94a3b8;"></i>
+                    <span class="current">Flow Templates</span>
+                </div>
+
+                <!-- Page Header Flex -->
+                <div class="page-header-flex">
+                    <div class="header-title-area">
+                        <h1>Flow Templates</h1>
+                        <p>Use templates to create flows faster or manage your created flows</p>
+                    </div>
+                    <div class="header-actions-group">
+                        <button class="btn-hdr-link" id="btn-how-it-works">
+                            <i class="fa-regular fa-circle-question"></i> How it works?
+                        </button>
+                        <button class="btn-hdr-outline" id="btn-import-flow">
+                            <i class="fa-solid fa-upload"></i> Import Flow
+                        </button>
+                        <button class="btn-hdr-primary" id="btn-create-flow">
+                            <i class="fa-solid fa-plus"></i> Create New Flow
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SECTION 1: FLOW TEMPLATES GRID -->
+                <div id="section-flow-templates" style="margin-bottom: 24px;">
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">Flow Templates</h2>
+                            <p class="section-subtitle">Start with a template and customize it as per your requirement</p>
+                        </div>
+                        <a href="#" class="view-all-link" id="view-all-link">
+                            View All Templates <i class="fa-solid fa-arrow-right"></i>
+                        </a>
+                    </div>
+
+                    <div class="templates-grid-wrapper">
+                        <!-- 5 Template Cards Grid -->
+                        <div class="templates-grid" id="templates-grid-container">
+                            
+                            <!-- Card 1: Product Enquiry -->
+                            <div class="template-card">
+                                <div>
+                                    <div class="tpl-icon-box purple">
+                                        <i class="fa-solid fa-gift"></i>
+                                    </div>
+                                    <h3 class="tpl-card-title">Product Enquiry</h3>
+                                    <p class="tpl-card-desc">Ask product need, show products and collect contact details</p>
+                                    <div class="mini-flow-chips">
+                                        <span class="chip-item">Question</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Product</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Contact</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Lead</span>
+                                    </div>
+                                </div>
+                                <div class="tpl-card-bottom">
+                                    <span class="used-count-text">Used 124 times</span>
+                                    <button class="btn-use-tpl btn-use-template" data-template-id="1" data-template-name="Product Enquiry" data-category="Sales">Use Template</button>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Product Recommendation -->
+                            <div class="template-card">
+                                <div>
+                                    <div class="tpl-icon-box blue">
+                                        <i class="fa-solid fa-star"></i>
+                                    </div>
+                                    <h3 class="tpl-card-title">Product Recommendation</h3>
+                                    <p class="tpl-card-desc">Ask requirements and recommend suitable products</p>
+                                    <div class="mini-flow-chips">
+                                        <span class="chip-item">Question</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Condition</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Product</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Lead</span>
+                                    </div>
+                                </div>
+                                <div class="tpl-card-bottom">
+                                    <span class="used-count-text">Used 98 times</span>
+                                    <button class="btn-use-tpl btn-use-template" data-template-id="2" data-template-name="Product Recommendation" data-category="Sales">Use Template</button>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Lead Qualification -->
+                            <div class="template-card">
+                                <div>
+                                    <div class="tpl-icon-box green">
+                                        <i class="fa-solid fa-user-check"></i>
+                                    </div>
+                                    <h3 class="tpl-card-title">Lead Qualification</h3>
+                                    <p class="tpl-card-desc">Qualify leads with questions before sending to sales team</p>
+                                    <div class="mini-flow-chips">
+                                        <span class="chip-item">Questions</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Qualification</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Lead</span>
+                                    </div>
+                                </div>
+                                <div class="tpl-card-bottom">
+                                    <span class="used-count-text">Used 76 times</span>
+                                    <button class="btn-use-tpl btn-use-template" data-template-id="3" data-template-name="Lead Qualification" data-category="Qualification">Use Template</button>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Image Collection -->
+                            <div class="template-card">
+                                <div>
+                                    <div class="tpl-icon-box orange">
+                                        <i class="fa-solid fa-image"></i>
+                                    </div>
+                                    <h3 class="tpl-card-title">Image Collection</h3>
+                                    <p class="tpl-card-desc">Collect images or documents from customers</p>
+                                    <div class="mini-flow-chips">
+                                        <span class="chip-item">Question</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Image</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Lead</span>
+                                    </div>
+                                </div>
+                                <div class="tpl-card-bottom">
+                                    <span class="used-count-text">Used 42 times</span>
+                                    <button class="btn-use-tpl btn-use-template" data-template-id="4" data-template-name="Image Collection" data-category="Media">Use Template</button>
+                                </div>
+                            </div>
+
+                            <!-- Card 5: Appointment Booking -->
+                            <div class="template-card">
+                                <div>
+                                    <div class="tpl-icon-box red">
+                                        <i class="fa-solid fa-calendar-days"></i>
+                                    </div>
+                                    <h3 class="tpl-card-title">Appointment Booking</h3>
+                                    <p class="tpl-card-desc">Book appointment and collect customer details</p>
+                                    <div class="mini-flow-chips">
+                                        <span class="chip-item">Question</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Date/Time</span>
+                                        <i class="fa-solid fa-chevron-right chip-arrow"></i>
+                                        <span class="chip-item">Lead</span>
+                                    </div>
+                                </div>
+                                <div class="tpl-card-bottom">
+                                    <span class="used-count-text">Used 33 times</span>
+                                    <button class="btn-use-tpl btn-use-template" data-template-id="5" data-template-name="Appointment Booking" data-category="Booking">Use Template</button>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Right Scroll Button -->
+                        <button class="grid-scroll-right-btn" id="btn-scroll-right">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: MY CREATED FLOWS -->
+                <div id="section-created-flows">
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">My Created Flows</h2>
+                            <p class="section-subtitle">All flows created by you and your team</p>
+                        </div>
+
+                        <!-- Toolbar Filters -->
+                        <div class="toolbar-flex">
+                            <div class="search-box-wrapper">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" class="search-box-input" id="flows-search-input" name="flows-search-input" placeholder="Search flows...">
+                            </div>
+                            <select class="select-filter" id="filter-status" name="filter-status">
+                                <option value="ALL">All Status</option>
+                                <option value="ACTIVE">Active</option>
+                                <option value="DRAFT">Draft</option>
+                                <option value="STOPPED">Stopped</option>
+                            </select>
+                            <select class="select-filter" id="filter-category" name="filter-category">
+                                <option value="ALL">All Categories</option>
+                                <option value="Agriculture">Agriculture</option>
+                                <option value="Construction">Construction</option>
+                                <option value="Gardening">Gardening</option>
+                                <option value="General">General</option>
+                            </select>
+                            <select class="select-filter" id="sort-select" name="sort-select">
+                                <option value="recently_modified">Recently Modified</option>
+                                <option value="oldest_modified">Oldest Modified</option>
+                                <option value="name_asc">Name (A-Z)</option>
+                                <option value="name_desc">Name (Z-A)</option>
+                            </select>
+                            <button class="btn-hdr-outline" style="padding: 5px 7px;" id="btn-filter-icon" type="button">
+                                <i class="fa-solid fa-sliders"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 11-Column Data Table Container -->
+                    <div class="table-card-container">
+                        <div class="table-scroll-wrapper">
+                            <table class="created-flows-table">
+                                <colgroup>
+                                    <col class="col-flow-name">
+                                    <col class="col-trigger">
+                                    <col class="col-category">
+                                    <col class="col-status">
+                                    <col class="col-version">
+                                    <col class="col-modified">
+                                    <col class="col-createdby">
+                                    <col class="col-leads">
+                                    <col class="col-completion">
+                                    <col class="col-conversion">
+                                    <col class="col-actions">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>FLOW NAME</th>
+                                        <th>TRIGGER / KEYWORDS</th>
+                                        <th>CATEGORY</th>
+                                        <th>STATUS</th>
+                                        <th>VERSION</th>
+                                        <th>LAST MODIFIED</th>
+                                        <th>CREATED BY</th>
+                                        <th>LEADS</th>
+                                        <th>COMPLETION RATE</th>
+                                        <th>CONVERSION RATE</th>
+                                        <th style="text-align: center;">ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="created-flows-tbody">
+                                    <!-- Dynamic Flow Rows Rendered by FlowService JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination Footer -->
+                        <div class="pagination-flex">
+                            <div id="pagination-info">Showing 0 flows</div>
+                            <div class="pagination-controls-group">
+                                <button class="page-nav-btn" type="button"><i class="fa-solid fa-angles-left"></i></button>
+                                <button class="page-nav-btn" type="button"><i class="fa-solid fa-chevron-left"></i></button>
+                                <button class="page-nav-btn active" type="button">1</button>
+                                <button class="page-nav-btn" type="button"><i class="fa-solid fa-chevron-right"></i></button>
+                                <button class="page-nav-btn" type="button"><i class="fa-solid fa-angles-right"></i></button>
+                                <select class="select-filter" id="page-size-select" name="page-size-select" style="padding: 2px 6px; font-size: 11px; margin-left: 6px;">
+                                    <option value="10">10 / page</option>
+                                    <option value="25">25 / page</option>
+                                    <option value="50">50 / page</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Legend Bar -->
+                    <div class="legend-bar-container">
+                        <div class="legend-group-flex">
+                            <span class="legend-label-bold">Status Types</span>
+                            <div class="legend-item-inline"><span class="status-dot-indicator" style="background:#16a34a;"></span> <strong>Active</strong> - Flow is live and receiving chats</div>
+                            <div class="legend-item-inline"><span class="status-dot-indicator" style="background:#d97706;"></span> <strong>Draft</strong> - Flow is not published yet</div>
+                            <div class="legend-item-inline"><span class="status-dot-indicator" style="background:#dc2626;"></span> <strong>Stopped</strong> - Flow is paused</div>
+                        </div>
+                        <div class="legend-group-flex">
+                            <span class="legend-label-bold">Actions</span>
+                            <div class="legend-item-inline"><i class="fa-regular fa-pen-to-square"></i> Edit Flow</div>
+                            <div class="legend-item-inline"><i class="fa-solid fa-chart-line"></i> View Analytics</div>
+                            <div class="legend-item-inline"><i class="fa-regular fa-copy"></i> Duplicate Flow</div>
+                            <div class="legend-item-inline"><i class="fa-solid fa-play" style="color: #16a34a;"></i> Test Flow</div>
+                            <div class="legend-item-inline"><i class="fa-solid fa-ellipsis-vertical"></i> More Options</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    <!-- MODAL 1: HOW IT WORKS -->
+    <div class="modal-backdrop" id="modal-how-it-works">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fa-regular fa-circle-question" style="color: var(--primary-indigo);"></i> How Flow Templates Work</h3>
+                <button class="btn-hdr-link btn-close-modal" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <ol style="padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.8; margin: 0;">
+                    <li>Select a template or create a new flow.</li>
+                    <li>Configure the flow in Flow Builder.</li>
+                    <li>Save the flow as Draft.</li>
+                    <li>Test the flow.</li>
+                    <li>Publish the flow.</li>
+                    <li>Published flow becomes available for WhatsApp conversations.</li>
+                    <li>Existing flows can be reopened and edited from My Created Flows.</li>
+                </ol>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-hdr-primary btn-close-modal" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CREATE FROM TEMPLATE -->
+    <div class="modal-backdrop" id="modal-create-from-template">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary-indigo);"></i> Create Flow from Template</h3>
+                <button class="btn-close-modal" type="button" title="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-create-from-template">
+                <div class="modal-body">
+                    <input type="hidden" id="tpl-modal-id" name="tpl-modal-id">
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="tpl-flow-name">Flow Name *</label>
+                        <input type="text" id="tpl-flow-name" name="tpl-flow-name" class="modal-input" required placeholder="e.g. Full Set / Trolley Enquiry">
+                    </div>
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="tpl-flow-category">Category</label>
+                        <select id="tpl-flow-category" name="tpl-flow-category" class="modal-select">
+                            <option value="Enquiry">Enquiry</option>
+                            <option value="Agriculture">Agriculture</option>
+                            <option value="Construction">Construction</option>
+                            <option value="Gardening">Gardening</option>
+                            <option value="Lead Capture">Lead Capture</option>
+                            <option value="Support">Support</option>
+                        </select>
+                    </div>
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="tpl-flow-desc">Description</label>
+                        <textarea id="tpl-flow-desc" name="tpl-flow-desc" class="modal-textarea" style="height: 64px; resize: vertical;" placeholder="Brief description of what this flow does"></textarea>
+                    </div>
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="tpl-flow-keywords">Trigger Keywords (comma separated)</label>
+                        <input type="text" id="tpl-flow-keywords" name="tpl-flow-keywords" class="modal-input" placeholder="e.g. trolley, full set, machine">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-hdr-outline btn-close-modal" type="button">Cancel</button>
+                    <button class="btn-hdr-primary" type="submit"><i class="fa-solid fa-check"></i> Create & Open Builder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: CREATE NEW FLOW -->
+    <div class="modal-backdrop" id="modal-create-flow">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-plus" style="color: var(--primary-indigo);"></i> Create New Blank Flow</h3>
+                <button class="btn-close-modal" type="button" title="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-create-flow">
+                <div class="modal-body">
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="new-flow-name">Flow Name *</label>
+                        <input type="text" id="new-flow-name" name="new-flow-name" class="modal-input" required placeholder="e.g. Custom Equipment Enquiry">
+                    </div>
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="new-flow-category">Category</label>
+                        <select id="new-flow-category" name="new-flow-category" class="modal-select">
+                            <option value="Enquiry">Enquiry</option>
+                            <option value="Agriculture">Agriculture</option>
+                            <option value="Construction">Construction</option>
+                            <option value="Gardening">Gardening</option>
+                            <option value="Lead Capture">Lead Capture</option>
+                            <option value="Support">Support</option>
+                        </select>
+                    </div>
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="new-flow-desc">Description</label>
+                        <textarea id="new-flow-desc" name="new-flow-desc" class="modal-textarea" style="height: 64px; resize: vertical;" placeholder="Flow description"></textarea>
+                    </div>
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="new-flow-keywords">Trigger Keywords</label>
+                        <input type="text" id="new-flow-keywords" name="new-flow-keywords" class="modal-input" placeholder="e.g. hello, help, price">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-hdr-outline btn-close-modal" type="button">Cancel</button>
+                    <button class="btn-hdr-primary" type="submit"><i class="fa-solid fa-check"></i> Create Flow</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: DUPLICATE FLOW -->
+    <div class="modal-backdrop" id="modal-duplicate-flow">
+        <div class="modal-box" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3><i class="fa-regular fa-copy" style="color: var(--primary-indigo);"></i> Duplicate Flow</h3>
+                <button class="btn-close-modal" type="button" title="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-duplicate-flow">
+                <div class="modal-body">
+                    <input type="hidden" id="dup-flow-id" name="dup-flow-id">
+                    <div class="modal-form-group">
+                        <label class="modal-label" for="dup-flow-name">New Flow Name *</label>
+                        <input type="text" id="dup-flow-name" name="dup-flow-name" class="modal-input" required placeholder="e.g. Flow Name - Copy">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-hdr-outline btn-close-modal" type="button">Cancel</button>
+                    <button class="btn-hdr-primary" type="submit"><i class="fa-regular fa-copy"></i> Duplicate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 5: TEST FLOW SIMULATOR -->
+    <div class="modal-backdrop" id="modal-test-flow">
+        <div class="modal-box" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-play" style="color: #16a34a;"></i> Test Flow Simulator</h3>
+                <button class="btn-close-modal" type="button" title="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                    <strong id="test-bot-name" style="font-size: 12.5px; color: #0f172a; display: block;">Flow Simulator</strong>
+                    <span style="font-size: 11px; color: #64748b;">Simulate chat interactions with this bot flow.</span>
+                </div>
+                <div id="simulator-chat-box" style="height: 220px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; overflow-y: auto; background: #efeae2; font-size: 12px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="background: #ffffff; padding: 8px 12px; border-radius: 8px; max-width: 80%; box-shadow: 0 1px 1px rgba(0,0,0,0.05); align-self: flex-start;">
+                        👋 Hello! Welcome to SGB Agro. Type a keyword to begin testing.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 10px;">
+                    <input type="text" id="sim-input-text" name="sim-input-text" class="modal-input" style="flex: 1;" placeholder="Type reply...">
+                    <button type="button" class="btn-hdr-primary" id="btn-send-sim"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-hdr-outline btn-close-modal" type="button">Close Simulator</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Stack -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Shared CRM Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <!-- Module Scripts -->
+    <script src="./js/FlowService.js"></script>
+    <script src="./js/templates.js"></script>
+</body>
+</html>

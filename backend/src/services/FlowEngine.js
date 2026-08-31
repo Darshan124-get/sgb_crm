@@ -431,17 +431,17 @@ class FlowEngine {
      * Helper to get the next target node key from config or edges
      */
     static async getNextTargetNodeKey(versionId, currentKey, config = {}) {
-        // 1. Primary: Query visual edge connections from chatbot_edges table
+        // 1. Primary: Query visual edge connections from chatbot_edges table (excluding self-referencing loops)
         const [edgeRows] = await pool.query(
-            'SELECT target_node_key FROM chatbot_edges WHERE version_id = ? AND source_node_key = ? ORDER BY id ASC LIMIT 1',
-            [versionId, currentKey]
+            'SELECT target_node_key FROM chatbot_edges WHERE version_id = ? AND source_node_key = ? AND target_node_key != ? ORDER BY id ASC LIMIT 1',
+            [versionId, currentKey, currentKey]
         );
         if (edgeRows.length > 0) {
             return edgeRows[0].target_node_key;
         }
 
-        // 2. Fallback: Return config.nextNode if no edge connection exists
-        if (config && config.nextNode) {
+        // 2. Fallback: Return config.nextNode if no valid edge connection exists and it is not self-referencing
+        if (config && config.nextNode && config.nextNode !== currentKey) {
             return config.nextNode;
         }
 
@@ -468,8 +468,15 @@ class FlowEngine {
     static async executeFlowLoop(session) {
         let executionLimit = 25; // Prevent infinite loops
         let currentKey = session.current_node_key;
+        const visitedNodes = new Set();
 
         while (executionLimit > 0 && currentKey) {
+            if (visitedNodes.has(currentKey)) {
+                console.warn(`[FlowEngine] ⚠️ Cycle detected! Node ${currentKey} was already visited in this execution pass. Breaking loop.`);
+                break;
+            }
+            visitedNodes.add(currentKey);
+
             executionLimit--;
 
             const [nodeRows] = await pool.query(
@@ -918,14 +925,6 @@ class FlowEngine {
         );
 
         return { success: true, message: 'Handoff resolved successfully' };
-    }
-
-    /**
-     * Pauses flow execution briefly after triggering WhatsApp media/product card messages
-     * to allow Meta WhatsApp servers to complete media upload and delivery before executing downstream nodes.
-     */
-    static async waitForMediaDelivery(sendRes) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
     }
 }
 

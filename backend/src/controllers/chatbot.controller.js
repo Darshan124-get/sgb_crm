@@ -445,6 +445,9 @@ exports.saveDraft = async (req, res) => {
         // Insert new edges
         if (edges && Array.isArray(edges)) {
             for (const edge of edges) {
+                if (!edge.source || !edge.target || edge.source === edge.target) {
+                    continue; // Ignore self-looping edges
+                }
                 await connection.query(
                     'INSERT INTO chatbot_edges (version_id, source_node_key, target_node_key, source_handle, target_handle) VALUES (?, ?, ?, ?, ?)',
                     [versionId, edge.source, edge.target, edge.sourceHandle || null, edge.targetHandle || null]
@@ -564,10 +567,12 @@ exports.publishFlow = async (req, res) => {
 
         // Clone edges to the new draft
         for (const e of edges) {
-            await connection.query(
-                'INSERT INTO chatbot_edges (version_id, source_node_key, target_node_key, source_handle, target_handle) VALUES (?, ?, ?, ?, ?)',
-                [newDraftVersionId, e.source_node_key, e.target_node_key, e.source_handle, e.target_handle]
-            );
+            if (e.source_node_key && e.target_node_key && e.source_node_key !== e.target_node_key) {
+                await connection.query(
+                    'INSERT INTO chatbot_edges (version_id, source_node_key, target_node_key, source_handle, target_handle) VALUES (?, ?, ?, ?, ?)',
+                    [newDraftVersionId, e.source_node_key, e.target_node_key, e.source_handle, e.target_handle]
+                );
+            }
         }
 
         await logAudit(connection, flowId, draftVersionId, req.user?.id, 'Flow Published', { version: currentVerNum });

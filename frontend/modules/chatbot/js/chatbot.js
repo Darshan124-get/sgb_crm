@@ -2202,6 +2202,64 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (currentNode.type === 'delay' || currentNode.type === 'time_trigger') {
+            const delayVal = parseFloat(currentNode.config.delayValue || currentNode.config.duration || currentNode.config.delaySeconds) || 5;
+            const delayUnit = currentNode.config.delayUnit || currentNode.config.unit || 'seconds';
+
+            appendSystemMessage(`⏱️ Wait ${delayVal} ${delayUnit}...`);
+
+            setTimeout(() => {
+                if (activeNodeEl) {
+                    activeNodeEl.classList.remove('active-node');
+                    activeNodeEl.classList.add('passed-node');
+                }
+
+                const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
+                if (edge) {
+                    highlightActiveEdge(edge.from, edge.to);
+                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    executeNodeInSim();
+                } else {
+                    appendSystemMessage('Simulation Stalled: Time trigger output not connected.');
+                }
+            }, 1200);
+            return;
+        }
+
+        if (currentNode.type === 'save_lead_field' || currentNode.type === 'assign_to_user' || currentNode.type === 'webhook') {
+            appendSystemMessage(`System Action: Executed ${currentNode.name || currentNode.type}`);
+
+            setTimeout(() => {
+                if (activeNodeEl) {
+                    activeNodeEl.classList.remove('active-node');
+                    activeNodeEl.classList.add('passed-node');
+                }
+
+                const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
+                if (edge) {
+                    highlightActiveEdge(edge.from, edge.to);
+                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    executeNodeInSim();
+                }
+            }, 800);
+            return;
+        }
+
+        if (currentNode.type === 'goto') {
+            const targetId = currentNode.config.targetNodeId;
+            if (activeNodeEl) {
+                activeNodeEl.classList.remove('active-node');
+                activeNodeEl.classList.add('passed-node');
+            }
+            if (targetId) {
+                currentSimNodeId = targetId;
+                executeNodeInSim();
+            } else {
+                appendSystemMessage('Error: Jump target node not specified.');
+            }
+            return;
+        }
+
         if (currentNode.type === 'text_input') {
             appendBotMessage(currentNode.config.question || 'Please share your details:');
             return;
@@ -2643,7 +2701,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sourceHandle: sourceHandle,
                 targetHandle: null
             };
-        });
+        }).filter(e => e.source && e.target && e.source !== e.target);
 
         // Backend expects options arrays inside Question/Contact_Time nodes to carry nextNode targets
         // Let's populate config.options automatically for backend FlowEngine compatibility

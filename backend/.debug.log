@@ -941,3 +941,69 @@
 [2026-08-26T07:41:44.994Z] [INFO] Text message sent to 918217286727: 200 
 [2026-08-26T07:59:25.607Z] [INFO] Text message sent to 918217286727: 200 
 [2026-08-26T08:08:57.817Z] [ERROR] Error sending WhatsApp text message: {"error":{"message":"Invalid OAuth access token - Cannot parse access token","type":"OAuthException","code":190,"fbtrace_id":"Acm4wO0lAHkZfe0N9wdSHLw"}}
+[2026-08-26T12:06:26.820Z] [ERROR] Fetch all chat customers error: Table 'u581231108_SGB_CRM_test1.leads' doesn't exist
+[2026-08-26T12:06:26.823Z] [ERROR] API Error (getCustomers): Table 'u581231108_SGB_CRM_test1.leads' doesn't exist
+[2026-08-26T12:06:27.211Z] [ERROR] Fetch chat history error: Table 'u581231108_SGB_CRM_test1.chat_messages' doesn't exist
+[2026-08-26T12:06:27.214Z] [ERROR] API Error (getHistory): Table 'u581231108_SGB_CRM_test1.chat_messages' doesn't exist
+[2026-08-26T12:06:29.681Z] [ERROR] Error fetching quick replies: Table 'u581231108_SGB_CRM_test1.whatsapp_quick_replies' doesn't exist
+[2026-08-26T12:06:29.685Z] [ERROR] Fetch all chat customers error: Table 'u581231108_SGB_CRM_test1.leads' doesn't exist
+[2026-08-26T12:06:29.686Z] [ERROR] API Error (getCustomers): Table 'u581231108_SGB_CRM_test1.leads' doesn't exist
+[2026-08-26T12:07:19.368Z] [ERROR] Fetch all chat customers error: Table 'u581231108_SGB_CRM_test1.leads' doesn't exist
+[2026-08-26T12:07:19.372Z] [ERROR] API Error (getCustomers): Table 'u581231108_SGB_CRM_test1.leads' doesn't exist
+[2026-08-26T12:07:19.381Z] [ERROR] Error fetching quick replies: Table 'u581231108_SGB_CRM_test1.whatsapp_quick_replies' doesn't exist
+[2026-08-30T18:12:04.849Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-30T18:12:05.022Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-30T19:24:52.254Z] [INFO] Text message sent to 8217286727: 200 
+[2026-08-31T04:57:05.040Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-31T05:38:28.989Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-31T05:44:05.212Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-31T05:50:23.510Z] [INFO] Text message sent to 8217286727: 200 
+[2026-08-31T05:52:14.277Z] [INFO] Text message sent to 8217286727: 200 
+[2026-08-31T11:37:42.121Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-31T12:00:03.787Z] [INFO] Text message sent to 8867724616: 200 
+[2026-08-31T12:00:31.346Z] [INFO] Text message sent to 6364594854: 200 
+[2026-08-31T12:09:51.860Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:09:51.877Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:10:09.760Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:10:09.762Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:12:43.996Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:12:43.997Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:12:47.739Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:12:47.742Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:29.988Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:29.990Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:44.309Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:44.311Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:49.644Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:49.645Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:56.979Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:13:56.988Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:06.539Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:06.540Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:16.551Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:16.555Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:25.842Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:26.783Z] [ERROR] Fetch all chat customers error: Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:14:26.785Z] [ERROR] API Error (getCustomers): Illegal mix of collations (utf8mb4_uca1400_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+[2026-08-31T12:17:19.316Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-31T12:17:19.321Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSQUJBODk5QTE1NEQ2QzcxNTVEAA=="}]}
+[2026-08-31T12:17:19.330Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSQUJBODk5QTE1NEQ2QzcxNTVEAA==
+[2026-08-31T12:17:28.063Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-31T12:17:28.065Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSNzQ3MzQxMzJFOTk3ODlEMDJGAA=="}]}
+[2026-08-31T12:17:28.068Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSNzQ3MzQxMzJFOTk3ODlEMDJGAA==
+[2026-08-31T13:49:25.437Z] [INFO] Text message sent to 918050126631: 200 
+[2026-08-31T13:49:25.440Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"918050126631","wa_id":"918050126631"}],"messages":[{"id":"wamid.HBgMOTE4MDUwMTI2NjMxFQIAERgSNDIyMDc5QzRGMjkwNURGNzQzAA=="}]}
+[2026-08-31T13:49:25.446Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE4MDUwMTI2NjMxFQIAERgSNDIyMDc5QzRGMjkwNURGNzQzAA==
+[2026-08-31T13:49:27.853Z] [INFO] Text message sent to 918867724616: 200 
+[2026-08-31T13:49:27.855Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"918867724616","wa_id":"918867724616"}],"messages":[{"id":"wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSRjg0NDEyNUE4QzI3QjUyQjUwAA=="}]}
+[2026-08-31T13:49:27.858Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE4ODY3NzI0NjE2FQIAERgSRjg0NDEyNUE4QzI3QjUyQjUwAA==
+[2026-08-31T13:49:35.061Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-31T13:49:35.064Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSQ0NCMDgxQjAwQzc1NDU4MEVEAA=="}]}
+[2026-08-31T13:49:35.067Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSQ0NCMDgxQjAwQzc1NDU4MEVEAA==
+[2026-08-31T17:45:22.343Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-31T17:45:22.345Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSNjJFMTg0OTBCNUUxQUYyQjZBAA=="}]}
+[2026-08-31T17:45:22.348Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSNjJFMTg0OTBCNUUxQUYyQjZBAA==
+[2026-08-31T18:30:50.587Z] [INFO] Text message sent to 916364594854: 200 
+[2026-08-31T18:30:50.591Z] [INFO] TEXT META RESPONSE: {"messaging_product":"whatsapp","contacts":[{"input":"916364594854","wa_id":"916364594854"}],"messages":[{"id":"wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSN0EzMDlGRUQ0OTE2MkY3NEFGAA=="}]}
+[2026-08-31T18:30:50.602Z] [INFO] TEXT META MESSAGE ID: wamid.HBgMOTE2MzY0NTk0ODU0FQIAERgSN0EzMDlGRUQ0OTE2MkY3NEFGAA==
+[2026-08-31T18:55:07.381Z] [INFO] [META MEDIA] Pre-uploaded URL to Meta Media ID: 1424700416204030 

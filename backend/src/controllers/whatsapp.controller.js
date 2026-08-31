@@ -3,6 +3,7 @@ const messageService = require('../services/message.service');
 const logger = require('../utils/whatsappLogger');
 const { normalizePhone, formatForWhatsApp } = require('../utils/phoneUtils');
 const pool = require('../config/db');
+const deliveryNotifier = require('../utils/deliveryNotifier');
 
 /**
  * Handles Meta/WhatsApp Webhook Verification (GET)
@@ -45,6 +46,9 @@ const receiveMessage = async (req, res) => {
             try {
               await messageService.updateMessageStatus(id, status);
               logger.info(`Message ${id} status updated to ${status}`);
+              if (status === 'delivered' || status === 'read') {
+                deliveryNotifier.emit(`delivered:${id}`, status);
+              }
             } catch (err) {
               logger.error(`Failed to update message status for ${id}:`, err.message);
             }
@@ -269,6 +273,14 @@ const sendReply = async (req, res) => {
       const metaMessageId = metaResponse?.messages?.[0]?.id || null;
       logger.info('TEXT META MESSAGE ID:', metaMessageId);
       await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id, metaMessageId, 'sent', reply_to_chat_id, is_forwarded);
+    }
+
+    // Auto-resolve handoff if active for this customer
+    try {
+      const FlowEngine = require('../services/FlowEngine');
+      await FlowEngine.resolveHandoff(phone);
+    } catch (resolveErr) {
+      console.warn('Auto handoff resolve error:', resolveErr.message);
     }
 
     res.json({ success: true });

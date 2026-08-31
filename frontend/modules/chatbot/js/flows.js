@@ -124,13 +124,21 @@ function closeCreateModal() {
 
 // Submit Create Flow request
 async function submitCreateFlow() {
-    const name = document.getElementById('flowName').value;
-    const description = document.getElementById('flowDesc').value;
-    const triggerType = document.getElementById('flowTrigger').value;
-    const keywords = document.getElementById('flowKeywords').value;
+    const nameInput = document.getElementById('flowName');
+    const name = (nameInput ? nameInput.value : '').trim();
+    const description = (document.getElementById('flowDesc') ? document.getElementById('flowDesc').value : '').trim();
+    const triggerType = document.getElementById('flowTrigger') ? document.getElementById('flowTrigger').value : 'Default';
+    const keywords = (document.getElementById('flowKeywords') ? document.getElementById('flowKeywords').value : '').trim();
 
     if (!name) {
         alert('Please specify a Flow Name.');
+        if (nameInput) nameInput.focus();
+        return;
+    }
+
+    if (name.length < 2) {
+        alert('Flow Name must be at least 2 characters long.');
+        if (nameInput) nameInput.focus();
         return;
     }
 

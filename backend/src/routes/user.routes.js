@@ -17,8 +17,19 @@ router.delete('/roles/:id', authenticateToken, isAdmin, userController.deleteRol
 router.post('/fcm-token', authenticateToken, userController.registerFcmToken);
 router.delete('/fcm-token', authenticateToken, userController.deleteFcmToken);
 
+// Allow any authenticated staff to view their own profile
+router.get('/profile/me', authenticateToken, (req, res, next) => {
+    req.params.id = req.user.user_id;
+    return userController.getUserById(req, res, next);
+});
+router.get('/me', authenticateToken, (req, res, next) => {
+    req.params.id = req.user.user_id;
+    return userController.getUserById(req, res, next);
+});
+
 // User management allows managers to manage users (controller isolates them to their dept)
 router.get('/', authenticateToken, isManagerOrAdmin, userController.getAllUsers);
+router.get('/:id', authenticateToken, userController.getUserById);
 router.post('/', authenticateToken, isManagerOrAdmin, userController.createUser);
 router.put('/:id', authenticateToken, isManagerOrAdmin, userController.updateUser);
 router.patch('/:id/status', authenticateToken, isManagerOrAdmin, userController.toggleUserStatus);

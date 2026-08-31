@@ -7,6 +7,7 @@ router.get('/dashboard-stats', authenticateToken, reportController.getDashboardS
 router.get('/leads', authenticateToken, reportController.exportLeads);
 router.get('/orders', authenticateToken, reportController.exportOrders);
 router.get('/campaign-analytics', authenticateToken, reportController.getCampaignAnalytics);
+router.get('/telecaller-performance', authenticateToken, reportController.getTelecallerPerformance);
 router.get('/locations', authenticateToken, reportController.getLocations);
 
 module.exports = router;

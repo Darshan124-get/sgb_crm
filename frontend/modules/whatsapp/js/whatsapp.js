@@ -280,20 +280,39 @@ function renderSidebarTabs() {
     const container = document.getElementById('sidebar-tabs-container');
     if (!container) return;
 
-    const isResolved = (c) => ['converted', 'closed', 'lost'].includes(c.status);
+    const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+    const currentUserId = currentUser.id || currentUser.user_id;
+    const role = (currentUser.role || '').toLowerCase();
+    const isAdminOrManager = role.includes('admin') || role.includes('whatsapp_manager') || role.includes('manager');
+
+    // Total active customers count
+    const totalCount = (allCustomers || []).length;
 
     // Calculate unread count
     const unreadCount = (allCustomers || []).filter(c => {
         return parseInt(c.unread_msg_count || 0) > 0;
     }).length;
 
+    // Calculate handoff count
+    const handoffCustomers = (allCustomers || []).filter(c => 
+        c.status === 'human_needed' || 
+        c.lead_status === 'human_needed' || 
+        c.session_status === 'paused_for_human'
+    );
+    const myHandoffs = handoffCustomers.filter(c => String(c.assigned_to) === String(currentUserId));
+    const handoffCount = isAdminOrManager ? handoffCustomers.length : myHandoffs.length;
+
     const isCampaignActive = activeCampaigns.some(camp => camp.tag_line === currentTab);
     const customLists = loadCustomLists();
     const isCustomListActive = customLists.some(list => list.id === currentTab) || currentTab === 'undefined' || currentTab === 'resolved';
+    const isHandoffActive = currentTab === 'handoff' || currentTab === 'my_handoff';
 
     let html = `
-        <div class="tab-item ${currentTab === 'all' ? 'active' : ''}" data-tab="all">All <span id="all-unread-count" style="margin-left: 4px;">${unreadCount}</span></div>
+        <div class="tab-item ${currentTab === 'all' ? 'active' : ''}" data-tab="all">All <span id="all-unread-count" style="margin-left: 4px;">${totalCount}</span></div>
         <div class="tab-item ${currentTab === 'unviewed' ? 'active' : ''}" data-tab="unviewed">Unread <span id="unread-count" style="margin-left: 4px;">${unreadCount}</span></div>
+        <div class="tab-item ${isHandoffActive ? 'active' : ''}" data-tab="${isAdminOrManager ? 'handoff' : 'my_handoff'}" id="tab-handoff-pill" style="${isHandoffActive ? 'color: #ef4444; border-color: #ef4444; background: #fef2f2;' : 'color: #ef4444; border-color: #fca5a5;'} font-weight: 700;">
+            Handoff <span id="handoff-pill-count" style="margin-left: 4px; font-weight: 800;">${handoffCount}</span>
+        </div>
         
         <select id="campaign-filter-select" class="tab-select ${isCampaignActive ? 'active' : ''}" style="
             flex: 0 0 auto;
@@ -565,6 +584,140 @@ async function loadCampaignsAndTabs() {
     }
 }
 
+function updateHandoffCounts() {
+    if (!Array.isArray(allCustomers)) return;
+    const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+    const currentUserId = currentUser.id || currentUser.user_id;
+    const role = (currentUser.role || '').toLowerCase();
+    const isAdminOrManager = role.includes('admin') || role === 'whatsapp_manager';
+
+    const btnTopHandoff = document.getElementById('btn-top-handoff');
+    if (btnTopHandoff) {
+        btnTopHandoff.style.display = isAdminOrManager ? 'inline-flex' : 'none';
+    }
+
+    const btnTopMyHandoff = document.getElementById('btn-top-my-handoff');
+    if (btnTopMyHandoff) {
+        btnTopMyHandoff.style.display = isAdminOrManager ? 'none' : 'inline-flex';
+    }
+
+    const handoffCustomers = allCustomers.filter(c => 
+        c.status === 'human_needed' || 
+        c.lead_status === 'human_needed' || 
+        c.session_status === 'paused_for_human' ||
+        c.needs_human === 1 ||
+        c.needs_human === true
+    );
+
+    const myHandoffs = handoffCustomers.filter(c => String(c.assigned_to) === String(currentUserId));
+
+    const topHandoffEl = document.getElementById('top-handoff-count');
+    if (topHandoffEl) topHandoffEl.textContent = handoffCustomers.length;
+
+    const topMyHandoffEl = document.getElementById('top-my-handoff-count');
+    if (topMyHandoffEl) topMyHandoffEl.textContent = myHandoffs.length;
+
+    const handoffPillEl = document.getElementById('handoff-pill-count');
+    if (handoffPillEl) handoffPillEl.textContent = handoffCustomers.length;
+}
+
+window.switchToHandoffTab = function(tabType) {
+    const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+    const role = (currentUser.role || '').toLowerCase();
+    const isAdminOrManager = role.includes('admin') || role === 'whatsapp_manager';
+
+    currentTab = tabType || (isAdminOrManager ? 'handoff' : 'my_handoff');
+    
+    // Style active top buttons
+    const btnTopHandoff = document.getElementById('btn-top-handoff');
+    const btnTopMyHandoff = document.getElementById('btn-top-my-handoff');
+    if (btnTopHandoff) {
+        btnTopHandoff.style.borderColor = currentTab === 'handoff' ? '#ef4444' : '#cbd5e1';
+        btnTopHandoff.style.background = currentTab === 'handoff' ? '#fef2f2' : '#ffffff';
+    }
+    if (btnTopMyHandoff) {
+        btnTopMyHandoff.style.borderColor = currentTab === 'my_handoff' ? '#ef4444' : '#cbd5e1';
+        btnTopMyHandoff.style.background = currentTab === 'my_handoff' ? '#fef2f2' : '#ffffff';
+    }
+
+    // Highlight sidebar tab pill if container exists
+    const container = document.getElementById('sidebar-tabs-container');
+    if (container) {
+        container.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        const pillEl = document.getElementById('tab-handoff-pill');
+        if (pillEl) pillEl.classList.add('active');
+    }
+
+    renderCustomerList();
+};
+
+window.resolveHandoffChat = async function(phoneParam) {
+    const phone = phoneParam || (activeCustomer ? activeCustomer.phone : null);
+    if (!phone) return;
+
+    try {
+        const response = await fetch(`${window.API_URL}/chatbot/sessions/resolve-handoff`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ phone: phone })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to resolve handoff');
+
+        // Update activeCustomer and matching customer in allCustomers list
+        const customer = allCustomers.find(c => c.phone === phone);
+        if (customer) {
+            customer.status = customer.status === 'human_needed' ? 'assigned' : customer.status;
+            customer.lead_status = customer.lead_status === 'human_needed' ? 'assigned' : customer.lead_status;
+            customer.session_status = null;
+            customer.needs_human = false;
+        }
+        if (activeCustomer && activeCustomer.phone === phone) {
+            activeCustomer.status = activeCustomer.status === 'human_needed' ? 'assigned' : activeCustomer.status;
+            activeCustomer.lead_status = activeCustomer.lead_status === 'human_needed' ? 'assigned' : activeCustomer.lead_status;
+            activeCustomer.session_status = null;
+            activeCustomer.needs_human = false;
+
+            const bannerEl = document.getElementById('handoff-action-banner');
+            if (bannerEl) bannerEl.classList.add('hidden');
+        }
+
+        // Instantly update handoff counts in top bar and sidebar tabs
+        updateHandoffCounts();
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Handoff Resolved', 'Conversation started! Chat moved to standard conversations list.', 'success');
+        }
+
+        // Re-render customer list (removes from handoff tab, shows in All tab)
+        renderCustomerList();
+    } catch (err) {
+        console.error('Failed to resolve handoff:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message || 'Failed to resolve handoff', 'error');
+        }
+    }
+};
+
+window.retriggerBotFromBanner = async function() {
+    if (!activeCustomer || !activeCustomer.phone) return;
+    if (typeof window.retriggerBotFlow === 'function') {
+        await window.retriggerBotFlow(activeCustomer.phone);
+        const bannerEl = document.getElementById('handoff-action-banner');
+        if (bannerEl) bannerEl.classList.add('hidden');
+        if (activeCustomer) {
+            activeCustomer.session_status = 'active';
+            activeCustomer.status = activeCustomer.status === 'human_needed' ? 'assigned' : activeCustomer.status;
+            activeCustomer.needs_human = false;
+        }
+        updateHandoffCounts();
+        renderCustomerList();
+    }
+};
+
 /**
  * Fetch and Render Customer List
  */
@@ -587,11 +740,13 @@ async function loadCustomers() {
                 }
                 delete window._pendingPhone;
             }
+            updateHandoffCounts();
             return;
         }
         currentCustomersJson = dataJson;
 
         allCustomers = data;
+        updateHandoffCounts();
         renderSidebarTabs(); // update unread count
         renderCustomerList();
 
@@ -642,6 +797,15 @@ function renderCustomerList() {
             matchesTab = resolved;
         } else if (currentTab === 'unviewed') {
             matchesTab = parseInt(customer.unread_msg_count || 0) > 0 || (activeCustomer && activeCustomer.phone === customer.phone);
+        } else if (currentTab === 'handoff' || currentTab === 'my_handoff') {
+            const isHumanNeeded = customer.status === 'human_needed' || customer.lead_status === 'human_needed' || customer.session_status === 'paused_for_human';
+            if (currentTab === 'my_handoff') {
+                const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+                const currentUserId = currentUser.id || currentUser.user_id;
+                matchesTab = isHumanNeeded && String(customer.assigned_to) === String(currentUserId);
+            } else {
+                matchesTab = isHumanNeeded;
+            }
         } else if (currentTab === 'undefined') {
             if (resolved) {
                 matchesTab = false;
@@ -775,6 +939,18 @@ function renderCustomerList() {
         const timeColor = hasUnread ? 'var(--whatsapp-green)' : 'var(--whatsapp-secondary)';
         const timeWeight = hasUnread ? 'font-weight: 600;' : '';
 
+        const isHumanNeeded = customer.status === 'human_needed' || customer.lead_status === 'human_needed' || customer.session_status === 'paused_for_human';
+        let handoffBadgeHtml = '';
+        if (isHumanNeeded) {
+            let waitingStr = '';
+            const pausedTs = customer.paused_at || customer.updated_at;
+            if (pausedTs) {
+                const diffMinutes = Math.max(0, Math.floor((Date.now() - new Date(pausedTs).getTime()) / 60000));
+                waitingStr = diffMinutes > 0 ? `${diffMinutes} min` : 'Just now';
+            }
+            handoffBadgeHtml = `<span class="score-badge" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; font-weight: 800; padding: 2px 6px;">Needs Human ${waitingStr ? '• Waiting ' + waitingStr : ''}</span>`;
+        }
+
         item.innerHTML = `
             <div class="avatar-wrap">
                 <div class="avatar" style="background-color: ${color}">${initials}</div>
@@ -795,6 +971,7 @@ function renderCustomerList() {
                     ${hasUnread ? `<span class="unread-badge" style="background-color: var(--whatsapp-green); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">${customer.unread_msg_count}</span>` : ''}
                 </div>
                 <div class="customer-meta-footer">
+                    ${handoffBadgeHtml}
                     ${scoreLabel ? `<span class="score-badge badge-${scoreClass}">${scoreLabel}</span>` : ''}
                     ${customer.assigned_name ? `<div class="assigned-badge"><i class="fas fa-user-check"></i> ${customer.assigned_name}</div>` : ''}
                 </div>
@@ -881,6 +1058,27 @@ async function selectCustomer(customer) {
 
     // 24h Window Badge
     update24hWindow(customer);
+
+    // Handoff Action Banner
+    const isHumanNeeded = customer.status === 'human_needed' || customer.lead_status === 'human_needed' || customer.session_status === 'paused_for_human' || customer.needs_human === 1 || customer.needs_human === true;
+    const handoffBanner = document.getElementById('handoff-action-banner');
+    const handoffBannerText = document.getElementById('handoff-banner-text');
+    if (handoffBanner) {
+        if (isHumanNeeded) {
+            let waitingStr = '';
+            const pausedTs = customer.paused_at || customer.updated_at;
+            if (pausedTs) {
+                const diffMinutes = Math.max(0, Math.floor((Date.now() - new Date(pausedTs).getTime()) / 60000));
+                waitingStr = diffMinutes > 0 ? `${diffMinutes} min` : 'Just now';
+            }
+            if (handoffBannerText) {
+                handoffBannerText.textContent = `🚨 Customer requested Human Handoff ${waitingStr ? '• Waiting ' + waitingStr : ''}`;
+            }
+            handoffBanner.classList.remove('hidden');
+        } else {
+            handoffBanner.classList.add('hidden');
+        }
+    }
 
     // Highlight active item
     document.querySelectorAll('.customer-item').forEach(el => {
@@ -1905,7 +2103,8 @@ function renderMessages(history) {
                     </div>`;
             }
         } else {
-            contentHtml = `<div class="message-content">${msg.body || '(Empty message)'}</div>`;
+            const formattedText = (msg.body || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            contentHtml = `<div class="message-content" style="white-space: pre-wrap; word-break: break-word; line-height: 1.45;">${formattedText || '(Empty message)'}</div>`;
         }
 
         let tickHtml = '';
@@ -1923,9 +2122,19 @@ function renderMessages(history) {
             }
         }
 
+        let senderTagHtml = '';
+        if (msg.direction === 'outgoing') {
+            const isBot = !msg.sender_id || msg.sender_name === 'Chatbot';
+            if (isBot) {
+                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
+            } else if (msg.sender_name) {
+                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px;">${msg.sender_name}</div>`;
+            }
+        }
+
         msgEl.innerHTML = `
             ${actionsHtml}
-            ${msg.direction === 'outgoing' && msg.sender_name ? `<div class="message-sender">${msg.sender_name}</div>` : ''}
+            ${senderTagHtml}
             ${forwardedHtml}
             ${replyHtml}
             ${contentHtml}
@@ -1975,6 +2184,31 @@ async function handleSend() {
         });
         if (response.ok) {
             clearReplyPreview();
+
+            // Clear handoff state locally if customer was in handoff
+            if (activeCustomer) {
+                const wasHandoff = activeCustomer.status === 'human_needed' || activeCustomer.lead_status === 'human_needed' || activeCustomer.session_status === 'paused_for_human' || activeCustomer.needs_human;
+                if (wasHandoff) {
+                    activeCustomer.status = activeCustomer.status === 'human_needed' ? 'assigned' : activeCustomer.status;
+                    activeCustomer.lead_status = activeCustomer.lead_status === 'human_needed' ? 'assigned' : activeCustomer.lead_status;
+                    activeCustomer.session_status = null;
+                    activeCustomer.needs_human = false;
+
+                    const matchingInList = allCustomers.find(c => c.phone === activeCustomer.phone);
+                    if (matchingInList) {
+                        matchingInList.status = activeCustomer.status;
+                        matchingInList.lead_status = activeCustomer.lead_status;
+                        matchingInList.session_status = null;
+                        matchingInList.needs_human = false;
+                    }
+
+                    const bannerEl = document.getElementById('handoff-action-banner');
+                    if (bannerEl) bannerEl.classList.add('hidden');
+
+                    updateHandoffCounts();
+                }
+            }
+
             loadChatHistory(activeCustomer.phone);
             currentCustomersJson = '';
             loadCustomers();

@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../utils/whatsappLogger');
+const messageService = require('./message.service');
 
 const { formatForWhatsApp } = require('../utils/phoneUtils');
 
@@ -33,6 +34,9 @@ const sendMessage = async (to, text, replyToMessageId = null) => {
         'Content-Type': 'application/json',
       },
     });
+
+    const metaMsgId = response.data?.messages?.[0]?.id || null;
+    await messageService.logChatMessage(to, 'outgoing', 'text', text, null, null, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot message:', err.message));
 
     logger.info(`Text message sent to ${to}: ${response.status}`);
     return response.data;
@@ -79,13 +83,49 @@ const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
   }
 };
 
+const mediaIdCache = new Map();
+
 /**
- * Sends a media message using a media_id
+ * Downloads HTTP media URL and uploads to Meta to obtain a direct Meta Media ID for instant delivery
+ */
+const getOrCreateMetaMediaId = async (url, type) => {
+  if (mediaIdCache.has(url)) {
+    return mediaIdCache.get(url);
+  }
+  try {
+    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    const buffer = Buffer.from(res.data);
+    const mimeType = type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf'));
+    const metaMediaId = await uploadMedia(buffer, mimeType, type, `file-${Date.now()}`);
+    if (metaMediaId) {
+      mediaIdCache.set(url, metaMediaId);
+      logger.info(`[META MEDIA] Pre-uploaded URL to Meta Media ID: ${metaMediaId}`);
+      return metaMediaId;
+    }
+  } catch (err) {
+    logger.error(`Error pre-uploading media URL to Meta (${url}):`, err.message);
+  }
+  return null;
+};
+
+/**
+ * Sends a media message using a media_id or pre-uploaded URL
  */
 const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
-    const mediaObj = mediaId.startsWith('http') ? { link: mediaId } : { id: mediaId };
+    let resolvedMediaId = mediaId;
+    let isUrl = typeof mediaId === 'string' && mediaId.startsWith('http');
+
+    if (isUrl) {
+      const uploadedId = await getOrCreateMetaMediaId(mediaId, type);
+      if (uploadedId) {
+        resolvedMediaId = uploadedId;
+      }
+    }
+
+    const isMetaId = !resolvedMediaId.startsWith('http');
+    const mediaObj = isMetaId ? { id: resolvedMediaId } : { link: resolvedMediaId };
     if (caption) mediaObj.caption = caption;
 
     const data = {
@@ -106,6 +146,10 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
         'Content-Type': 'application/json',
       },
     });
+
+    const metaMsgId = response.data?.messages?.[0]?.id || null;
+    const mimeType = type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf'));
+    await messageService.logChatMessage(to, 'outgoing', type, caption || '', isUrl ? mediaId : null, mimeType, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot media message:', err.message));
 
     return response.data;
   } catch (err) {
@@ -173,6 +217,10 @@ const sendButtons = async (to, text, buttons) => {
       },
     });
 
+    const metaMsgId = response.data?.messages?.[0]?.id || null;
+    const formattedBtnText = `${text}\n\n` + buttons.map((b, i) => `${i + 1}. ${b.title}`).join('\n');
+    await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedBtnText, null, null, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot buttons:', err.message));
+
     return response.data;
   } catch (err) {
     logger.error('Error sending WhatsApp buttons:', err.response ? err.response.data : err.message);
@@ -217,6 +265,10 @@ const sendList = async (to, text, buttonLabel, rows) => {
       },
     });
 
+    const metaMsgId = response.data?.messages?.[0]?.id || null;
+    const formattedListText = `${text}\n\n${buttonLabel || 'Select Option'}:\n` + rows.map((r, i) => `${i + 1}. ${r.title}`).join('\n');
+    await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedListText, null, null, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot list:', err.message));
+
     return response.data;
   } catch (err) {
     logger.error('Error sending WhatsApp list:', err.response ? err.response.data : err.message);
@@ -229,6 +281,7 @@ module.exports = {
   sendButtons,
   sendList,
   uploadMedia,
+  getOrCreateMetaMediaId,
   sendMediaMessage,
   downloadMedia,
 };

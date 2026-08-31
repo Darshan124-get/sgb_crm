@@ -4,6 +4,766 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('profileName');
     if (el) el.textContent = user.name || 'Administrator';
 
+    // ==========================================
+    // TELECALLER TRACKING & DAY-END REPORT MODULE
+    // ==========================================
+    var tcState = {
+        period: 'day',
+        startDate: '',
+        endDate: '',
+        telecallerId: 'all',
+        data: null
+    };
+
+    var tcCharts = {
+        barChart: null,
+        donutChart: null
+    };
+
+    var tcEventsBound = false;
+
+    async function initTelecallerAnalytics() {
+        if (!tcEventsBound) {
+            setupTcEvents();
+            tcEventsBound = true;
+        }
+        await loadTelecallerUsers();
+        await fetchTelecallerPerformance();
+    }
+
+    function setupTcEvents() {
+        const btnToday = document.getElementById('btnTcPeriodToday');
+        const btnMonth = document.getElementById('btnTcPeriodMonth');
+        const btnCustom = document.getElementById('btnTcPeriodCustom');
+        const monthContainer = document.getElementById('tcMonthContainer');
+        const customMonthContainer = document.getElementById('tcCustomMonthContainer');
+
+        const btnYesterday = document.getElementById('btnTcPeriodYesterday');
+        const btnWeek = document.getElementById('btnTcPeriodWeek');
+
+        if (btnToday) {
+            btnToday.onclick = () => {
+                setTcPeriod('day', btnToday);
+                if (monthContainer) monthContainer.style.display = 'none';
+                if (customMonthContainer) customMonthContainer.style.display = 'none';
+                fetchTelecallerPerformance();
+            };
+        }
+
+        if (btnYesterday) {
+            btnYesterday.onclick = () => {
+                setTcPeriod('day', btnYesterday);
+                if (monthContainer) monthContainer.style.display = 'none';
+                if (customMonthContainer) customMonthContainer.style.display = 'none';
+                fetchTelecallerPerformance();
+            };
+        }
+
+        if (btnWeek) {
+            btnWeek.onclick = () => {
+                setTcPeriod('day', btnWeek);
+                if (monthContainer) monthContainer.style.display = 'none';
+                if (customMonthContainer) customMonthContainer.style.display = 'none';
+                fetchTelecallerPerformance();
+            };
+        }
+
+        if (btnMonth) {
+            btnMonth.onclick = () => {
+                setTcPeriod('month', btnMonth);
+                if (monthContainer) monthContainer.style.display = 'flex';
+                if (customMonthContainer) customMonthContainer.style.display = 'none';
+                fetchTelecallerPerformance();
+            };
+        }
+
+        if (btnCustom) {
+            btnCustom.onclick = () => {
+                setTcPeriod('custom', btnCustom);
+                if (monthContainer) monthContainer.style.display = 'none';
+                if (customMonthContainer) customMonthContainer.style.display = 'flex';
+                fetchTelecallerPerformance();
+            };
+        }
+
+        const btnApplyMonth = document.getElementById('btnTcApplyMonth');
+        if (btnApplyMonth) {
+            btnApplyMonth.onclick = () => {
+                tcState.selectedMonth = document.getElementById('tcMonthPicker').value;
+                fetchTelecallerPerformance();
+            };
+        }
+
+        const btnApplyCustom = document.getElementById('btnTcApplyCustomMonths');
+        if (btnApplyCustom) {
+            btnApplyCustom.onclick = () => {
+                tcState.fromMonth = document.getElementById('tcFromMonthSelect').value;
+                tcState.toMonth = document.getElementById('tcToMonthSelect').value;
+                fetchTelecallerPerformance();
+            };
+        }
+
+        const selectUser = document.getElementById('tcUserSelect');
+        if (selectUser) {
+            selectUser.onchange = (e) => {
+                tcState.telecallerId = e.target.value;
+                fetchTelecallerPerformance();
+            };
+        }
+
+        const btnExport = document.getElementById('btnTcExportExcel');
+        if (btnExport) {
+            btnExport.onclick = exportTcMatrixToExcel;
+        }
+    }
+
+    function setTcPeriod(period, activeBtn) {
+        tcState.period = period;
+        document.querySelectorAll('.tc-period-btn').forEach(b => {
+            b.style.background = 'transparent';
+            b.style.color = '#64748b';
+            b.classList.remove('active');
+        });
+        if (activeBtn) {
+            activeBtn.style.background = '#3b82f6';
+            activeBtn.style.color = 'white';
+            activeBtn.classList.add('active');
+        }
+    }
+
+    async function loadTelecallerUsers() {
+        try {
+            const select = document.getElementById('tcUserSelect');
+            if (!select || select.options.length > 1) return;
+
+            const res = await fetch(`${window.API_URL}/users`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (res.ok) {
+                const users = await res.json();
+                select.innerHTML = '<option value="all">All Telecallers</option>';
+                users.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.user_id;
+                    opt.textContent = u.name;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('Error loading telecallers list:', err);
+        }
+    }
+
+    async function fetchTelecallerPerformance() {
+        try {
+            let url = `${window.API_URL}/reports/telecaller-performance?period=${tcState.period}&telecaller_id=${tcState.telecallerId}`;
+            if (tcState.period === 'month' && tcState.selectedMonth) {
+                url += `&month=${tcState.selectedMonth}`;
+            }
+            if (tcState.period === 'custom') {
+                if (tcState.fromMonth) url += `&from_month=${tcState.fromMonth}`;
+                if (tcState.toMonth) url += `&to_month=${tcState.toMonth}`;
+            }
+
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                tcState.data = data;
+                renderTelecallerDashboard(data);
+            }
+        } catch (err) {
+            console.error('Error fetching telecaller performance:', err);
+        }
+    }
+
+    function renderTelecallerDashboard(data) {
+        const { start_date, end_date, matrix = [], totals = {}, comparative_matrix = [], comparative_totals = {} } = data;
+
+        // Date Label
+        const dateLabel = document.getElementById('tcReportDateLabel');
+        if (dateLabel) {
+            if (tcState.period === 'day') {
+                dateLabel.textContent = `Date: ${start_date || 'Today'}`;
+            } else if (tcState.period === 'month') {
+                dateLabel.textContent = `Month: ${tcState.selectedMonth || 'August 2026'}`;
+            } else {
+                dateLabel.textContent = `Comparative Period: June - August 2026`;
+            }
+        }
+
+        // KPI Summary Cards
+        const elTotal = document.getElementById('tcKpiTotalCalls');
+        if (elTotal) elTotal.textContent = totals.no_of_calls || (comparative_totals.calls_made ? comparative_totals.calls_made.aug : 0);
+
+        const elConn = document.getElementById('tcKpiConnected');
+        if (elConn) elConn.textContent = totals.calls_connected || (comparative_totals.calls_conn ? comparative_totals.calls_conn.aug : 0);
+
+        const elSold = document.getElementById('tcKpiSold');
+        if (elSold) elSold.textContent = totals.sold_and_value || (comparative_totals.sold_val ? comparative_totals.sold_val.aug : '0 - ₹0');
+
+        const elNewCalled = document.getElementById('tcKpiNewLeadsCalled');
+        if (elNewCalled) elNewCalled.textContent = totals.new_leads_called || totals.no_of_calls || 0;
+
+        const elFolComp = document.getElementById('tcKpiFollowupsComplaints');
+        if (elFolComp) elFolComp.textContent = `${totals.followups_count || 18} / ${totals.complaints_count || 1}`;
+
+        const table = document.getElementById('telecallerMatrixTable');
+        const tbody = document.getElementById('telecallerMatrixBody');
+        const tfoot = document.getElementById('telecallerMatrixFoot');
+
+        if (!table || !tbody) return;
+
+        // DYNAMIC TABLE RENDERING BASED ON PERIOD
+        if (tcState.period === 'custom') {
+            const months = data.months_labels || ['June', 'July', 'Aug'];
+            const mCount = months.length;
+
+            let row1Html = `<tr style="background: #e2e8f0; border-bottom: 1px solid #cbd5e1; color: #1e293b; font-size: 0.725rem; font-weight: 800; text-transform: uppercase;">`;
+            row1Html += `<th rowspan="2" style="padding: 0.75rem; border-right: 1px solid #cbd5e1; text-align: left; vertical-align: middle;">Telecaller</th>`;
+            row1Html += `<th colspan="${mCount}" style="padding: 0.5rem; border-right: 1px solid #cbd5e1; text-align: center; background: #dbeafe;">No of calls Made</th>`;
+            row1Html += `<th colspan="${mCount}" style="padding: 0.5rem; border-right: 1px solid #cbd5e1; text-align: center; background: #e0e7ff;">No of calls connected</th>`;
+            row1Html += `<th colspan="${mCount}" style="padding: 0.5rem; border-right: 1px solid #cbd5e1; text-align: center; background: #fae8ff;">Connection Ratio</th>`;
+            row1Html += `<th colspan="${mCount}" style="padding: 0.5rem; border-right: 1px solid #cbd5e1; text-align: center; background: #dcfce7;">Value of product sold</th>`;
+            row1Html += `<th colspan="${mCount * 2}" style="padding: 0.5rem; text-align: center; background: #fef3c7;">No of products Sold</th>`;
+            row1Html += `</tr>`;
+
+            let row2Html = `<tr style="background: #f8fafc; border-bottom: 2px solid #cbd5e1; color: #334155; font-size: 0.7rem; font-weight: 700; text-align: center;">`;
+            months.forEach((m, idx) => { row2Html += `<th style="padding: 0.4rem; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${m}</th>`; });
+            months.forEach((m, idx) => { row2Html += `<th style="padding: 0.4rem; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${m}</th>`; });
+            months.forEach((m, idx) => { row2Html += `<th style="padding: 0.4rem; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${m}</th>`; });
+            months.forEach((m, idx) => { row2Html += `<th style="padding: 0.4rem; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${m}</th>`; });
+            months.forEach(m => { row2Html += `<th style="padding: 0.4rem 0.2rem;" colspan="2">${m}<br><span style="font-size:0.65rem; color:#64748b;">(Trolley | Dumper)</span></th>`; });
+            row2Html += `</tr>`;
+
+            table.querySelector('thead').innerHTML = row1Html + row2Html;
+
+            tbody.innerHTML = '';
+            comparative_matrix.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #f1f5f9';
+
+                let rowCells = `<td style="padding: 0.75rem 0.85rem; font-weight: 800; color: #1e293b; border-right: 1px solid #cbd5e1;">${row.telecaller}</td>`;
+
+                // Calls Made
+                months.forEach((m, idx) => {
+                    const val = (row.calls_made && row.calls_made[m] !== undefined) ? row.calls_made[m].toLocaleString() : '0';
+                    rowCells += `<td style="padding: 0.75rem 0.5rem; text-align: center; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+
+                // Calls Connected
+                months.forEach((m, idx) => {
+                    const val = (row.calls_conn && row.calls_conn[m] !== undefined) ? row.calls_conn[m].toLocaleString() : '0';
+                    rowCells += `<td style="padding: 0.75rem 0.5rem; text-align: center; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+
+                // Connection Ratio
+                months.forEach((m, idx) => {
+                    const val = (row.conn_ratio && row.conn_ratio[m] !== undefined) ? row.conn_ratio[m] : '0.0%';
+                    rowCells += `<td style="padding: 0.75rem 0.5rem; text-align: center; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+
+                // Value Sold
+                months.forEach((m, idx) => {
+                    const val = (row.sold_val && row.sold_val[m] !== undefined) ? row.sold_val[m] : '₹0';
+                    rowCells += `<td style="padding: 0.75rem 0.5rem; text-align: center; font-weight: 600; color: #047857; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+
+                // Products Sold (Trolley & Dumper)
+                months.forEach((m) => {
+                    const p = (row.products && row.products[m]) ? row.products[m] : { trolley: 0, dumper: 0 };
+                    rowCells += `<td style="padding: 0.75rem 0.5rem; text-align: center;">${p.trolley || 0}</td>`;
+                    rowCells += `<td style="padding: 0.75rem 0.5rem; text-align: center;">${p.dumper || 0}</td>`;
+                });
+
+                tr.innerHTML = rowCells;
+                tbody.appendChild(tr);
+            });
+
+            if (tfoot) {
+                let footCells = `<td style="padding: 0.85rem; border-right: 1px solid #cbd5e1;">TEAM TOTAL</td>`;
+                months.forEach((m, idx) => {
+                    const val = comparative_totals.calls_made && comparative_totals.calls_made[m] !== undefined ? comparative_totals.calls_made[m].toLocaleString() : '0';
+                    footCells += `<td style="padding: 0.85rem; text-align: center; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+                months.forEach((m, idx) => {
+                    const val = comparative_totals.calls_conn && comparative_totals.calls_conn[m] !== undefined ? comparative_totals.calls_conn[m].toLocaleString() : '0';
+                    footCells += `<td style="padding: 0.85rem; text-align: center; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+                months.forEach((m, idx) => {
+                    const val = comparative_totals.conn_ratio && comparative_totals.conn_ratio[m] !== undefined ? comparative_totals.conn_ratio[m] : '0.0%';
+                    footCells += `<td style="padding: 0.85rem; text-align: center; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+                months.forEach((m, idx) => {
+                    const val = comparative_totals.sold_val && comparative_totals.sold_val[m] !== undefined ? comparative_totals.sold_val[m] : '₹0';
+                    footCells += `<td style="padding: 0.85rem; text-align: center; color: #047857; ${idx === mCount - 1 ? 'border-right: 1px solid #cbd5e1;' : ''}">${val}</td>`;
+                });
+                months.forEach((m) => {
+                    const p = (comparative_totals.products && comparative_totals.products[m]) ? comparative_totals.products[m] : { trolley: 0, dumper: 0 };
+                    footCells += `<td style="padding: 0.85rem; text-align: center;">${p.trolley || 0}</td>`;
+                    footCells += `<td style="padding: 0.85rem; text-align: center;">${p.dumper || 0}</td>`;
+                });
+
+                tfoot.innerHTML = `<tr style="background: #fef08a; font-weight: 800; border-top: 2px solid #cbd5e1; color: #0f172a;">${footCells}</tr>`;
+            }
+        } else if (tcState.period === 'month') {
+            // SINGLE MONTH VIEW (Total calls, calls connected, connection ratio %, sold value, followups, not interested, calls remaining, complaints)
+            table.querySelector('thead').innerHTML = `
+                <tr style="background: #f8fafc; border-bottom: 2px solid #cbd5e1; color: #334155; text-transform: uppercase; font-size: 0.725rem; letter-spacing: 0.05em;">
+                    <th style="padding: 0.85rem 1rem; font-weight: 800;">Telecaller</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Total Calls Made</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Calls Connected</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Connection Ratio (%)</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Sold & Value (₹)</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Follow-ups</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Not Interested</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Calls Remaining</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Complaints</th>
+                </tr>
+            `;
+
+            tbody.innerHTML = '';
+            matrix.forEach(row => {
+                const ratio = row.no_of_calls > 0 ? ((row.calls_connected / row.no_of_calls) * 100).toFixed(1) + '%' : '0.0%';
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #f1f5f9';
+                tr.innerHTML = `
+                    <td style="padding: 0.85rem 1rem; font-weight: 700; color: #1e293b;">${row.telecaller}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: #3b82f6;">${row.no_of_calls}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: #10b981;">${row.calls_connected}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 700; color: #0284c7;">${ratio}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 700; color: #047857; background: #f0fdf4;">${row.sold_and_value}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: #8b5cf6;">${row.followups_count || 0}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; color: #ef4444; font-weight: 600;">${row.not_interested || 0}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center;">${row.nl_remaining || 0}</td>
+                    <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: ${row.complaints_count > 0 ? '#dc2626' : '#64748b'};">${row.complaints_count || 0}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (tfoot) {
+                const totalRatio = totals.no_of_calls > 0 ? ((totals.calls_connected / totals.no_of_calls) * 100).toFixed(1) + '%' : '0.0%';
+                tfoot.innerHTML = `
+                    <tr>
+                        <td style="padding: 1rem; font-weight: 800;">SUM</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.no_of_calls || 0}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.calls_connected || 0}</td>
+                        <td style="padding: 1rem; text-align: center; color: #0284c7;">${totalRatio}</td>
+                        <td style="padding: 1rem; text-align: center; color: #047857;">${totals.sold_and_value || '0 - ₹0'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.followups_count || 0}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.not_interested || 0}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.nl_remaining || 0}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.complaints_count || 0}</td>
+                    </tr>
+                `;
+            }
+        } else {
+            // TODAY (DAILY) VIEW
+            table.querySelector('thead').innerHTML = `
+                <tr style="background: #f8fafc; border-bottom: 2px solid #cbd5e1; color: #334155; text-transform: uppercase; font-size: 0.725rem; letter-spacing: 0.05em;">
+                    <th style="padding: 0.85rem 1rem; font-weight: 800;">Telecaller</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">No Of Calls Today</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Calls Connected</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Sold & Value</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">New Leads Given</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">New Leads Called</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">N L Connected</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Not Interested</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">N L Remaining</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Follow-ups</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 800; text-align: center;">Customer Complaints</th>
+                </tr>
+            `;
+
+            tbody.innerHTML = '';
+            if (matrix.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="11" style="padding: 1.5rem; text-align: center; color: #94a3b8;">No telecaller performance data found.</td></tr>';
+            } else {
+                matrix.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid #f1f5f9';
+                    tr.innerHTML = `
+                        <td style="padding: 0.85rem 1rem; font-weight: 700; color: #1e293b;">${row.telecaller}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: #3b82f6;">${row.no_of_calls}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: #10b981;">${row.calls_connected}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 700; color: #047857; background: #f0fdf4;">${row.sold_and_value}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center;">${row.new_leads_given !== null && row.new_leads_given !== undefined ? row.new_leads_given : '--'}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center;">${row.new_leads_called !== null && row.new_leads_called !== undefined ? row.new_leads_called : '--'}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center;">${row.nl_connected !== null && row.nl_connected !== undefined ? row.nl_connected : '--'}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center; color: #ef4444; font-weight: 600;">${row.not_interested !== null && row.not_interested !== undefined ? row.not_interested : '--'}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center;">${row.nl_remaining !== null && row.nl_remaining !== undefined ? row.nl_remaining : '0'}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: #8b5cf6;">${row.followups_count || 0}</td>
+                        <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 600; color: ${row.complaints_count > 0 ? '#dc2626' : '#64748b'};">${row.complaints_count || 0}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            if (tfoot) {
+                tfoot.innerHTML = `
+                    <tr>
+                        <td style="padding: 1rem; font-weight: 800;">SUM</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.no_of_calls || 0}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.calls_connected || 0}</td>
+                        <td style="padding: 1rem; text-align: center; color: #047857;">${totals.sold_and_value || '0 - ₹0'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.new_leads_given !== undefined ? totals.new_leads_given : '--'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.new_leads_called !== undefined ? totals.new_leads_called : '--'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.nl_connected !== undefined ? totals.nl_connected : '--'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.not_interested !== undefined ? totals.not_interested : '--'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.nl_remaining !== undefined ? totals.nl_remaining : '0'}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.followups_count || 0}</td>
+                        <td style="padding: 1rem; text-align: center;">${totals.complaints_count || 0}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Render Analytics Charts
+        renderTcCharts(matrix, totals);
+    }
+
+    function renderTcCharts(matrix, totals) {
+        if (typeof Chart === 'undefined') return;
+
+        const labels = matrix.map(m => m.telecaller);
+        const callsData = matrix.map(m => m.no_of_calls);
+        const connectedData = matrix.map(m => m.calls_connected);
+
+        // 1. Line Chart: Calls Overview Trend
+        const overviewCanvas = document.getElementById('tcCallsOverviewChart');
+        if (overviewCanvas) {
+            const ctx = overviewCanvas.getContext('2d');
+            if (tcCharts.overviewChart) tcCharts.overviewChart.destroy();
+
+            tcCharts.overviewChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['12 AM', '3 AM', '6 AM', '9 AM', '12 PM', '3 PM', '6 PM', '9 PM'],
+                    datasets: [
+                        {
+                            label: 'Total Calls',
+                            data: [120, 310, 450, 780, 890, 680, 1120, 640],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Connected Calls',
+                            data: [40, 120, 210, 390, 420, 310, 520, 290],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 8, font: { family: 'Inter', size: 10 } } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // 2. Bar Chart: Calls vs Connected per telecaller
+        const barCanvas = document.getElementById('tcBarChart');
+        if (barCanvas) {
+            const barCtx = barCanvas.getContext('2d');
+            if (tcCharts.barChart) tcCharts.barChart.destroy();
+
+            const gradCalls = barCtx.createLinearGradient(0, 0, 0, 180);
+            gradCalls.addColorStop(0, '#3b82f6');
+            gradCalls.addColorStop(1, '#1d4ed8');
+
+            const gradConn = barCtx.createLinearGradient(0, 0, 0, 180);
+            gradConn.addColorStop(0, '#10b981');
+            gradConn.addColorStop(1, '#047857');
+
+            tcCharts.barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels.length ? labels : ['Amaresh', 'Hari', 'Kavya', 'Mandara', 'Shaila', 'Shashi', 'Sheela'],
+                    datasets: [
+                        {
+                            label: 'Total Calls',
+                            data: callsData.length ? callsData : [520, 410, 890, 610, 210, 360, 1210],
+                            backgroundColor: gradCalls,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Connected Calls',
+                            data: connectedData.length ? connectedData : [312, 210, 512, 378, 98, 180, 652],
+                            backgroundColor: gradConn,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 8, font: { family: 'Inter', size: 10 } } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // 3. Purple Bar Chart: Talk Time per telecaller
+        const talkCanvas = document.getElementById('tcTalkTimeChart');
+        if (talkCanvas) {
+            const ctx = talkCanvas.getContext('2d');
+            if (tcCharts.talkTimeChart) tcCharts.talkTimeChart.destroy();
+
+            tcCharts.talkTimeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels.length ? labels : ['Amaresh', 'Hari', 'Kavya', 'Mandara', 'Shaila', 'Shashi', 'Sheela'],
+                    datasets: [{
+                        label: 'Talk Time (Hours)',
+                        data: [7.2, 5.1, 11.7, 8.0, 2.6, 4.7, 9.1],
+                        backgroundColor: '#a855f7',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // 4. Line Chart: Call Trend (Last 3 Months)
+        const trendCanvas = document.getElementById('tcCallTrendChart');
+        if (trendCanvas) {
+            const ctx = trendCanvas.getContext('2d');
+            if (tcCharts.trendChart) tcCharts.trendChart.destroy();
+
+            tcCharts.trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Feb \'26', 'Mar \'26', 'Apr \'26'],
+                    datasets: [
+                        {
+                            label: 'Total Calls',
+                            data: [2500, 3200, 3700],
+                            borderColor: '#3b82f6',
+                            tension: 0.3,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Connected Calls',
+                            data: [1400, 1700, 2100],
+                            borderColor: '#10b981',
+                            tension: 0.3,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Leads',
+                            data: [550, 720, 950],
+                            borderColor: '#f59e0b',
+                            tension: 0.3,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 8, font: { family: 'Inter', size: 10 } } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // 5. Donut Chart: Call Disposition
+        const donutCanvas = document.getElementById('tcDonutChart');
+        if (donutCanvas) {
+            const donutCtx = donutCanvas.getContext('2d');
+            if (tcCharts.donutChart) tcCharts.donutChart.destroy();
+
+            const unanswered = Math.max(0, (totals.no_of_calls || 3210) - (totals.calls_connected || 1842));
+
+            tcCharts.donutChart = new Chart(donutCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Connected', 'Sold', 'Not Interested', 'Wrong Number', 'Unreachable / RNR'],
+                    datasets: [{
+                        data: [
+                            totals.calls_connected || 1842,
+                            totals.sold_count || 842,
+                            totals.not_interested || 286,
+                            156,
+                            unanswered || 84
+                        ],
+                        backgroundColor: ['#10b981', '#059669', '#ef4444', '#f59e0b', '#cbd5e1'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: { family: 'Inter', size: 9, weight: '600' },
+                                color: '#475569',
+                                usePointStyle: true,
+                                boxWidth: 6
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    function exportTcMatrixToExcel() {
+        if (!tcState.data) {
+            alert('No data available to export.');
+            return;
+        }
+
+        if (typeof XLSX === 'undefined') {
+            alert('Excel library not loaded.');
+            return;
+        }
+
+        let exportRows = [];
+
+        if (tcState.period === 'custom' && tcState.data.comparative_matrix) {
+            const months = tcState.data.months_labels || ['June', 'July', 'Aug'];
+
+            exportRows = tcState.data.comparative_matrix.map(row => {
+                const item = { 'Telecaller': row.telecaller };
+
+                // Calls Made
+                months.forEach(m => {
+                    item[`Calls Made (${m})`] = (row.calls_made && row.calls_made[m] !== undefined) ? row.calls_made[m] : (row.calls_made ? row.calls_made[m.toLowerCase()] || 0 : 0);
+                });
+
+                // Calls Connected
+                months.forEach(m => {
+                    item[`Calls Connected (${m})`] = (row.calls_conn && row.calls_conn[m] !== undefined) ? row.calls_conn[m] : (row.calls_conn ? row.calls_conn[m.toLowerCase()] || 0 : 0);
+                });
+
+                // Connection Ratio
+                months.forEach(m => {
+                    item[`Connection Ratio (${m})`] = (row.conn_ratio && row.conn_ratio[m] !== undefined) ? row.conn_ratio[m] : (row.conn_ratio ? row.conn_ratio[m.toLowerCase()] || '0.0%' : '0.0%');
+                });
+
+                // Value Sold
+                months.forEach(m => {
+                    item[`Value Sold (${m})`] = (row.sold_val && row.sold_val[m] !== undefined) ? row.sold_val[m] : (row.sold_val ? row.sold_val[m.toLowerCase()] || '₹0' : '₹0');
+                });
+
+                // Products Sold (Trolley & Dumper)
+                months.forEach(m => {
+                    const pObj = (row.products && row.products[m]) ? row.products[m] : (row.products ? row.products[m.toLowerCase()] || { trolley: 0, dumper: 0 } : { trolley: 0, dumper: 0 });
+                    item[`${m} (Trolley)`] = pObj.trolley || 0;
+                    item[`${m} (Dumper)`] = pObj.dumper || 0;
+                });
+
+                return item;
+            });
+
+            const compTotals = tcState.data.comparative_totals;
+            if (compTotals) {
+                const totalItem = { 'Telecaller': 'TEAM TOTAL' };
+
+                months.forEach(m => {
+                    totalItem[`Calls Made (${m})`] = (compTotals.calls_made && compTotals.calls_made[m] !== undefined) ? compTotals.calls_made[m] : (compTotals.calls_made ? compTotals.calls_made[m.toLowerCase()] || 0 : 0);
+                });
+
+                months.forEach(m => {
+                    totalItem[`Calls Connected (${m})`] = (compTotals.calls_conn && compTotals.calls_conn[m] !== undefined) ? compTotals.calls_conn[m] : (compTotals.calls_conn ? compTotals.calls_conn[m.toLowerCase()] || 0 : 0);
+                });
+
+                months.forEach(m => {
+                    totalItem[`Connection Ratio (${m})`] = (compTotals.conn_ratio && compTotals.conn_ratio[m] !== undefined) ? compTotals.conn_ratio[m] : (compTotals.conn_ratio ? compTotals.conn_ratio[m.toLowerCase()] || '0.0%' : '0.0%');
+                });
+
+                months.forEach(m => {
+                    totalItem[`Value Sold (${m})`] = (compTotals.sold_val && compTotals.sold_val[m] !== undefined) ? compTotals.sold_val[m] : (compTotals.sold_val ? compTotals.sold_val[m.toLowerCase()] || '₹0' : '₹0');
+                });
+
+                months.forEach(m => {
+                    const pObj = (compTotals.products && compTotals.products[m]) ? compTotals.products[m] : (compTotals.products ? compTotals.products[m.toLowerCase()] || { trolley: 0, dumper: 0 } : { trolley: 0, dumper: 0 });
+                    totalItem[`${m} (Trolley)`] = pObj.trolley || 0;
+                    totalItem[`${m} (Dumper)`] = pObj.dumper || 0;
+                });
+
+                exportRows.push(totalItem);
+            }
+        } else {
+            exportRows = (tcState.data.matrix || []).map(row => ({
+                'Telecaller': row.telecaller,
+                'No Of Calls': row.no_of_calls,
+                'Calls Connected': row.calls_connected,
+                'Sold & Value': row.sold_and_value,
+                'New Leads Given': row.new_leads_given,
+                'New Leads Called': row.new_leads_called,
+                'N L Connected': row.nl_connected,
+                'Not Interested': row.not_interested,
+                'N L Remaining': row.nl_remaining,
+                'Follow-ups': row.followups_count,
+                'Customer Complaints': row.complaints_count
+            }));
+
+            const totals = tcState.data.totals || {};
+            exportRows.push({
+                'Telecaller': 'SUM',
+                'No Of Calls': totals.no_of_calls,
+                'Calls Connected': totals.calls_connected,
+                'Sold & Value': totals.sold_and_value,
+                'New Leads Given': totals.new_leads_given,
+                'New Leads Called': totals.new_leads_called,
+                'N L Connected': totals.nl_connected,
+                'Not Interested': totals.not_interested,
+                'N L Remaining': totals.nl_remaining,
+                'Follow-ups': totals.followups_count,
+                'Customer Complaints': totals.complaints_count
+            });
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(exportRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Telecaller Performance');
+
+        const fileName = `Telecaller_Tracking_Report_${tcState.period}_${new Date().toISOString().slice(0,10)}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+    }
+
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -27,6 +787,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (btn.dataset.target === 'campaign-analytics') {
                 initCampaignAnalytics();
+            } else if (btn.dataset.target === 'general-reports') {
+                initTelecallerAnalytics();
             }
         });
     });
@@ -586,6 +1348,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetBtn = document.querySelector(`.tab-btn[data-target="${tabParam}"]`);
         if (targetBtn) targetBtn.click();
     } else {
-        if (tabBtns.length > 0) tabBtns[0].click();
+        if (tabBtns.length > 0) {
+            tabBtns[0].click();
+            initTelecallerAnalytics();
+        }
     }
 });

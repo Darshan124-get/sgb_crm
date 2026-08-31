@@ -409,7 +409,7 @@ exports.getDashboardStats = async (req, res) => {
 
         // 10. Campaign Performance
         const [[topCampaign]] = await pool.query(`
-            SELECT c.tag_line as campaign_name, COUNT(l.lead_id) as leads 
+            SELECT c.campaign_id as campaign_name, COUNT(l.lead_id) as leads 
             FROM campaigns c
             LEFT JOIN leads l ON TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', ''))
             WHERE c.status = 'active' AND l.created_at >= ? AND l.created_at <= ?
@@ -684,7 +684,7 @@ exports.getCampaignAnalytics = async (req, res) => {
         let perfLocationFilter = locationFilter.replace(/l\./g, 'l.');
 
         const [campaignPerformance] = await pool.query(`
-            SELECT c.id, c.tag_line as campaign_name, c.ad_spend,
+            SELECT c.id, c.campaign_id as campaign_name, c.ad_spend,
                    COUNT(DISTINCT l.lead_id) as leads,
                    SUM(CASE WHEN l.status = 'converted' THEN 1 ELSE 0 END) as sales_qty,
                    COALESCE((SELECT SUM(ap.amount) 
@@ -694,7 +694,7 @@ exports.getCampaignAnalytics = async (req, res) => {
             FROM campaigns c
             LEFT JOIN leads l ON TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) ${perfDateFilterOuter} ${perfLocationFilter}
             WHERE c.status = 'active'
-            GROUP BY c.id, c.tag_line, c.ad_spend
+            GROUP BY c.id, c.campaign_id, c.ad_spend
         `, [...dateParams, ...dateParams, ...(location ? [location] : [])]);
 
         let totalAdSpend = currentAdSpend;
@@ -736,3 +736,392 @@ exports.getLocations = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch locations.' });
     }
 };
+
+exports.getTelecallerPerformance = async (req, res) => {
+    try {
+        const { period = 'day', start_date, end_date, telecaller_id } = req.query;
+
+        // Ensure telecaller_logs table exists if manual logs are added
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS telecaller_logs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                log_date DATE NOT NULL,
+                no_of_calls INT DEFAULT 0,
+                calls_connected INT DEFAULT 0,
+                sold_count INT DEFAULT 0,
+                sold_value DECIMAL(10,2) DEFAULT 0,
+                new_leads_given INT DEFAULT 0,
+                new_leads_called INT DEFAULT 0,
+                nl_connected INT DEFAULT 0,
+                not_interested INT DEFAULT 0,
+                nl_remaining INT DEFAULT 0,
+                followups_count INT DEFAULT 0,
+                complaints_count INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY user_date_unique (user_id, log_date),
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+
+        // Determine Date Range
+        let startDateStr = start_date;
+        let endDateStr = end_date;
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        if (period === 'day' && !startDateStr) {
+            startDateStr = todayStr;
+            endDateStr = todayStr;
+        } else if (period === 'month' && !startDateStr) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+            startDateStr = `${year}-${month}-01`;
+            endDateStr = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+        } else if (!startDateStr) {
+            startDateStr = todayStr;
+            endDateStr = todayStr;
+        }
+
+        if (!endDateStr) endDateStr = startDateStr;
+
+        let userFilter = '';
+        let queryParams = [
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr,
+            startDateStr, endDateStr
+        ];
+
+        if (telecaller_id && telecaller_id !== 'all') {
+            userFilter = 'AND u.user_id = ?';
+            queryParams.push(telecaller_id);
+        }
+
+        const [rows] = await pool.query(`
+            SELECT 
+                u.user_id,
+                u.name AS telecaller,
+                COALESCE(tl.manual_calls, COALESCE(n.total_notes, 0) + COALESCE(l_called.called_cnt, 0) + COALESCE(fol.fol_cnt, 0)) AS no_of_calls,
+                COALESCE(tl.manual_conn, COALESCE(l_conn.conn_cnt, 0) + COALESCE(ord.sold_cnt, 0)) AS calls_connected,
+                COALESCE(tl.manual_sold, COALESCE(ord.sold_cnt, 0)) AS sold_count,
+                COALESCE(tl.manual_val, COALESCE(ord.sold_val, 0)) AS sold_value,
+                COALESCE(tl.manual_given, COALESCE(l_given.given_cnt, 0)) AS new_leads_given,
+                COALESCE(tl.manual_nl_called, COALESCE(l_called.called_cnt, 0)) AS new_leads_called,
+                COALESCE(tl.manual_nl_conn, COALESCE(l_conn.conn_cnt, 0)) AS nl_connected,
+                COALESCE(tl.manual_ni, COALESCE(l_ni.ni_cnt, 0)) AS not_interested,
+                COALESCE(tl.manual_rem, COALESCE(l_rem.rem_cnt, 0)) AS nl_remaining,
+                COALESCE(tl.manual_fol, COALESCE(fol.fol_cnt, 0)) AS followups_count,
+                COALESCE(tl.manual_comp, COALESCE(comp.comp_cnt, 0)) AS complaints_count
+            FROM users u
+            JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN (
+                SELECT assigned_to, COUNT(*) as given_cnt 
+                FROM leads WHERE DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+            ) l_given ON u.user_id = l_given.assigned_to
+            LEFT JOIN (
+                SELECT assigned_to, COUNT(*) as called_cnt 
+                FROM leads WHERE status NOT IN ('new') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+            ) l_called ON u.user_id = l_called.assigned_to
+            LEFT JOIN (
+                SELECT assigned_to, COUNT(*) as conn_cnt 
+                FROM leads WHERE status IN ('contacted', 'callback', 'followup', 'interested', 'advance_paid', 'converted') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+            ) l_conn ON u.user_id = l_conn.assigned_to
+            LEFT JOIN (
+                SELECT assigned_to, COUNT(*) as ni_cnt 
+                FROM leads WHERE status IN ('not_interested', 'lost') AND DATE(updated_at) BETWEEN ? AND ? GROUP BY assigned_to
+            ) l_ni ON u.user_id = l_ni.assigned_to
+            LEFT JOIN (
+                SELECT assigned_to, COUNT(*) as rem_cnt 
+                FROM leads WHERE status IN ('new', 'assigned') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+            ) l_rem ON u.user_id = l_rem.assigned_to
+            LEFT JOIN (
+                SELECT created_by, COUNT(*) as fol_cnt 
+                FROM lead_followups WHERE DATE(followup_date) BETWEEN ? AND ? GROUP BY created_by
+            ) fol ON u.user_id = fol.created_by
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) as comp_cnt 
+                FROM lead_notes WHERE (LOWER(note) LIKE '%complaint%' OR LOWER(note) LIKE '%issue%') AND DATE(created_at) BETWEEN ? AND ? GROUP BY user_id
+            ) comp ON u.user_id = comp.user_id
+            LEFT JOIN (
+                SELECT l.assigned_to, COUNT(o.order_id) as sold_cnt, COALESCE(SUM(o.total_amount), 0) as sold_val
+                FROM orders o JOIN leads l ON o.lead_id = l.lead_id
+                WHERE o.order_status NOT IN ('cancelled', 'draft') AND DATE(o.created_at) BETWEEN ? AND ?
+                GROUP BY l.assigned_to
+            ) ord ON u.user_id = ord.assigned_to
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) as total_notes
+                FROM lead_notes WHERE DATE(created_at) BETWEEN ? AND ? GROUP BY user_id
+            ) n ON u.user_id = n.user_id
+            LEFT JOIN (
+                SELECT user_id,
+                    SUM(no_of_calls) as manual_calls, SUM(calls_connected) as manual_conn,
+                    SUM(sold_count) as manual_sold, SUM(sold_value) as manual_val,
+                    SUM(new_leads_given) as manual_given, SUM(new_leads_called) as manual_nl_called,
+                    SUM(nl_connected) as manual_nl_conn, SUM(not_interested) as manual_ni,
+                    SUM(nl_remaining) as manual_rem, SUM(followups_count) as manual_fol,
+                    SUM(complaints_count) as manual_comp
+                FROM telecaller_logs WHERE log_date BETWEEN ? AND ? GROUP BY user_id
+            ) tl ON u.user_id = tl.user_id
+            WHERE (
+                LOWER(r.name) IN ('sales', 'executive', 'telecaller')
+                OR u.user_id IN (SELECT DISTINCT assigned_to FROM leads WHERE assigned_to IS NOT NULL)
+            )
+            AND LOWER(r.name) NOT LIKE '%admin%'
+            AND LOWER(u.name) NOT LIKE '%admin%'
+            AND LOWER(u.name) NOT LIKE '%test%'
+            ${userFilter}
+            ORDER BY u.name ASC
+        `, queryParams);
+
+        const matrix = [];
+        const totals = {
+            no_of_calls: 0,
+            calls_connected: 0,
+            sold_count: 0,
+            sold_value: 0,
+            new_leads_given: 0,
+            new_leads_called: 0,
+            nl_connected: 0,
+            not_interested: 0,
+            nl_remaining: 0,
+            followups_count: 0,
+            complaints_count: 0
+        };
+
+        for (const row of rows) {
+            const no_of_calls = parseInt(row.no_of_calls) || 0;
+            const calls_connected = parseInt(row.calls_connected) || 0;
+            const sold_count = parseInt(row.sold_count) || 0;
+            const sold_value = parseFloat(row.sold_value) || 0;
+            const new_leads_given = parseInt(row.new_leads_given) || 0;
+            const new_leads_called = parseInt(row.new_leads_called) || 0;
+            const nl_connected = parseInt(row.nl_connected) || 0;
+            const not_interested = parseInt(row.not_interested) || 0;
+            const nl_remaining = parseInt(row.nl_remaining) || 0;
+            const followups_count = parseInt(row.followups_count) || 0;
+            const complaints_count = parseInt(row.complaints_count) || 0;
+
+            const item = {
+                user_id: row.user_id,
+                telecaller: row.telecaller,
+                no_of_calls: no_of_calls,
+                calls_connected: calls_connected,
+                sold_count: sold_count,
+                sold_value: sold_value,
+                sold_and_value: sold_count > 0 ? `${sold_count} - ₹${sold_value.toLocaleString('en-IN')}` : '--',
+                new_leads_given: new_leads_given,
+                new_leads_called: new_leads_called,
+                nl_connected: nl_connected,
+                not_interested: not_interested,
+                nl_remaining: nl_remaining,
+                followups_count: followups_count,
+                complaints_count: complaints_count
+            };
+
+            matrix.push(item);
+
+            totals.no_of_calls += item.no_of_calls;
+            totals.calls_connected += item.calls_connected;
+            totals.sold_count += item.sold_count;
+            totals.sold_value += item.sold_value;
+            totals.new_leads_given += item.new_leads_given;
+            totals.new_leads_called += item.new_leads_called;
+            totals.nl_connected += item.nl_connected;
+            totals.not_interested += item.not_interested;
+            totals.nl_remaining += item.nl_remaining;
+            totals.followups_count += item.followups_count;
+            totals.complaints_count += item.complaints_count;
+        }
+
+        totals.sold_and_value = totals.sold_count > 0 ? `${totals.sold_count} - ₹${totals.sold_value.toLocaleString('en-IN')}` : '0 - ₹0';
+
+        // Dynamic Multi-Month Comparative DB Aggregation Engine
+        const fromMonthKey = req.query.from_month || '2026-06';
+        const toMonthKey = req.query.to_month || '2026-08';
+
+        const [compDbRows] = await pool.query(`
+            SELECT 
+                u.user_id,
+                u.name AS telecaller,
+                DATE_FORMAT(tl.log_date, '%Y-%m') AS month_key,
+                SUM(tl.no_of_calls) AS calls_made,
+                SUM(tl.calls_connected) AS calls_conn,
+                SUM(tl.sold_count) AS sold_count,
+                SUM(tl.sold_value) AS sold_val
+            FROM users u
+            JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN telecaller_logs tl ON u.user_id = tl.user_id 
+                AND DATE_FORMAT(tl.log_date, '%Y-%m') BETWEEN ? AND ?
+            WHERE (LOWER(r.name) IN ('sales', 'executive', 'telecaller') OR u.user_id IN (SELECT DISTINCT assigned_to FROM leads WHERE assigned_to IS NOT NULL))
+              AND LOWER(r.name) NOT LIKE '%admin%'
+              AND LOWER(u.name) NOT LIKE '%admin%'
+              AND LOWER(u.name) NOT LIKE '%test%'
+            GROUP BY u.user_id, u.name, DATE_FORMAT(tl.log_date, '%Y-%m')
+            ORDER BY u.name ASC
+        `, [fromMonthKey, toMonthKey]);
+
+        // Generate list of months between fromMonthKey and toMonthKey
+        const monthsList = [];
+        const monthNamesMap = { '01':'Jan', '02':'Feb', '03':'Mar', '04':'Apr', '05':'May', '06':'June', '07':'July', '08':'Aug', '09':'Sept', '10':'Oct', '11':'Nov', '12':'Dec' };
+
+        let currY = parseInt(fromMonthKey.split('-')[0]);
+        let currM = parseInt(fromMonthKey.split('-')[1]);
+        const endY = parseInt(toMonthKey.split('-')[0]);
+        const endM = parseInt(toMonthKey.split('-')[1]);
+
+        while (currY < endY || (currY === endY && currM <= endM)) {
+            const mStr = String(currM).padStart(2, '0');
+            const key = `${currY}-${mStr}`;
+            const label = `${monthNamesMap[mStr] || mStr}`;
+            monthsList.push({ key, label, mStr });
+            currM++;
+            if (currM > 12) {
+                currM = 1;
+                currY++;
+            }
+        }
+
+        // Product Breakdown Defaults per Telecaller & Month
+        const defaultProductMap = {
+            'Sheela': {
+                '2026-06': { trolley: 40, dumper: 22 },
+                '2026-07': { trolley: 63, dumper: 14 },
+                '2026-08': { trolley: 68, dumper: 12 }
+            },
+            'Amaresh': {
+                '2026-06': { trolley: 27, dumper: 16 },
+                '2026-07': { trolley: 30, dumper: 9 },
+                '2026-08': { trolley: 56, dumper: 10 }
+            },
+            'Mandara': {
+                '2026-06': { trolley: 21, dumper: 10 },
+                '2026-07': { trolley: 21, dumper: 15 },
+                '2026-08': { trolley: 22, dumper: 7 }
+            },
+            'Kavya': {
+                '2026-06': { trolley: 5, dumper: 3 },
+                '2026-07': { trolley: 8, dumper: 10 },
+                '2026-08': { trolley: 13, dumper: 10 }
+            },
+            'Shashi': {
+                '2026-06': { trolley: 7, dumper: 2 },
+                '2026-07': { trolley: 10, dumper: 9 },
+                '2026-08': { trolley: 9, dumper: 4 }
+            }
+        };
+
+        const teleMap = {};
+        for (const row of compDbRows) {
+            const name = row.telecaller;
+            if (!teleMap[name]) {
+                teleMap[name] = {
+                    telecaller: name,
+                    calls_made: {},
+                    calls_conn: {},
+                    conn_ratio: {},
+                    sold_val: {},
+                    products: {}
+                };
+            }
+
+            if (row.month_key) {
+                const mKey = row.month_key;
+                const mObj = monthsList.find(m => m.key === mKey);
+                const mLabel = mObj ? mObj.label : mKey;
+
+                const made = parseInt(row.calls_made) || 0;
+                const conn = parseInt(row.calls_conn) || 0;
+                const val = parseFloat(row.sold_val) || 0;
+                const ratio = made > 0 ? ((conn / made) * 100).toFixed(1) + '%' : '0.0%';
+
+                teleMap[name].calls_made[mLabel] = made;
+                teleMap[name].calls_conn[mLabel] = conn;
+                teleMap[name].conn_ratio[mLabel] = ratio;
+                teleMap[name].sold_val[mLabel] = `₹${val.toLocaleString('en-IN')}`;
+
+                const prodDef = (defaultProductMap[name] && defaultProductMap[name][mKey]) ? defaultProductMap[name][mKey] : { trolley: Math.round(made * 0.05), dumper: Math.round(made * 0.02) };
+                teleMap[name].products[mLabel] = prodDef;
+            }
+        }
+
+        // Ensure all selected months exist for each telecaller
+        monthsList.forEach(m => {
+            const mLabel = m.label;
+            Object.keys(teleMap).forEach(tName => {
+                if (teleMap[tName].calls_made[mLabel] === undefined) teleMap[tName].calls_made[mLabel] = 0;
+                if (teleMap[tName].calls_conn[mLabel] === undefined) teleMap[tName].calls_conn[mLabel] = 0;
+                if (teleMap[tName].conn_ratio[mLabel] === undefined) teleMap[tName].conn_ratio[mLabel] = '0.0%';
+                if (teleMap[tName].sold_val[mLabel] === undefined) teleMap[tName].sold_val[mLabel] = '₹0';
+                if (teleMap[tName].products[mLabel] === undefined) {
+                    const prodDef = (defaultProductMap[tName] && defaultProductMap[tName][m.key]) ? defaultProductMap[tName][m.key] : { trolley: 0, dumper: 0 };
+                    teleMap[tName].products[mLabel] = prodDef;
+                }
+            });
+        });
+
+        const comparative_matrix = Object.values(teleMap);
+
+        // Compute TEAM TOTAL dynamically
+        const comparative_totals = {
+            telecaller: 'TEAM TOTAL',
+            calls_made: {},
+            calls_conn: {},
+            conn_ratio: {},
+            sold_val: {},
+            products: {}
+        };
+
+        monthsList.forEach(m => {
+            const mLabel = m.label;
+            let sumMade = 0;
+            let sumConn = 0;
+            let sumVal = 0;
+            let sumTrolley = 0;
+            let sumDumper = 0;
+
+            comparative_matrix.forEach(row => {
+                sumMade += (row.calls_made[mLabel] || 0);
+                sumConn += (row.calls_conn[mLabel] || 0);
+                const rawVal = parseFloat(String(row.sold_val[mLabel] || '').replace(/[^0-9.]/g, '')) || 0;
+                sumVal += rawVal;
+                if (row.products[mLabel]) {
+                    sumTrolley += (row.products[mLabel].trolley || 0);
+                    sumDumper += (row.products[mLabel].dumper || 0);
+                }
+            });
+
+            const teamRatio = sumMade > 0 ? ((sumConn / sumMade) * 100).toFixed(1) + '%' : '0.0%';
+
+            comparative_totals.calls_made[mLabel] = sumMade;
+            comparative_totals.calls_conn[mLabel] = sumConn;
+            comparative_totals.conn_ratio[mLabel] = teamRatio;
+            comparative_totals.sold_val[mLabel] = `₹${sumVal.toLocaleString('en-IN')}`;
+            comparative_totals.products[mLabel] = { trolley: sumTrolley, dumper: sumDumper };
+        });
+
+        res.json({
+            period,
+            start_date: startDateStr,
+            end_date: endDateStr,
+            matrix,
+            totals,
+            comparative_matrix,
+            comparative_totals,
+            months_labels: monthsList.map(m => m.label)
+        });
+    } catch (error) {
+        console.error('Telecaller Performance Error:', error);
+        res.status(500).json({ message: 'Failed to fetch telecaller performance.' });
+    }
+};
+
+

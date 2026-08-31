@@ -732,6 +732,7 @@ exports.getNodeTypes = (req, res) => {
         save_lead_field: { label: 'Save CRM Field', desc: 'Binds variable answer to lead column' },
         create_lead: { label: 'Create CRM Lead', desc: 'Generates lead in CRM system' },
         human_handoff: { label: 'Human Handoff', desc: 'Escalates session and pauses bot' },
+        time_trigger: { label: 'Time Trigger / Delay', desc: 'Pauses execution for specified duration before next step' },
         end: { label: 'End Flow', desc: 'Terminates chatbot flow session' }
     });
 };
@@ -1149,5 +1150,102 @@ exports.getStorageUsage = async (req, res) => {
     } catch (err) {
         console.error('[GET STORAGE USAGE ERROR]', err);
         res.status(500).json({ message: 'Error calculating storage usage' });
+    }
+};
+
+// 21. Get pending human handoff alerts (only show to assigned staff, admin, and whatsapp_manager)
+exports.getPendingHumanAlerts = async (req, res) => {
+    try {
+        const userId = req.user ? (req.user.user_id || req.user.id) : null;
+        const role = req.user && req.user.role ? String(req.user.role).toLowerCase() : '';
+
+        const isAdminUser = role === 'admin' || role === 'super-admin' || role.includes('admin');
+        const isWhatsappManager = role === 'whatsapp_manager' || role.includes('whatsapp');
+
+        let sql = `
+            SELECT 
+                cs.session_id, cs.flow_id, cs.phone, cs.status as session_status, cs.paused_at, cs.current_node_key,
+                l.lead_id, l.customer_name, l.status as lead_status, l.assigned_to, l.score, l.city,
+                (
+                    SELECT message FROM chat_messages cm 
+                    JOIN chat_sessions s ON cm.session_id = s.session_id 
+                    WHERE s.lead_id = l.lead_id ORDER BY cm.chat_id DESC LIMIT 1
+                ) as last_message
+            FROM chatbot_sessions cs
+            LEFT JOIN leads l ON (cs.lead_id IS NOT NULL AND cs.lead_id = l.lead_id) OR (l.phone_number COLLATE utf8mb4_general_ci LIKE CONCAT('%', RIGHT(REPLACE(cs.phone, '+', ''), 10)) COLLATE utf8mb4_general_ci)
+            WHERE (cs.status = 'paused_for_human' OR l.status = 'human_needed')
+        `;
+
+        const queryParams = [];
+
+        // Telecallers / Executives only see handoff alerts for leads assigned to them
+        if (!isAdminUser && !isWhatsappManager) {
+            if (userId) {
+                sql += ` AND l.assigned_to = ?`;
+                queryParams.push(userId);
+            } else {
+                return res.json([]);
+            }
+        }
+
+        sql += ` ORDER BY cs.paused_at DESC, cs.session_id DESC`;
+
+        const [rows] = await pool.query(sql, queryParams);
+
+        res.json(rows);
+    } catch (err) {
+        console.error('[GET PENDING HUMAN ALERTS ERROR]', err);
+        res.status(500).json({ message: 'Error fetching human handoff alerts' });
+    }
+};
+
+// 22. Re-trigger chatbot flow session for a customer
+exports.retriggerFlowSession = async (req, res) => {
+    try {
+        const FlowEngine = require('../services/FlowEngine');
+        const identifier = req.params.sessionId || req.body.sessionId || req.body.phone;
+        if (!identifier) {
+            return res.status(400).json({ message: 'Session ID or Phone number is required' });
+        }
+
+        const result = await FlowEngine.retriggerSession(identifier);
+        res.json({ message: 'Chatbot flow re-triggered successfully', ...result });
+    } catch (err) {
+        console.error('[RETRIGGER FLOW ERROR]', err);
+        res.status(500).json({ message: err.message || 'Error re-triggering flow session' });
+    }
+};
+
+// 23. Takeover chatbot flow session (pause bot for manual agent chat)
+exports.takeoverFlowSession = async (req, res) => {
+    try {
+        const FlowEngine = require('../services/FlowEngine');
+        const identifier = req.params.sessionId || req.body.sessionId || req.body.phone;
+        if (!identifier) {
+            return res.status(400).json({ message: 'Session ID or Phone number is required' });
+        }
+
+        const result = await FlowEngine.takeoverSession(identifier);
+        res.json({ message: 'Bot paused for human takeover successfully', ...result });
+    } catch (err) {
+        console.error('[TAKEOVER FLOW ERROR]', err);
+        res.status(500).json({ message: err.message || 'Error taking over flow session' });
+    }
+};
+
+// 24. Resolve human handoff for a customer or session
+exports.resolveHandoffSession = async (req, res) => {
+    try {
+        const FlowEngine = require('../services/FlowEngine');
+        const identifier = req.params.sessionId || req.body.sessionId || req.body.phone;
+        if (!identifier) {
+            return res.status(400).json({ message: 'Session ID or Phone number is required' });
+        }
+
+        const result = await FlowEngine.resolveHandoff(identifier);
+        res.json({ message: 'Handoff resolved successfully', ...result });
+    } catch (err) {
+        console.error('[RESOLVE HANDOFF ERROR]', err);
+        res.status(500).json({ message: err.message || 'Error resolving handoff session' });
     }
 };

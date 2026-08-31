@@ -30,18 +30,36 @@ async function loadSettings() {
         const vrlInput = document.getElementById('s-vrl-tracking');
         if (vrlInput) vrlInput.value = data.vrl_tracking_url || 'https://www.vrlgroup.in/track_consignment.aspx';
 
+        // Load Notification Toggles from Backend / LocalStorage
+        const notifOn = data.notifications_enabled !== undefined ? data.notifications_enabled === 'true' : (localStorage.getItem('notifications_enabled') !== 'false');
+        const soundMuted = data.notification_sound_muted !== undefined ? data.notification_sound_muted === 'true' : (localStorage.getItem('notification_sound_muted') === 'true');
+
+        const notifEl = document.getElementById('s-notifications-toggle');
+        if (notifEl) notifEl.checked = notifOn;
+        const soundEl = document.getElementById('s-sound-mute-toggle');
+        if (soundEl) soundEl.checked = soundMuted;
+
     } catch (err) {
         showToast('Failed to load settings', true);
     }
 }
 
 async function saveSettings() {
+    const notifEnabled = document.getElementById('s-notifications-toggle') ? document.getElementById('s-notifications-toggle').checked : true;
+    const soundMuted = document.getElementById('s-sound-mute-toggle') ? document.getElementById('s-sound-mute-toggle').checked : false;
+
+    // Save to LocalStorage immediately
+    localStorage.setItem('notifications_enabled', notifEnabled ? 'true' : 'false');
+    localStorage.setItem('notification_sound_muted', soundMuted ? 'true' : 'false');
+
     const payload = {
         gst_rate: document.getElementById('s-gst-rate').value,
         company_state: document.getElementById('s-company-state').value,
         auto_tax_switch: document.getElementById('s-auto-tax').checked ? 'true' : 'false',
         invoice_prefix: document.getElementById('s-invoice-prefix').value,
-        last_invoice_num: document.getElementById('s-last-invoice').value
+        last_invoice_num: document.getElementById('s-last-invoice').value,
+        notifications_enabled: notifEnabled ? 'true' : 'false',
+        notification_sound_muted: soundMuted ? 'true' : 'false'
     };
 
     const postInput = document.getElementById('s-post-tracking');

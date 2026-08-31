@@ -19,7 +19,7 @@ server.on('error', (err) => {
             lines.forEach(line => {
                 const parts = line.trim().split(/\s+/);
                 const pid = parts[parts.length - 1];
-                if (pid && pid !== '0') pids.add(pid);
+                if (pid && pid !== '0' && pid !== String(process.pid)) pids.add(pid);
             });
             pids.forEach(pid => {
                 try {
@@ -30,8 +30,10 @@ server.on('error', (err) => {
         } catch (e) {
             console.error('Could not auto-kill port process:', e.message);
         }
-        // Exit so nodemon restarts cleanly
-        process.exit(1);
+        setTimeout(() => {
+            console.log(`🔄 Retrying server.listen on port ${PORT}...`);
+            server.listen(PORT);
+        }, 1000);
     } else {
         throw err;
     }

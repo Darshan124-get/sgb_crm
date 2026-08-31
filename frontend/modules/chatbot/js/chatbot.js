@@ -95,11 +95,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchFlowDetails(id) {
         const token = localStorage.getItem('token');
+        const apiUrl = window.API_URL || '/api';
         try {
-            const res = await fetch(`${window.API_URL}/chatbot/flows/${id}`, {
+            if (!token) {
+                console.warn('[LOAD FLOW WARN] No authorization token found in localStorage.');
+            }
+
+            const res = await fetch(`${apiUrl}/chatbot/flows/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) throw new Error('Failed to load flow details');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.message || `Failed to load flow details (HTTP ${res.status})`);
+            }
             const data = await res.json();
 
             // Populate flow metadata settings
@@ -228,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { type: 'document', name: 'Document', category: 'MESSAGE', desc: 'Send PDF or catalog files', icon: 'fa-file-invoice', iconClass: 'green-node-icon' },
         { type: 'product', name: 'Product', category: 'MESSAGE', desc: 'Send product brochure card', icon: 'fa-box-open', iconClass: 'orange-node-icon' },
         { type: 'condition', name: 'Condition', category: 'FLOW LOGIC', desc: 'Set branch rules', icon: 'fa-code-branch', iconClass: 'pink-node-icon' },
+        { type: 'time_trigger', name: 'Time Trigger / Delay', category: 'FLOW LOGIC', desc: 'Wait N seconds/minutes', icon: 'fa-hourglass-half', iconClass: 'amber-node-icon' },
         { type: 'end', name: 'End', category: 'FLOW LOGIC', desc: 'Terminate interaction', icon: 'fa-ban', iconClass: 'pink-node-icon' },
         { type: 'create_lead', name: 'Create Lead', category: 'INTEGRATION', desc: 'Insert new lead into CRM', icon: 'fa-address-card', iconClass: 'indigo-node-icon' }
     ];
@@ -534,8 +543,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return { variable: 'land_acres', operator: '>', value: '2', trueTarget: 'unconnected', falseTarget: 'unconnected' };
         } else if (type === 'goto') {
             return { targetNodeId: 'unconnected' };
-        } else if (type === 'delay') {
-            return { duration: 5, unit: 'seconds' };
+        } else if (type === 'delay' || type === 'time_trigger') {
+            return { delayValue: 5, delayUnit: 'seconds', duration: 5, unit: 'seconds', name: 'Time Delay' };
         } else if (type === 'end') {
             return { message: 'Thank you for visiting SGB Agro!' };
         } else if (type === 'save_lead_field') {
@@ -692,9 +701,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (['image', 'video', 'document', 'audio', 'multi_media'].includes(node.type)) {
             borderClass = 'media-node-accent';
             typeIcon = node.type === 'image' ? 'fa-image' : node.type === 'video' ? 'fa-video' : node.type === 'document' ? 'fa-file-invoice' : node.type === 'audio' ? 'fa-music' : 'fa-images';
-        } else if (['condition', 'goto', 'delay', 'end'].includes(node.type)) {
+        } else if (['condition', 'goto', 'delay', 'time_trigger', 'end'].includes(node.type)) {
             borderClass = 'logic-node-accent';
-            typeIcon = node.type === 'condition' ? 'fa-code-branch' : node.type === 'goto' ? 'fa-share' : node.type === 'delay' ? 'fa-hourglass-half' : 'fa-ban';
+            typeIcon = node.type === 'condition' ? 'fa-code-branch' : node.type === 'goto' ? 'fa-share' : (node.type === 'delay' || node.type === 'time_trigger') ? 'fa-hourglass-half' : 'fa-ban';
         } else if (['create_lead', 'save_lead_field', 'assign_to_user', 'webhook'].includes(node.type)) {
             borderClass = 'integration-node-accent';
             typeIcon = node.type === 'create_lead' ? 'fa-address-card' : node.type === 'save_lead_field' ? 'fa-floppy-disk' : node.type === 'assign_to_user' ? 'fa-user-plus' : 'fa-globe';
@@ -833,9 +842,11 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyPreview = `
                 <div class="node-preview" style="color:#6366f1; font-weight:700;"><i class="fa-solid fa-share"></i> Jump to: ${targetNode ? targetNode.name : 'Unconnected'}</div>
             `;
-        } else if (node.type === 'delay') {
+        } else if (node.type === 'delay' || node.type === 'time_trigger') {
+            const delayVal = node.config.delayValue || node.config.duration || 5;
+            const delayUnit = node.config.delayUnit || node.config.unit || 'seconds';
             bodyPreview = `
-                <div class="node-preview" style="color:#ec4899;"><i class="fa-solid fa-hourglass-half"></i> Wait ${node.config.duration || 5} ${node.config.unit || 'seconds'}</div>
+                <div class="node-preview" style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-hourglass-half"></i> Wait ${delayVal} ${delayUnit}</div>
             `;
         } else if (node.type === 'save_lead_field') {
             bodyPreview = `
@@ -1122,6 +1133,20 @@ document.addEventListener('DOMContentLoaded', () => {
             node.config.sendVariables = document.getElementById('node-wh-sendvars') ? document.getElementById('node-wh-sendvars').checked : true;
             const targetSel = document.getElementById('node-next-step-select');
             if (targetSel) mapSimpleOutputConnection(node.id, targetSel.value);
+        } else if (node.type === 'time_trigger' || node.type === 'delay') {
+            const delayValEl = document.getElementById('node-delay-val');
+            const delayUnitEl = document.getElementById('node-delay-unit');
+            if (delayValEl) {
+                const parsedVal = parseInt(delayValEl.value) || 5;
+                node.config.delayValue = parsedVal;
+                node.config.duration = parsedVal;
+            }
+            if (delayUnitEl) {
+                node.config.delayUnit = delayUnitEl.value;
+                node.config.unit = delayUnitEl.value;
+            }
+            const targetSel = document.getElementById('node-next-step-select');
+            if (targetSel) mapSimpleOutputConnection(node.id, targetSel.value);
         } else if (node.type === 'end') {
             node.config.message = document.getElementById('node-end-msg').value;
         }
@@ -1330,7 +1355,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="inspector-form-group">
                     <label>Validation Type</label>
                     <select id="node-text-valtype">
-                        <option value="text" ${node.config.validationType === 'text' ? 'selected' : ''}>Any Short Text</option>
+                        <option value="name" ${node.config.validationType === 'name' ? 'selected' : ''}>Name & Location (Disallow pure numbers)</option>
+                        <option value="text" ${node.config.validationType === 'text' ? 'selected' : ''}>General Text</option>
                         <option value="email" ${node.config.validationType === 'email' ? 'selected' : ''}>Email Address Format</option>
                         <option value="phone" ${node.config.validationType === 'phone' ? 'selected' : ''}>Phone Number</option>
                     </select>
@@ -1863,6 +1889,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="inspector-form-group" style="display:flex; align-items:center; gap:0.5rem; margin-top:0.25rem;">
                     <input type="checkbox" id="node-wh-sendvars" ${node.config.sendVariables !== false ? 'checked' : ''} style="width:auto;">
                     <label for="node-wh-sendvars" style="margin:0; font-size:0.75rem;">Send All Session Variables in Body</label>
+                </div>
+                <div class="inspector-form-group" style="margin-top:0.5rem;">
+                    <label>Next Step Target</label>
+                    <select id="node-next-step-select">
+                        ${optionsDropdown}
+                    </select>
+                </div>
+            `;
+        } else if (node.type === 'time_trigger' || node.type === 'delay') {
+            const currentTarget = getTargetNodeIdFromPort(`port-${node.id}-out`);
+            const optionsDropdown = getNextNodeOptionsHtml(currentTarget ? `port-${currentTarget}-in` : '');
+            const delayVal = node.config.delayValue || node.config.duration || 5;
+            const delayUnit = node.config.delayUnit || node.config.unit || 'seconds';
+
+            fieldsHtml = `
+                ${triggerHtml}
+                <div class="inspector-form-group">
+                    <label>Node Name</label>
+                    <input type="text" id="node-name-input" value="${node.name}">
+                </div>
+                <div class="inspector-form-group">
+                    <label><i class="fa-solid fa-hourglass-half" style="color:#f59e0b;"></i> Delay Duration</label>
+                    <input type="number" id="node-delay-val" min="1" value="${delayVal}">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Time Unit</label>
+                    <select id="node-delay-unit">
+                        <option value="seconds" ${delayUnit === 'seconds' ? 'selected' : ''}>Seconds</option>
+                        <option value="minutes" ${delayUnit === 'minutes' ? 'selected' : ''}>Minutes</option>
+                        <option value="hours" ${delayUnit === 'hours' ? 'selected' : ''}>Hours</option>
+                    </select>
                 </div>
                 <div class="inspector-form-group" style="margin-top:0.5rem;">
                     <label>Next Step Target</label>
@@ -3102,7 +3159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 columns[3].push(n);
             } else if (['contact_time', 'text_input', 'number_input', 'buttons', 'list'].includes(n.type)) {
                 columns[4].push(n);
-            } else if (['create_lead', 'save_lead_field', 'assign_to_user', 'webhook', 'human_handoff'].includes(n.type)) {
+            } else if (['create_lead', 'save_lead_field', 'assign_to_user', 'webhook', 'human_handoff', 'time_trigger', 'delay'].includes(n.type)) {
                 columns[5].push(n);
             } else if (n.type === 'end') {
                 columns[6].push(n);

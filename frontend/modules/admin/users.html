@@ -237,6 +237,368 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- USER PROFILE VIEW TAB -->
+                    <div id="tab-user-profile" class="tab-section">
+                        <!-- Breadcrumb navigation -->
+                        <div class="profile-breadcrumb">
+                            <a id="btnBackToUsersList"><i class="fas fa-arrow-left"></i> Users</a>
+                            <span>&rsaquo;</span>
+                            <span id="profileBreadcrumbName" style="color:#0f172a;font-weight:700;">User Profile</span>
+                        </div>
+
+                        <!-- Profile Header Banner Card matching image_1.png -->
+                        <div class="user-profile-header-card">
+                            <div class="profile-header-flex-wrapper">
+                                <!-- Left: Avatar + Identity details -->
+                                <div class="profile-header-left">
+                                    <div class="profile-avatar-container">
+                                        <div class="profile-avatar-circle" id="userProfileAvatar">P</div>
+                                        <div class="profile-online-dot" id="userProfileStatusDot"></div>
+                                    </div>
+                                    <div class="profile-header-info">
+                                        <div class="profile-name-row">
+                                            <h1 class="profile-name-title" id="userProfileName">Preetham</h1>
+                                            <span class="status-badge active" id="userProfileStatusBadge">Active</span>
+                                        </div>
+                                        <div class="profile-email-subtitle" id="userProfileEmail">preetham@gmail.com</div>
+                                        <div class="profile-badges-row">
+                                            <span class="badge-pill-outline badge-emp-id"><i class="fas fa-id-card"></i> Employee ID: <strong id="userProfileEmpId">SGB-017</strong></span>
+                                            <span class="badge-pill-outline badge-role-tag" id="userProfileRoleBadge"><i class="fas fa-user-shield"></i> WhatsApp Manager</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Middle: 2 columns of 3 meta fields -->
+                                <div class="profile-header-meta-columns">
+                                    <!-- Column 1 -->
+                                    <div class="profile-meta-column">
+                                        <div class="profile-meta-item-inline">
+                                            <i class="fas fa-phone profile-inline-icon"></i>
+                                            <div>
+                                                <div class="profile-meta-label">Phone</div>
+                                                <div class="profile-meta-value" id="userProfilePhone">+91 98765 43210</div>
+                                            </div>
+                                        </div>
+                                        <div class="profile-meta-item-inline">
+                                            <i class="fas fa-building profile-inline-icon"></i>
+                                            <div>
+                                                <div class="profile-meta-label">Department</div>
+                                                <div class="profile-meta-value" id="userProfileDept">Sales</div>
+                                            </div>
+                                        </div>
+                                        <div class="profile-meta-item-inline">
+                                            <i class="fas fa-calendar-alt profile-inline-icon"></i>
+                                            <div>
+                                                <div class="profile-meta-label">Date of Joining</div>
+                                                <div class="profile-meta-value" id="userProfileJoining">12 Mar 2024</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Column 2 -->
+                                    <div class="profile-meta-column">
+                                        <div class="profile-meta-item-inline">
+                                            <i class="fas fa-location-dot profile-inline-icon"></i>
+                                            <div>
+                                                <div class="profile-meta-label">Location</div>
+                                                <div class="profile-meta-value" id="userProfileLocation">Tamil Nadu, India</div>
+                                            </div>
+                                        </div>
+                                        <div class="profile-meta-item-inline">
+                                            <i class="fas fa-user-tie profile-inline-icon"></i>
+                                            <div>
+                                                <div class="profile-meta-label">Reporting To</div>
+                                                <div class="profile-meta-value" id="userProfileReporting">Admin</div>
+                                            </div>
+                                        </div>
+                                        <div class="profile-meta-item-inline">
+                                            <i class="fas fa-clock profile-inline-icon"></i>
+                                            <div>
+                                                <div class="profile-meta-label">Last Login</div>
+                                                <div class="profile-meta-value" id="userProfileLastLogin">27 Aug 2026, 03:15 PM</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right: Action Buttons -->
+                                <div class="profile-header-actions">
+                                    <button class="btn btn-primary" id="btnEditUserProfile" style="border-radius:8px;padding:0.6rem 1.25rem;">
+                                        <i class="fas fa-edit"></i> Edit User
+                                    </button>
+                                    <button class="btn btn-outline" id="btnMoreUserProfileOptions" style="border-radius:8px;padding:0.6rem 1rem;">
+                                        More <i class="fas fa-ellipsis-v" style="margin-left:0.3rem;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Profile Navigation Tabs -->
+                        <div class="profile-tabs-bar" id="profileSubTabs">
+                            <div class="profile-tab-item active" data-ptab="overview">Overview</div>
+                            <div class="profile-tab-item" data-ptab="activity">Activity & History</div>
+                            <div class="profile-tab-item" data-ptab="permissions">Permissions</div>
+                            <div class="profile-tab-item" data-ptab="leads">Leads & Performance</div>
+                            <div class="profile-tab-item" data-ptab="orders">Orders & Sales</div>
+                            <div class="profile-tab-item" data-ptab="documents">Documents</div>
+                        </div>
+
+                        <!-- TAB PANES -->
+
+                        <!-- OVERVIEW PANE -->
+                        <div id="ptab-overview" class="profile-pane-content">
+                            <!-- 5 Stat Cards -->
+                            <div class="profile-stat-grid-5">
+                                <div class="p-stat-card">
+                                    <div class="p-stat-icon-wrapper" style="background:#eff6ff;color:#3b82f6;">
+                                        <i class="fas fa-user-group"></i>
+                                    </div>
+                                    <div>
+                                        <div class="p-stat-val" id="statLeadsAssigned">287</div>
+                                        <div class="p-stat-lbl">Leads Assigned</div>
+                                    </div>
+                                </div>
+
+                                <div class="p-stat-card">
+                                    <div class="p-stat-icon-wrapper" style="background:#f0fdf4;color:#10b981;">
+                                        <i class="fas fa-circle-check"></i>
+                                    </div>
+                                    <div>
+                                        <div class="p-stat-val" id="statLeadsConverted">146</div>
+                                        <div class="p-stat-lbl">Leads Converted</div>
+                                    </div>
+                                </div>
+
+                                <div class="p-stat-card">
+                                    <div class="p-stat-icon-wrapper" style="background:#fff7ed;color:#f97316;">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </div>
+                                    <div>
+                                        <div class="p-stat-val" id="statOrdersCreated">112</div>
+                                        <div class="p-stat-lbl">Orders Created</div>
+                                    </div>
+                                </div>
+
+                                <div class="p-stat-card">
+                                    <div class="p-stat-icon-wrapper" style="background:#faf5ff;color:#a855f7;">
+                                        <i class="fas fa-indian-rupee-sign"></i>
+                                    </div>
+                                    <div>
+                                        <div class="p-stat-val" id="statTotalSales">₹12,45,680</div>
+                                        <div class="p-stat-lbl">Total Sales</div>
+                                    </div>
+                                </div>
+
+                                <div class="p-stat-card">
+                                    <div class="p-stat-icon-wrapper" style="background:#f0fdfa;color:#14b8a6;">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                    <div>
+                                        <div class="p-stat-val" id="statConversionRate">78.54%</div>
+                                        <div class="p-stat-lbl">Conversion Rate</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2-Column Content Layout (Fills all gaps and optimizes height) -->
+                            <div class="profile-content-grid">
+                                <!-- Left Column: User Information + Recent Activity -->
+                                <div>
+                                    <!-- User Information Card -->
+                                    <div class="profile-card-panel">
+                                        <div class="profile-card-header">
+                                            <h3 class="profile-card-title">User Information</h3>
+                                            <button style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.95rem;" id="btnEditUserSection">
+                                                <i class="fas fa-pen"></i>
+                                            </button>
+                                        </div>
+                                        <div class="info-table-list">
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Full Name</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoFullName">Preetham</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Email</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoEmail">preetham@gmail.com</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Phone</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoPhone">+91 98765 43210</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Employee ID</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoEmpId">SGB-017</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Department</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoDept">Sales</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Role</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoRole">Whatsapp Manager</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Date of Joining</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoJoining">12 Mar 2024</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Status</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value"><span class="status-badge active" id="infoStatus">Active</span></div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Address</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoAddress">Coimbatore, Tamil Nadu, India</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Bio</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="infoBio">Handles WhatsApp leads, follow-ups, and customer conversions.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Recent Activity Card -->
+                                    <div class="profile-card-panel">
+                                        <div class="profile-card-header">
+                                            <h3 class="profile-card-title">Recent Activity</h3>
+                                            <a style="color:#3b82f6;font-size:0.85rem;font-weight:600;text-decoration:none;cursor:pointer;" id="btnViewAllActivity">View All</a>
+                                        </div>
+                                        <div class="activity-timeline" id="profileActivityTimeline">
+                                            <!-- Dynamically injected activity timeline -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: Roles, Security & System Info -->
+                                <div>
+                                    <!-- Roles & Permissions Card -->
+                                    <div class="profile-card-panel">
+                                        <div class="profile-card-header">
+                                            <h3 class="profile-card-title">Roles & Permissions</h3>
+                                        </div>
+                                        <div style="margin-bottom:1.25rem;">
+                                            <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.4rem;">Primary Role</div>
+                                            <span class="badge-pill-outline badge-role-tag" id="permPrimaryRole">Whatsapp Manager</span>
+                                        </div>
+                                        <div style="margin-bottom:1.5rem;">
+                                            <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.4rem;">Other Roles</div>
+                                            <span class="badge-pill-outline" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;" id="permOtherRoles">Sales Team</span>
+                                        </div>
+                                        <div style="font-size:0.85rem;font-weight:700;color:#1e293b;margin-bottom:0.75rem;">Permissions</div>
+                                        <div class="permission-check-list" id="profilePermissionsList">
+                                            <div class="permission-check-item"><i class="fas fa-check-circle"></i> Lead Management</div>
+                                            <div class="permission-check-item"><i class="fas fa-check-circle"></i> WhatsApp Communication</div>
+                                            <div class="permission-check-item"><i class="fas fa-check-circle"></i> View Orders</div>
+                                            <div class="permission-check-item"><i class="fas fa-check-circle"></i> Create Orders</div>
+                                            <div class="permission-check-item"><i class="fas fa-check-circle"></i> Update Follow-ups</div>
+                                            <div class="permission-check-item"><i class="fas fa-check-circle"></i> Reports & Analytics (View)</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Account & Security Card -->
+                                    <div class="profile-card-panel">
+                                        <div class="profile-card-header">
+                                            <h3 class="profile-card-title">Account & Security</h3>
+                                        </div>
+                                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+                                            <div>
+                                                <div style="font-weight:600;font-size:0.9rem;color:#1e293b;">Password</div>
+                                                <div style="font-size:0.78rem;color:#64748b;" id="pwdLastChanged">Last changed 45 days ago</div>
+                                            </div>
+                                            <button class="btn btn-outline" id="btnResetUserPassword" style="font-size:0.82rem;padding:0.4rem 0.85rem;border-radius:8px;">Reset Password</button>
+                                        </div>
+                                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                                            <div>
+                                                <div style="font-weight:600;font-size:0.9rem;color:#1e293b;">Two-Factor Authentication</div>
+                                            </div>
+                                            <span class="badge-pill-outline" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;" id="tfaBadge">Enabled</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- System Information Card -->
+                                    <div class="profile-card-panel">
+                                        <div class="profile-card-header">
+                                            <h3 class="profile-card-title">System Information</h3>
+                                        </div>
+                                        <div class="info-table-list">
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Created By</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="sysCreatedBy">admin</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Created On</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="sysCreatedOn">12 Mar 2024, 10:30 AM</div>
+                                            </div>
+                                            <div class="info-table-row">
+                                                <div class="info-table-label">Last Updated</div>
+                                                <div class="info-table-colon">:</div>
+                                                <div class="info-table-value" id="sysLastUpdated">27 Aug 2026, 03:15 PM</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OTHER TAB PANES (Activity, Permissions, Leads, Orders, Documents) -->
+                        <div id="ptab-activity" class="profile-pane-content" style="display:none;">
+                            <div class="profile-card-panel">
+                                <h3 class="profile-card-title" style="margin-bottom:1rem;">Complete Activity Log</h3>
+                                <div class="activity-timeline" id="fullActivityTimeline">
+                                    <!-- Full timeline -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ptab-permissions" class="profile-pane-content" style="display:none;">
+                            <div class="profile-card-panel">
+                                <h3 class="profile-card-title" style="margin-bottom:1rem;">Role & Access Matrix</h3>
+                                <div id="fullPermissionsMatrix">
+                                    <!-- Full permissions matrix -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ptab-leads" class="profile-pane-content" style="display:none;">
+                            <div class="profile-card-panel">
+                                <h3 class="profile-card-title" style="margin-bottom:1rem;">Assigned Leads</h3>
+                                <div id="userLeadsTableContainer">
+                                    <!-- Leads table -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ptab-orders" class="profile-pane-content" style="display:none;">
+                            <div class="profile-card-panel">
+                                <h3 class="profile-card-title" style="margin-bottom:1rem;">Created Orders & Sales</h3>
+                                <div id="userOrdersTableContainer">
+                                    <!-- Orders table -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ptab-documents" class="profile-pane-content" style="display:none;">
+                            <div class="profile-card-panel">
+                                <h3 class="profile-card-title" style="margin-bottom:1rem;">User Documents</h3>
+                                <div style="padding:2rem;text-align:center;color:#64748b;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1;">
+                                    <i class="fas fa-folder-open" style="font-size:2rem;color:#94a3b8;margin-bottom:0.5rem;"></i>
+                                    <p>No documents uploaded for this user yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

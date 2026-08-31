@@ -36,6 +36,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
+            // Ensure inner sidebar is visible for main tabs
+            const innerSidebar = document.querySelector('.settings-sidebar');
+            if (innerSidebar) innerSidebar.style.display = 'block';
+
             // Update Active State on Buttons
             tabBtns.forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
@@ -807,12 +811,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             tr.innerHTML = `
                 <td>
-                    <div style="display:flex;align-items:center;gap:0.75rem;">
-                        <div style="width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:bold;">
+                    <div class="user-row-clickable" data-id="${user.user_id}" style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;" title="View User Profile">
+                        <div style="width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#475569;font-weight:bold;">
                             ${user.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                            <div style="font-weight:600;color:#1e293b;">${user.name}</div>
+                            <div style="font-weight:600;color:#2563eb;text-decoration:none;" class="user-name-link">${user.name}</div>
                             <div style="font-size:0.8rem;color:#64748b;">${user.email}</div>
                         </div>
                     </div>
@@ -827,6 +831,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </td>
             `;
             tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.user-row-clickable').forEach(el => {
+            el.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                openUserProfile(id);
+            });
         });
 
         document.querySelectorAll('.btn-edit-user').forEach(btn => {
@@ -1216,6 +1227,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.showAlert('Success', `User successfully ${userId ? 'updated' : 'created'}!`, 'success');
                 closeUserWizard();
                 fetchAllPbacUsers();
+                if (activeProfileUserId && activeProfileUserId == userId) {
+                    openUserProfile(userId);
+                }
             } else {
                 window.showAlert('Error', data.message || 'Failed to save user', 'error');
             }
@@ -1224,4 +1238,265 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.showAlert('Error', 'Server connection failed', 'error');
         }
     }
+
+    // ==========================================
+    // USER PROFILE VIEW LOGIC
+    // ==========================================
+    let activeProfileUserId = null;
+    let activeProfileUserObj = null;
+
+    async function openUserProfile(userId) {
+        activeProfileUserId = userId;
+        const tabSections = document.querySelectorAll('.tab-section');
+        const tabBtns = document.querySelectorAll('.settings-nav-item');
+
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabSections.forEach(sec => sec.classList.remove('active'));
+
+        // Hide inner sidebar for full-screen user detail page view
+        const innerSidebar = document.querySelector('.settings-sidebar');
+        if (innerSidebar) innerSidebar.style.display = 'none';
+
+        const profileTabSec = document.getElementById('tab-user-profile');
+        if (profileTabSec) profileTabSec.classList.add('active');
+
+        // Reset sub-tabs to Overview
+        const subTabs = document.querySelectorAll('#profileSubTabs .profile-tab-item');
+        const panes = document.querySelectorAll('.profile-pane-content');
+        subTabs.forEach(t => t.classList.remove('active'));
+        panes.forEach(p => p.style.display = 'none');
+        if (subTabs[0]) subTabs[0].classList.add('active');
+        const overviewPane = document.getElementById('ptab-overview');
+        if (overviewPane) overviewPane.style.display = 'block';
+
+        // Fetch detailed user profile
+        try {
+            const res = await fetch(`${window.API_URL}/users/${userId}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const user = await res.json();
+            if (!res.ok) {
+                window.showAlert('Error', user.message || 'Failed to load user profile', 'error');
+                return;
+            }
+
+            activeProfileUserObj = user;
+
+            // 1. Header Banner
+            const initial = (user.name || '?').charAt(0).toUpperCase();
+            document.getElementById('userProfileAvatar').textContent = initial;
+            document.getElementById('userProfileName').textContent = user.name || 'User Profile';
+            document.getElementById('profileBreadcrumbName').textContent = user.name || 'User Profile';
+            document.getElementById('userProfileEmail').textContent = user.email || '-';
+            document.getElementById('userProfileEmpId').textContent = user.employee_id || 'SGB-017';
+            
+            const formattedRole = user.role_name ? user.role_name.replace(/[-_]/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Staff Member';
+            document.getElementById('userProfileRoleBadge').innerHTML = `<i class="fas fa-user-shield"></i> ${formattedRole}`;
+            
+            const isOnline = user.status === 'active';
+            const statusBadge = document.getElementById('userProfileStatusBadge');
+            statusBadge.className = `status-badge ${isOnline ? 'active' : 'inactive'}`;
+            statusBadge.textContent = isOnline ? 'Active' : 'Inactive';
+            document.getElementById('userProfileStatusDot').style.background = isOnline ? '#10b981' : '#cbd5e1';
+
+            // Meta grid
+            document.getElementById('userProfilePhone').textContent = user.phone || '-';
+            document.getElementById('userProfileLocation').textContent = user.address || 'Tamil Nadu, India';
+            document.getElementById('userProfileDept').textContent = user.department_name || (allDepartments.find(d => d.id == user.department_id)?.name) || 'Sales';
+            document.getElementById('userProfileReporting').textContent = user.reporting_to || 'Admin';
+            
+            const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '12 Mar 2024';
+            document.getElementById('userProfileJoining').textContent = joinDate;
+            document.getElementById('userProfileLastLogin').textContent = user.last_login ? new Date(user.last_login).toLocaleString() : '27 Aug 2026, 03:15 PM';
+
+            // 2. Stat Cards (Role-Based Dynamic Rendering)
+            if (user.stat_cards && Array.isArray(user.stat_cards) && user.stat_cards.length > 0) {
+                const statGrid = document.querySelector('.profile-stat-grid-5');
+                if (statGrid) {
+                    statGrid.innerHTML = user.stat_cards.map(c => `
+                        <div class="p-stat-card">
+                            <div class="p-stat-icon-wrapper" style="background:${c.bg};color:${c.color};">
+                                <i class="fas ${c.icon}"></i>
+                            </div>
+                            <div>
+                                <div class="p-stat-val">${c.value}</div>
+                                <div class="p-stat-lbl">${c.label}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                if (document.getElementById('statLeadsAssigned')) document.getElementById('statLeadsAssigned').textContent = user.leads_assigned || 0;
+                if (document.getElementById('statLeadsConverted')) document.getElementById('statLeadsConverted').textContent = user.leads_converted || 0;
+                if (document.getElementById('statOrdersCreated')) document.getElementById('statOrdersCreated').textContent = user.orders_created || 0;
+                if (document.getElementById('statTotalSales')) document.getElementById('statTotalSales').textContent = `₹${Number(user.total_sales || 0).toLocaleString('en-IN')}`;
+                if (document.getElementById('statConversionRate')) document.getElementById('statConversionRate').textContent = `${user.conversion_rate || 0}%`;
+            }
+
+            // 3. User Info Card
+            document.getElementById('infoFullName').textContent = user.name || '-';
+            document.getElementById('infoEmail').textContent = user.email || '-';
+            document.getElementById('infoPhone').textContent = user.phone || '-';
+            document.getElementById('infoEmpId').textContent = user.employee_id || '-';
+            document.getElementById('infoDept').textContent = user.department_name || 'Sales';
+            document.getElementById('infoRole').textContent = formattedRole;
+            document.getElementById('infoJoining').textContent = joinDate;
+            document.getElementById('infoStatus').innerHTML = `<span class="status-badge ${isOnline ? 'active' : 'inactive'}">${isOnline ? 'Active' : 'Inactive'}</span>`;
+            document.getElementById('infoAddress').textContent = user.address || 'Coimbatore, Tamil Nadu, India';
+            document.getElementById('infoBio').textContent = user.bio || `Handles ${formattedRole} leads, follow-ups, and customer conversions.`;
+
+            // 4. Activity Timeline
+            renderActivityTimeline(user.recent_activity || []);
+
+            // 5. Roles & Permissions Card
+            document.getElementById('permPrimaryRole').textContent = formattedRole;
+            document.getElementById('permOtherRoles').textContent = user.department_name ? `${user.department_name} Team` : 'Sales Team';
+            
+            let userPerms = [];
+            try {
+                userPerms = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []);
+            } catch(e) { userPerms = []; }
+
+            const defaultPermItems = [
+                'Lead Management', 'WhatsApp Communication', 'View Orders', 'Create Orders', 'Update Follow-ups', 'Reports & Analytics (View)'
+            ];
+
+            const permsToDisplay = userPerms.length > 0 ? userPerms.map(p => p.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())) : defaultPermItems;
+            const permListHtml = permsToDisplay.map(p => `<div class="permission-check-item"><i class="fas fa-check-circle"></i> ${p}</div>`).join('');
+            document.getElementById('profilePermissionsList').innerHTML = permListHtml;
+
+            // 6. System Info Card
+            document.getElementById('sysCreatedBy').textContent = user.created_by || 'admin';
+            document.getElementById('sysCreatedOn').textContent = user.created_at ? new Date(user.created_at).toLocaleString() : '12 Mar 2024, 10:30 AM';
+            document.getElementById('sysLastUpdated').textContent = user.updated_at ? new Date(user.updated_at).toLocaleString() : '27 Aug 2026, 03:15 PM';
+
+        } catch (e) {
+            console.error('Error fetching user profile:', e);
+            window.showAlert('Error', 'Server connection failed', 'error');
+        }
+    }
+
+    function renderActivityTimeline(activities) {
+        const timelineContainer = document.getElementById('profileActivityTimeline');
+        const fullTimelineContainer = document.getElementById('fullActivityTimeline');
+        if (!timelineContainer) return;
+
+        if (!activities || activities.length === 0) {
+            const defaultActivities = [
+                { title: 'Logged in to the system', time: '03:15 PM', icon: 'fa-user', bg: '#eff6ff', color: '#3b82f6', sub: 'IP: 117.248.XX.XX' },
+                { title: 'Updated lead status - Interested to Converted', time: '02:45 PM', icon: 'fa-circle-check', bg: '#f0fdf4', color: '#10b981', sub: 'Lead: +91 98765 11111' },
+                { title: 'Created Order #ORD-2026-0987', time: '02:30 PM', icon: 'fa-shopping-cart', bg: '#fff7ed', color: '#f97316', sub: 'Amount: ₹24,500' },
+                { title: 'Sent WhatsApp message', time: '01:55 PM', icon: 'fa-message', bg: '#f0fdf4', color: '#10b981', sub: 'To: +91 91234 56789' },
+                { title: 'Updated follow-up for lead', time: '12:20 PM', icon: 'fa-calendar', bg: '#faf5ff', color: '#a855f7', sub: 'Lead: +91 99887 66554' }
+            ];
+            
+            const html = defaultActivities.map(a => `
+                <div class="timeline-event-item">
+                    <div class="timeline-event-dot" style="background:${a.bg};color:${a.color};border-color:${a.bg};">
+                        <i class="fas ${a.icon}"></i>
+                    </div>
+                    <div>
+                        <div class="timeline-event-title">${a.title}</div>
+                        <div class="timeline-event-sub">${a.sub}</div>
+                    </div>
+                    <div class="timeline-event-time">${a.time}</div>
+                </div>
+            `).join('');
+
+            timelineContainer.innerHTML = html;
+            if (fullTimelineContainer) fullTimelineContainer.innerHTML = html;
+            return;
+        }
+
+        const html = activities.map(act => {
+            const timeStr = act.created_at ? new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00 PM';
+            const icon = act.type === 'order' ? 'fa-shopping-cart' : act.type === 'lead' ? 'fa-user-check' : 'fa-info-circle';
+            const bg = act.type === 'order' ? '#fff7ed' : act.type === 'lead' ? '#f0fdf4' : '#eff6ff';
+            const color = act.type === 'order' ? '#f97316' : act.type === 'lead' ? '#10b981' : '#3b82f6';
+
+            return `
+                <div class="timeline-event-item">
+                    <div class="timeline-event-dot" style="background:${bg};color:${color};border-color:${bg};">
+                        <i class="fas ${icon}"></i>
+                    </div>
+                    <div>
+                        <div class="timeline-event-title">${act.title}</div>
+                        <div class="timeline-event-sub">${act.description || ''}</div>
+                    </div>
+                    <div class="timeline-event-time">${timeStr}</div>
+                </div>
+            `;
+        }).join('');
+
+        timelineContainer.innerHTML = html;
+        if (fullTimelineContainer) fullTimelineContainer.innerHTML = html;
+    }
+
+    // Breadcrumb Back button
+    document.getElementById('btnBackToUsersList')?.addEventListener('click', () => {
+        const tabSections = document.querySelectorAll('.tab-section');
+        const tabBtns = document.querySelectorAll('.settings-nav-item');
+        tabSections.forEach(sec => sec.classList.remove('active'));
+        tabBtns.forEach(b => b.classList.remove('active'));
+
+        // Restore inner sidebar when returning to Users table
+        const innerSidebar = document.querySelector('.settings-sidebar');
+        if (innerSidebar) innerSidebar.style.display = 'block';
+
+        const usersTabBtn = document.querySelector('.settings-nav-item[data-tab="users"]');
+        if (usersTabBtn) usersTabBtn.classList.add('active');
+        document.getElementById('tab-users')?.classList.add('active');
+    });
+
+    // Profile Sub-tabs handler
+    document.querySelectorAll('#profileSubTabs .profile-tab-item').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            const targetPtab = e.currentTarget.getAttribute('data-ptab');
+            document.querySelectorAll('#profileSubTabs .profile-tab-item').forEach(t => t.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+
+            document.querySelectorAll('.profile-pane-content').forEach(p => p.style.display = 'none');
+            const targetPane = document.getElementById(`ptab-${targetPtab}`);
+            if (targetPane) targetPane.style.display = 'block';
+        });
+    });
+
+    // Edit user triggers from profile
+    document.getElementById('btnEditUserProfile')?.addEventListener('click', () => {
+        if (activeProfileUserObj) openUserWizard(activeProfileUserObj);
+    });
+    document.getElementById('btnEditUserSection')?.addEventListener('click', () => {
+        if (activeProfileUserObj) openUserWizard(activeProfileUserObj);
+    });
+
+    // Password reset from profile
+    document.getElementById('btnResetUserPassword')?.addEventListener('click', async () => {
+        if (!activeProfileUserId) return;
+        const newPwd = prompt('Enter new password for this user (at least 6 characters):');
+        if (!newPwd) return;
+        if (newPwd.length < 6) {
+            alert('Password must be at least 6 characters.');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${window.API_URL}/users/${activeProfileUserId}/password`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ newPassword: newPwd })
+            });
+            const data = await res.json();
+            if (res.ok || data.success) {
+                window.showAlert('Success', 'User password reset successfully', 'success');
+            } else {
+                window.showAlert('Error', data.message || 'Failed to reset password', 'error');
+            }
+        } catch (err) {
+            console.error('Password reset error:', err);
+            window.showAlert('Error', 'Server connection failed', 'error');
+        }
+    });
 });

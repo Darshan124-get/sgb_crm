@@ -140,11 +140,34 @@ const logInteraction = async (phoneInput, action, data = {}) => {
  */
 const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent', replyToChatId = null, isForwarded = 0) => {
   const phone = normalizePhone(phoneInput);
+  const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
   try {
-    // 1. Get Lead ID and assignment details
-    const [leads] = await db.execute('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [phone]);
-    if (leads.length === 0) return;
-    const lead_id = leads[0].lead_id;
+    // 1. Get Lead ID and assignment details (with flexible phone number matching)
+    let [leads] = await db.execute(
+      'SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1',
+      [phone, phoneInput, `%${phoneTen}`]
+    );
+
+    let lead_id;
+    let assigned_to = null;
+    let customer_name = null;
+
+    if (leads.length === 0) {
+      // Auto-create lead entry if missing to ensure bot messages are never dropped
+      await storeMessageAsLead(phoneInput, body || 'Incoming message');
+      const [newLeads] = await db.execute(
+        'SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1',
+        [phone, phoneInput, `%${phoneTen}`]
+      );
+      if (newLeads.length === 0) return;
+      lead_id = newLeads[0].lead_id;
+      assigned_to = newLeads[0].assigned_to;
+      customer_name = newLeads[0].customer_name;
+    } else {
+      lead_id = leads[0].lead_id;
+      assigned_to = leads[0].assigned_to;
+      customer_name = leads[0].customer_name;
+    }
 
     // 2. Get or Create an Open Chat Session
     let [sessions] = await db.execute('SELECT session_id FROM chat_sessions WHERE lead_id = ? AND status = "open"', [lead_id]);
@@ -204,13 +227,13 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     );
 
     // 4. Send push notification to assigned executive if message is incoming
-    if (direction === 'incoming' && leads[0].assigned_to) {
+    if (direction === 'incoming' && assigned_to) {
       try {
         const notificationService = require('./notification.service');
-        const leadName = leads[0].customer_name || phoneInput;
+        const leadName = customer_name || phoneInput;
         const snippet = messageType === 'text' ? body : `Sent a ${messageType}`;
         await notificationService.sendToUser(
-          leads[0].assigned_to,
+          assigned_to,
           `New Message from ${leadName}`,
           snippet,
           { leadId: String(lead_id), type: 'whatsapp_message' }
@@ -230,19 +253,20 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
  */
 const getChatHistory = async (phoneInput, user = null) => {
   const phone = normalizePhone(phoneInput);
+  const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
   try {
     let query = `
       SELECT cm.*, 
       CASE WHEN cm.sender_type = 'user' THEN 'incoming' ELSE 'outgoing' END as direction, 
       cm.message as body,
-      u.name as sender_name
+      COALESCE(u.name, CASE WHEN cm.sender_type = 'admin' AND cm.sender_id IS NULL THEN 'Chatbot' ELSE NULL END) as sender_name
       FROM chat_messages cm
       JOIN chat_sessions cs ON cm.session_id = cs.session_id
       JOIN leads l ON cs.lead_id = l.lead_id
       LEFT JOIN users u ON cm.sender_id = u.user_id
-      WHERE l.phone_number = ?
+      WHERE (l.phone_number = ? OR l.phone_number = ? OR l.phone_number LIKE ? OR RIGHT(REPLACE(l.phone_number, '+', ''), 10) = ?)
     `;
-    let params = [phone];
+    let params = [phone, phoneInput, `%${phoneTen}`, phoneTen];
 
     if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
       query += " AND l.assigned_to = ?";
@@ -266,6 +290,8 @@ const getAllChatCustomers = async (user = null) => {
   try {
     let query = `
       SELECT l.*, l.phone_number AS phone, u.name AS assigned_name,
+       (SELECT status FROM chatbot_sessions cs WHERE (cs.lead_id = l.lead_id OR (cs.phone IS NOT NULL AND RIGHT(REPLACE(cs.phone, '+', ''), 10) COLLATE utf8mb4_unicode_ci = RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_unicode_ci)) AND cs.status = 'paused_for_human' ORDER BY cs.session_id DESC LIMIT 1) AS session_status,
+       (SELECT paused_at FROM chatbot_sessions cs WHERE (cs.lead_id = l.lead_id OR (cs.phone IS NOT NULL AND RIGHT(REPLACE(cs.phone, '+', ''), 10) COLLATE utf8mb4_unicode_ci = RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_unicode_ci)) AND cs.status = 'paused_for_human' ORDER BY cs.session_id DESC LIMIT 1) AS paused_at,
        agg.last_message_at,
        agg.last_inbound_at,
        agg.unread_msg_count,

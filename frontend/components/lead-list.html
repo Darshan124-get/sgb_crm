@@ -354,6 +354,15 @@
                 <option value="cold">COLD</option>
             </select>
         </div>
+        <div class="filter-group">
+            <span class="filter-label"><i class="fa-solid fa-robot"></i> PRIORITY</span>
+            <select id="leadPriorityFilter" class="date-input">
+                <option value="all">All Priorities</option>
+                <option value="high">HIGH (4-5 Bot Steps)</option>
+                <option value="medium">MEDIUM (2-3 Bot Steps)</option>
+                <option value="low">LOW (0-1 Bot Steps)</option>
+            </select>
+        </div>
         <div class="filter-group" id="staffFilterGroup">
             <span class="filter-label"><i class="fa-solid fa-user-tie"></i> STAFF</span>
             <select id="leadStaffFilter" class="date-input">
@@ -411,6 +420,7 @@
                     <th>Farmer Name</th>
                     <th>Status</th>
                     <th>Score</th>
+                    <th>Priority</th>
                     <th>State</th>
                     <th>Language</th>
                     <th>Phone Number</th>
@@ -421,7 +431,7 @@
             </thead>
             <tbody id="leadsTableBody">
                 <tr id="leadsLoadingRow">
-                    <td colspan="10" class="loading-state">
+                    <td colspan="11" class="loading-state">
                         <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                         <p>Loading leads...</p>
                     </td>

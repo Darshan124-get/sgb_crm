@@ -47,7 +47,7 @@ const processAutoReplies = async (campaign_id, auto_replies) => {
 
 exports.createCampaign = async (req, res) => {
     try {
-        const { campaign_id, tag_line, ad_spend, auto_replies } = req.body;
+        const { campaign_id, tag_line, product_name, ad_spend, auto_replies } = req.body;
         if (!campaign_id || !tag_line) {
             return res.status(400).json({ error: 'campaign_id and tag_line are required' });
         }
@@ -55,8 +55,8 @@ exports.createCampaign = async (req, res) => {
         const processedReplies = await processAutoReplies(campaign_id, auto_replies);
 
         const [result] = await db.query(
-            'INSERT INTO campaigns (campaign_id, tag_line, ad_spend, auto_replies) VALUES (?, ?, ?, ?)',
-            [campaign_id, tag_line, ad_spend || 0.00, processedReplies]
+            'INSERT INTO campaigns (campaign_id, tag_line, product_name, ad_spend, auto_replies) VALUES (?, ?, ?, ?, ?)',
+            [campaign_id, tag_line, product_name || null, ad_spend || 0.00, processedReplies]
         );
         
         res.status(201).json({ message: 'Campaign created', id: result.insertId });
@@ -98,7 +98,7 @@ exports.getCampaigns = async (req, res) => {
 exports.updateCampaign = async (req, res) => {
     try {
         const { id } = req.params;
-        const { campaign_id, tag_line, status, ad_spend, auto_replies } = req.body;
+        const { campaign_id, tag_line, product_name, status, ad_spend, auto_replies } = req.body;
         
         // Fetch existing campaign to preserve values not sent in payload
         const [existing] = await db.query('SELECT * FROM campaigns WHERE id = ?', [id]);
@@ -109,6 +109,7 @@ exports.updateCampaign = async (req, res) => {
         
         const finalCampaignId = campaign_id !== undefined ? campaign_id : currentCampaign.campaign_id;
         const finalTagLine = tag_line !== undefined ? tag_line : currentCampaign.tag_line;
+        const finalProductName = product_name !== undefined ? product_name : currentCampaign.product_name;
         const finalStatus = status !== undefined ? status : currentCampaign.status;
         const finalAdSpend = ad_spend !== undefined ? ad_spend : currentCampaign.ad_spend;
         
@@ -120,8 +121,8 @@ exports.updateCampaign = async (req, res) => {
         }
 
         const [result] = await db.query(
-            'UPDATE campaigns SET campaign_id = ?, tag_line = ?, status = ?, ad_spend = ?, auto_replies = ? WHERE id = ?',
-            [finalCampaignId, finalTagLine, finalStatus, finalAdSpend, finalReplies, id]
+            'UPDATE campaigns SET campaign_id = ?, tag_line = ?, product_name = ?, status = ?, ad_spend = ?, auto_replies = ? WHERE id = ?',
+            [finalCampaignId, finalTagLine, finalProductName, finalStatus, finalAdSpend, finalReplies, id]
         );
         
         if (result.affectedRows === 0) {

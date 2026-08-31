@@ -215,15 +215,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         topbar.prepend(hamburger);
     }
 
-    // ── Update Profile Name ──
-    const profileNameEl = document.getElementById('profileName');
+    // ── Update Profile Name, Role & Avatar ──
+    const profileNameEl = document.getElementById('profileName') || document.querySelector('.profile-name');
     if (profileNameEl && user.name) {
-        let displayName = user.name;
-        if (role === 'super-admin' && displayName.toLowerCase() === 'admin') {
-            displayName = 'Super Admin';
-        }
-        profileNameEl.textContent = displayName;
+        profileNameEl.textContent = user.name;
     }
+    const profileRoleEl = document.getElementById('profileRole') || document.querySelector('.profile-role');
+    if (profileRoleEl && user.role) {
+        profileRoleEl.textContent = user.role.replace(/_/g, ' ').toUpperCase();
+    }
+    const avatarEl = document.querySelector('.profile-section .avatar');
+    if (avatarEl && user.name) {
+        avatarEl.innerHTML = `<span style="font-weight:700;font-size:0.9rem;">${user.name.charAt(0).toUpperCase()}</span>`;
+    }
+
+    // ── Bind Profile Section Navigation to profile.html ──
+    const profileSections = document.querySelectorAll('.profile-section');
+    profileSections.forEach(section => {
+        section.style.cursor = 'pointer';
+        section.title = 'View My Profile';
+        section.addEventListener('click', (e) => {
+            // Ignore click if clicking notification icons
+            if (e.target.closest('.notif-bell') || e.target.closest('.notif-envelope')) {
+                return;
+            }
+            window.location.href = `${window.ROOT_PATH}modules/admin/profile.html`;
+        });
+    });
 
     // ── Inject Notification Bell dynamically ──
     const profileSection = document.querySelector('.profile-section');
@@ -413,7 +431,8 @@ async function updateLeadStats() {
                 'badge-hot': stats.hot,
                 'badge-followup': stats.followup,
                 'badge-lost': stats.lost,
-                'badge-all': stats.all
+                'badge-all': stats.all,
+                'badge-new': stats.new
             };
             Object.entries(badgeMap).forEach(([id, val]) => {
                 const el = document.getElementById(id);
@@ -447,7 +466,8 @@ function initLeadNav() {
                     hot: { score: 'hot', status: 'interested' },
                     followup: { status: 'followup' },
                     lost: { status: 'lost,not_interested' },
-                    all: {}
+                    all: {},
+                    new: { status: 'new' }
                 };
                 await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(filterConfig[filter] || {}));
             }
@@ -563,23 +583,9 @@ async function initLeadList(filters = {}, page = 1) {
     }
 
     // ─── Filter Setup ───
-    const searchInput = document.getElementById('leadSearch');
-    if (searchInput && !searchInput.dataset.listenerSet) {
-        searchInput.dataset.listenerSet = 'true';
-        searchInput.oninput = window.debounce(() => {
-            if (searchInput.value.trim().length > 0) {
-                const allTab = document.querySelector('.nav-tab[data-filter="all"]');
-                if (allTab && !allTab.classList.contains('active')) {
-                    allTab.click();
-                    return;
-                }
-            }
-            initLeadList(window.currentBaseFilters);
-        }, 500);
-    }
-
-    const statusF = document.getElementById('leadStatusFilter');
+    const searchInput = document.getElementById('leadSearch');    const statusF = document.getElementById('leadStatusFilter');
     const scoreF = document.getElementById('leadScoreFilter');
+    const priorityF = document.getElementById('leadPriorityFilter');
     const staffF = document.getElementById('leadStaffFilter');
     const dateF = document.getElementById('leadDateFilter');
     const btnAll = document.getElementById('btnFilterAll');
@@ -591,6 +597,10 @@ async function initLeadList(filters = {}, page = 1) {
     if (scoreF && !scoreF.dataset.listenerSet) {
         scoreF.dataset.listenerSet = 'true';
         scoreF.onchange = () => initLeadList(window.currentBaseFilters);
+    }
+    if (priorityF && !priorityF.dataset.listenerSet) {
+        priorityF.dataset.listenerSet = 'true';
+        priorityF.onchange = () => initLeadList(window.currentBaseFilters);
     }
     if (staffF && !staffF.dataset.listenerSet) {
         staffF.dataset.listenerSet = 'true';
@@ -653,8 +663,6 @@ async function initLeadList(filters = {}, page = 1) {
         })();
     }
 
-
-
     if (dateF && !dateF.dataset.listenerSet) {
         dateF.dataset.listenerSet = 'true';
         if (typeof flatpickr !== 'undefined') {
@@ -674,6 +682,7 @@ async function initLeadList(filters = {}, page = 1) {
         btnAll.onclick = () => {
             if (statusF) statusF.value = 'all';
             if (scoreF) scoreF.value = 'all';
+            if (priorityF) priorityF.value = 'all';
             if (staffF) staffF.value = 'all';
             if (campaignF) campaignF.value = 'all';
             if (dateF) {
@@ -686,7 +695,7 @@ async function initLeadList(filters = {}, page = 1) {
         };
     }
 
-    tbody.innerHTML = '<tr><td colspan="10" class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading leads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading leads...</td></tr>';
 
     window.currentBaseFilters = filters; // Original context (e.g. {assigned_to: NULL})
     window.currentLeadsPage = page;
@@ -701,6 +710,7 @@ async function initLeadList(filters = {}, page = 1) {
     // Overlay with dynamic UI filters
     if (statusF && statusF.value !== 'all') params.set('status', statusF.value);
     if (scoreF && scoreF.value !== 'all') params.set('score', scoreF.value);
+    if (priorityF && priorityF.value !== 'all') params.set('priority', priorityF.value);
     if (campaignF && campaignF.value !== 'all') params.set('campaign_id', campaignF.value);
 
     if (staffF && staffF.value !== 'all') {
@@ -729,20 +739,19 @@ async function initLeadList(filters = {}, page = 1) {
         window.currentLeadsList = leads; // For export
 
         if (!leads || leads.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No leads available.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No leads available.</td></tr>';
             // Clear pagination controls if empty
             const pagContainer = document.getElementById('leadsPagination');
             if (pagContainer) pagContainer.style.display = 'none';
             return;
         }
 
-        const currentUser = window.getCurrentUser();
+        const currentUser = window.getCurrentUser ? window.getCurrentUser() : {};
         const currentUserRole = (currentUser.role || '').toLowerCase();
         const isTelecomPanelUser = currentUserRole.includes('telecaller');
 
         tbody.innerHTML = leads.map(lead => {
             const statusClass = lead.status === 'assigned' ? 'badge-assigned' : (lead.status === 'new' ? 'badge-unassigned' : 'badge-state');
-            const scoreClass = `badge-score-${(lead.score || 'COLD').toLowerCase()}`;
             const _dateObj = new Date(lead.created_at);
             const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const time = _dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -759,12 +768,11 @@ async function initLeadList(filters = {}, page = 1) {
                 const d = fuDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
                 const t = fuDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-                // Smart color based on due date
                 const diffHrs = (fuDate - new Date()) / (1000 * 60 * 60);
-                let colorClass = '#10b981'; // Green (future)
+                let colorClass = '#10b981';
                 let icon = '📅';
-                if (diffHrs < 0) { colorClass = '#ef4444'; icon = '⚠'; } // Red (overdue)
-                else if (diffHrs < 24) { colorClass = '#f59e0b'; icon = '🔴'; } // Orange (due soon)
+                if (diffHrs < 0) { colorClass = '#ef4444'; icon = '⚠'; }
+                else if (diffHrs < 24) { colorClass = '#f59e0b'; icon = '🔴'; }
 
                 dateHtml = `<div style="font-size:0.75rem;font-weight:700;color:${colorClass};text-transform:uppercase;margin-bottom:2px;">${icon} Follow-up</div>
                             <div style="font-size:0.85rem;font-weight:600;color:#1e293b;white-space:nowrap;">${d}</div>
@@ -773,6 +781,33 @@ async function initLeadList(filters = {}, page = 1) {
                 dateHtml = `<div style="font-size:0.75rem;font-weight:600;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Added</div>
                             <div style="font-size:0.85rem;font-weight:600;color:#1e293b;white-space:nowrap;">${date}</div>
                             <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">${time}</div>`;
+            }
+
+            // 1. CRM Score Badge
+            const scoreUpper = (lead.score || 'COLD').toUpperCase();
+            let scoreBadgeHtml = '';
+            if (scoreUpper === 'HOT') {
+                scoreBadgeHtml = `<span class="badge-score" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:3px 8px; border-radius:999px;">HOT</span>`;
+            } else if (scoreUpper === 'WARM' || scoreUpper === 'MILD') {
+                scoreBadgeHtml = `<span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:3px 8px; border-radius:999px;">MILD</span>`;
+            } else {
+                scoreBadgeHtml = `<span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:3px 8px; border-radius:999px;">COLD</span>`;
+            }
+
+            // 2. Chatbot Priority Badge & Progress Pill
+            let priorityBadgeHtml = '-';
+            if (lead.bot_answered !== undefined && lead.bot_answered > 0) {
+                const bAns = lead.bot_answered;
+                const bTot = lead.bot_total || 5;
+                if (bAns >= 4) {
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-weight:700; padding:3px 8px; border-radius:999px;">HIGH</span><div style="font-size:0.68rem; font-weight:700; color:#10b981; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                } else if (bAns >= 2) {
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:3px 8px; border-radius:999px;">MEDIUM</span><div style="font-size:0.68rem; font-weight:700; color:#d97706; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                } else {
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:3px 8px; border-radius:999px;">LOW</span><div style="font-size:0.68rem; font-weight:700; color:#64748b; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                }
+            } else {
+                priorityBadgeHtml = `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
             }
 
             return `
@@ -792,7 +827,8 @@ async function initLeadList(filters = {}, page = 1) {
                     </div>
                 </td>
                 <td><span class="${statusClass}">${lead.status}</span></td>
-                <td><span class="badge-score ${scoreClass}">${(lead.score || 'COLD').toUpperCase() === 'WARM' ? 'MILD' : (lead.score || 'COLD').toUpperCase()}</span></td>
+                <td>${scoreBadgeHtml}</td>
+                <td>${priorityBadgeHtml}</td>
                 <td>${lead.state || '-'}</td>
                 <td><span class="language-tag">${lead.language || 'EN'}</span></td>
                 <td onclick="event.stopPropagation()">
@@ -857,6 +893,7 @@ async function initLeadList(filters = {}, page = 1) {
             }
         }
     } catch (err) {
+        console.error('[fetchAndRenderLeads Error]', err);
         tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Failed to load leads.</td></tr>';
     }
 }
@@ -1220,7 +1257,7 @@ async function populateLeadDetails(leadId) {
                 leadDetailLanguageInfo: lead.language || 'English',
                 leadDetailAssigned: lead.assigned_to_name || 'Unassigned',
                 leadDetailAssignedId: lead.assigned_to || '',
-                topCustomerNameDisplay: lead.first_message || lead.customer_name || 'No Message',
+                topCustomerNameDisplay: lead.first_message || lead.customer_name || (lead.phone_number ? `Lead (${lead.phone_number})` : 'Lead Details'),
                 leadDetailSaleStatus: lead.status || 'New',
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailStatusSelect: lead.status || 'new',
@@ -1263,7 +1300,7 @@ async function populateLeadDetails(leadId) {
                     tagEl.style.color = '#0369a1';
                     tagEl.style.border = '1px solid #bae6fd';
                 } else {
-                    tagEl.textContent = 'Direct Lead';
+                    tagEl.textContent = lead.source || 'Direct Lead';
                     tagEl.style.background = '#f1f5f9';
                     tagEl.style.color = '#475569';
                     tagEl.style.border = '1px solid #e2e8f0';
@@ -1386,6 +1423,9 @@ async function populateLeadDetails(leadId) {
             // ── Load Timeline ──
             await loadLeadTimeline(leadId);
 
+            // ── Render Chatbot Summary Card ──
+            renderChatbotSummaryCard(lead.chatbot_summary);
+
             // ── Hide Change Assignee for Telecaller Role ──
             const user = window.getCurrentUser();
             const role = (user.role || '').toLowerCase();
@@ -1399,6 +1439,125 @@ async function populateLeadDetails(leadId) {
             }
         }
     } catch (err) { console.error('Lead detail error:', err); }
+}
+
+// ─── Chatbot Summary Renderer ────────────────────────────────────
+function renderChatbotSummaryCard(chatbotSummary) {
+    const badgeEl = document.getElementById('chatbotPriorityBadge');
+    const containerEl = document.getElementById('chatbotSummaryContainer');
+    if (!containerEl) return;
+
+    if (!chatbotSummary || !chatbotSummary.steps || chatbotSummary.steps.length === 0) {
+        if (badgeEl) badgeEl.style.display = 'none';
+        containerEl.innerHTML = `
+            <div style="text-align: center; padding: 1.25rem 0.75rem; background: #f8fafc; border-radius: 0.75rem; border: 1px dashed #cbd5e1;">
+                <i class="fab fa-whatsapp" style="font-size: 1.75rem; color: #94a3b8; margin-bottom: 0.5rem; display: block;"></i>
+                <p style="font-size: 0.8125rem; color: #64748b; font-weight: 600; margin: 0;">No Chatbot Activity</p>
+                <p style="font-size: 0.75rem; color: #94a3b8; margin: 0.25rem 0 0 0;">This customer hasn't completed any WhatsApp bot questions yet.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Render Priority Badge
+    if (badgeEl) {
+        badgeEl.style.display = 'inline-flex';
+        badgeEl.textContent = chatbotSummary.priority_label;
+        badgeEl.style.padding = '0.2rem 0.6rem';
+        badgeEl.style.borderRadius = '9999px';
+        badgeEl.style.fontSize = '0.7rem';
+        badgeEl.style.fontWeight = '700';
+        badgeEl.style.fontFamily = "'Outfit', sans-serif";
+
+        if (chatbotSummary.priority_level === 'qualified') {
+            badgeEl.style.background = '#dcfce7';
+            badgeEl.style.color = '#15803d';
+            badgeEl.style.border = '1px solid #bbf7d0';
+        } else if (chatbotSummary.priority_level === 'medium') {
+            badgeEl.style.background = '#fef3c7';
+            badgeEl.style.color = '#b45309';
+            badgeEl.style.border = '1px solid #fde68a';
+        } else {
+            badgeEl.style.background = '#f1f5f9';
+            badgeEl.style.color = '#64748b';
+            badgeEl.style.border = '1px solid #e2e8f0';
+        }
+    }
+
+    // Progress Bar
+    const pct = chatbotSummary.completion_percentage || 0;
+    const answered = chatbotSummary.answered_questions || 0;
+    const total = chatbotSummary.total_questions || 5;
+
+    let html = `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 700; color: #475569;">
+                <span>STAGE PROGRESS</span>
+                <span style="color: #0284c7;">${answered} / ${total} Questions (${pct}%)</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #0284c7, #10b981); border-radius: 999px; transition: width 0.4s ease;"></div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <h4 style="font-size: 0.75rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; font-weight: 700; margin-bottom: 0.65rem;">Question Flow Stages</h4>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+    `;
+
+    chatbotSummary.steps.forEach(step => {
+        const isDone = step.answered;
+        const icon = isDone 
+            ? `<div style="width: 22px; height: 22px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0;"><i class="fas fa-check"></i></div>`
+            : `<div style="width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0;">${step.step_number}</div>`;
+
+        const valDisplay = isDone 
+            ? `<span style="font-weight: 700; color: #0f172a; font-size: 0.8125rem;">${step.answer_value}</span>`
+            : `<span style="color: #94a3b8; font-size: 0.75rem; font-style: italic;">Pending response</span>`;
+
+        html += `
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: ${isDone ? '#ffffff' : '#f8fafc'}; border: 1px solid ${isDone ? '#cbd5e1' : '#f1f5f9'}; border-radius: 0.5rem; transition: all 0.2s;">
+                ${icon}
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">Step ${step.step_number}: ${step.title}</div>
+                    <div style="margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${valDisplay}</div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    const isHumanNeeded = chatbotSummary.status === 'paused_for_human' || (window.currentLeadData && window.currentLeadData.status === 'human_needed');
+    const phone = window.currentLeadData ? window.currentLeadData.phone_number : '';
+
+    html += `
+        <div style="background: ${isHumanNeeded ? '#fef2f2' : '#eff6ff'}; border: 1px solid ${isHumanNeeded ? '#fecaca' : '#dbeafe'}; border-radius: 0.75rem; padding: 0.85rem; font-size: 0.75rem; margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="color: ${isHumanNeeded ? '#991b1b' : '#1e40af'}; font-weight: 700;">
+                    <i class="fas ${isHumanNeeded ? 'fa-triangle-exclamation' : 'fa-info-circle'} mr-1"></i> 
+                    Flow: ${chatbotSummary.flow_name || 'Enquiry Flow'}
+                </span>
+                <span class="badge" style="background: ${isHumanNeeded ? '#ef4444' : (chatbotSummary.status === 'completed' ? '#dcfce7' : '#fef9c3')}; color: ${isHumanNeeded ? '#ffffff' : (chatbotSummary.status === 'completed' ? '#166534' : '#854d0e')}; font-size: 0.65rem; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-weight: 700;">
+                    ${isHumanNeeded ? '🚨 HUMAN NEEDED' : (chatbotSummary.status || 'active')}
+                </span>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button onclick="window.retriggerBotFlow('${phone}')" class="login-btn" style="flex: 1; padding: 0.45rem 0.5rem; font-size: 0.75rem; background: #3b82f6; border: none; color: white; border-radius: 0.375rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                    <i class="fas fa-rotate-right"></i> Re-Trigger Bot
+                </button>
+                <button onclick="window.takeoverBotFlow('${phone}')" class="login-btn" style="flex: 1; padding: 0.45rem 0.5rem; font-size: 0.75rem; background: #f59e0b; border: none; color: white; border-radius: 0.375rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                    <i class="fas fa-pause"></i> Pause & Takeover
+                </button>
+            </div>
+        </div>
+    `;
+
+    containerEl.innerHTML = html;
 }
 
 // ─── Lead Helpers ─────────────────────────────────────────────
@@ -2010,37 +2169,100 @@ window.exportLeadsToExcel = async function () {
         return;
     }
 
-    // Define CSV headers
-    const headers = [
-        "Lead ID", "Customer Name", "Phone Number", "Status", "Score",
-        "State", "District", "City/Village", "Pincode", "Language",
-        "Crop", "Acreage", "First Message", "Next Follow-up", "Assigned Staff", "Created At"
-    ];
+    const activeTab = document.querySelector('.nav-tab.active');
+    const isNewTab = activeTab && activeTab.getAttribute('data-filter') === 'new';
 
-    // Build CSV content
-    let csvContent = headers.join(",") + "\n";
+    let csvContent = "";
 
-    leadsToExport.forEach(lead => {
-        const row = [
-            lead.lead_id || '',
-            `"${(lead.customer_name || '').replace(/"/g, '""')}"`,
-            `"${lead.phone_number || ''}"`,
-            `"${lead.status || ''}"`,
-            `"${lead.score || ''}"`,
-            `"${(lead.state || '').replace(/"/g, '""')}"`,
-            `"${(lead.district || '').replace(/"/g, '""')}"`,
-            `"${(lead.city || '').replace(/"/g, '""')}"`,
-            `"${lead.pincode || ''}"`,
-            `"${lead.language || ''}"`,
-            `"${(lead.current_crop || '').replace(/"/g, '""')}"`,
-            `"${lead.acreage || ''}"`,
-            `"${(lead.first_message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
-            `"${lead.next_followup_date ? new Date(lead.next_followup_date).toLocaleString() : ''}"`,
-            `"${(lead.assigned_to_name || 'Unassigned').replace(/"/g, '""')}"`,
-            `"${lead.created_at ? new Date(lead.created_at).toLocaleString() : ''}"`
+    if (isNewTab) {
+        // Specific 4-column export for New Leads tab
+        const headers = ["Phone Number", "Priority", "Product Name", "Campaign Tag / Code"];
+        csvContent = headers.join(",") + "\n";
+
+        leadsToExport.forEach(lead => {
+            const bAns = lead.bot_answered !== undefined ? lead.bot_answered : 0;
+            const bTot = lead.bot_total || 5;
+            let priorityStr = 'NONE';
+            if (lead.bot_priority) {
+                priorityStr = lead.bot_priority.toUpperCase();
+            } else if (bAns >= 4) {
+                priorityStr = 'HIGH';
+            } else if (bAns >= 2) {
+                priorityStr = 'MEDIUM';
+            } else if (bAns >= 1) {
+                priorityStr = 'LOW';
+            }
+            const priorityFull = `${priorityStr} (${bAns}/${bTot})`;
+
+            let prodName = lead.campaign_product_name || '';
+            if (!prodName && lead.bot_variables) {
+                try {
+                    const vars = typeof lead.bot_variables === 'string' ? JSON.parse(lead.bot_variables) : lead.bot_variables;
+                    prodName = vars.product_interest || vars.product || vars.barrow_type || '';
+                } catch(e) {}
+            }
+            if (!prodName) prodName = '-';
+
+            const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.source || 'Direct';
+
+            const row = [
+                `"${lead.phone_number || ''}"`,
+                `"${priorityFull}"`,
+                `"${prodName.replace(/"/g, '""')}"`,
+                `"${campaignCode.replace(/"/g, '""')}"`
+            ];
+            csvContent += row.join(",") + "\n";
+        });
+    } else {
+        // Standard multi-column export for other tabs
+        const headers = [
+            "Lead ID", "Customer Name", "Phone Number", "Bot Priority", "Questions Answered",
+            "Campaign Tag / Code", "Status", "Score", "State", "District", "City/Village",
+            "Pincode", "Language", "Crop", "Acreage", "First Message", "Next Follow-up",
+            "Assigned Staff", "Created At"
         ];
-        csvContent += row.join(",") + "\n";
-    });
+        csvContent = headers.join(",") + "\n";
+
+        leadsToExport.forEach(lead => {
+            const bAns = lead.bot_answered !== undefined ? lead.bot_answered : 0;
+            const bTot = lead.bot_total || 5;
+            let priorityStr = 'NONE';
+            if (lead.bot_priority) {
+                priorityStr = lead.bot_priority.toUpperCase();
+            } else if (bAns >= 4) {
+                priorityStr = 'HIGH';
+            } else if (bAns >= 2) {
+                priorityStr = 'MEDIUM';
+            } else if (bAns >= 1) {
+                priorityStr = 'LOW';
+            }
+            const priorityFull = `${priorityStr} (${bAns}/${bTot})`;
+            const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.source || 'Direct';
+
+            const row = [
+                lead.lead_id || '',
+                `"${(lead.customer_name || '').replace(/"/g, '""')}"`,
+                `"${lead.phone_number || ''}"`,
+                `"${priorityFull}"`,
+                `"${bAns}/${bTot}"`,
+                `"${campaignCode}"`,
+                `"${lead.status || ''}"`,
+                `"${lead.score || ''}"`,
+                `"${(lead.state || '').replace(/"/g, '""')}"`,
+                `"${(lead.district || '').replace(/"/g, '""')}"`,
+                `"${(lead.city || '').replace(/"/g, '""')}"`,
+                `"${lead.pincode || ''}"`,
+                `"${lead.language || ''}"`,
+                `"${(lead.current_crop || '').replace(/"/g, '""')}"`,
+                `"${lead.acreage || ''}"`,
+                `"${(lead.first_message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+                `"${lead.next_followup_date ? new Date(lead.next_followup_date).toLocaleString() : ''}"`,
+                `"${(lead.assigned_to_name || 'Unassigned').replace(/"/g, '""')}"`,
+                `"${lead.created_at ? new Date(lead.created_at).toLocaleString() : ''}"`
+            ];
+            csvContent += row.join(",") + "\n";
+        });
+    }
 
     // Create a Blob and trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -2048,7 +2270,6 @@ window.exportLeadsToExcel = async function () {
 
     // Get active tab name for filename
     let tabName = "Leads";
-    const activeTab = document.querySelector('.nav-tab.active');
     if (activeTab) {
         const filter = activeTab.getAttribute('data-filter');
         const nameMap = {
@@ -2057,7 +2278,8 @@ window.exportLeadsToExcel = async function () {
             hot: 'Hot_Leads',
             followup: 'FollowUps_Mild',
             lost: 'Lost_Leads',
-            all: 'All_Leads'
+            all: 'All_Leads',
+            new: 'New_Leads'
         };
         tabName = nameMap[filter] || 'Leads';
     }
@@ -2079,3 +2301,218 @@ function initGlobalSearch() {
         input.addEventListener('focus', () => console.log('Search focus...'));
     });
 }
+
+// Helper to manage dismissed human alert IDs in session storage
+function getDismissedAlerts() {
+    try {
+        return JSON.parse(sessionStorage.getItem('dismissed_human_alerts') || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function markAlertAsDismissed(identifier) {
+    if (!identifier) return;
+    const list = getDismissedAlerts();
+    const str = String(identifier);
+    if (!list.includes(str)) {
+        list.push(str);
+        sessionStorage.setItem('dismissed_human_alerts', JSON.stringify(list));
+    }
+}
+
+window.retriggerBotFlow = async function(sessionIdOrPhone) {
+    if (!sessionIdOrPhone) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`${window.API_URL}/chatbot/sessions/retrigger`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ sessionId: sessionIdOrPhone, phone: sessionIdOrPhone })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to re-trigger flow');
+
+        window.showAlert('Flow Re-Triggered', 'Chatbot flow resumed and prompt sent to customer on WhatsApp!', 'success');
+        
+        // Remove toast if active
+        const toast = document.getElementById('telecaller-human-alert-toast');
+        if (toast) toast.remove();
+
+        // Refresh UI if functions exist
+        if (typeof window.fetchPendingHumanAlerts === 'function') window.fetchPendingHumanAlerts();
+        if (typeof window.loadLeads === 'function') window.loadLeads();
+    } catch (err) {
+        window.showAlert('Error', err.message, 'error');
+    }
+};
+
+window.takeoverBotFlow = async function(sessionIdOrPhone) {
+    if (!sessionIdOrPhone) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`${window.API_URL}/chatbot/sessions/takeover`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ sessionId: sessionIdOrPhone, phone: sessionIdOrPhone })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to take over flow');
+
+        markAlertAsDismissed(sessionIdOrPhone);
+        const toast = document.getElementById('telecaller-human-alert-toast');
+        if (toast) toast.remove();
+
+        window.showAlert('Bot Paused', 'Chatbot flow paused for manual telecaller takeover!', 'info');
+    } catch (err) {
+        window.showAlert('Error', err.message, 'error');
+    }
+};
+
+window.openTelecallerChat = function(phone, sessionId) {
+    if (!phone) return;
+    markAlertAsDismissed(phone);
+    if (sessionId) markAlertAsDismissed(sessionId);
+    const toast = document.getElementById('telecaller-human-alert-toast');
+    if (toast) toast.remove();
+    window.location.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${encodeURIComponent(phone)}`;
+};
+
+window.dismissHumanAlertToast = function(identifier) {
+    if (identifier) {
+        markAlertAsDismissed(identifier);
+    } else if (window._currentActiveAlertId) {
+        markAlertAsDismissed(window._currentActiveAlertId);
+    }
+    const toast = document.getElementById('telecaller-human-alert-toast');
+    if (toast) toast.remove();
+};
+
+let lastAlertCount = 0;
+window.fetchPendingHumanAlerts = async function() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    // Check Notification settings
+    const notifEnabled = localStorage.getItem('notifications_enabled') !== 'false';
+    const soundMuted = localStorage.getItem('notification_sound_muted') === 'true';
+
+    if (!notifEnabled) {
+        const toast = document.getElementById('telecaller-human-alert-toast');
+        if (toast) toast.remove();
+        return;
+    }
+
+    try {
+        const res = await fetch(`${window.API_URL}/chatbot/sessions/human-needed`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+
+        const alerts = await res.json();
+        if (!Array.isArray(alerts) || alerts.length === 0) {
+            const toast = document.getElementById('telecaller-human-alert-toast');
+            if (toast) toast.remove();
+            lastAlertCount = 0;
+            return;
+        }
+
+        const dismissedList = getDismissedAlerts();
+        const activeAlerts = alerts.filter(a => 
+            !dismissedList.includes(String(a.session_id)) && 
+            !dismissedList.includes(String(a.phone))
+        );
+
+        if (activeAlerts.length === 0) {
+            const toast = document.getElementById('telecaller-human-alert-toast');
+            if (toast) toast.remove();
+            lastAlertCount = 0;
+            return;
+        }
+
+        const firstAlert = activeAlerts[0];
+        window._currentActiveAlertId = firstAlert.session_id || firstAlert.phone;
+
+        // Play alert chime sound if new alert arrives AND sound is not muted
+        if (activeAlerts.length > lastAlertCount && !soundMuted) {
+            try {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.play().catch(() => {});
+            } catch (e) {}
+        }
+        lastAlertCount = activeAlerts.length;
+
+        let toast = document.getElementById('telecaller-human-alert-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'telecaller-human-alert-toast';
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 24px;
+                right: 24px;
+                background: #0f172a;
+                color: #ffffff;
+                padding: 16px 20px;
+                border-radius: 14px;
+                box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.2);
+                border-left: 5px solid #ef4444;
+                z-index: 99999;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                max-width: 380px;
+                font-family: 'Inter', sans-serif;
+                animation: fcmSlideIn 0.35s ease-out;
+            `;
+            document.body.appendChild(toast);
+        }
+
+        const custName = firstAlert.customer_name || 'WhatsApp Customer';
+        const phone = firstAlert.phone || firstAlert.phone_number || '';
+        const sessionId = firstAlert.session_id || phone;
+        const msgSnippet = firstAlert.last_message ? `"${firstAlert.last_message.slice(0, 45)}..."` : 'Requested human agent takeover';
+
+        toast.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; font-size:13.5px; color:#f87171; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:15px;"></i>
+                    🚨 Human Assistance Needed (${activeAlerts.length})
+                </span>
+                <button onclick="window.dismissHumanAlertToast('${sessionId}')" style="background:transparent; border:none; color:#94a3b8; cursor:pointer; font-size:14px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div style="font-size:12.5px; color:#cbd5e1; line-height:1.4;">
+                Customer <strong>${escapeHtml(custName)}</strong> (${escapeHtml(phone)})<br>
+                <span style="font-size:11.5px; color:#94a3b8; font-style:italic;">${escapeHtml(msgSnippet)}</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:4px;">
+                <button onclick="window.openTelecallerChat('${phone}', '${sessionId}')" style="background:#ef4444; color:#fff; border:none; padding:7px 12px; border-radius:7px; font-weight:700; font-size:12px; cursor:pointer; flex:1;">
+                    <i class="fa-solid fa-headset"></i> Takeover Chat
+                </button>
+                <button onclick="window.retriggerBotFlow('${sessionId}')" style="background:#3b82f6; color:#fff; border:none; padding:7px 12px; border-radius:7px; font-weight:700; font-size:12px; cursor:pointer; flex:1;">
+                    <i class="fa-solid fa-rotate-right"></i> Re-Trigger Flow
+                </button>
+            </div>
+        `;
+    } catch (err) {
+        console.warn('[PENDING ALERTS POLL ERROR]', err);
+    }
+};
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Start polling pending human handoff alerts every 12 seconds
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(window.fetchPendingHumanAlerts, 2000);
+    setInterval(window.fetchPendingHumanAlerts, 12000);
+});

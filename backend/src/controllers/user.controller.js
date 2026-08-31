@@ -44,6 +44,208 @@ exports.getAllUsers = async (req, res) => {
     }
 };
 
+exports.getUserById = async (req, res) => {
+    let { id } = req.params;
+    if ((id === 'me' || id === 'self') && req.user) {
+        id = req.user.user_id || req.user.id;
+    }
+    try {
+        const query = `
+            SELECT 
+                u.user_id, u.name, u.email, u.phone, u.employee_id, u.language, u.status, u.permissions, u.role_id, u.department_id, u.created_at,
+                COALESCE(u.updated_at, u.created_at) as updated_at,
+                r.name as role_name,
+                d.name as department_name,
+                (SELECT COUNT(*) FROM leads l WHERE l.assigned_to = u.user_id) as leads_assigned,
+                (SELECT COUNT(*) FROM leads l WHERE l.assigned_to = u.user_id AND (l.status = 'converted' OR l.status = 'Interested to Converted')) as leads_converted,
+                (SELECT COUNT(*) FROM orders o WHERE o.created_by = u.user_id) as orders_created,
+                (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.created_by = u.user_id) as total_sales
+            FROM users u
+            LEFT JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE u.user_id = ?
+        `;
+        const [[user]] = await db.execute(query, [id]);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // PBAC check: Allow if user is viewing their OWN profile or is manager/admin
+        const isSelf = req.user && (req.user.user_id == user.user_id || req.user.id == user.user_id);
+        if (!isSelf && req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            if (user.department_id !== req.user.department_id) {
+                return res.status(403).json({ message: 'Unauthorized to view this user profile' });
+            }
+        }
+        if (!isSelf && req.user && !req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            return res.status(403).json({ message: 'Unauthorized to view other user profiles' });
+        }
+
+        // Role-based Stat Cards Calculation
+        const roleName = (user.role_name || '').toLowerCase();
+        const deptName = (user.department_name || '').toLowerCase();
+
+        let roleCategory = 'sales';
+        if (roleName.includes('billing') || deptName.includes('billing') || roleName.includes('invoice')) {
+            roleCategory = 'billing';
+        } else if (roleName.includes('pack') || deptName.includes('pack')) {
+            roleCategory = 'packing';
+        } else if (roleName.includes('ship') || deptName.includes('ship') || roleName.includes('logistics')) {
+            roleCategory = 'shipping';
+        }
+
+        let statCards = [];
+
+        if (roleCategory === 'billing') {
+            let bStats = { total_invoices: 0, finalized_invoices: 0, draft_invoices: 0, total_revenue: 0 };
+            try {
+                const [[resStats]] = await db.execute(`
+                    SELECT 
+                        (SELECT COUNT(*) FROM invoices WHERE created_by = ?) as total_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE created_by = ? AND invoice_status = 'finalized') as finalized_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE created_by = ? AND invoice_status = 'draft') as draft_invoices,
+                        (SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE created_by = ?) as total_revenue
+                `, [id, id, id, id]);
+                if (resStats) bStats = resStats;
+            } catch (e) {
+                console.error('Billing stats query fallback:', e.message);
+            }
+
+            const handled = Number(bStats.total_invoices || 0);
+            const finalized = Number(bStats.finalized_invoices || 0);
+            const clearanceRate = handled > 0 ? ((finalized / handled) * 100).toFixed(2) : '0.00';
+
+            statCards = [
+                { label: 'Invoices Generated', value: handled, icon: 'fa-file-invoice', bg: '#eff6ff', color: '#3b82f6' },
+                { label: 'Finalized Invoices', value: finalized, icon: 'fa-circle-check', bg: '#f0fdf4', color: '#10b981' },
+                { label: 'Draft Invoices', value: Number(bStats.draft_invoices || 0), icon: 'fa-file-pen', bg: '#fff7ed', color: '#f97316' },
+                { label: 'Total Billed Amount', value: `₹${Number(bStats.total_revenue || 0).toLocaleString('en-IN')}`, icon: 'fa-indian-rupee-sign', bg: '#faf5ff', color: '#a855f7' },
+                { label: 'Finalization Rate', value: `${clearanceRate}%`, icon: 'fa-chart-line', bg: '#f0fdfa', color: '#14b8a6' }
+            ];
+        } else if (roleCategory === 'packing') {
+            let pStats = { assigned_orders: 0, packed_count: 0, pending_count: 0, items_packed: 0 };
+            try {
+                const [[resStats]] = await db.execute(`
+                    SELECT 
+                        (SELECT COUNT(*) FROM orders WHERE order_status IN ('billed', 'packed')) as assigned_orders,
+                        (SELECT COUNT(*) FROM packing WHERE packed_by = ? AND status = 'packed') as packed_count,
+                        (SELECT COUNT(*) FROM packing WHERE packed_by = ? AND status = 'pending') as pending_count,
+                        (SELECT COALESCE(SUM(oi.quantity), 0) FROM packing p JOIN order_items oi ON p.order_id = oi.order_id WHERE p.packed_by = ?) as items_packed
+                `, [id, id, id]);
+                if (resStats) pStats = resStats;
+            } catch (e) {
+                console.error('Packing stats query fallback:', e.message);
+            }
+
+            const assigned = Number(pStats.assigned_orders || 0);
+            const packed = Number(pStats.packed_count || 0);
+            const completionRate = assigned > 0 ? ((packed / assigned) * 100).toFixed(2) : '0.00';
+
+            statCards = [
+                { label: 'Orders Assigned', value: assigned, icon: 'fa-box-archive', bg: '#eff6ff', color: '#3b82f6' },
+                { label: 'Orders Packed', value: packed, icon: 'fa-box', bg: '#f0fdf4', color: '#10b981' },
+                { label: 'Pending Packing', value: Number(pStats.pending_count || 0), icon: 'fa-clock', bg: '#fff7ed', color: '#f97316' },
+                { label: 'Total Units Packed', value: Number(pStats.items_packed || 0), icon: 'fa-boxes-stacked', bg: '#faf5ff', color: '#a855f7' },
+                { label: 'Completion Rate', value: `${completionRate}%`, icon: 'fa-chart-line', bg: '#f0fdfa', color: '#14b8a6' }
+            ];
+        } else if (roleCategory === 'shipping') {
+            let sStats = { total_shipments: 0, shipped_count: 0, delivered_count: 0, transit_count: 0 };
+            try {
+                const [[resStats]] = await db.execute(`
+                    SELECT 
+                        (SELECT COUNT(*) FROM shipments WHERE shipped_by = ?) as total_shipments,
+                        (SELECT COUNT(*) FROM shipments WHERE shipped_by = ? AND status = 'shipped') as shipped_count,
+                        (SELECT COUNT(*) FROM shipments WHERE shipped_by = ? AND status = 'delivered') as delivered_count,
+                        (SELECT COUNT(*) FROM shipments WHERE shipped_by = ? AND status = 'in_transit') as transit_count
+                `, [id, id, id, id]);
+                if (resStats) sStats = resStats;
+            } catch (e) {
+                console.error('Shipping stats query fallback:', e.message);
+            }
+
+            const handled = Number(sStats.total_shipments || 0);
+            const delivered = Number(sStats.delivered_count || 0);
+            const successRate = handled > 0 ? ((delivered / handled) * 100).toFixed(2) : '0.00';
+
+            statCards = [
+                { label: 'Shipments Handled', value: handled, icon: 'fa-truck-fast', bg: '#eff6ff', color: '#3b82f6' },
+                { label: 'Dispatched Orders', value: Number(sStats.shipped_count || 0), icon: 'fa-paper-plane', bg: '#f0fdf4', color: '#10b981' },
+                { label: 'Delivered Orders', value: delivered, icon: 'fa-house-circle-check', bg: '#fff7ed', color: '#f97316' },
+                { label: 'In-Transit Orders', value: Number(sStats.transit_count || 0), icon: 'fa-route', bg: '#faf5ff', color: '#a855f7' },
+                { label: 'Delivery Success Rate', value: `${successRate}%`, icon: 'fa-chart-line', bg: '#f0fdfa', color: '#14b8a6' }
+            ];
+        } else {
+            // Default Sales / Telecaller / Admin
+            const leadsAssigned = Number(user.leads_assigned || 0);
+            const leadsConverted = Number(user.leads_converted || 0);
+            const conversionRate = leadsAssigned > 0 ? ((leadsConverted / leadsAssigned) * 100).toFixed(2) : '0.00';
+
+            statCards = [
+                { label: 'Leads Assigned', value: leadsAssigned, icon: 'fa-user-group', bg: '#eff6ff', color: '#3b82f6' },
+                { label: 'Leads Converted', value: leadsConverted, icon: 'fa-circle-check', bg: '#f0fdf4', color: '#10b981' },
+                { label: 'Orders Created', value: Number(user.orders_created || 0), icon: 'fa-shopping-cart', bg: '#fff7ed', color: '#f97316' },
+                { label: 'Total Sales', value: `₹${Number(user.total_sales || 0).toLocaleString('en-IN')}`, icon: 'fa-indian-rupee-sign', bg: '#faf5ff', color: '#a855f7' },
+                { label: 'Conversion Rate', value: `${conversionRate}%`, icon: 'fa-chart-line', bg: '#f0fdfa', color: '#14b8a6' }
+            ];
+        }
+
+        user.role_category = roleCategory;
+        user.stat_cards = statCards;
+
+        // Fetch recent activities for this user
+        let activities = [];
+        try {
+            const activityQuery = `
+                SELECT * FROM (
+                    SELECT 
+                        CONCAT('sys_', l.log_id) as id,
+                        l.created_at,
+                        'system' as type,
+                        l.action as title,
+                        COALESCE(l.details, 'Logged in to system') as description
+                    FROM system_logs l
+                    WHERE l.user_id = ?
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CONCAT('lead_', ln.note_id) as id,
+                        ln.created_at,
+                        'lead' as type,
+                        'Updated lead status' as title,
+                        CONCAT('Lead Note: ', LEFT(ln.note, 120)) as description
+                    FROM lead_notes ln
+                    WHERE ln.user_id = ?
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CONCAT('ord_', o.order_id) as id,
+                        o.created_at,
+                        'order' as type,
+                        CONCAT('Created Order #', o.order_id) as title,
+                        CONCAT('Amount: ₹', o.total_amount) as description
+                    FROM orders o
+                    WHERE o.created_by = ?
+                ) AS combined
+                ORDER BY created_at DESC
+                LIMIT 15
+            `;
+            const [logs] = await db.execute(activityQuery, [id, id, id]);
+            activities = logs;
+        } catch (actErr) {
+            console.error('Error fetching user activity logs:', actErr.message);
+        }
+
+        user.recent_activity = activities;
+        res.json(user);
+    } catch (err) {
+        console.error('getUserById Error:', err);
+        res.status(500).json({ message: err.message });
+    }
+};
+
 exports.getSalesTeam = async (req, res) => {
     try {
         const query = `

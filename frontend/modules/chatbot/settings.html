@@ -233,20 +233,32 @@
                     </div>
                 </div>
 
-                <!-- Card 3: Webhooks -->
+                <!-- Card 4: Notification & Audio Settings -->
                 <div class="settings-card">
                     <div class="settings-card-title">
-                        <i class="fa-solid fa-plug" style="color:#3b82f6;"></i> WhatsApp Webhook Integration
+                        <i class="fa-solid fa-bell" style="color:#10b981;"></i> Notification Alerts & Sound
                     </div>
 
-                    <div class="settings-row">
-                        <label>Webhook URL (Payload Delivery)</label>
-                        <input type="text" id="webhookUrl" placeholder="https://yourdomain.com/webhooks/whatsapp">
+                    <div class="toggle-container" style="margin-bottom:1rem;">
+                        <div class="toggle-info">
+                            <h4>Pop-up Notifications (ON / OFF)</h4>
+                            <p>Enable real-time toast alert pop-ups when human assistance or handoff is requested.</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="notifToggle" checked>
+                            <span class="slider"></span>
+                        </label>
                     </div>
 
-                    <div class="settings-row">
-                        <label>Webhook Auth Authorization Token</label>
-                        <input type="password" id="webhookToken" value="Bearer abc123xyz_token_secret">
+                    <div class="toggle-container">
+                        <div class="toggle-info">
+                            <h4>Mute Alert Ringtone Sound (MUTE / UNMUTE)</h4>
+                            <p>Mute/Silence the audio chime ringtone sound for new notifications.</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="soundMuteToggle">
+                            <span class="slider"></span>
+                        </label>
                     </div>
                 </div>
 

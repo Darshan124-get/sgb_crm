@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTable(campaigns) {
         if (!campaigns || campaigns.length === 0) {
-            campaignTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No campaigns found.</td></tr>`;
+            campaignTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #64748b;">No campaigns found.</td></tr>`;
             return;
         }
 
@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
                 <td style="font-weight: 600; color: #1e293b;">${c.campaign_id}</td>
                 <td>${c.tag_line || ''}</td>
+                <td><span style="font-weight: 600; color: #059669;">${c.product_name || '-'}</span></td>
                 <td style="font-weight: 500;">₹${parseFloat(c.ad_spend || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td>
                     <span class="badge badge-${c.status}">
@@ -96,6 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label for="c_tag_line" style="display:block; margin-bottom:0.5rem; font-weight:600; font-size:0.875rem;">Tag Line / Text</label>
                             <textarea id="c_tag_line" class="form-control-premium" required style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:0.5rem; min-height:80px;">${isEdit ? campaign.tag_line : ''}</textarea>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label for="c_product_name" style="display:block; margin-bottom:0.5rem; font-weight:600; font-size:0.875rem;">Product Name</label>
+                            <input type="text" id="c_product_name" class="form-control-premium" value="${isEdit ? (campaign.product_name || '') : ''}" placeholder="e.g. Trolley, Dumper, Brush Cutter" style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:0.5rem;">
                         </div>
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label for="c_ad_spend" style="display:block; margin-bottom:0.5rem; font-weight:600; font-size:0.875rem;">Ad Spend Amount (₹)</label>
@@ -387,10 +392,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const id = document.getElementById('c_id').value;
         const campaign_id = document.getElementById('c_campaign_id').value;
         const tag_line = document.getElementById('c_tag_line').value;
+        const product_name = document.getElementById('c_product_name').value.trim();
         const ad_spend = parseFloat(document.getElementById('c_ad_spend').value) || 0;
         const status = isEdit ? document.getElementById('c_status').value : 'active';
 
-        const payload = { campaign_id, tag_line, ad_spend, status, auto_replies: window.currentAutoReplies };
+        const payload = { campaign_id, tag_line, product_name, ad_spend, status, auto_replies: window.currentAutoReplies };
         const url = isEdit ? `${window.API_URL}/campaigns/${id}` : `${window.API_URL}/campaigns`;
         const method = isEdit ? 'PUT' : 'POST';
 

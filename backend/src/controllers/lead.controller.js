@@ -7,10 +7,16 @@ exports.getLeads = async (req, res) => {
 
     try {
         let query = `
-            SELECT l.*, u.name as assigned_to_name, c.campaign_id as campaign_id_code 
+            SELECT l.*, u.name as assigned_to_name,
+                   (SELECT c.campaign_id FROM campaigns c 
+                    WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
+                    ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
+                   (SELECT c.product_name FROM campaigns c 
+                    WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
+                    ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_product_name,
+                   (SELECT cs.variables FROM chatbot_sessions cs WHERE cs.lead_id = l.lead_id OR cs.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci ORDER BY cs.session_id DESC LIMIT 1) as bot_variables
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
-            LEFT JOIN campaigns c ON TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', ''))
             WHERE 1=1
         `;
         let params = [];
@@ -96,12 +102,35 @@ exports.getLeads = async (req, res) => {
         // Apply Order
         query += ' ORDER BY l.created_at DESC';
 
+        const reqPriority = (req.query.priority || '').toLowerCase();
+
         // Check if client requested full export or non-paginated access
         if (limit === 'all') {
             const [rows] = await pool.query(query, params);
+            rows.forEach(l => {
+                if (l.bot_variables) {
+                    try {
+                        const v = typeof l.bot_variables === 'string' ? JSON.parse(l.bot_variables) : l.bot_variables;
+                        const validKeys = Object.keys(v).filter(k => !k.startsWith('_') && k !== 'first_message');
+                        l.bot_answered = validKeys.length;
+                        l.bot_total = 5;
+                    } catch(e) { l.bot_answered = 0; l.bot_total = 5; }
+                } else { l.bot_answered = 0; l.bot_total = 5; }
+
+                if (l.bot_answered >= 4) l.bot_priority = 'high';
+                else if (l.bot_answered >= 2) l.bot_priority = 'medium';
+                else if (l.bot_answered >= 1) l.bot_priority = 'low';
+                else l.bot_priority = 'none';
+            });
+
+            let finalRows = rows;
+            if (reqPriority && reqPriority !== 'all') {
+                finalRows = rows.filter(l => l.bot_priority === reqPriority);
+            }
+
             return res.json({
-                leads: rows || [],
-                totalLeads,
+                leads: finalRows || [],
+                totalLeads: finalRows.length,
                 totalPages: 1,
                 currentPage: 1,
                 limit: 'all'
@@ -116,10 +145,33 @@ exports.getLeads = async (req, res) => {
         query += ` LIMIT ${parseInt(limitNum)} OFFSET ${parseInt(offset)}`;
 
         const [rows] = await pool.query(query, params);
+        rows.forEach(l => {
+            if (l.bot_variables) {
+                try {
+                    const v = typeof l.bot_variables === 'string' ? JSON.parse(l.bot_variables) : l.bot_variables;
+                    const validKeys = Object.keys(v).filter(k => !k.startsWith('_') && k !== 'first_message');
+                    l.bot_answered = validKeys.length;
+                    l.bot_total = 5;
+                } catch(e) { l.bot_answered = 0; l.bot_total = 5; }
+            } else { l.bot_answered = 0; l.bot_total = 5; }
+
+            if (l.bot_answered >= 4) l.bot_priority = 'high';
+            else if (l.bot_answered >= 2) l.bot_priority = 'medium';
+            else if (l.bot_answered >= 1) l.bot_priority = 'low';
+            else l.bot_priority = 'none';
+        });
+
+        let finalRows = rows;
+        if (reqPriority && reqPriority !== 'all') {
+            finalRows = rows.filter(l => l.bot_priority === reqPriority);
+        }
+
+        const effectiveTotal = (reqPriority && reqPriority !== 'all') ? finalRows.length : totalLeads;
+
         res.json({
-            leads: rows || [],
-            totalLeads,
-            totalPages: Math.ceil(totalLeads / limitNum),
+            leads: finalRows || [],
+            totalLeads: effectiveTotal,
+            totalPages: Math.ceil(effectiveTotal / limitNum) || 1,
             currentPage: pageNum,
             limit: limitNum
         });
@@ -136,7 +188,7 @@ exports.getLeadById = async (req, res) => {
     try {
         const [rows] = await pool.query(
             `SELECT l.*, u.name as assigned_to_name,
-                    (SELECT campaign_id FROM campaigns c 
+                    (SELECT c.campaign_id FROM campaigns c 
                      WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
                      LIMIT 1) as campaign_name
              FROM leads l
@@ -191,6 +243,129 @@ exports.getLeadById = async (req, res) => {
             [req.params.id]
         );
         lead.call_attempts = attemptRows[0].count;
+
+        // 🤖 CHATBOT SUMMARY & STEP PROGRESSION
+        const phoneTen = (lead.phone_number || '').replace(/\D/g, '').slice(-10);
+        const [sessionRows] = await pool.query(
+            `SELECT cs.*, cf.name as flow_name 
+             FROM chatbot_sessions cs
+             JOIN chatbot_flows cf ON cs.flow_id = cf.flow_id
+             WHERE cs.lead_id = ? OR cs.phone = ? OR cs.phone LIKE ?
+             ORDER BY cs.session_id DESC LIMIT 1`,
+            [lead.lead_id, lead.phone_number, `%${phoneTen}`]
+        );
+
+        if (sessionRows.length > 0) {
+            const session = sessionRows[0];
+            let vars = {};
+            try {
+                vars = typeof session.variables === 'string' ? JSON.parse(session.variables) : (session.variables || {});
+            } catch (e) {
+                vars = {};
+            }
+
+            // Query flow nodes to discover steps
+            const [nodes] = await pool.query(
+                `SELECT node_key, node_type, name, config 
+                 FROM chatbot_nodes 
+                 WHERE version_id = ? 
+                 ORDER BY id ASC`,
+                [session.version_id]
+            );
+
+            const questionNodes = nodes.filter(n => ['question', 'buttons', 'list', 'contact_time', 'text_input', 'number_input'].includes(n.node_type));
+
+            let steps = [];
+            let answeredCount = 0;
+
+            if (questionNodes.length > 0) {
+                questionNodes.forEach((node, idx) => {
+                    let cfg = {};
+                    try {
+                        cfg = typeof node.config === 'string' ? JSON.parse(node.config) : (node.config || {});
+                    } catch (e) {}
+
+                    const saveKey = cfg.saveResponseTo || cfg.saveTo;
+                    const qText = cfg.question || node.name || `Question ${idx + 1}`;
+                    let cleanTitle = qText.replace(/^Q:\s*/i, '').split('\n')[0];
+                    if (cleanTitle.length > 40) cleanTitle = cleanTitle.substring(0, 37) + '...';
+
+                    let answerVal = null;
+                    if (saveKey && vars[saveKey] !== undefined && vars[saveKey] !== null) {
+                        answerVal = vars[saveKey];
+                    }
+
+                    const isAnswered = answerVal !== null && answerVal !== undefined && String(answerVal).trim() !== '';
+                    if (isAnswered) answeredCount++;
+
+                    steps.push({
+                        step_number: idx + 1,
+                        node_key: node.node_key,
+                        title: cleanTitle,
+                        save_key: saveKey,
+                        answered: isAnswered,
+                        answer_value: isAnswered ? String(answerVal) : null
+                    });
+                });
+            }
+
+            const totalQuestions = steps.length > 0 ? steps.length : 5;
+            if (steps.length === 0) {
+                const stdSteps = [
+                    { title: 'Product Requirement', key: 'product_interest', val: vars.product_interest || vars.product },
+                    { title: 'Land & Acreage', key: 'land_acres', val: vars.land_acres },
+                    { title: 'Brush Cutter / Attachment', key: 'brush_cutter_type', val: vars.brush_cutter_type },
+                    { title: 'Preferred Time Slot', key: 'preferred_contact_time', val: vars.preferred_contact_time },
+                    { title: 'Customer Name & Location', key: 'name_place', val: vars.name_place }
+                ];
+                steps = stdSteps.map((s, i) => {
+                    const hasVal = s.val !== undefined && s.val !== null && String(s.val).trim() !== '';
+                    if (hasVal) answeredCount++;
+                    return {
+                        step_number: i + 1,
+                        title: s.title,
+                        save_key: s.key,
+                        answered: hasVal,
+                        answer_value: hasVal ? String(s.val) : null
+                    };
+                });
+            }
+
+            const completionPct = Math.round((answeredCount / totalQuestions) * 100);
+
+            let priorityLevel = 'incomplete';
+            let priorityLabel = `Incomplete (${answeredCount}/${totalQuestions})`;
+            let priorityBadgeClass = 'badge-red';
+
+            if (answeredCount >= 4 || completionPct >= 80) {
+                priorityLevel = 'qualified';
+                priorityLabel = `Qualified (${answeredCount}/${totalQuestions})`;
+                priorityBadgeClass = 'badge-green';
+            } else if (answeredCount >= 2 || completionPct >= 40) {
+                priorityLevel = 'medium';
+                priorityLabel = `Medium (${answeredCount}/${totalQuestions})`;
+                priorityBadgeClass = 'badge-amber';
+            }
+
+            lead.chatbot_summary = {
+                session_id: session.session_id,
+                flow_id: session.flow_id,
+                flow_name: session.flow_name,
+                status: session.status,
+                started_at: session.started_at,
+                completed_at: session.completed_at,
+                total_questions: totalQuestions,
+                answered_questions: answeredCount,
+                completion_percentage: completionPct,
+                priority_level: priorityLevel,
+                priority_label: priorityLabel,
+                priority_badge_class: priorityBadgeClass,
+                variables: vars,
+                steps: steps
+            };
+        } else {
+            lead.chatbot_summary = null;
+        }
 
         res.json(lead);
     } catch (err) {
@@ -558,6 +733,7 @@ exports.getStats = async (req, res) => {
         const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, params);
         const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, params);
         const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, params);
+        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "new"`, params);
         const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, params);
 
         res.json({
@@ -566,7 +742,8 @@ exports.getStats = async (req, res) => {
             hot: hot[0].count,
             followup: followup[0].count,
             lost: lost[0].count,
-            open: open[0].count
+            open: open[0].count,
+            new: newCount[0].count
         });
     } catch (err) {
         console.error('getStats Error:', err);

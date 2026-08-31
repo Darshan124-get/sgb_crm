@@ -56,6 +56,13 @@ router.delete('/categories/:id', optionalAuth, chatbotController.deleteCategory)
 router.get('/media', optionalAuth, chatbotController.getMedia);
 router.post('/media/upload', optionalAuth, upload.any(), chatbotController.uploadMedia);
 router.delete('/media/:id', optionalAuth, chatbotController.deleteMedia);
-router.get('/media/storage-usage', optionalAuth, chatbotController.getStorageUsage);
+// Human Handoff & Session Control API
+router.get('/sessions/human-needed', optionalAuth, chatbotController.getPendingHumanAlerts);
+router.post('/sessions/:sessionId/retrigger', optionalAuth, chatbotController.retriggerFlowSession);
+router.post('/sessions/:sessionId/takeover', optionalAuth, chatbotController.takeoverFlowSession);
+router.post('/sessions/retrigger', optionalAuth, chatbotController.retriggerFlowSession);
+router.post('/sessions/takeover', optionalAuth, chatbotController.takeoverFlowSession);
+router.post('/sessions/resolve-handoff', optionalAuth, chatbotController.resolveHandoffSession);
+router.post('/sessions/:sessionId/resolve', optionalAuth, chatbotController.resolveHandoffSession);
 
 module.exports = router;

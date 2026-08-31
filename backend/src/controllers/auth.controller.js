@@ -94,7 +94,11 @@ exports.login = async (req, res) => {
             token, 
             user: { 
                 id: user.user_id,
+                user_id: user.user_id,
                 name: user.name, 
+                email: user.email || '',
+                phone: user.phone || '',
+                employee_id: user.employee_id || '',
                 role: user.role_name,
                 language: user.language,
                 permissions: perms,

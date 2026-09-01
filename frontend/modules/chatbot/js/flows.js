@@ -89,6 +89,9 @@ function renderFlows(flows) {
                 </td>
                 <td><span style="color:#64748b; font-size:0.8rem;">${updatedDate}</span></td>
                 <td>
+                    <button class="btn-action" onclick="toggleFlowStatus(${flow.flow_id}, '${flow.status}')" title="${flow.status === 'active' ? 'Deactivate (Switch to Draft)' : 'Activate (Switch to Active)'}">
+                        <i class="fa-solid ${flow.status === 'active' ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color: ${flow.status === 'active' ? '#10b981' : '#94a3b8'}; font-size: 1.15rem;"></i>
+                    </button>
                     <a href="chatbot.html?flowId=${flow.flow_id}" class="btn-action" title="Open in Flow Builder">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </a>
@@ -198,6 +201,28 @@ async function archiveFlow(flowId) {
         fetchFlows();
     } catch (err) {
         alert('Error archiving flow: ' + err.message);
+    }
+}
+
+// Toggle flow status (active <-> draft)
+async function toggleFlowStatus(flowId, currentStatus) {
+    const newStatus = currentStatus === 'active' ? 'draft' : 'active';
+    const token = localStorage.getItem('token');
+
+    try {
+        const res = await fetch(`${window.API_URL}/chatbot/flows/${flowId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+        if (!res.ok) throw new Error('Status update failed');
+
+        fetchFlows();
+    } catch (err) {
+        alert('Error updating flow status: ' + err.message);
     }
 }
 

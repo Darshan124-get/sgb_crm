@@ -127,12 +127,12 @@ class FlowEngine {
             }
         }).catch(() => {});
 
-        // Fetch all non-archived flows containing a Start node trigger configuration
+        // Fetch ALL ACTIVE flows containing a Start node trigger configuration
         const [flows] = await pool.query(`
-            SELECT f.flow_id, f.active_version_id, f.name, n.config 
+            SELECT f.flow_id, f.active_version_id, f.name, f.status, n.config 
             FROM chatbot_flows f 
             JOIN chatbot_nodes n ON f.active_version_id = n.version_id 
-            WHERE f.status != "archived" AND f.active_version_id IS NOT NULL AND n.node_type = "start"
+            WHERE f.status = "active" AND f.active_version_id IS NOT NULL AND n.node_type = "start"
         `);
 
         // Check if incoming message matches an explicit Flow Trigger Keyword or Campaign Tagline
@@ -145,6 +145,20 @@ class FlowEngine {
                     if (keywordStr) {
                         const words = keywordStr.split(/,|\n/).map(w => w.trim().toLowerCase()).filter(Boolean);
                         if (words.some(w => cleanedText === w || cleanedText.includes(w) || w.includes(cleanedText))) {
+                            // Check if this tagline/keyword is linked to a Campaign in the database
+                            const [campaignRows] = await pool.query(
+                                'SELECT id, status, campaign_id, tag_line FROM campaigns WHERE LOWER(TRIM(tag_line)) = LOWER(TRIM(?)) OR LOWER(TRIM(?)) LIKE CONCAT("%", LOWER(TRIM(tag_line)), "%")',
+                                [keywordStr, cleanedText]
+                            );
+
+                            if (campaignRows.length > 0) {
+                                const activeCampaign = campaignRows.find(c => (c.status || '').toLowerCase() === 'active');
+                                if (!activeCampaign) {
+                                    console.log(`[FlowEngine] Tagline matched Campaign "${campaignRows[0].campaign_id}", but Campaign status is "${campaignRows[0].status}". Both Campaign AND Flow MUST be active! Skipping flow execution.`);
+                                    continue; // Skip flow because campaign is inactive
+                                }
+                            }
+
                             matchedFlow = f;
                             break;
                         }

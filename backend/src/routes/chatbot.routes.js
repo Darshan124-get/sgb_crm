@@ -54,6 +54,7 @@ router.delete('/categories/:id', optionalAuth, chatbotController.deleteCategory)
 
 // Media Library & Storage API
 router.get('/media', optionalAuth, chatbotController.getMedia);
+router.get('/media/storage-usage', optionalAuth, chatbotController.getStorageUsage);
 router.post('/media/upload', optionalAuth, upload.any(), chatbotController.uploadMedia);
 router.delete('/media/:id', optionalAuth, chatbotController.deleteMedia);
 // Human Handoff & Session Control API

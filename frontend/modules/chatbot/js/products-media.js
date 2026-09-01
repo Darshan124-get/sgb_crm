@@ -144,10 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseHowItWorksFtr = document.getElementById('btn-close-how-it-works-ftr');
     const btnHowStartWizard = document.getElementById('btn-how-start-wizard');
 
-    // Dynamic API Base URL
-    const API_BASE_URL = (window.location.origin && window.location.origin.includes(':5000')) 
-        ? '' 
-        : 'http://localhost:5000';
+    // Dynamic API Base URL (respects HTTPS production cloud backend & local development)
+    const API_BASE_URL = (window.BASE_URL || (window.API_URL ? window.API_URL.replace(/\/api$/, '') : '') || (window.location.origin && window.location.origin.includes(':5000') ? '' : 'http://127.0.0.1:5000')).replace(/\/$/, '');
 
     // Auth Header Helper
     function getAuthHeaders() {

@@ -4,29 +4,65 @@ const ExcelJS = require('exceljs');
 exports.exportLeads = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT lead_id, customer_name, phone_number, language, city, status, source, created_at 
-            FROM leads 
-            ORDER BY created_at DESC
+            SELECT l.*, u.name as assigned_to_name,
+                   (SELECT c.campaign_id FROM campaigns c 
+                    WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
+                    ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
+                   (SELECT c.product_name FROM campaigns c 
+                    WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
+                    ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_product_name,
+                   (SELECT cs.variables FROM chatbot_sessions cs WHERE cs.lead_id = l.lead_id OR cs.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci ORDER BY cs.session_id DESC LIMIT 1) as bot_variables
+            FROM leads l
+            LEFT JOIN users u ON l.assigned_to = u.user_id
+            ORDER BY l.created_at DESC
         `);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Leads Report');
 
         worksheet.columns = [
-            { header: 'ID', key: 'lead_id', width: 10 },
-            { header: 'Name', key: 'customer_name', width: 25 },
-            { header: 'Phone', key: 'phone_number', width: 15 },
-            { header: 'Language', key: 'language', width: 15 },
-            { header: 'City', key: 'city', width: 15 },
-            { header: 'Status', key: 'status', width: 15 },
-            { header: 'Source', key: 'source', width: 15 },
-            { header: 'Created On', key: 'created_at', width: 20 }
+            { header: 'Phone Number', key: 'phone_number', width: 20 },
+            { header: 'Priority', key: 'priority', width: 20 },
+            { header: 'Product Name', key: 'product_name', width: 25 },
+            { header: 'Campaign Tag / Code', key: 'campaign_code', width: 35 },
+            { header: 'Assigned Staff', key: 'assigned_staff', width: 25 },
+            { header: 'Date and Time', key: 'date_time', width: 25 },
+            { header: 'Farmer Name', key: 'farmer_name', width: 25 }
         ];
 
         worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4B5563' } };
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } };
 
-        rows.forEach(row => worksheet.addRow(row));
+        rows.forEach(lead => {
+            let priorityStr = 'NONE';
+            if (lead.score) {
+                priorityStr = lead.score.toUpperCase();
+            }
+
+            let prodName = lead.campaign_product_name || '';
+            if (!prodName && lead.bot_variables) {
+                try {
+                    const vars = typeof lead.bot_variables === 'string' ? JSON.parse(lead.bot_variables) : lead.bot_variables;
+                    prodName = vars.product_interest || vars.product || vars.barrow_type || '';
+                } catch(e) {}
+            }
+            if (!prodName) prodName = '-';
+
+            const campaignCode = lead.campaign_id_code || lead.first_message || lead.source || 'Direct';
+            const farmerName = lead.customer_name || '-';
+            const assignedStaff = lead.assigned_to_name || 'Unassigned';
+            const dateTimeStr = lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-';
+
+            worksheet.addRow({
+                phone_number: lead.phone_number || '',
+                priority: priorityStr,
+                product_name: prodName,
+                campaign_code: campaignCode,
+                assigned_staff: assignedStaff,
+                date_time: dateTimeStr,
+                farmer_name: farmerName
+            });
+        });
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename=leads_report.xlsx');

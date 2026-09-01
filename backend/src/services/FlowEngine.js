@@ -127,15 +127,15 @@ class FlowEngine {
             }
         }).catch(() => {});
 
-        // Fetch all active flows containing a Start node trigger configuration
+        // Fetch all non-archived flows containing a Start node trigger configuration
         const [flows] = await pool.query(`
-            SELECT f.flow_id, f.active_version_id, n.config 
+            SELECT f.flow_id, f.active_version_id, f.name, n.config 
             FROM chatbot_flows f 
             JOIN chatbot_nodes n ON f.active_version_id = n.version_id 
-            WHERE f.status = "active" AND n.node_type = "start"
+            WHERE f.status != "archived" AND f.active_version_id IS NOT NULL AND n.node_type = "start"
         `);
 
-        // Check if incoming message is an explicit Flow Trigger Keyword or Campaign Tagline
+        // Check if incoming message matches an explicit Flow Trigger Keyword or Campaign Tagline
         let matchedFlow = null;
         if (cleanedText) {
             for (const f of flows) {
@@ -143,8 +143,8 @@ class FlowEngine {
                 if (config) {
                     const keywordStr = config.keywords || config.campaignTagline || '';
                     if (keywordStr) {
-                        const words = keywordStr.split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
-                        if (words.some(w => cleanedText.includes(w) || w === cleanedText)) {
+                        const words = keywordStr.split(/,|\n/).map(w => w.trim().toLowerCase()).filter(Boolean);
+                        if (words.some(w => cleanedText === w || cleanedText.includes(w) || w.includes(cleanedText))) {
                             matchedFlow = f;
                             break;
                         }
@@ -187,7 +187,7 @@ class FlowEngine {
             return;
         }
 
-        // 3. If no active session, trigger flow execution
+        // 3. If no active session, trigger flow execution ONLY if keyword/tagline matched
         if (!session) {
             // Check human escape keywords (agent, human, support, representative, talk to human)
             const humanEscapes = ['agent', 'human', 'support', 'representative', 'talk to human', 'help me'];
@@ -196,13 +196,15 @@ class FlowEngine {
                 return;
             }
 
-            // Fallback to active flow if no specific keyword matched
+            // Optional explicit Default trigger (ONLY if triggerType is explicitly set to 'Default' and no keywords set)
             if (!matchedFlow && flows.length > 0) {
-                const defaultFlow = flows.find(f => {
+                const explicitDefaultFlow = flows.find(f => {
                     const cfg = typeof f.config === 'string' ? JSON.parse(f.config) : f.config;
-                    return cfg && (cfg.triggerType === 'Default' || !cfg.keywords);
-                }) || flows[0];
-                matchedFlow = defaultFlow;
+                    return cfg && cfg.triggerType === 'Default' && !cfg.keywords;
+                });
+                if (explicitDefaultFlow) {
+                    matchedFlow = explicitDefaultFlow;
+                }
             }
 
             if (matchedFlow) {

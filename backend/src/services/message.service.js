@@ -255,7 +255,7 @@ const getChatHistory = async (phoneInput, user = null) => {
   const phone = normalizePhone(phoneInput);
   const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
   try {
-    let query = `
+    let baseQuery = `
       SELECT cm.*, 
       CASE WHEN cm.sender_type = 'user' THEN 'incoming' ELSE 'outgoing' END as direction, 
       cm.message as body,
@@ -269,13 +269,18 @@ const getChatHistory = async (phoneInput, user = null) => {
     let params = [phone, phoneInput, `%${phoneTen}`, phoneTen];
 
     if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
-      query += " AND l.assigned_to = ?";
+      baseQuery += " AND l.assigned_to = ?";
       params.push(user.id);
     }
 
-    query += " ORDER BY cm.timestamp ASC LIMIT 100";
+    baseQuery += " ORDER BY cm.timestamp DESC, cm.chat_id DESC LIMIT 300";
 
-    const [rows] = await db.execute(query, params);
+    const fullQuery = `
+      SELECT * FROM (${baseQuery}) sub
+      ORDER BY sub.timestamp ASC, sub.chat_id ASC
+    `;
+
+    const [rows] = await db.execute(fullQuery, params);
     return rows;
   } catch (err) {
     logger.error('Fetch chat history error:', err.message);

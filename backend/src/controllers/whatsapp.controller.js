@@ -27,14 +27,25 @@ const verifyWebhook = (req, res) => {
   }
 };
 
+// Message deduplication cache to prevent Meta webhook retries from triggering duplicate auto-replies
+const processedMsgIds = new Set();
+
 /**
  * Handles incoming WhatsApp Message Events (POST)
  */
 const receiveMessage = async (req, res) => {
   const body = req.body;
 
-  // Check if it's a WhatsApp message event
-  if (body.object === 'whatsapp_business_account' && body.entry) {
+  // Acknowledge Meta webhook immediately to prevent Meta from retrying and causing duplicate messages
+  if (body.object === 'whatsapp_business_account') {
+    res.status(200).send('EVENT_RECEIVED');
+  } else {
+    return res.sendStatus(404);
+  }
+
+  if (!body.entry) return;
+
+  try {
     for (const entry of body.entry) {
       for (const change of (entry.changes || [])) {
         const value = change.value;
@@ -58,6 +69,20 @@ const receiveMessage = async (req, res) => {
         if (!value.messages) continue;
 
         for (const msg of value.messages) {
+          // Deduplicate incoming messages using Meta message ID
+          if (msg.id) {
+            if (processedMsgIds.has(msg.id)) {
+              logger.info(`Duplicate Meta message ID ${msg.id} ignored.`);
+              continue;
+            }
+            processedMsgIds.add(msg.id);
+            // Limit cache size to prevent memory leak (keep last 5000 message IDs)
+            if (processedMsgIds.size > 5000) {
+              const firstVal = processedMsgIds.values().next().value;
+              processedMsgIds.delete(firstVal);
+            }
+          }
+
           const fromNumber = normalizePhone(msg.from);
           const timestamp = msg.timestamp;
 
@@ -115,7 +140,7 @@ const receiveMessage = async (req, res) => {
               logger.error(`FlowEngine execution failed for ${fromNumber}:`, err.message);
             }
 
-            // 4. Campaign Auto-Replies Check
+            // 4. Campaign Auto-Replies Check (ONLY for ACTIVE campaigns)
             logger.info(`Message received from ${fromNumber}: ${inputText}`);
 
             const [campaigns] = await pool.query('SELECT * FROM campaigns WHERE status = "active" AND auto_replies IS NOT NULL AND auto_replies != \'[]\' ORDER BY id DESC');
@@ -136,7 +161,7 @@ const receiveMessage = async (req, res) => {
             }
 
             if (matchedCampaign && matchedCampaign.auto_replies) {
-              logger.info(`Matched campaign ${matchedCampaign.campaign_id} for number ${fromNumber}`);
+              logger.info(`Matched ACTIVE campaign ${matchedCampaign.campaign_id} (ID: ${matchedCampaign.id}) for number ${fromNumber}`);
               let autoReplies = [];
               try {
                 autoReplies = typeof matchedCampaign.auto_replies === 'string' ? JSON.parse(matchedCampaign.auto_replies) : matchedCampaign.auto_replies;
@@ -148,32 +173,15 @@ const receiveMessage = async (req, res) => {
                 for (const reply of autoReplies) {
                   try {
                     if (reply.type === 'text') {
-                      const metaResponse = await whatsappService.sendMessage(formatForWhatsApp(fromNumber), reply.content);
-                      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-                      await messageService.logChatMessage(fromNumber, 'outgoing', 'text', reply.content, null, null, null, metaMessageId, 'sent');
+                      await whatsappService.sendMessage(formatForWhatsApp(fromNumber), reply.content);
                     } else if (reply.type === 'image' || reply.type === 'video') {
-                      // For media, we assume reply.url holds the Supabase URL
                       if (reply.url) {
-                        // For Meta API we need a media ID or a link.
-                        // sendMediaMessage supports sending a link directly if we pass it.
-                        const metaResponse = await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption);
-                        const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-                        await messageService.logChatMessage(
-                          fromNumber,
-                          'outgoing',
-                          reply.type,
-                          reply.caption || '',
-                          reply.url,
-                          reply.mimeType || (reply.type === 'image' ? 'image/jpeg' : (reply.type === 'video' ? 'video/mp4' : null)),
-                          null,
-                          metaMessageId,
-                          'sent'
-                        );
+                        await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption);
                       }
                     }
 
-                    // Optional: Small delay between messages so they arrive in order
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // Pacing delay (1.5s) so media messages arrive cleanly in order
+                    await new Promise(resolve => setTimeout(resolve, 1500));
                   } catch (sendErr) {
                     logger.error(`Error sending campaign auto-reply to ${fromNumber}:`, sendErr.message);
                   }
@@ -187,9 +195,8 @@ const receiveMessage = async (req, res) => {
         }
       }
     }
-    res.status(200).send('EVENT_RECEIVED');
-  } else {
-    res.sendStatus(404);
+  } catch (err) {
+    logger.error('Error handling webhook event:', err.message);
   }
 };
 
@@ -240,12 +247,11 @@ const sendReply = async (req, res) => {
       }
     }
 
-    // 1. Handle Media Sending
-    if (mediaData) {
-      const category = mimeType && mimeType.startsWith('image') ? 'image' :
-        mimeType && mimeType.startsWith('video') ? 'video' :
-          mimeType && mimeType.startsWith('audio') ? 'audio' : 'document';
+    // Determine type: text vs media
+    const category = mimeType ? (mimeType.startsWith('image/') ? 'image' : (mimeType.startsWith('video/') ? 'video' : (mimeType.startsWith('audio/') ? 'audio' : 'document'))) : null;
 
+    // 1. Handle Media Sending
+    if (mediaData && category) {
       let mediaId;
       if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
         mediaId = mediaData;
@@ -257,22 +263,12 @@ const sendReply = async (req, res) => {
       }
 
       const waPhone = formatForWhatsApp(phone);
-      const metaResponse = await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId);
-      console.log('MEDIA META RESPONSE:', JSON.stringify(metaResponse));
-      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-      console.log('MEDIA META MESSAGE ID:', metaMessageId);
-
-      // Log to local Chat History (Use normalized number for DB)
-      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', category, message || '', mediaData, mimeType, req.user.id, metaMessageId, 'sent', reply_to_chat_id, is_forwarded);
+      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId);
     }
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
-      const metaResponse = await whatsappService.sendMessage(waPhone, message, replyToMessageId);
-      logger.info('TEXT META RESPONSE:', metaResponse);
-      const metaMessageId = metaResponse?.messages?.[0]?.id || null;
-      logger.info('TEXT META MESSAGE ID:', metaMessageId);
-      await messageService.logChatMessage(normalizePhone(phone), 'outgoing', 'text', message, null, null, req.user.id, metaMessageId, 'sent', reply_to_chat_id, is_forwarded);
+      await whatsappService.sendMessage(waPhone, message, replyToMessageId);
     }
 
     // Auto-resolve handoff if active for this customer

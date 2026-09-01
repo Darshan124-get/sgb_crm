@@ -2169,106 +2169,59 @@ window.exportLeadsToExcel = async function () {
         return;
     }
 
-    const activeTab = document.querySelector('.nav-tab.active');
-    const isNewTab = activeTab && activeTab.getAttribute('data-filter') === 'new';
+    // Standardized export layout across ALL tabs (All Leads, Lost, Followups, MildHot, Today, Open, New, etc.)
+    const headers = ["Phone Number", "Priority", "Product Name", "Campaign Tag / Code", "Assigned Staff", "Date and Time", "Farmer Name"];
+    let csvContent = headers.join(",") + "\n";
 
-    let csvContent = "";
+    leadsToExport.forEach(lead => {
+        const bAns = lead.bot_answered !== undefined ? lead.bot_answered : 0;
+        const bTot = lead.bot_total || 5;
+        let priorityStr = 'NONE';
+        if (lead.bot_priority) {
+            priorityStr = lead.bot_priority.toUpperCase();
+        } else if (lead.score) {
+            priorityStr = lead.score.toUpperCase();
+        } else if (bAns >= 4) {
+            priorityStr = 'HIGH';
+        } else if (bAns >= 2) {
+            priorityStr = 'MEDIUM';
+        } else if (bAns >= 1) {
+            priorityStr = 'LOW';
+        }
+        const priorityFull = priorityStr.includes('/') ? priorityStr : `${priorityStr} (${bAns}/${bTot})`;
 
-    if (isNewTab) {
-        // Specific 4-column export for New Leads tab
-        const headers = ["Phone Number", "Priority", "Product Name", "Campaign Tag / Code"];
-        csvContent = headers.join(",") + "\n";
+        let prodName = lead.campaign_product_name || lead.product_name || lead.product_interest || '';
+        if (!prodName && lead.bot_variables) {
+            try {
+                const vars = typeof lead.bot_variables === 'string' ? JSON.parse(lead.bot_variables) : lead.bot_variables;
+                prodName = vars.product_interest || vars.product || vars.barrow_type || '';
+            } catch(e) {}
+        }
+        if (!prodName) prodName = '-';
 
-        leadsToExport.forEach(lead => {
-            const bAns = lead.bot_answered !== undefined ? lead.bot_answered : 0;
-            const bTot = lead.bot_total || 5;
-            let priorityStr = 'NONE';
-            if (lead.bot_priority) {
-                priorityStr = lead.bot_priority.toUpperCase();
-            } else if (bAns >= 4) {
-                priorityStr = 'HIGH';
-            } else if (bAns >= 2) {
-                priorityStr = 'MEDIUM';
-            } else if (bAns >= 1) {
-                priorityStr = 'LOW';
-            }
-            const priorityFull = `${priorityStr} (${bAns}/${bTot})`;
+        const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.campaign_tag || lead.first_message || lead.source || 'Direct';
+        const farmerName = lead.customer_name || lead.farmer_name || '-';
+        const assignedStaff = lead.assigned_to_name || lead.assigned_name || lead.staff_name || 'Unassigned';
+        const dateTimeStr = lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-';
 
-            let prodName = lead.campaign_product_name || '';
-            if (!prodName && lead.bot_variables) {
-                try {
-                    const vars = typeof lead.bot_variables === 'string' ? JSON.parse(lead.bot_variables) : lead.bot_variables;
-                    prodName = vars.product_interest || vars.product || vars.barrow_type || '';
-                } catch(e) {}
-            }
-            if (!prodName) prodName = '-';
-
-            const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.source || 'Direct';
-
-            const row = [
-                `"${lead.phone_number || ''}"`,
-                `"${priorityFull}"`,
-                `"${prodName.replace(/"/g, '""')}"`,
-                `"${campaignCode.replace(/"/g, '""')}"`
-            ];
-            csvContent += row.join(",") + "\n";
-        });
-    } else {
-        // Standard multi-column export for other tabs
-        const headers = [
-            "Lead ID", "Customer Name", "Phone Number", "Bot Priority", "Questions Answered",
-            "Campaign Tag / Code", "Status", "Score", "State", "District", "City/Village",
-            "Pincode", "Language", "Crop", "Acreage", "First Message", "Next Follow-up",
-            "Assigned Staff", "Created At"
+        const row = [
+            `"${lead.phone_number || ''}"`,
+            `"${priorityFull}"`,
+            `"${prodName.replace(/"/g, '""')}"`,
+            `"${campaignCode.replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+            `"${assignedStaff.replace(/"/g, '""')}"`,
+            `"${dateTimeStr}"`,
+            `"${farmerName.replace(/"/g, '""')}"`
         ];
-        csvContent = headers.join(",") + "\n";
-
-        leadsToExport.forEach(lead => {
-            const bAns = lead.bot_answered !== undefined ? lead.bot_answered : 0;
-            const bTot = lead.bot_total || 5;
-            let priorityStr = 'NONE';
-            if (lead.bot_priority) {
-                priorityStr = lead.bot_priority.toUpperCase();
-            } else if (bAns >= 4) {
-                priorityStr = 'HIGH';
-            } else if (bAns >= 2) {
-                priorityStr = 'MEDIUM';
-            } else if (bAns >= 1) {
-                priorityStr = 'LOW';
-            }
-            const priorityFull = `${priorityStr} (${bAns}/${bTot})`;
-            const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.source || 'Direct';
-
-            const row = [
-                lead.lead_id || '',
-                `"${(lead.customer_name || '').replace(/"/g, '""')}"`,
-                `"${lead.phone_number || ''}"`,
-                `"${priorityFull}"`,
-                `"${bAns}/${bTot}"`,
-                `"${campaignCode}"`,
-                `"${lead.status || ''}"`,
-                `"${lead.score || ''}"`,
-                `"${(lead.state || '').replace(/"/g, '""')}"`,
-                `"${(lead.district || '').replace(/"/g, '""')}"`,
-                `"${(lead.city || '').replace(/"/g, '""')}"`,
-                `"${lead.pincode || ''}"`,
-                `"${lead.language || ''}"`,
-                `"${(lead.current_crop || '').replace(/"/g, '""')}"`,
-                `"${lead.acreage || ''}"`,
-                `"${(lead.first_message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
-                `"${lead.next_followup_date ? new Date(lead.next_followup_date).toLocaleString() : ''}"`,
-                `"${(lead.assigned_to_name || 'Unassigned').replace(/"/g, '""')}"`,
-                `"${lead.created_at ? new Date(lead.created_at).toLocaleString() : ''}"`
-            ];
-            csvContent += row.join(",") + "\n";
-        });
-    }
+        csvContent += row.join(",") + "\n";
+    });
 
     // Create a Blob and trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
     // Get active tab name for filename
+    const activeTab = document.querySelector('.nav-tab.active');
     let tabName = "Leads";
     if (activeTab) {
         const filter = activeTab.getAttribute('data-filter');

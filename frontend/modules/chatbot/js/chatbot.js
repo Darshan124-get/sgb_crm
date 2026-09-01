@@ -1463,6 +1463,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (['image', 'video', 'document', 'audio'].includes(node.type)) {
             const currentTarget = getTargetNodeIdFromPort(`port-${node.id}-out`);
             const optionsDropdown = getNextNodeOptionsHtml(currentTarget ? `port-${currentTarget}-in` : '');
+            const mimeAccept = node.type === 'image' ? 'image/*' : (node.type === 'video' ? 'video/*' : (node.type === 'audio' ? 'audio/*' : '.pdf,.doc,.docx'));
 
             fieldsHtml = `
                 ${triggerHtml}
@@ -1471,10 +1472,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" id="node-name-input" value="${node.name}">
                 </div>
                 <div class="inspector-form-group">
-                    <label>${node.type.toUpperCase()} File Link / URL</label>
-                    <div style="display:flex; gap:0.35rem;">
-                        <input type="text" id="node-media-url" value="${node.config.mediaUrl || ''}" placeholder="https://...">
-                        <button class="btn-secondary" style="padding:0 0.5rem; font-size:0.7rem; font-weight:700; white-space:nowrap;" onclick="triggerMediaPickerForNode('${node.type}')"><i class="fa-solid fa-folder-open"></i> Pick</button>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fa-solid ${node.type === 'video' ? 'fa-file-video' : (node.type === 'image' ? 'fa-image' : 'fa-file')}"></i> ${node.type.toUpperCase()} FILE</span>
+                        <span style="font-size:0.65rem; color:var(--text-light); font-weight:normal;">Direct Upload / Pick</span>
+                    </label>
+                    <div class="media-picker-box" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 12px; background: #f8fafc; text-align: center; position: relative;">
+                        <input type="hidden" id="node-media-url" value="${node.config.mediaUrl || ''}">
+                        <input type="file" id="node-media-file-input" accept="${mimeAccept}" style="display: none;" onchange="handleNodeMediaFileUpload(event, '${node.type}')">
+
+                        <div id="media-preview-container" style="display: ${node.config.mediaUrl ? 'block' : 'none'}; position: relative; margin-bottom: 6px;">
+                            ${node.type === 'video' && node.config.mediaUrl ? `
+                                <video src="${node.config.mediaUrl}" controls style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#000;"></video>
+                            ` : (node.type === 'image' && node.config.mediaUrl ? `
+                                <img src="${node.config.mediaUrl}" style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; object-fit:contain;">
+                            ` : `
+                                <div style="font-size:0.75rem; font-weight:700; color:#1e293b; word-break:break-all; background:#ffffff; padding:6px; border-radius:6px; border:1px solid #cbd5e1;">
+                                    ${node.config.mediaUrl ? node.config.mediaUrl.split('/').pop() : ''}
+                                </div>
+                            `)}
+                            <button type="button" style="position: absolute; top: -6px; right: -6px; background: rgba(239, 68, 68, 0.95); color: #ffffff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;" title="Remove File" onclick="removeNodeMediaFile(event)">&times;</button>
+                        </div>
+
+                        <div id="media-empty-box" style="display: ${node.config.mediaUrl ? 'none' : 'block'}; padding: 10px 4px; cursor: pointer;" onclick="openNodeFilePicker()">
+                            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.8rem; color: #6366f1; margin-bottom: 4px;"></i>
+                            <div style="font-size: 0.78rem; color: #475569; font-weight: 600;">Click to upload or choose ${node.type} file</div>
+                            <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 2px;">Direct file upload to server</div>
+                        </div>
+
+                        <div style="display: flex; gap: 6px; margin-top: 6px;">
+                            <button type="button" class="btn btn-secondary btn-sm" style="flex: 1; font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: #6366f1; color: #ffffff; font-weight: 600; border: none;" onclick="openNodeFilePicker()">
+                                <i class="fa-solid fa-upload"></i> <span id="btn-browse-media-text">${node.config.mediaUrl ? 'Change ' + node.type.toUpperCase() + ' File' : 'Upload / Pick ' + node.type.toUpperCase() + ' File'}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 ${node.type === 'document' ? `
@@ -3897,11 +3926,90 @@ document.addEventListener('DOMContentLoaded', () => {
         fitCanvasView();
         runLiveValidation();
     }, 200);
-    // Browser tab close / reload protection
-    window.addEventListener('beforeunload', (e) => {
-        if (hasUnsavedChanges) {
-            e.preventDefault();
-            e.returnValue = '';
+    // ─── Direct Media File Upload & Picker Handlers for Video / Image / Media Nodes
+    window.openNodeFilePicker = function(type) {
+        const input = document.getElementById('node-media-file-input');
+        if (input) input.click();
+    };
+
+    window.removeNodeMediaFile = function(e) {
+        if (e) e.stopPropagation();
+        const urlInput = document.getElementById('node-media-url');
+        const previewBox = document.getElementById('media-preview-container');
+        const emptyBox = document.getElementById('media-empty-box');
+        const browseText = document.getElementById('btn-browse-media-text');
+
+        if (urlInput) urlInput.value = '';
+        if (previewBox) previewBox.style.display = 'none';
+        if (emptyBox) emptyBox.style.display = 'block';
+        if (browseText) browseText.textContent = 'Upload / Pick File';
+    };
+
+    window.handleNodeMediaFileUpload = async function(event, type) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const browseText = document.getElementById('btn-browse-media-text');
+        if (browseText) browseText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', type || 'image');
+
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${window.API_URL}/chatbot/media/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Upload failed');
+            const data = await res.json();
+            const uploadedMedia = Array.isArray(data) ? data[0] : data;
+            const fileUrl = uploadedMedia.file_url || uploadedMedia.url || uploadedMedia.file_path;
+
+            const urlInput = document.getElementById('node-media-url');
+            const previewBox = document.getElementById('media-preview-container');
+            const emptyBox = document.getElementById('media-empty-box');
+
+            if (urlInput) urlInput.value = fileUrl;
+
+            const mediaType = (type || '').toLowerCase();
+            const isImg = mediaType === 'image' || (file && file.type && file.type.startsWith('image/'));
+            const isVid = mediaType === 'video' || (file && file.type && file.type.startsWith('video/'));
+            const isAud = mediaType === 'audio' || (file && file.type && file.type.startsWith('audio/'));
+
+            let previewHtml = '';
+            if (isImg) {
+                previewHtml = `<img src="${fileUrl}" style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; object-fit:contain; background:#ffffff;">`;
+            } else if (isVid) {
+                previewHtml = `<video src="${fileUrl}" controls style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#000;"></video>`;
+            } else if (isAud) {
+                previewHtml = `<audio src="${fileUrl}" controls style="width:100%; margin-top:8px;"></audio>`;
+            } else {
+                previewHtml = `
+                    <div style="font-size:0.75rem; font-weight:700; color:#1e293b; word-break:break-all; background:#ffffff; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+                        <i class="fa-solid fa-file-pdf" style="color:#ef4444; margin-right:4px;"></i> ${fileUrl.split('/').pop()}
+                    </div>
+                `;
+            }
+
+            if (previewBox) {
+                previewBox.innerHTML = `
+                    ${previewHtml}
+                    <button type="button" style="position: absolute; top: -6px; right: -6px; background: rgba(239, 68, 68, 0.95); color: #ffffff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;" title="Remove File" onclick="removeNodeMediaFile(event)">&times;</button>
+                `;
+                previewBox.style.display = 'block';
+            }
+            if (emptyBox) emptyBox.style.display = 'none';
+            if (browseText) browseText.textContent = 'Change File';
+
+            alert('File uploaded successfully!');
+        } catch (err) {
+            console.error('File upload error:', err);
+            alert('Error uploading file: ' + err.message);
+            if (browseText) browseText.textContent = 'Upload / Pick File';
         }
-    });
+    };
 });

@@ -468,11 +468,11 @@ exports.saveDraft = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Draft saved successfully' });
     } catch (err) {
-        await connection.rollback();
-        console.error('[SAVE DRAFT ERROR]', err);
+        try { await connection.rollback(); } catch (rbErr) {}
+        console.error('[SAVE DRAFT ERROR]', err.message);
         res.status(500).json({ message: 'Error saving draft' });
     } finally {
-        connection.release();
+        try { connection.release(); } catch (relErr) {}
     }
 };
 
@@ -484,19 +484,21 @@ exports.publishFlow = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // 1. Get draft version
-        const [versionRows] = await connection.query(
-            'SELECT version_id, version_number FROM chatbot_flow_versions WHERE flow_id = ? AND status = "draft" LIMIT 1',
+        // 1. Get draft version ID
+        const [verRows] = await connection.query(
+            'SELECT version_id, version_number FROM chatbot_flow_versions WHERE flow_id = ? AND status = "draft" ORDER BY version_id DESC LIMIT 1',
             [flowId]
         );
 
-        if (versionRows.length === 0) {
-            return res.status(400).json({ message: 'No draft found to publish' });
+        if (verRows.length === 0) {
+            try { await connection.rollback(); } catch (e) {}
+            return res.status(404).json({ message: 'No draft version found to publish' });
         }
-        const draftVersionId = versionRows[0].version_id;
-        const currentVerNum = parseFloat(versionRows[0].version_number);
 
-        // 2. Perform validation checks
+        const draftVersionId = verRows[0].version_id;
+        const currentVerNum = parseFloat(verRows[0].version_number) || 1.0;
+
+        // 2. Load draft nodes and edges for validation
         const [nodes] = await connection.query('SELECT * FROM chatbot_nodes WHERE version_id = ?', [draftVersionId]);
         const [edges] = await connection.query('SELECT * FROM chatbot_edges WHERE version_id = ?', [draftVersionId]);
 
@@ -533,7 +535,7 @@ exports.publishFlow = async (req, res) => {
         });
 
         if (errors.length > 0) {
-            await connection.rollback();
+            try { await connection.rollback(); } catch (e) {}
             return res.status(400).json({ message: 'Validation failed before publish', errors, warnings });
         }
 
@@ -580,11 +582,11 @@ exports.publishFlow = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Flow published successfully', active_version: currentVerNum, next_draft_version: nextVerNum });
     } catch (err) {
-        await connection.rollback();
-        console.error('[PUBLISH FLOW ERROR]', err);
+        try { await connection.rollback(); } catch (rbErr) {}
+        console.error('[PUBLISH FLOW ERROR]', err.message);
         res.status(500).json({ message: 'Error publishing flow' });
     } finally {
-        connection.release();
+        try { connection.release(); } catch (relErr) {}
     }
 };
 
@@ -599,6 +601,7 @@ exports.duplicateFlow = async (req, res) => {
         // Get original flow metadata
         const [flowRows] = await connection.query('SELECT * FROM chatbot_flows WHERE flow_id = ?', [flowId]);
         if (flowRows.length === 0) {
+            try { await connection.rollback(); } catch (e) {}
             return res.status(404).json({ message: 'Original flow not found' });
         }
         const orig = flowRows[0];
@@ -649,11 +652,11 @@ exports.duplicateFlow = async (req, res) => {
         await connection.commit();
         res.json({ duplicated_flow_id: newFlowId, message: 'Flow duplicated successfully' });
     } catch (err) {
-        await connection.rollback();
-        console.error('[DUPLICATE FLOW ERROR]', err);
+        try { await connection.rollback(); } catch (rbErr) {}
+        console.error('[DUPLICATE FLOW ERROR]', err.message);
         res.status(500).json({ message: 'Error duplicating flow' });
     } finally {
-        connection.release();
+        try { connection.release(); } catch (relErr) {}
     }
 };
 

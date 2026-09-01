@@ -12,30 +12,34 @@ class FlowEngine {
      * Waits for Meta double-tick (delivered / read) event before proceeding downstream
      */
     static async waitForMediaDelivery(sendRes) {
-        const metaMsgId = sendRes?.messages?.[0]?.id;
-        if (!metaMsgId) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            return;
+        try {
+            const metaMsgId = sendRes?.messages?.[0]?.id;
+            if (!metaMsgId) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                return;
+            }
+
+            console.log(`[FlowEngine] Waiting for Meta delivery confirmation for msg ${metaMsgId}...`);
+            await new Promise((resolve) => {
+                let timeoutId;
+                const onDelivered = (status) => {
+                    clearTimeout(timeoutId);
+                    console.log(`[FlowEngine] Delivery (${status}) CONFIRMED for msg ${metaMsgId}! Proceeding to next node...`);
+                    resolve();
+                };
+
+                deliveryNotifier.once(`delivered:${metaMsgId}`, onDelivered);
+
+                // Fallback timeout (max 3.5s) so downstream nodes (Product cards) execute quickly
+                timeoutId = setTimeout(() => {
+                    deliveryNotifier.removeListener(`delivered:${metaMsgId}`, onDelivered);
+                    console.log(`[FlowEngine] Delivery wait timeout (3.5s) reached for ${metaMsgId}. Proceeding to next node...`);
+                    resolve();
+                }, 3500);
+            });
+        } catch (e) {
+            console.error('[FlowEngine] waitForMediaDelivery error:', e.message);
         }
-
-        console.log(`[FlowEngine] Waiting for Meta double-tick (delivered/read) for msg ${metaMsgId}...`);
-        await new Promise((resolve) => {
-            let timeoutId;
-            const onDelivered = (status) => {
-                clearTimeout(timeoutId);
-                console.log(`[FlowEngine] Double-tick (${status}) CONFIRMED for msg ${metaMsgId}! Proceeding to next node...`);
-                resolve();
-            };
-
-            deliveryNotifier.once(`delivered:${metaMsgId}`, onDelivered);
-
-            // Fallback timeout in case Webhook is delayed or recipient is offline (max 8 seconds)
-            timeoutId = setTimeout(() => {
-                deliveryNotifier.removeListener(`delivered:${metaMsgId}`, onDelivered);
-                console.log(`[FlowEngine] Delivery wait fallback timeout (8s) reached for ${metaMsgId}. Proceeding...`);
-                resolve();
-            }, 8000);
-        });
     }
     /**
      * Helper to trigger human handoff, update lead status to 'human_needed', and dispatch notifications
@@ -316,9 +320,12 @@ class FlowEngine {
                 
                 // Find next node from choice edge source_handle or index port or option config
                 const sourcePortId = `port-${session.current_node_key}-out-${matchedOption.index}`;
+                const trimmedLabel = (matchedOption.label || '').trim();
+                const trimmedVal = (matchedOption.value || '').trim();
+
                 const [edgeRows] = await pool.query(
-                    'SELECT target_node_key FROM chatbot_edges WHERE version_id = ? AND source_node_key = ? AND (source_handle = ? OR source_handle = ? OR source_handle = ? OR source_handle IS NULL) ORDER BY id ASC LIMIT 1',
-                    [session.version_id, session.current_node_key, matchedOption.label, matchedOption.value, sourcePortId]
+                    'SELECT target_node_key FROM chatbot_edges WHERE version_id = ? AND source_node_key = ? AND (TRIM(source_handle) = ? OR TRIM(source_handle) = ? OR source_handle = ? OR source_handle IS NULL) ORDER BY (source_handle IS NOT NULL AND TRIM(source_handle) IN (?, ?)) DESC, id ASC LIMIT 1',
+                    [session.version_id, session.current_node_key, trimmedLabel, trimmedVal, sourcePortId, trimmedLabel, trimmedVal]
                 );
 
                 if (edgeRows.length > 0) {
@@ -522,81 +529,109 @@ class FlowEngine {
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
             } 
             else if (node.node_type === 'image') {
-                const imgUrl = config.mediaUrl || config.image_url || config.file_url || '';
-                const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
-                if (imgUrl) {
-                    const sendRes = await whatsappService.sendMediaMessage(session.phone, imgUrl, 'image', caption);
-                    await this.waitForMediaDelivery(sendRes);
-                } else if (caption) {
-                    await whatsappService.sendMessage(session.phone, caption);
+                try {
+                    const imgUrl = config.mediaUrl || config.image_url || config.file_url || '';
+                    const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
+                    if (imgUrl) {
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, imgUrl, 'image', caption);
+                        await this.waitForMediaDelivery(sendRes);
+                    } else if (caption) {
+                        await whatsappService.sendMessage(session.phone, caption);
+                    }
+                } catch (err) {
+                    console.error(`[FlowEngine] Error executing Image node ${currentKey}:`, err.message);
                 }
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
             }
             else if (node.node_type === 'video') {
-                const videoUrl = config.mediaUrl || config.video_url || config.file_url || '';
-                const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
-                if (videoUrl) {
-                    const sendRes = await whatsappService.sendMediaMessage(session.phone, videoUrl, 'video', caption);
-                    await this.waitForMediaDelivery(sendRes);
-                } else if (caption) {
-                    await whatsappService.sendMessage(session.phone, caption);
+                try {
+                    const videoUrl = config.mediaUrl || config.video_url || config.file_url || '';
+                    const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
+                    if (videoUrl) {
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, videoUrl, 'video', caption);
+                        await this.waitForMediaDelivery(sendRes);
+                    } else if (caption) {
+                        await whatsappService.sendMessage(session.phone, caption);
+                    }
+                } catch (err) {
+                    console.error(`[FlowEngine] Error executing Video node ${currentKey}:`, err.message);
                 }
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
             }
             else if (node.node_type === 'media' || node.node_type === 'document' || node.node_type === 'audio') {
-                const mediaUrl = config.mediaUrl || config.file_url || '';
-                const type = node.node_type === 'audio' ? 'audio' : 'document';
-                const caption = this.formatTextVariables(config.caption || config.filename || '', session.variables);
-                if (mediaUrl) {
-                    const sendRes = await whatsappService.sendMediaMessage(session.phone, mediaUrl, type, caption);
-                    await this.waitForMediaDelivery(sendRes);
+                try {
+                    const mediaUrl = config.mediaUrl || config.file_url || '';
+                    const type = node.node_type === 'audio' ? 'audio' : 'document';
+                    const caption = this.formatTextVariables(config.caption || config.filename || '', session.variables);
+                    if (mediaUrl) {
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, mediaUrl, type, caption);
+                        await this.waitForMediaDelivery(sendRes);
+                    }
+                } catch (err) {
+                    console.error(`[FlowEngine] Error executing Media node ${currentKey}:`, err.message);
                 }
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
             }
             else if (node.node_type === 'multi_media') {
-                const items = config.mediaItems || [];
-                const caption = this.formatTextVariables(config.caption || '', session.variables);
-                for (let i = 0; i < items.length; i++) {
-                    const itemUrl = items[i];
-                    if (itemUrl) {
-                        const sendRes = await whatsappService.sendMediaMessage(session.phone, itemUrl, 'image', i === 0 ? caption : '');
-                        await this.waitForMediaDelivery(sendRes);
+                try {
+                    const items = config.mediaItems || [];
+                    const caption = this.formatTextVariables(config.caption || '', session.variables);
+                    for (let i = 0; i < items.length; i++) {
+                        const itemUrl = items[i];
+                        if (itemUrl) {
+                            const sendRes = await whatsappService.sendMediaMessage(session.phone, itemUrl, 'image', i === 0 ? caption : '');
+                            await this.waitForMediaDelivery(sendRes);
+                        }
                     }
+                } catch (err) {
+                    console.error(`[FlowEngine] Error executing MultiMedia node ${currentKey}:`, err.message);
                 }
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
             }
             else if (node.node_type === 'product') {
-                let productName = config.product || config.name || '';
-                let priceText = config.price || '';
-                let description = config.desc || config.description || '';
-                let imageUrl = config.image || config.image_url || '';
+                try {
+                    let productName = config.product || config.name || '';
+                    let priceText = config.price || '';
+                    let description = config.desc || config.description || '';
+                    let imageUrl = config.image || config.image_url || '';
+                    if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+                        imageUrl = '';
+                    }
 
-                if ((!productName || !priceText) && config.productId) {
-                    const [catRows] = await pool.query('SELECT name, price, description, image_url FROM chatbot_products WHERE id = ?', [config.productId]);
-                    if (catRows.length > 0) {
-                        productName = productName || catRows[0].name;
-                        priceText = priceText || `₹${parseFloat(catRows[0].price).toLocaleString('en-IN')}`;
-                        description = description || catRows[0].description;
-                        imageUrl = imageUrl || catRows[0].image_url;
-                    } else {
-                        const [prodRows] = await pool.query('SELECT name, selling_price, description, image_url FROM products WHERE product_id = ?', [config.productId]);
-                        if (prodRows.length > 0) {
-                            productName = productName || prodRows[0].name;
-                            priceText = priceText || `₹${parseFloat(prodRows[0].selling_price).toLocaleString('en-IN')}`;
-                            description = description || prodRows[0].description;
-                            imageUrl = imageUrl || prodRows[0].image_url;
+                    if ((!productName || !priceText || !imageUrl) && config.productId) {
+                        const [catRows] = await pool.query('SELECT name, price, description, image_url FROM chatbot_products WHERE id = ?', [config.productId]);
+                        if (catRows.length > 0) {
+                            productName = productName || catRows[0].name;
+                            priceText = priceText || `₹${parseFloat(catRows[0].price).toLocaleString('en-IN')}`;
+                            description = description || catRows[0].description;
+                            imageUrl = imageUrl || (catRows[0].image_url && catRows[0].image_url.startsWith('http') ? catRows[0].image_url : '');
+                        } else {
+                            const [prodRows] = await pool.query('SELECT name, selling_price, description, image_url FROM products WHERE product_id = ?', [config.productId]);
+                            if (prodRows.length > 0) {
+                                productName = productName || prodRows[0].name;
+                                priceText = priceText || `₹${parseFloat(prodRows[0].selling_price).toLocaleString('en-IN')}`;
+                                description = description || prodRows[0].description;
+                                imageUrl = imageUrl || (prodRows[0].image_url && prodRows[0].image_url.startsWith('http') ? prodRows[0].image_url : '');
+                            }
                         }
                     }
-                }
 
-                productName = productName || node.name || 'Product Details';
-                const cardText = `📦 *${productName}*\n${priceText ? `Price: ${priceText}\n` : ''}\n${description || ''}`.trim();
+                    productName = productName || node.name || 'Product Details';
+                    const cardText = `📦 *${productName}*\n${priceText ? `Price: ${priceText}\n` : ''}\n${description || ''}`.trim();
 
-                if (imageUrl) {
-                    const sendRes = await whatsappService.sendMediaMessage(session.phone, imageUrl, 'image', cardText);
-                    await this.waitForMediaDelivery(sendRes);
-                } else {
-                    await whatsappService.sendMessage(session.phone, cardText);
+                    if (imageUrl && imageUrl.startsWith('http')) {
+                        try {
+                            const sendRes = await whatsappService.sendMediaMessage(session.phone, imageUrl, 'image', cardText);
+                            await this.waitForMediaDelivery(sendRes);
+                        } catch (mediaErr) {
+                            console.warn(`[FlowEngine] Image send failed for Product node ${currentKey}, falling back to text:`, mediaErr.message);
+                            await whatsappService.sendMessage(session.phone, cardText);
+                        }
+                    } else {
+                        await whatsappService.sendMessage(session.phone, cardText);
+                    }
+                } catch (err) {
+                    console.error(`[FlowEngine] Error executing Product node ${currentKey}:`, err.message);
                 }
 
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);

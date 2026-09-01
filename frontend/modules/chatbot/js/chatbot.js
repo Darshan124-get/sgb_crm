@@ -919,6 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (node.type === 'product') {
             const pSel = document.getElementById('node-p-select');
             if (pSel) node.config.product = pSel.value;
+            const pShowPrice = document.getElementById('node-p-showprice');
+            if (pShowPrice) node.config.showPrice = pShowPrice.checked;
             const pPrice = document.getElementById('node-p-price');
             if (pPrice) node.config.price = pPrice.value;
             const pDesc = document.getElementById('node-p-desc');
@@ -1023,6 +1025,8 @@ document.addEventListener('DOMContentLoaded', () => {
             node.config.choices = choices;
         } else if (node.type === 'product') {
             node.config.product = document.getElementById('node-p-select').value;
+            const pShowPrice = document.getElementById('node-p-showprice');
+            if (pShowPrice) node.config.showPrice = pShowPrice.checked;
             node.config.price = document.getElementById('node-p-price').value;
             node.config.desc = document.getElementById('node-p-desc').value;
             node.config.image = document.getElementById('node-p-image').value;
@@ -1611,8 +1615,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                 </div>
                 <div class="inspector-form-group">
-                    <label>Price Display</label>
-                    <input type="text" id="node-p-price" value="${node.config.price || ''}" placeholder="e.g. ₹12,000">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="margin:0; font-weight:600; color:#334155;">Price Display</label>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span id="price-toggle-status-lbl" style="font-size:0.7rem; font-weight:700; color:${node.config.showPrice !== false ? '#10b981' : '#94a3b8'};">${node.config.showPrice !== false ? 'ENABLED' : 'DISABLED'}</span>
+                            <input type="checkbox" id="node-p-showprice" ${node.config.showPrice !== false ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;" onchange="const lbl = document.getElementById('price-toggle-status-lbl'); const inp = document.getElementById('node-p-price'); if (lbl) { lbl.textContent = this.checked ? 'ENABLED' : 'DISABLED'; lbl.style.color = this.checked ? '#10b981' : '#94a3b8'; } if (inp) { inp.style.display = this.checked ? 'block' : 'none'; } window.saveSelectedNodeSettingsSilently();">
+                        </div>
+                    </div>
+                    <input type="text" id="node-p-price" value="${node.config.price || ''}" placeholder="e.g. ₹12,000" style="display: ${node.config.showPrice !== false ? 'block' : 'none'};">
                 </div>
                 <div class="inspector-form-group">
                     <label>Product Description</label>
@@ -1625,7 +1635,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </label>
                     <div class="product-image-picker-box" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 10px; background: #f8fafc; text-align: center; position: relative;">
                         <input type="hidden" id="node-p-image" value="${node.config.image || ''}">
-                        <input type="file" id="node-p-file-input" accept="image/*" style="display: none;">
+                        <input type="file" id="node-p-file-input" accept="image/*" style="display: none;" onchange="handleProductFileUpload(event)">
 
                         <div id="product-img-preview-container" style="display: ${node.config.image ? 'block' : 'none'}; position: relative; margin-bottom: 6px;">
                             <img id="product-img-preview" src="${node.config.image || 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3C/svg%3E'}" crossorigin="anonymous" onerror="this.style.display='none';" style="max-width: 100%; max-height: 140px; border-radius: 6px; object-fit: contain; border: 1px solid #e2e8f0; background: #ffffff; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -3930,6 +3940,70 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openNodeFilePicker = function(type) {
         const input = document.getElementById('node-media-file-input');
         if (input) input.click();
+    };
+
+    window.openProductFilePicker = function() {
+        const input = document.getElementById('node-p-file-input');
+        if (input) input.click();
+    };
+
+    window.removeProductImage = function(e) {
+        if (e) e.stopPropagation();
+        const hiddenInp = document.getElementById('node-p-image');
+        const previewContainer = document.getElementById('product-img-preview-container');
+        const emptyBox = document.getElementById('product-img-empty-box');
+        const browseText = document.getElementById('btn-browse-p-text');
+
+        if (hiddenInp) hiddenInp.value = '';
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (emptyBox) emptyBox.style.display = 'block';
+        if (browseText) browseText.textContent = 'Choose Image File';
+        window.saveSelectedNodeSettingsSilently();
+    };
+
+    window.handleProductFileUpload = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const browseText = document.getElementById('btn-browse-p-text');
+        if (browseText) browseText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', 'image');
+
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${window.API_URL}/chatbot/media/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Upload failed');
+            const data = await res.json();
+            const uploadedMedia = Array.isArray(data) ? data[0] : data;
+            const fileUrl = uploadedMedia.file_url || uploadedMedia.url || uploadedMedia.file_path;
+
+            const hiddenInp = document.getElementById('node-p-image');
+            const previewImg = document.getElementById('product-img-preview');
+            const previewContainer = document.getElementById('product-img-preview-container');
+            const emptyBox = document.getElementById('product-img-empty-box');
+
+            if (hiddenInp) hiddenInp.value = fileUrl;
+            if (previewImg) {
+                previewImg.src = fileUrl;
+                previewImg.style.display = 'block';
+            }
+            if (previewContainer) previewContainer.style.display = 'block';
+            if (emptyBox) emptyBox.style.display = 'none';
+            if (browseText) browseText.textContent = 'Change Image';
+
+            window.saveSelectedNodeSettingsSilently();
+        } catch (err) {
+            console.error('[PRODUCT IMAGE UPLOAD ERROR]', err);
+            if (browseText) browseText.textContent = 'Choose Image File';
+        }
     };
 
     window.removeNodeMediaFile = function(e) {

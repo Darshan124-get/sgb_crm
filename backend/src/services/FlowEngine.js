@@ -139,7 +139,7 @@ class FlowEngine {
             WHERE f.status = "active" AND f.active_version_id IS NOT NULL AND n.node_type = "start"
         `);
 
-        // Check if incoming message matches an explicit Flow Trigger Keyword or Campaign Tagline
+        // Check if incoming message matches an explicit Flow Trigger Keyword or Campaign Tagline (STRICT EXACT MATCH ONLY)
         let matchedFlow = null;
         if (cleanedText) {
             for (const f of flows) {
@@ -148,17 +148,18 @@ class FlowEngine {
                     const keywordStr = config.keywords || config.campaignTagline || '';
                     if (keywordStr) {
                         const words = keywordStr.split(/,|\n/).map(w => w.trim().toLowerCase()).filter(Boolean);
-                        if (words.some(w => cleanedText === w || cleanedText.includes(w) || w.includes(cleanedText))) {
+                        // Strict exact match: incoming message must equal keyword/tagline exactly
+                        if (words.some(w => cleanedText === w)) {
                             // Check if this tagline/keyword is linked to a Campaign in the database
                             const [campaignRows] = await pool.query(
-                                'SELECT id, status, campaign_id, tag_line FROM campaigns WHERE LOWER(TRIM(tag_line)) = LOWER(TRIM(?)) OR LOWER(TRIM(?)) LIKE CONCAT("%", LOWER(TRIM(tag_line)), "%")',
+                                'SELECT id, status, campaign_id, tag_line FROM campaigns WHERE LOWER(TRIM(tag_line)) = LOWER(TRIM(?)) OR LOWER(TRIM(tag_line)) = LOWER(TRIM(?))',
                                 [keywordStr, cleanedText]
                             );
 
                             if (campaignRows.length > 0) {
                                 const activeCampaign = campaignRows.find(c => (c.status || '').toLowerCase() === 'active');
                                 if (!activeCampaign) {
-                                    console.log(`[FlowEngine] Tagline matched Campaign "${campaignRows[0].campaign_id}", but Campaign status is "${campaignRows[0].status}". Both Campaign AND Flow MUST be active! Skipping flow execution.`);
+                                    console.log(`[FlowEngine] Tagline exact-matched Campaign "${campaignRows[0].campaign_id}", but Campaign status is "${campaignRows[0].status}". Both Campaign AND Flow MUST be active! Skipping flow execution.`);
                                     continue; // Skip flow because campaign is inactive
                                 }
                             }
@@ -212,17 +213,6 @@ class FlowEngine {
             if (humanEscapes.some(h => cleanedText.includes(h))) {
                 await this.triggerHumanTakeover(phone, 'Customer typed human escape keyword');
                 return;
-            }
-
-            // Optional explicit Default trigger (ONLY if triggerType is explicitly set to 'Default' and no keywords set)
-            if (!matchedFlow && flows.length > 0) {
-                const explicitDefaultFlow = flows.find(f => {
-                    const cfg = typeof f.config === 'string' ? JSON.parse(f.config) : f.config;
-                    return cfg && cfg.triggerType === 'Default' && !cfg.keywords;
-                });
-                if (explicitDefaultFlow) {
-                    matchedFlow = explicitDefaultFlow;
-                }
             }
 
             if (matchedFlow) {
@@ -591,33 +581,37 @@ class FlowEngine {
             else if (node.node_type === 'product') {
                 try {
                     let productName = config.product || config.name || '';
-                    let priceText = config.price || '';
                     let description = config.desc || config.description || '';
                     let imageUrl = config.image || config.image_url || '';
+
                     if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
                         imageUrl = '';
                     }
 
-                    if ((!productName || !priceText || !imageUrl) && config.productId) {
-                        const [catRows] = await pool.query('SELECT name, price, description, image_url FROM chatbot_products WHERE id = ?', [config.productId]);
-                        if (catRows.length > 0) {
-                            productName = productName || catRows[0].name;
-                            priceText = priceText || `₹${parseFloat(catRows[0].price).toLocaleString('en-IN')}`;
-                            description = description || catRows[0].description;
-                            imageUrl = imageUrl || (catRows[0].image_url && catRows[0].image_url.startsWith('http') ? catRows[0].image_url : '');
-                        } else {
-                            const [prodRows] = await pool.query('SELECT name, selling_price, description, image_url FROM products WHERE product_id = ?', [config.productId]);
-                            if (prodRows.length > 0) {
-                                productName = productName || prodRows[0].name;
-                                priceText = priceText || `₹${parseFloat(prodRows[0].selling_price).toLocaleString('en-IN')}`;
-                                description = description || prodRows[0].description;
-                                imageUrl = imageUrl || (prodRows[0].image_url && prodRows[0].image_url.startsWith('http') ? prodRows[0].image_url : '');
-                            }
+                    // Look up catalog details ONLY if fields are missing
+                    let catRows = [];
+                    if (config.productId) {
+                        [catRows] = await pool.query('SELECT name, description, image_url FROM chatbot_products WHERE id = ?', [config.productId]);
+                    }
+                    if (catRows.length === 0 && productName) {
+                        [catRows] = await pool.query('SELECT name, description, image_url FROM chatbot_products WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))', [productName]);
+                    }
+                    if (catRows.length > 0) {
+                        productName = productName || catRows[0].name;
+                        description = description || catRows[0].description;
+                        // ONLY use catalog image_url if node config image is completely empty
+                        if (!imageUrl && catRows[0].image_url && catRows[0].image_url.startsWith('http')) {
+                            imageUrl = catRows[0].image_url;
                         }
                     }
 
                     productName = productName || node.name || 'Product Details';
-                    const cardText = `📦 *${productName}*\n${priceText ? `Price: ${priceText}\n` : ''}\n${description || ''}`.trim();
+
+                    // Format card text COMPLETELY WITHOUT price line
+                    let cardText = `📦 *${productName}*`;
+                    if (description && description.trim()) {
+                        cardText += `\n\n${description.trim()}`;
+                    }
 
                     if (imageUrl && imageUrl.startsWith('http')) {
                         try {

@@ -13,7 +13,7 @@ const phoneNumberId = process.env.PHONE_NUMBER_ID;
 /**
  * Sends a text message to a WhatsApp recipient
  */
-const sendMessage = async (to, text, replyToMessageId = null) => {
+const sendMessage = async (to, text, replyToMessageId = null, senderId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     const data = {
@@ -36,7 +36,7 @@ const sendMessage = async (to, text, replyToMessageId = null) => {
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
-    await messageService.logChatMessage(to, 'outgoing', 'text', text, null, null, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot message:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', 'text', text, null, null, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot message:', err.message));
 
     logger.info(`Text message sent to ${to}: ${response.status}`);
     return response.data;
@@ -111,7 +111,7 @@ const getOrCreateMetaMediaId = async (url, type) => {
 /**
  * Sends a media message using a media_id or pre-uploaded URL
  */
-const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null) => {
+const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null, senderId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     let resolvedMediaId = mediaId;
@@ -149,7 +149,7 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
     const mimeType = type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf'));
-    await messageService.logChatMessage(to, 'outgoing', type, caption || '', isUrl ? mediaId : null, mimeType, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot media message:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', type, caption || '', isUrl ? mediaId : null, mimeType, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot media message:', err.message));
 
     return response.data;
   } catch (err) {

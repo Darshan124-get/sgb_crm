@@ -2124,10 +2124,10 @@ function renderMessages(history) {
 
         let senderTagHtml = '';
         if (msg.direction === 'outgoing') {
-            const isBot = !msg.sender_id || msg.sender_name === 'Chatbot';
+            const isBot = msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1;
             if (isBot) {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
-            } else if (msg.sender_name) {
+            } else if (msg.sender_name && msg.sender_name !== 'Staff') {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px;">${msg.sender_name}</div>`;
             }
         }

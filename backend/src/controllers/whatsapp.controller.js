@@ -151,8 +151,8 @@ const receiveMessage = async (req, res) => {
               for (const campaign of campaigns) {
                 if (campaign.tag_line) {
                   const tagLine = campaign.tag_line.toLowerCase().trim();
-                  // Check if the input contains the tag line or exactly matches
-                  if (tagLine && (normalizedInput.includes(tagLine) || normalizedInput === tagLine)) {
+                  // STRICT EXACT MATCH ONLY: message must equal campaign tag_line exactly
+                  if (tagLine && normalizedInput === tagLine) {
                     matchedCampaign = campaign;
                     break;
                   }
@@ -232,6 +232,7 @@ const getHistory = async (req, res) => {
  */
 const sendReply = async (req, res) => {
   const { phone, message, mediaData, mimeType, reply_to_chat_id, is_forwarded } = req.body;
+  const staffUserId = req.user ? (req.user.id || req.user.user_id) : null;
 
   if (!phone || (!message && !mediaData)) {
     return res.status(400).json({ error: 'Phone and either message or media are required' });
@@ -263,12 +264,12 @@ const sendReply = async (req, res) => {
       }
 
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId);
+      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId);
     }
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMessage(waPhone, message, replyToMessageId);
+      await whatsappService.sendMessage(waPhone, message, replyToMessageId, staffUserId);
     }
 
     // Auto-resolve handoff if active for this customer

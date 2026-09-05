@@ -44,6 +44,9 @@ exports.getLeads = async (req, res) => {
             } else {
                 query += ' AND l.status = ?';
                 params.push(status);
+                if (status === 'new') {
+                    query += ' AND l.assigned_to IS NULL';
+                }
             }
         }
 
@@ -718,6 +721,7 @@ exports.transferLead = async (req, res) => {
 exports.getStats = async (req, res) => {
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
+    const search = req.query.search ? req.query.search.trim() : '';
 
     try {
         let baseWhere = 'WHERE 1=1';
@@ -728,13 +732,20 @@ exports.getStats = async (req, res) => {
             params.push(userId);
         }
 
-        const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, params);
-        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, params);
-        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, params);
-        const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, params);
-        const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, params);
-        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "new"`, params);
-        const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, params);
+        if (search) {
+            baseWhere += ' AND (customer_name LIKE ? OR phone_number LIKE ? OR first_message LIKE ?)';
+            const escapedSearch = search.replace(/[%_]/g, '\\$&');
+            const searchVal = `%${escapedSearch}%`;
+            params.push(searchVal, searchVal, searchVal);
+        }
+
+        const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, [...params]);
+        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, [...params]);
+        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, [...params]);
+        const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, [...params]);
+        const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, [...params]);
+        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "new" AND assigned_to IS NULL`, [...params]);
+        const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, [...params]);
 
         res.json({
             all: all[0].count,
@@ -763,7 +774,7 @@ exports.bulkAssign = async (req, res) => {
 
         // 1. Bulk Update Leads table
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
+            'UPDATE leads SET assigned_to = ?, status = CASE WHEN status = "new" OR status IS NULL OR status = "" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
             [staffId, leadIds]
         );
 

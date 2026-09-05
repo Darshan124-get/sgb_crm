@@ -414,15 +414,19 @@ function initSidebar(links) {
 const API_URL = window.API_URL || 'http://localhost:5000/api';
 
 // ─── Lead Stats Badge Updater ─────────────────────────────────
-async function updateLeadStats() {
+async function updateLeadStats(searchQuery = '') {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) return null;
 
     try {
-        const response = await fetch(`${API_URL}/leads/stats`, {
+        let url = `${API_URL}/leads/stats`;
+        if (searchQuery) {
+            url += `?search=${encodeURIComponent(searchQuery)}`;
+        }
+        const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (response.status === 401 || response.status === 403) { window.doLogout(); return; }
+        if (response.status === 401 || response.status === 403) { window.doLogout(); return null; }
         if (response.ok) {
             const stats = await response.json();
             const badgeMap = {
@@ -437,12 +441,138 @@ async function updateLeadStats() {
             Object.entries(badgeMap).forEach(([id, val]) => {
                 const el = document.getElementById(id);
                 if (el) {
-                    el.textContent = val || '0';
-                    el.style.display = val > 0 ? 'inline-flex' : 'none';
+                    const count = val !== undefined ? val : 0;
+                    el.textContent = count;
+                    el.style.display = 'inline-flex';
+                    if (searchQuery) {
+                        el.style.background = count > 0 ? '#10b981' : '#e2e8f0';
+                        el.style.color = count > 0 ? '#ffffff' : '#64748b';
+                    } else {
+                        el.style.background = '';
+                        el.style.color = '';
+                    }
                 }
             });
+            return stats;
         }
     } catch (err) { console.error('Error fetching stats:', err); }
+    return null;
+}
+
+let leadSearchDebounceTimer = null;
+function setupLeadSearchInput() {
+    const searchInput = document.getElementById('leadSearch');
+    if (!searchInput) return;
+
+    if (!document.getElementById('leadSearchStyles')) {
+        const style = document.createElement('style');
+        style.id = 'leadSearchStyles';
+        style.innerHTML = `
+            .search-bar {
+                position: relative !important;
+                display: flex !important;
+                align-items: center !important;
+            }
+            .search-bar input {
+                padding-right: 2.2rem !important;
+            }
+            .search-bar .clear-search-btn {
+                position: absolute;
+                right: 0.75rem;
+                cursor: pointer;
+                color: #94a3b8;
+                font-size: 0.9rem;
+                padding: 2px;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+                display: none;
+                z-index: 10;
+            }
+            .search-bar .clear-search-btn:hover {
+                color: #ef4444;
+                background: #fee2e2;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const searchBar = searchInput.closest('.search-bar');
+    if (searchBar) {
+        let clearBtn = searchBar.querySelector('.clear-search-btn');
+        if (!clearBtn) {
+            clearBtn = document.createElement('i');
+            clearBtn.className = 'fa-solid fa-circle-xmark clear-search-btn';
+            clearBtn.id = 'leadSearchClear';
+            clearBtn.title = 'Clear search';
+            searchBar.appendChild(clearBtn);
+        }
+
+        clearBtn.style.display = searchInput.value.trim().length > 0 ? 'inline-block' : 'none';
+
+        clearBtn.onclick = (e) => {
+            e.stopPropagation();
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            searchInput.focus();
+            triggerLeadSearch('');
+        };
+    }
+
+    if (!searchInput.dataset.listenerSet) {
+        searchInput.dataset.listenerSet = 'true';
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            const searchBar = searchInput.closest('.search-bar');
+            const clearBtn = searchBar ? searchBar.querySelector('.clear-search-btn') : null;
+
+            if (clearBtn) {
+                clearBtn.style.display = query.length > 0 ? 'inline-block' : 'none';
+            }
+
+            clearTimeout(leadSearchDebounceTimer);
+            leadSearchDebounceTimer = setTimeout(() => {
+                triggerLeadSearch(query);
+            }, 250);
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(leadSearchDebounceTimer);
+                triggerLeadSearch(searchInput.value.trim());
+            }
+        });
+    }
+}
+
+async function triggerLeadSearch(query) {
+    const stats = await updateLeadStats(query);
+
+    const activeTab = document.querySelector('.nav-tab.active');
+    const activeFilter = activeTab ? activeTab.getAttribute('data-filter') : 'all';
+
+    if (query && stats) {
+        const activeCount = stats[activeFilter] || 0;
+        if (activeCount === 0 && stats.all > 0) {
+            let targetFilter = 'all';
+            const filterOrder = ['all', 'open', 'today', 'hot', 'followup', 'new', 'lost'];
+            for (const f of filterOrder) {
+                if (stats[f] > 0) {
+                    targetFilter = f;
+                    break;
+                }
+            }
+            const targetTab = document.querySelector(`.nav-tab[data-filter="${targetFilter}"]`);
+            if (targetTab && targetTab !== activeTab) {
+                targetTab.click();
+                return;
+            }
+        }
+    }
+
+    if (typeof window.initLeadList === 'function' && window.currentBaseFilters) {
+        window.initLeadList(window.currentBaseFilters);
+    }
 }
 
 // ─── Lead Navigation ──────────────────────────────────────────
@@ -474,7 +604,11 @@ function initLeadNav() {
         });
     });
 
-    updateLeadStats();
+    setupLeadSearchInput();
+    const searchInput = document.getElementById('leadSearch');
+    const currentQuery = searchInput ? searchInput.value.trim() : '';
+    updateLeadStats(currentQuery);
+
     const todayTab = document.querySelector('.nav-tab[data-filter="today"]') || document.querySelector('.nav-tab[data-filter="all"]');
     if (todayTab) todayTab.click();
 
@@ -490,7 +624,7 @@ window.goBackToLeadsList = async function () {
     const contentArea = document.getElementById('lead-content-area');
     if (contentArea) {
         await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => {
-            initLeadList(window.currentFilters || window.currentBaseFilters || {});
+            initLeadList(window.currentBaseFilters || {});
         });
     }
 };
@@ -583,7 +717,9 @@ async function initLeadList(filters = {}, page = 1) {
     }
 
     // ─── Filter Setup ───
-    const searchInput = document.getElementById('leadSearch');    const statusF = document.getElementById('leadStatusFilter');
+    setupLeadSearchInput();
+    const searchInput = document.getElementById('leadSearch');
+    const statusF = document.getElementById('leadStatusFilter');
     const scoreF = document.getElementById('leadScoreFilter');
     const priorityF = document.getElementById('leadPriorityFilter');
     const staffF = document.getElementById('leadStaffFilter');
@@ -690,6 +826,13 @@ async function initLeadList(filters = {}, page = 1) {
                 if (dateF._flatpickr) {
                     dateF._flatpickr.clear();
                 }
+            }
+            if (searchInput) {
+                searchInput.value = '';
+                const searchBar = searchInput.closest('.search-bar');
+                const clearBtn = searchBar ? searchBar.querySelector('.clear-search-btn') : null;
+                if (clearBtn) clearBtn.style.display = 'none';
+                updateLeadStats('');
             }
             initLeadList(window.currentBaseFilters);
         };
@@ -1061,35 +1204,64 @@ window.clearSelection = function () {
 
 // ─── Manual Bulk Assignment ──────────────────────────────────
 window.openBulkAssignModal = async function () {
+    if (!window.currentSelectedLeadIds || window.currentSelectedLeadIds.length === 0) {
+        return window.showAlert("No Selection", "Please select at least one lead.", "info");
+    }
+
+    const selectedLeads = (window.currentLeadsList || []).filter(l => window.currentSelectedLeadIds.includes(l.lead_id));
+    const alreadyAssigned = selectedLeads.filter(l => l.assigned_to && l.assigned_to_name && l.assigned_to_name.toLowerCase() !== 'unassigned');
+
     const token = localStorage.getItem('token');
     try {
-        // Fetch staff to choose from
         const response = await fetch(`${API_URL}/users/sales`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const allUsers = await response.json();
         const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
 
+        let warningHtml = '';
+        if (alreadyAssigned.length > 0) {
+            const listItems = alreadyAssigned.map(l => 
+                `<li style="margin-bottom: 4px;">• <strong>${l.customer_name || 'Lead'}</strong> (${l.phone_number || '-'}) is already assigned to <strong>${l.assigned_to_name}</strong></li>`
+            ).join('');
+            
+            warningHtml = `
+                <div style="margin-bottom: 1.25rem; padding: 0.85rem 1rem; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; font-size: 0.85rem; color: #9a3412;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.4rem; color: #c2410c;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 1rem;"></i> Warning: ${alreadyAssigned.length} selected lead(s) are already assigned!
+                    </div>
+                    <ul style="list-style: none; margin: 0; padding: 0; line-height: 1.4;">
+                        ${listItems}
+                    </ul>
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #c2410c;">
+                        Check before re-assigning to avoid duplicate assignments.
+                    </div>
+                </div>
+            `;
+        }
+
         const content = `
-            <div style="padding: 1.5rem; background: #fff;">
-                <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; display: flex; align-items: center; gap: 0.75rem;">
-                    <i class="fas fa-users-gear" style="color: #16a34a; font-size: 1.25rem;"></i>
-                    <p style="margin: 0; color: #166534; font-weight: 600;">Assigning ${window.currentSelectedLeadIds.length} leads</p>
+            <div style="padding: 1.25rem; background: #fff;">
+                <div style="margin-bottom: 1.25rem; padding: 0.85rem 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fas fa-users-gear" style="color: #16a34a; font-size: 1.2rem;"></i>
+                    <p style="margin: 0; color: #166534; font-weight: 600;">Assigning ${window.currentSelectedLeadIds.length} selected lead(s)</p>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 2rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; color: #475569; font-weight: 700; font-size: 0.875rem;">SELECT TEAM MEMBER</label>
-                    <select id="bulkStaffSelect" class="form-control-premium" style="width: 100%; border: 1px solid #e2e8f0;">
+                ${warningHtml}
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #475569; font-weight: 700; font-size: 0.85rem;">SELECT TEAM MEMBER</label>
+                    <select id="bulkStaffSelect" class="form-control-premium" style="width: 100%; border: 1px solid #cbd5e1; padding: 0.6rem; border-radius: 8px;">
                         <option value="">Choose a staff member...</option>
                         ${users.map(u => `<option value="${u.user_id}">${u.name} — ${u.language || 'General'}</option>`).join('')}
                     </select>
                 </div>
 
-                <div style="display: flex; gap: 1rem;">
-                    <button onclick="performBulkAssign()" class="btn" style="flex: 2; height: 48px; background: #059669; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700;">
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="performBulkAssign()" class="btn" style="flex: 2; height: 44px; background: #059669; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; border-radius: 8px;">
                         <i class="fas fa-check-circle"></i> Confirm Assignment
                     </button>
-                    <button onclick="window.hideModal()" class="btn btn-outline" style="flex: 1; height: 48px; font-weight: 600;">Cancel</button>
+                    <button onclick="window.hideModal()" class="btn btn-outline" style="flex: 1; height: 44px; font-weight: 600; border-radius: 8px;">Cancel</button>
                 </div>
             </div>
         `;
@@ -1100,9 +1272,18 @@ window.openBulkAssignModal = async function () {
 };
 
 window.autoAssignSelected = async function () {
-    if (window.currentSelectedLeadIds.length === 0) return window.showAlert("No Selection", "Please select at least one lead.", "info");
+    if (!window.currentSelectedLeadIds || window.currentSelectedLeadIds.length === 0) return window.showAlert("No Selection", "Please select at least one lead.", "info");
 
-    if (!confirm(`Are you sure you want to let the system auto-assign these ${window.currentSelectedLeadIds.length} leads based on language?`)) return;
+    const selectedLeads = (window.currentLeadsList || []).filter(l => window.currentSelectedLeadIds.includes(l.lead_id));
+    const alreadyAssigned = selectedLeads.filter(l => l.assigned_to && l.assigned_to_name && l.assigned_to_name.toLowerCase() !== 'unassigned');
+
+    let confirmMsg = `Are you sure you want to let the system auto-assign these ${window.currentSelectedLeadIds.length} lead(s) based on language?`;
+    if (alreadyAssigned.length > 0) {
+        const details = alreadyAssigned.map(l => `• ${l.customer_name || 'Lead'} (${l.phone_number || '-'}) is already assigned to ${l.assigned_to_name}`).join('\n');
+        confirmMsg = `Notice: ${alreadyAssigned.length} selected lead(s) are ALREADY ASSIGNED:\n\n${details}\n\nDo you still want to re-assign them?`;
+    }
+
+    if (!confirm(confirmMsg)) return;
 
     const token = localStorage.getItem('token');
     try {
@@ -1118,8 +1299,10 @@ window.autoAssignSelected = async function () {
         if (response.ok) {
             const result = await response.json();
             window.currentSelectedLeadIds = [];
-            initLeadList(window.currentFilters || {});
-            updateLeadStats();
+            if (typeof clearSelection === 'function') clearSelection();
+            const currentSearch = document.getElementById('leadSearch')?.value.trim() || '';
+            updateLeadStats(currentSearch);
+            initLeadList(window.currentBaseFilters || {});
             window.showAlert("Success", `Auto-assignment complete: ${result.count} leads assigned.`, "success");
         } else {
             const err = await response.json();
@@ -1134,11 +1317,23 @@ window.performBulkAssign = async function () {
     const staffId = document.getElementById('bulkStaffSelect').value;
     if (!staffId) return alert('Please select a staff member.');
 
+    const selectedLeads = (window.currentLeadsList || []).filter(l => (window.currentSelectedLeadIds || []).includes(l.lead_id));
+    const alreadyAssigned = selectedLeads.filter(l => l.assigned_to && l.assigned_to_name && l.assigned_to_name.toLowerCase() !== 'unassigned');
+
+    if (alreadyAssigned.length > 0) {
+        const details = alreadyAssigned.map(l => `• ${l.customer_name || 'Lead'} (${l.phone_number || '-'}) is currently assigned to ${l.assigned_to_name}`).join('\n');
+        if (!confirm(`Warning: ${alreadyAssigned.length} of the selected lead(s) are already assigned:\n\n${details}\n\nDo you still want to re-assign them?`)) {
+            return;
+        }
+    }
+
     const token = localStorage.getItem('token');
     const btn = document.querySelector('#globalModal .btn');
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Assigning...';
+    const originalText = btn ? btn.textContent : 'Assign';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Assigning...';
+    }
 
     try {
         const response = await fetch(`${API_URL}/leads/bulk-assign`, {
@@ -1155,9 +1350,11 @@ window.performBulkAssign = async function () {
 
         if (response.ok) {
             window.currentSelectedLeadIds = [];
+            if (typeof clearSelection === 'function') clearSelection();
             window.hideModal();
-            initLeadList(window.currentFilters || {});
-            updateLeadStats();
+            const currentSearch = document.getElementById('leadSearch')?.value.trim() || '';
+            updateLeadStats(currentSearch);
+            initLeadList(window.currentBaseFilters || {});
             window.showAlert("Success", "Leads assigned successfully!", "success");
         } else {
             const err = await response.json();
@@ -1166,8 +1363,10 @@ window.performBulkAssign = async function () {
     } catch (err) {
         alert('Failed to connect to server.');
     } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
     }
 };
 
@@ -1196,8 +1395,10 @@ window.bulkUnassignLeads = async function () {
         if (response.ok) {
             const result = await response.json();
             window.currentSelectedLeadIds = [];
-            initLeadList(window.currentFilters || {});
-            updateLeadStats();
+            if (typeof clearSelection === 'function') clearSelection();
+            const currentSearch = document.getElementById('leadSearch')?.value.trim() || '';
+            updateLeadStats(currentSearch);
+            initLeadList(window.currentBaseFilters || {});
             window.showAlert("Success", `Successfully unassigned ${result.count} leads.`, "success");
         } else {
             const err = await response.json();
@@ -1849,9 +2050,22 @@ window.changeAssigneeFromDetails = async function () {
         const allUsers = await response.json();
         const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
 
+        let warningHtml = '';
+        if (window.currentLeadData && window.currentLeadData.assigned_to_name && window.currentLeadData.assigned_to_name.toLowerCase() !== 'unassigned') {
+            warningHtml = `
+                <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; font-size: 0.825rem; color: #9a3412;">
+                    <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: #c2410c; margin-bottom: 0.25rem;">
+                        <i class="fas fa-exclamation-triangle"></i> Notice: Lead Already Assigned
+                    </div>
+                    This lead (<strong>${window.currentLeadData.customer_name || window.currentLeadData.phone_number || 'Lead'}</strong>) is currently assigned to <strong>${window.currentLeadData.assigned_to_name}</strong>. Re-assigning will transfer ownership.
+                </div>
+            `;
+        }
+
         const content = `
             <div style="padding: 1rem;">
-                <p style="margin-bottom: 1rem; color: #64748b;">Assign this lead to a staff member:</p>
+                ${warningHtml}
+                <p style="margin-bottom: 0.75rem; color: #475569; font-weight: 600; font-size: 0.875rem;">Assign this lead to a staff member:</p>
                 <select id="singleStaffSelect" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <option value="">Select Staff Member...</option>
                     ${users.map(u => {
@@ -1861,8 +2075,8 @@ window.changeAssigneeFromDetails = async function () {
         }).join('')}
                 </select>
                 <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                    <button onclick="performSingleAssign(${leadId})" class="btn" style="flex: 2; background: #059669; color: white;">Confirm Change</button>
-                    <button onclick="window.hideModal()" class="btn btn-outline" style="flex: 1;">Cancel</button>
+                    <button onclick="performSingleAssign(${leadId})" class="btn" style="flex: 2; background: #059669; color: white; font-weight: 700;">Confirm Change</button>
+                    <button onclick="window.hideModal()" class="btn btn-outline" style="flex: 1; font-weight: 600;">Cancel</button>
                 </div>
             </div>
         `;

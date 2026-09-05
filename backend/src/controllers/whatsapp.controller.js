@@ -249,7 +249,7 @@ const sendReply = async (req, res) => {
     }
 
     // Determine type: text vs media
-    const category = mimeType ? (mimeType.startsWith('image/') ? 'image' : (mimeType.startsWith('video/') ? 'video' : (mimeType.startsWith('audio/') ? 'audio' : 'document'))) : null;
+    const category = mimeType ? (mimeType.startsWith('image') ? 'image' : (mimeType.startsWith('video') ? 'video' : (mimeType.startsWith('audio') ? 'audio' : 'document'))) : null;
 
     // 1. Handle Media Sending
     if (mediaData && category) {

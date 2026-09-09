@@ -345,9 +345,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         tbody.innerHTML = '';
-        allRoles.forEach(role => {
-            // Placeholder values for permissions and users counts since we don't fetch them currently
-            const permissionsCount = Math.floor(Math.random() * 50) + 10; // Mock data
+            let permsObj = role.default_permissions || role.permissions || {};
+            if (typeof permsObj === 'string') {
+                try { permsObj = JSON.parse(permsObj); } catch(e) { permsObj = {}; }
+            }
+            const permissionsCount = Array.isArray(permsObj) ? permsObj.length : Object.keys(permsObj).length;
             const usersCount = allUsers ? allUsers.filter(u => u.role_id === role.role_id).length : 0; // Actual data based on fetched users, if available
 
             const statusBadge = role.status === 'inactive' 

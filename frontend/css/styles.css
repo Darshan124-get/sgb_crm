@@ -41,6 +41,14 @@ body {
     color: var(--text-main);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+/* Hide number input native spinners (up/down arrows) */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type=number] {
+    -moz-appearance: textfield;
 }
 
 /* Premium Utility Classes */
@@ -569,7 +577,32 @@ body {
     font-weight: 600;
 }
 
-/* CRM Pipeline Status Badges */
+/* CRM Pipeline & Order Status Badges */
+.status-pill {
+    padding: 0.3rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.725rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border: 1px solid transparent;
+    box-shadow: none !important;
+    white-space: nowrap;
+}
+.status-pill.active { background: #ECFDF5 !important; color: #059669 !important; border-color: #A7F3D0 !important; box-shadow: none !important; }
+.status-pill.inactive { background: #FEF2F2 !important; color: #DC2626 !important; border-color: #FECACA !important; box-shadow: none !important; }
+.status-draft { background: #F3E8FF !important; color: #7E22CE !important; border-color: #E9D5FF !important; }
+.status-in-review { background: #FEF3C7 !important; color: #B45309 !important; border-color: #FDE68A !important; }
+.status-billed { background: #E0E7FF !important; color: #4338CA !important; border-color: #C7D2FE !important; }
+.status-packed { background: #FFEDD5 !important; color: #C2410C !important; border-color: #FED7AA !important; }
+.status-shipped { background: #DBEAFE !important; color: #1D4ED8 !important; border-color: #BFDBFE !important; }
+.status-delivered { background: #DCFCE7 !important; color: #15803D !important; border-color: #BBF7D0 !important; }
+.status-cancelled { background: #FEE2E2 !important; color: #B91C1C !important; border-color: #FCA5A5 !important; }
+
 .status-badge {
     padding: 0.35rem 0.85rem;
     border-radius: 2rem;
@@ -1859,10 +1892,11 @@ body {
 }
 
 .status-pill.active {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+    background: #ECFDF5;
+    color: #059669;
+    border: 1px solid #A7F3D0;
+    box-shadow: none !important;
+    border-radius: 6px;
 }
 
 /* ============================================================ */
@@ -3832,3 +3866,261 @@ body.modal-open {
 
 
 
+/* ==========================================
+   Dealer Module Custom Design (List & Form)
+   ========================================== */
+.btn-orange {
+    background-color: #FF6B00 !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s, transform 0.1s;
+    box-shadow: 0 2px 4px rgba(255, 107, 0, 0.2);
+}
+.btn-orange:hover {
+    background-color: #e56000 !important;
+    transform: translateY(-1px);
+}
+.btn-back {
+    background-color: #FFFFFF !important;
+    color: #334155 !important;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1 !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.btn-back:hover {
+    background-color: #F8FAFC !important;
+    border-color: #94A3B8 !important;
+}
+.btn-cancel {
+    background-color: #FFFFFF !important;
+    color: #475569 !important;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.65rem 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1 !important;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.btn-cancel:hover {
+    background-color: #F1F5F9 !important;
+}
+.btn-save-dealer {
+    background-color: #FF6B00 !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.65rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s;
+    box-shadow: 0 2px 6px rgba(255, 107, 0, 0.25);
+}
+.btn-save-dealer:hover {
+    background-color: #e56000 !important;
+}
+
+/* Stat cards */
+.stat-card-box {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    min-width: 140px;
+}
+.stat-icon-wrapper {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+.stat-icon-wrapper.blue { background-color: #EFF6FF; color: #3B82F6; }
+.stat-icon-wrapper.green { background-color: #F0FDF4; color: #22C55E; }
+.stat-icon-wrapper.red { background-color: #FEF2F2; color: #EF4444; }
+
+/* Filter & Search controls */
+.filter-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.filter-search-box i {
+    position: absolute;
+    left: 14px;
+    color: #94A3B8;
+    font-size: 0.85rem;
+}
+.filter-search-box input {
+    padding: 0.55rem 0.85rem 0.55rem 2.3rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    width: 300px;
+    outline: none;
+    background: #FFFFFF;
+}
+.filter-search-box input:focus {
+    border-color: #FF6B00;
+}
+.btn-outline-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    color: #334155;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.btn-outline-card:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+/* Status Pill */
+.status-pill {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-block;
+    box-shadow: none !important;
+}
+.status-pill.active, .status-pill.safe { background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; box-shadow: none !important; }
+.status-pill.attention { background-color: #FEF9C3; color: #CA8A04; border: 1px solid #FDE047; box-shadow: none !important; }
+.status-pill.urgent { background-color: #FFEDD5; color: #C2410C; border: 1px solid #FDBA74; box-shadow: none !important; }
+.status-pill.new { background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; box-shadow: none !important; }
+.status-pill.inactive { background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; box-shadow: none !important; }
+
+/* Table Action Buttons */
+.action-btn-square {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background-color: #FFFFFF;
+    color: #64748B;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.15s ease;
+}
+.action-btn-square:hover {
+    background-color: #F8FAFC;
+    color: #0F172A;
+    border-color: #CBD5E1;
+}
+
+/* Form Styles */
+.form-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+.orange-bar {
+    width: 4px;
+    height: 16px;
+    background-color: #FF6B00;
+    border-radius: 2px;
+    display: inline-block;
+}
+.form-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+@media (max-width: 992px) {
+    .form-grid-3, .form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+.form-group-custom {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.form-group-custom label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+}
+.form-group-custom label .req {
+    color: #FF6B00;
+}
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.input-with-icon .input-icon {
+    position: absolute;
+    left: 14px;
+    color: #94A3B8;
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+.input-with-icon input, .input-with-icon select {
+    width: 100%;
+    padding: 0.65rem 0.85rem 0.65rem 2.6rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #1E293B;
+    background-color: #FAFAFA;
+    outline: none;
+    transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+.input-with-icon input:focus, .input-with-icon select:focus {
+    border-color: #FF6B00;
+    background-color: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.12);
+}
+.input-with-icon select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%3C94A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+}

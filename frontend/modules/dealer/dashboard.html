@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dealer Dashboard | SGB Agro Dealer Panel</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        html, body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden !important;
+            max-width: 100vw;
+        }
+
+        .dashboard-wrapper {
+            display: flex;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden !important;
+        }
+
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            max-width: 100%;
+            overflow-x: hidden !important;
+            padding: 0 !important;
+            box-sizing: border-box;
+        }
+
+        .dashboard-container {
+            padding: 0.35rem 0.85rem 0.6rem 0.85rem;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        /* Title Row */
+        .dash-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.35rem;
+            width: 100%;
+        }
+
+        /* Date Filter Bar Row */
+        .filter-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.45rem;
+            width: 100%;
+            flex-wrap: wrap;
+            position: relative;
+        }
+
+        .date-filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.15rem 0.35rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            flex-wrap: wrap;
+        }
+
+        .date-range-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 0.15rem 0.45rem;
+            border-radius: 5px;
+            font-size: 0.725rem;
+            font-weight: 700;
+            color: #334155;
+            transition: all 0.15s ease;
+            position: relative;
+            user-select: none;
+        }
+
+        .date-range-badge:hover {
+            background: #e2e8f0;
+            border-color: #0284c7;
+        }
+
+        .date-input-compact {
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 0.25rem 0.45rem;
+            font-size: 0.75rem;
+            font-family: 'Inter', sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            outline: none;
+        }
+
+        .date-input-compact:focus {
+            border-color: #0284c7;
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+        }
+
+        .filter-btn-pill {
+            background: transparent;
+            border: none;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            font-size: 0.725rem;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .filter-btn-pill:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .filter-btn-pill.active {
+            background: #e0f2fe;
+            color: #0284c7;
+            font-weight: 800;
+        }
+
+        /* Responsive 100% Full-Width KPI Cards Grid */
+        .kpi-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.4rem;
+            margin-bottom: 0.45rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .kpi-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.4rem 0.6rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .kpi-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .kpi-icon.blue { background: #eff6ff; color: #2563eb; }
+        .kpi-icon.green { background: #ecfdf5; color: #059669; }
+        .kpi-icon.orange { background: #fff7ed; color: #ea580c; }
+        .kpi-icon.red { background: #fef2f2; color: #dc2626; }
+        .kpi-icon.purple { background: #faf5ff; color: #9333ea; }
+
+        .kpi-val {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.1;
+        }
+
+        .kpi-label {
+            font-size: 0.625rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            margin-bottom: 1px;
+        }
+
+        .kpi-subtext {
+            font-size: 0.6rem;
+            font-weight: 600;
+            margin-top: 1px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .kpi-subtext.up { color: #16a34a; }
+        .kpi-subtext.down { color: #dc2626; }
+
+        /* Responsive 100% Full-Width 3-Column Layouts */
+        .dash-row-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.45rem;
+            margin-bottom: 0.45rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .dash-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .dash-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.3rem;
+        }
+
+        .dash-card-title {
+            font-size: 0.775rem;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dash-card-title i {
+            color: #FF6B00;
+            font-size: 0.775rem;
+        }
+
+        .dash-card-subtitle {
+            font-size: 0.625rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .view-all-link {
+            font-size: 0.675rem;
+            font-weight: 700;
+            color: #2563eb;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            transition: all 0.15s ease;
+        }
+
+        .view-all-link:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        /* Compact Progress Bars */
+        .progress-bar-container {
+            margin-bottom: 0.3rem;
+        }
+
+        .progress-bar-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.675rem;
+            font-weight: 700;
+            margin-bottom: 1px;
+        }
+
+        .progress-bar-bg {
+            height: 4px;
+            background: #f1f5f9;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        /* Compact Table Styling inside Cards */
+        .dash-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.725rem;
+        }
+
+        .dash-table th {
+            text-align: left;
+            font-size: 0.625rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            padding: 0.25rem 0.35rem;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .dash-table td {
+            padding: 0.3rem 0.35rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+            font-weight: 500;
+        }
+
+        .dash-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Center chart donut overlay text */
+        .donut-wrapper {
+            position: relative;
+            height: 115px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .donut-center-text {
+            position: absolute;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .donut-center-val {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1;
+        }
+
+        .donut-center-sub {
+            font-size: 0.575rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Container (Dynamically Injected) -->
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <!-- Top Bar Header -->
+            <header class="topbar" style="padding: 0.35rem 0.85rem; height: 42px; margin-bottom: 0.2rem;">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavSearch" placeholder="Search dealer metrics, orders...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">admin</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="dashboard-container">
+                <!-- Page Title Row -->
+                <div class="dash-title-row">
+                    <div>
+                        <h1 style="font-size:1.15rem;font-weight:800;color:#0f172a;margin:0;line-height:1.2;">Dealer Dashboard</h1>
+                        <p style="color:#64748b;font-size:0.7rem;margin:0;">Welcome back, <span id="welcomeUserName" style="font-weight:700;color:#0f172a;">Admin</span>! Overview of strictly dealer accounts & B2B performance.</p>
+                    </div>
+                    <button class="btn-amber" onclick="fetchDealerDashboardData()" style="padding:0.25rem 0.6rem;font-size:0.725rem;">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+                </div>
+
+                <!-- Date Range Filters Row -->
+                <div class="filter-bar-row">
+                    <div class="date-filter-group">
+                        <div class="date-range-badge" id="dateRangeBadge" onclick="toggleCustomDatePopover(event)" title="Click to open date range picker" style="cursor:pointer;position:relative;">
+                            <i class="fa-regular fa-calendar-days" style="color:#0284c7;"></i>
+                            <span id="dateRangeDisplay">01 Aug 2026 – 31 Aug 2026</span>
+                            <i class="fa-solid fa-chevron-down" id="dateRangeChevron" style="font-size:0.65rem;color:#64748b;margin-left:4px;transition:transform 0.2s ease;"></i>
+
+                            <!-- Interactive Floating Dropdown Menu attached to dateRangeBadge -->
+                            <div id="customDatePopover" onclick="event.stopPropagation()" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:#ffffff;border:1px solid #cbd5e1;padding:0.65rem 0.85rem;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:280px;flex-direction:column;gap:0.5rem;">
+                                <div style="font-size:0.75rem;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;padding-bottom:0.35rem;margin-bottom:0.15rem;display:flex;justify-content:space-between;align-items:center;">
+                                    <span>Select Custom Date Range</span>
+                                    <i class="fa-solid fa-xmark" onclick="toggleCustomDatePopover(event)" style="cursor:pointer;color:#94a3b8;font-size:0.85rem;"></i>
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                                    <div>
+                                        <label style="font-size:0.675rem;font-weight:700;color:#64748b;display:block;margin-bottom:2px;">FROM DATE</label>
+                                        <input type="date" id="dashStartDate" class="date-input-compact" style="width:100%;box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.675rem;font-weight:700;color:#64748b;display:block;margin-bottom:2px;">TO DATE</label>
+                                        <input type="date" id="dashEndDate" class="date-input-compact" style="width:100%;box-sizing:border-box;">
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:0.4rem;margin-top:0.25rem;">
+                                    <button class="btn-amber" onclick="applyCustomDateFilter()" style="flex:1;padding:0.3rem 0.6rem;font-size:0.725rem;font-weight:700;text-align:center;">
+                                        <i class="fa-solid fa-check"></i> Apply Range
+                                    </button>
+                                    <button class="filter-btn-pill" onclick="resetDashboardFilter()" style="padding:0.3rem 0.6rem;font-size:0.725rem;border:1px solid #cbd5e1;color:#ef4444;font-weight:700;">
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="filter-btn-pill" onclick="setDashboardPeriod('today')">Today</button>
+                        <button class="filter-btn-pill" onclick="setDashboardPeriod('yesterday')">Yesterday</button>
+                        <button class="filter-btn-pill" onclick="setDashboardPeriod('this_week')">This Week</button>
+                        <button class="filter-btn-pill active" id="btnPeriodThisMonth" onclick="setDashboardPeriod('this_month')">This Month</button>
+                        <button class="filter-btn-pill" onclick="setDashboardPeriod('this_year')">This Year</button>
+                        <button class="filter-btn-pill" id="btnPeriodCustom" onclick="setDashboardPeriod('custom')">Custom</button>
+                        <button class="filter-btn-pill" onclick="resetDashboardFilter()" style="color:#ef4444;font-weight:700;" title="Reset filter to default (This Month)">
+                            <i class="fa-solid fa-rotate-left" style="font-size:0.65rem;"></i> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 7 Compact 100% Full-Width KPI Summary Cards -->
+                <div class="kpi-cards-grid">
+                    <!-- Total Dealers -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">Total Dealers</div>
+                            <div class="kpi-val" id="kpiTotalDealers">0</div>
+                            <div class="kpi-subtext up" id="kpiTotalDealersSub"><i class="fa-solid fa-arrow-up"></i> <span>0 vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon blue"><i class="fa-solid fa-users"></i></div>
+                    </div>
+
+                    <!-- Active Dealers -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">Active Dealers</div>
+                            <div class="kpi-val" id="kpiActiveDealers" style="color:#059669;">0</div>
+                            <div class="kpi-subtext up" id="kpiActiveDealersSub"><i class="fa-solid fa-arrow-up"></i> <span>0 vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon green"><i class="fa-solid fa-user-check"></i></div>
+                    </div>
+
+                    <!-- New Dealers -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">New Dealers</div>
+                            <div class="kpi-val" id="kpiNewDealers" style="color:#ea580c;">0</div>
+                            <div class="kpi-subtext up" id="kpiNewDealersSub"><i class="fa-solid fa-arrow-up"></i> <span>0 vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon orange"><i class="fa-solid fa-user-plus"></i></div>
+                    </div>
+
+                    <!-- Orders (This Month) -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">Orders (Period)</div>
+                            <div class="kpi-val" id="kpiOrdersMonth">0</div>
+                            <div class="kpi-subtext up" id="kpiOrdersMonthSub"><i class="fa-solid fa-arrow-up"></i> <span>0 vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon green"><i class="fa-solid fa-cart-shopping"></i></div>
+                    </div>
+
+                    <!-- Overdue Dealers -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">Overdue Dealers</div>
+                            <div class="kpi-val" id="kpiOverdueDealers" style="color:#dc2626;">0</div>
+                            <div class="kpi-subtext down" id="kpiOverdueDealersSub"><i class="fa-solid fa-arrow-down"></i> <span>0 vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon red"><i class="fa-solid fa-user-clock"></i></div>
+                    </div>
+
+                    <!-- Total Sales (₹) -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">Total Sales (₹)</div>
+                            <div class="kpi-val" id="kpiTotalSales" style="color:#2563eb;">₹0</div>
+                            <div class="kpi-subtext up" id="kpiTotalSalesSub"><i class="fa-solid fa-arrow-up"></i> <span>0% vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon blue"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                    </div>
+
+                    <!-- Total Outstanding (₹) -->
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-label">Outstanding (₹)</div>
+                            <div class="kpi-val" id="kpiTotalOutstanding" style="color:#dc2626;">₹0</div>
+                            <div class="kpi-subtext up" id="kpiTotalOutstandingSub"><i class="fa-solid fa-arrow-up"></i> <span>0% vs last month</span></div>
+                        </div>
+                        <div class="kpi-icon red"><i class="fa-solid fa-wallet"></i></div>
+                    </div>
+                </div>
+
+                <!-- ROW 1: 3 Compact Charts -->
+                <div class="dash-row-3">
+                    <!-- Sales Performance -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-chart-column"></i> Sales Performance</div>
+                                <div class="dash-card-subtitle">Current vs Previous Month</div>
+                            </div>
+                            <a href="reports.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="position:relative;height:115px;">
+                            <canvas id="chartSalesPerformance"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Order Status Distribution -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-chart-pie"></i> Order Status</div>
+                                <div class="dash-card-subtitle">Dealer order statuses</div>
+                            </div>
+                            <a href="orders.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div class="donut-wrapper">
+                            <canvas id="chartOrderStatus"></canvas>
+                            <div class="donut-center-text">
+                                <div class="donut-center-val" id="donutTotalOrdersVal">0</div>
+                                <div class="donut-center-sub">Orders</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dealer Status Overview -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-chart-donut"></i> Dealer Status</div>
+                                <div class="dash-card-subtitle">Active, Inactive & Validity</div>
+                            </div>
+                            <a href="dealer.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div class="donut-wrapper">
+                            <canvas id="chartDealerStatus"></canvas>
+                            <div class="donut-center-text">
+                                <div class="donut-center-val" id="donutTotalDealersVal">0</div>
+                                <div class="donut-center-sub">Dealers</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROW 2: 3 Compact Analytics Cards -->
+                <div class="dash-row-3">
+                    <!-- Dealer Last Order Age -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-clock"></i> Dealer Last Order Age</div>
+                                <div class="dash-card-subtitle">Validity timeline</div>
+                            </div>
+                            <a href="dealer.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="display:flex;flex-direction:column;justify-content:center;flex:1;">
+                            <!-- 0-15 Days -->
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-header">
+                                    <span style="color:#059669;">● 0–15 Days</span>
+                                    <span id="tier15Val" style="color:#0f172a;">0 (0%)</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="tier15Bar" class="progress-bar-fill" style="width:0%;background:#059669;"></div>
+                                </div>
+                            </div>
+                            <!-- 16-30 Days -->
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-header">
+                                    <span style="color:#eab308;">● 16–30 Days</span>
+                                    <span id="tier30Val" style="color:#0f172a;">0 (0%)</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="tier30Bar" class="progress-bar-fill" style="width:0%;background:#eab308;"></div>
+                                </div>
+                            </div>
+                            <!-- 31-45 Days -->
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-header">
+                                    <span style="color:#ea580c;">● 31–45 Days</span>
+                                    <span id="tier45Val" style="color:#0f172a;">0 (0%)</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="tier45Bar" class="progress-bar-fill" style="width:0%;background:#ea580c;"></div>
+                                </div>
+                            </div>
+                            <!-- > 45 Days -->
+                            <div class="progress-bar-container" style="margin-bottom:0;">
+                                <div class="progress-bar-header">
+                                    <span style="color:#dc2626;">● > 45 Days (Inactive)</span>
+                                    <span id="tierInactiveVal" style="color:#0f172a;">0 (0%)</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="tierInactiveBar" class="progress-bar-fill" style="width:0%;background:#dc2626;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top 5 Dealers by Sales -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-trophy"></i> Top 5 Dealers</div>
+                                <div class="dash-card-subtitle">Highest grossing dealers</div>
+                            </div>
+                            <a href="dealer.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="dash-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Dealer Name</th>
+                                        <th style="text-align:center;">Orders</th>
+                                        <th style="text-align:right;">Sales (₹)</th>
+                                        <th style="text-align:right;">Due (₹)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyTopDealers">
+                                    <tr><td colspan="5" style="text-align:center;padding:0.5rem;color:#94a3b8;">Loading top dealers...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Payment Collection Overview -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-money-bill-transfer"></i> Payment Collection</div>
+                                <div class="dash-card-subtitle">Collection rate & dues</div>
+                            </div>
+                            <a href="reports.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="display:flex;flex-direction:column;justify-content:center;flex:1;">
+                            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.3rem;">
+                                <div>
+                                    <div style="font-size:1.05rem;font-weight:800;color:#0f172a;" id="statTotalCollected">₹0</div>
+                                    <div style="font-size:0.625rem;color:#64748b;font-weight:600;">Total Collected</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-size:0.95rem;font-weight:800;color:#059669;" id="statCollectionRate">0%</div>
+                                    <div style="font-size:0.625rem;color:#64748b;font-weight:600;">Collection Rate</div>
+                                </div>
+                            </div>
+
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-header">
+                                    <span style="color:#059669;">Received</span>
+                                    <span id="colReceivedVal" style="color:#059669;">₹0</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="colReceivedBar" class="progress-bar-fill" style="width:0%;background:#059669;"></div>
+                                </div>
+                            </div>
+
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-header">
+                                    <span style="color:#dc2626;">Outstanding</span>
+                                    <span id="colOutstandingVal" style="color:#dc2626;">₹0</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="colOutstandingBar" class="progress-bar-fill" style="width:0%;background:#dc2626;"></div>
+                                </div>
+                            </div>
+
+                            <div class="progress-bar-container" style="margin-bottom:0;">
+                                <div class="progress-bar-header">
+                                    <span style="color:#2563eb;">Total Sales</span>
+                                    <span id="colTotalSalesVal" style="color:#2563eb;">₹0</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="colTotalSalesBar" class="progress-bar-fill" style="width:100%;background:#2563eb;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROW 3: 3 Compact Analytics Cards -->
+                <div class="dash-row-3">
+                    <!-- Sales Trend (Last 6 Months) -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-arrow-trend-up"></i> Sales Trend</div>
+                                <div class="dash-card-subtitle">Last 6 Months B2B Revenue</div>
+                            </div>
+                            <a href="reports.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="position:relative;height:115px;">
+                            <canvas id="chartSalesTrend"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top Selling Products -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-boxes-stacked"></i> Top Selling Products</div>
+                                <div class="dash-card-subtitle">Popular products among dealers</div>
+                            </div>
+                            <a href="reports.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="dash-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Product Name</th>
+                                        <th style="text-align:center;">Qty</th>
+                                        <th style="text-align:right;">Sales (₹)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyTopProducts">
+                                    <tr><td colspan="4" style="text-align:center;padding:0.5rem;color:#94a3b8;">Loading top products...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Recent Orders -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div>
+                                <div class="dash-card-title"><i class="fa-solid fa-list-check"></i> Recent Orders</div>
+                                <div class="dash-card-subtitle">Latest dealer purchases</div>
+                            </div>
+                            <a href="orders.html" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="dash-table">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Dealer</th>
+                                        <th style="text-align:right;">Amount</th>
+                                        <th style="text-align:center;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyRecentOrders">
+                                    <tr><td colspan="4" style="text-align:center;padding:0.5rem;color:#94a3b8;">Loading recent orders...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer note -->
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:0.3rem;border-top:1px solid #e2e8f0;font-size:0.65rem;color:#94a3b8;">
+                    <div>All amounts in INR (₹) • Strictly Dealer B2B Data</div>
+                    <div>SGB Agro Dealer Panel © 2026</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+
+</html>

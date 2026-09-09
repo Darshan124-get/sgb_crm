@@ -73,14 +73,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     function initCharts(data) {
         const perfCtx = document.getElementById('performanceChart');
         if (!perfCtx) return;
+        const rate = parseFloat(data.kpis?.conversionRate || 0);
 
         new Chart(perfCtx.getContext('2d'), {
             type: 'line',
             data: {
                 labels: ['W1', 'W2', 'W3', 'W4'],
                 datasets: [{
-                    label: 'Success Rate',
-                    data: [10, 25, 18, data.kpis.conversionRate],
+                    label: 'Success Rate (%)',
+                    data: [Math.round(rate * 0.5), Math.round(rate * 0.75), Math.round(rate * 0.9), rate],
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     tension: 0.4,

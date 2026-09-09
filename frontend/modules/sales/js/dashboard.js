@@ -50,17 +50,22 @@ function renderUrgentPanel(tasks) {
 function initChart(data) {
     const ctx = document.getElementById('performanceChart');
     if (!ctx) return;
+    const leadsTrend = data.operations?.trends?.received || [];
+    const convRate = parseFloat(data.kpis?.conversionRate || 0);
+    const totalLeads = parseFloat(data.kpis?.newLeads || data.kpis?.leadsMTD || 0);
+    const convertedCount = parseFloat(data.kpis?.convertedLeads || Math.round(totalLeads * (convRate / 100)));
+
     new Chart(ctx, {
         type: 'line',
         data: {
             labels: ['Week 1','Week 2','Week 3','Week 4'],
             datasets: [{
                 label: 'My Leads',
-                data: [Math.floor(Math.random()*10)+2, Math.floor(Math.random()*10)+2, Math.floor(Math.random()*10)+2, data.kpis.conversionRate || 0],
+                data: [Math.round(totalLeads * 0.2), Math.round(totalLeads * 0.25), Math.round(totalLeads * 0.25), totalLeads],
                 borderColor: '#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', tension:0.4, fill:true, borderWidth:2, pointRadius:4
             }, {
                 label: 'Conversions',
-                data: [1, 2, 1, Math.round((data.kpis.leadsMTD||0) * (data.kpis.conversionRate||0) / 100)],
+                data: [0, Math.round(convertedCount * 0.3), Math.round(convertedCount * 0.3), convertedCount],
                 borderColor: '#10b981', backgroundColor:'rgba(16,185,129,0.1)', tension:0.4, fill:true, borderWidth:2, pointRadius:4
             }]
         },

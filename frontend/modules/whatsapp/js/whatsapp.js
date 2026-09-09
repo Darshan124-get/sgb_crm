@@ -80,7 +80,7 @@ async function loadChatHistoryInBackground(phone) {
     if (chatHistoryCache.has(phone) || activeHistoryFetches.has(phone)) return;
     activeHistoryFetches.add(phone);
     try {
-        const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: AUTH_HEADER });
+        const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: getAuthHeader() });
         if (response.ok) {
             const history = await response.json();
             chatHistoryCache.set(phone, history);
@@ -575,7 +575,7 @@ function renderSidebarTabs() {
 
 async function loadCampaignsAndTabs() {
     try {
-        const response = await fetch(`${window.API_URL}/campaigns`, { headers: AUTH_HEADER });
+        const response = await fetch(`${window.API_URL}/campaigns`, { headers: getAuthHeader() });
         if (response.ok) {
             const allCampaigns = await response.json();
             activeCampaigns = allCampaigns.filter(c => c.status === 'active');
@@ -727,7 +727,7 @@ let currentCustomersJson = '';
 
 async function loadCustomers() {
     try {
-        const response = await fetch(`${API_BASE}/customers`, { headers: AUTH_HEADER });
+        const response = await fetch(`${API_BASE}/customers`, { headers: getAuthHeader() });
         if (response.status === 401) return window.doLogout();
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
@@ -1090,7 +1090,7 @@ async function selectCustomer(customer) {
 
     if (parseInt(customer.unread_msg_count || 0) > 0) {
         try {
-            fetch(`${API_BASE}/customers/${customer.phone}/read`, { method: 'PUT', headers: AUTH_HEADER }).catch(console.error);
+            fetch(`${API_BASE}/customers/${customer.phone}/read`, { method: 'PUT', headers: getAuthHeader() }).catch(console.error);
             customer.unread_msg_count = 0;
             renderSidebarTabs();
         } catch (err) {
@@ -1212,7 +1212,7 @@ async function handleSaveDetails() {
     try {
         const response = await fetch(`${LEAD_API_BASE}/${activeCustomer.lead_id}`, {
             method: 'PUT',
-            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
@@ -1232,7 +1232,7 @@ async function handleSaveDetails() {
 
 async function loadSalesUsers() {
     try {
-        const response = await fetch(`${USER_API_BASE}/sales`, { headers: AUTH_HEADER });
+        const response = await fetch(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
         if (response.ok) {
             salesUsers = await response.json();
             renderSalesList();
@@ -1291,7 +1291,7 @@ async function handleTransfer() {
     try {
         const response = await fetch(`${LEAD_API_BASE}/${activeCustomer.lead_id}/transfer`, {
             method: 'POST',
-            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: selectedTransferUserId })
         });
 
@@ -1328,7 +1328,7 @@ async function loadChatHistory(phone, isPolling = false) {
     if (activeHistoryFetches.has(phone)) return;
     activeHistoryFetches.add(phone);
     try {
-        const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: AUTH_HEADER });
+        const response = await fetch(`${API_BASE}/history/${phone}?t=${Date.now()}`, { headers: getAuthHeader() });
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
         const history = await response.json();
         
@@ -1586,7 +1586,7 @@ async function deleteMessage(chatId) {
     try {
         const response = await fetch(`${API_BASE}/message/${chatId}`, {
             method: 'DELETE',
-            headers: AUTH_HEADER
+            headers: getAuthHeader()
         });
 
         if (response.ok) {
@@ -1949,7 +1949,7 @@ window.initForwardAndReplyEvents = function () {
 
                     const res = await fetch(`${API_BASE}/send`, {
                         method: 'POST',
-                        headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+                        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
 
@@ -2181,7 +2181,7 @@ async function handleSend() {
 
         const response = await fetch(`${API_BASE}/send`, {
             method: 'POST',
-            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         if (response.ok) {
@@ -3096,7 +3096,7 @@ window.markCustomerAsUnread = async function (phone) {
     try {
         const response = await fetch(`${API_BASE}/customers/${phone}/unread`, {
             method: 'PUT',
-            headers: AUTH_HEADER
+            headers: getAuthHeader()
         });
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
         

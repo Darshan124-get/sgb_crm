@@ -13,7 +13,9 @@ if (typeof window.requireAuth === 'function') {
     }
 }
 
-const AUTH_HEADER = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+function getAuthHeader() {
+    return { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+}
 
 let activeCustomer = null;
 let currentHistory = [];
@@ -2366,10 +2368,11 @@ let quickReplies = [];
 async function loadQuickReplies() {
     try {
         const response = await fetch(`${API_BASE}/quick-replies`, {
-            headers: AUTH_HEADER
+            headers: getAuthHeader()
         });
         if (response.ok) {
             quickReplies = await response.json();
+            console.log(`[QuickReplies] Successfully loaded ${quickReplies.length} quick replies.`);
         }
     } catch (err) {
         console.error('Failed to load quick replies', err);
@@ -2381,7 +2384,7 @@ async function saveQuickReplyAPI(qr) {
     try {
         const response = await fetch(`${API_BASE}/quick-replies`, {
             method: 'POST',
-            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(qr)
         });
         if (response.ok) {
@@ -2400,7 +2403,7 @@ async function deleteQuickReplyAPI(id) {
     try {
         const response = await fetch(`${API_BASE}/quick-replies/${id}`, {
             method: 'DELETE',
-            headers: AUTH_HEADER
+            headers: getAuthHeader()
         });
         if (response.ok) {
             await loadQuickReplies();
@@ -2414,11 +2417,12 @@ async function deleteQuickReplyAPI(id) {
     }
 }
 
-function openQrManager() {
+async function openQrManager() {
     if (qrManagerModal) {
         qrManagerModal.classList.remove('hidden');
         qrManagerModal.classList.add('active');
         document.body.classList.add('modal-open');
+        await loadQuickReplies();
         showQrList();
     }
 }
@@ -2642,7 +2646,7 @@ function filterAndShowPopover(searchTerm) {
                     if (qr.message) {
                         await fetch(`${API_BASE}/send`, {
                             method: 'POST',
-                            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+                            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 phone: activeCustomer.phone,
                                 message: qr.message
@@ -2654,7 +2658,7 @@ function filterAndShowPopover(searchTerm) {
                     for (let i = 0; i < urls.length; i++) {
                         await fetch(`${API_BASE}/send`, {
                             method: 'POST',
-                            headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
+                            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 phone: activeCustomer.phone,
                                 message: '', // Caption
@@ -2751,24 +2755,43 @@ if (qrEditMediaRemove) {
     };
 }
 
-// Trigger popover when typing '/'
+// Bind Quick Reply Button (⚡ icon)
+const quickReplyBtn = document.getElementById('quick-reply-btn');
+if (quickReplyBtn) {
+    quickReplyBtn.onclick = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
+            quickRepliesPopover.style.display = 'none';
+        } else {
+            await loadQuickReplies();
+            filterAndShowPopover('');
+        }
+    };
+}
+
+// Trigger popover when typing '/' or '\'
 if (messageInputEl) {
-    messageInputEl.addEventListener('input', (e) => {
+    messageInputEl.addEventListener('input', async (e) => {
         const val = e.target.value;
         const lastWord = val.split(/\s+/).pop();
-        if (lastWord.startsWith('/')) {
+        const isSlash = lastWord.startsWith('/') || lastWord.startsWith('\\');
+        if (isSlash) {
+            if (quickReplies.length === 0) {
+                await loadQuickReplies();
+            }
             filterAndShowPopover(lastWord.substring(1));
         } else {
-            quickRepliesPopover.style.display = 'none';
+            if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
         }
     });
 
     messageInputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            quickRepliesPopover.style.display = 'none';
-        } else if (e.key === 'Enter' && !e.shiftKey && quickRepliesPopover.style.display === 'block') {
-            const firstItem = qrPopoverList.firstElementChild;
-            if (firstItem) {
+            if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
+        } else if (e.key === 'Enter' && !e.shiftKey && quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
+            const firstItem = qrPopoverList ? qrPopoverList.firstElementChild : null;
+            if (firstItem && firstItem.onclick) {
                 e.preventDefault();
                 e.stopPropagation();
                 firstItem.click();

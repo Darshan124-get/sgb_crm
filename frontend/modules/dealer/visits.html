@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dealer Visit Info | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .kpi-val {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+
+        .kpi-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-top: 0.2rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .filter-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        .filter-grid {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input-box {
+            position: relative;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        .search-input-box input {
+            width: 100%;
+            padding: 0.65rem 1rem 0.65rem 2.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #0f172a;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .search-input-box input:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+
+        .search-input-box i {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .filter-select {
+            padding: 0.65rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #0f172a;
+            outline: none;
+            background: #ffffff;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            border-color: #f59e0b;
+        }
+
+        .btn-amber {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.25rem;
+            font-weight: 700;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.25);
+            transition: all 0.2s;
+        }
+
+        .btn-amber:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(245, 158, 11, 0.35);
+        }
+
+        .btn-outline-card {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            border-radius: 8px;
+            padding: 0.6rem 1.25rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-outline-card:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+
+        .visit-qna-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .modal-container {
+            background: #ffffff;
+            border-radius: 16px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+        }
+
+        .modal-body {
+            padding: 1.75rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.75rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            background: #f8fafc;
+        }
+
+        .qna-box {
+            background: #f8fafc;
+            padding: 1rem 1.25rem;
+            border-radius: 10px;
+            border: 1px solid #f1f5f9;
+        }
+
+        .qna-box .qna-label {
+            font-size: 0.775rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .qna-box .qna-ans {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #0f172a;
+            white-space: pre-line;
+            line-height: 1.5;
+        }
+
+        .badge-qna {
+            background: #fef3c7;
+            color: #b45309;
+            border: 1px solid #fde68a;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .badge-basic {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .badge-converted {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .badge-prospect {
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn-convert-dealer {
+            background: linear-gradient(135deg, #FF6B00 0%, #ea580c 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 4px rgba(255,107,0,0.25);
+            transition: all 0.15s ease;
+        }
+
+        .btn-convert-dealer:hover {
+            background: linear-gradient(135deg, #e66000 0%, #c2410c 100%);
+            box-shadow: 0 4px 8px rgba(255,107,0,0.35);
+            transform: translateY(-1px);
+        }
+
+        /* Status Radio Card Styling */
+        .status-radio-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            background: #f8fafc;
+        }
+
+        .status-radio-card:hover {
+            border-color: #cbd5e1;
+            background: #ffffff;
+        }
+
+        .status-radio-card.selected-converted {
+            border-color: #16a34a;
+            background: #f0fdf4;
+        }
+
+        .status-radio-card.selected-prospect {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Dynamic Sidebar Injection -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar Header -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavVisitSearch" oninput="syncVisitSearch('top')" placeholder="Search visit logs...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">admin</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="content-body" style="padding: 1.5rem 2rem;">
+                <!-- Header Title & Action Row -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h1 style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:0.25rem;">Dealer Visit Info & Logs</h1>
+                        <p style="color:#64748b;font-size:0.875rem;">Track field visits, questionnaire responses, and dealer conversion statuses.</p>
+                    </div>
+                    <div style="display:flex;gap:0.75rem;align-items:center;">
+                        <button class="btn-outline-card" onclick="exportVisitsCSV()">
+                            <i class="fa-solid fa-download"></i> Export CSV
+                        </button>
+                        <button class="btn-amber" onclick="openNewVisitModal()">
+                            <i class="fa-solid fa-plus"></i> + Record New Visit
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Overview Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-val" id="kpiTotalVisits">0</div>
+                            <div class="kpi-label">Total Visits Logged</div>
+                        </div>
+                        <div class="kpi-icon" style="background:#fef3c7;color:#d97706;">
+                            <i class="fa-solid fa-clipboard-user"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-val" id="kpiDealersVisited">0</div>
+                            <div class="kpi-label">Converted Dealers</div>
+                        </div>
+                        <div class="kpi-icon" style="background:#ecfdf5;color:#059669;">
+                            <i class="fa-solid fa-handshake"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-val" id="kpiVisitsThisMonth">0</div>
+                            <div class="kpi-label">Recent Visits</div>
+                        </div>
+                        <div class="kpi-icon" style="background:#eff6ff;color:#2563eb;">
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div>
+                            <div class="kpi-val" id="kpiDetailedForms">0</div>
+                            <div class="kpi-label">Survey Forms Filled</div>
+                        </div>
+                        <div class="kpi-icon" style="background:#fdf2f8;color:#db2777;">
+                            <i class="fa-solid fa-file-signature"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search & Filters Card -->
+                <div class="filter-card">
+                    <div class="filter-grid">
+                        <div class="search-input-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="visitSearchInput" oninput="syncVisitSearch('main')"
+                                placeholder="Search firm, dealer name, town, staff...">
+                        </div>
+
+                        <div style="position:relative;width:200px;">
+                            <label style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Select Dealer</label>
+                            <select id="dealerSelectFilter" class="filter-select" style="width:100%;" onchange="applyVisitFilters()">
+                                <option value="all">All Dealers</option>
+                            </select>
+                        </div>
+
+                        <div style="position:relative;width:180px;">
+                            <label style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Visited By Staff</label>
+                            <select id="staffSelectFilter" class="filter-select" style="width:100%;" onchange="applyVisitFilters()">
+                                <option value="all">All Staff</option>
+                            </select>
+                        </div>
+
+                        <div style="position:relative;width:180px;">
+                            <label style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Visit Outcome</label>
+                            <select id="surveyTypeFilter" class="filter-select" style="width:100%;" onchange="applyVisitFilters()">
+                                <option value="all">All Outcomes</option>
+                                <option value="converted">Converted to Dealer</option>
+                                <option value="prospect">Just Visit / Prospect</option>
+                            </select>
+                        </div>
+
+                        <button class="btn-outline-card" onclick="resetVisitFilters()" style="margin-top:1.1rem;padding:0.6rem 1rem;">
+                            <i class="fa-solid fa-rotate-left"></i> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Visits Data Table -->
+                <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);overflow:hidden;">
+                    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+                        <div style="display:flex;align-items:center;gap:1rem;">
+                            <h3 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0;">Visit Records Log</h3>
+                            <div id="selectedVisitsBadge"
+                                style="display:none;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;padding:0.35rem 0.75rem;border-radius:8px;font-size:0.8rem;font-weight:700;align-items:center;gap:6px;">
+                                <i class="fa-solid fa-check-double"></i> <span id="selectedVisitsCount">0</span> Selected
+                            </div>
+                            <button class="btn-outline-card" id="btnDeleteSelectedVisits"
+                                onclick="deleteSelectedVisits()"
+                                style="display:none;padding:0.4rem 0.85rem;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;font-weight:700;border-radius:8px;cursor:pointer;align-items:center;gap:6px;transition:all 0.15s ease;"
+                                title="Delete Selected Visits">
+                                <i class="fa-solid fa-trash-can"></i> Delete Selected
+                            </button>
+                        </div>
+                        <span id="visitRecordCountBadge" style="font-size:0.8rem;color:#64748b;font-weight:600;">Showing 0 records</span>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;text-align:left;font-size:0.875rem;">
+                            <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;color:#475569;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">
+                                <tr>
+                                    <th style="padding:0.85rem 0.75rem;text-align:center;width:40px;">
+                                        <input type="checkbox" id="selectAllVisitsChk" onchange="toggleSelectAllVisits(this)" style="width:16px;height:16px;cursor:pointer;accent-color:#FF6B00;">
+                                    </th>
+                                    <th style="padding:0.85rem 1.25rem;">Firm / Dealer Name & Contact</th>
+                                    <th style="padding:0.85rem 1.25rem;">Location</th>
+                                    <th style="padding:0.85rem 1.25rem;">Visited Date</th>
+                                    <th style="padding:0.85rem 1.25rem;">Visited By</th>
+                                    <th style="padding:0.85rem 1.25rem;">Visit Outcome</th>
+                                    <th style="padding:0.85rem 1.25rem;text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="visitsTableBody">
+                                <tr>
+                                    <td colspan="7" style="padding:3rem;text-align:center;color:#94a3b8;">
+                                        <i class="fa-solid fa-spinner fa-spin" style="font-size:1.5rem;margin-bottom:0.5rem;display:block;"></i>
+                                        Loading visit records...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- VISIT DETAIL MODAL -->
+    <div id="visitDetailModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div>
+                    <h3 style="font-size:1.1rem;font-weight:800;color:#0f172a;margin:0;" id="modalVisitDealerTitle">Dealer Visit Form Details</h3>
+                    <p style="margin:2px 0 0 0;font-size:0.8rem;color:#64748b;" id="modalVisitSubTitle">Recorded visit questionnaire responses</p>
+                </div>
+                <button onclick="closeVisitDetailModal()" style="background:none;border:none;font-size:1.25rem;color:#64748b;cursor:pointer;padding:4px 8px;border-radius:6px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalVisitDetailContent">
+                <!-- Injected via visits.js -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline-card" onclick="closeVisitDetailModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEALER VISIT FORM MODAL (Record New Visit) -->
+    <div id="newVisitModal" class="modal-overlay">
+        <div class="modal-container" style="max-width:850px;">
+            <div class="modal-header" style="background:#ffffff;border-bottom:1px solid #e2e8f0;padding:1.25rem 1.75rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:#fff7ed;color:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fa-solid fa-clipboard-user"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size:1.15rem;font-weight:800;color:#0f172a;margin:0;">Dealer Visit Form</h3>
+                        <p style="margin:2px 0 0 0;font-size:0.8rem;color:#64748b;">Please fill in the information collected during this dealer visit.</p>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <button type="button" onclick="openAddQuestionModal()" style="border:1.5px solid #f59e0b;color:#d97706;background:#fffbeb;border-radius:8px;padding:0.45rem 1rem;font-weight:700;font-size:0.825rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;transition:all 0.2s;">
+                        <i class="fa-solid fa-plus"></i> Add Question
+                    </button>
+                    <button type="button" onclick="closeNewVisitModal()" style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;padding:4px 8px;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <form id="newVisitForm" onsubmit="handleNewVisitSubmit(event)" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                <div class="modal-body" style="display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem 1.75rem;">
+                    
+                    <!-- SECTION 1: DEALER & VISIT INFORMATION -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+                        <h4 style="font-size:0.9rem;font-weight:800;color:#0f172a;margin:0;display:flex;align-items:center;gap:0.5rem;border-bottom:1px solid #e2e8f0;padding-bottom:0.6rem;">
+                            <i class="fa-solid fa-store" style="color:#f59e0b;"></i> Step 1: Firm & Dealer Information
+                        </h4>
+
+                        <!-- Existing Dealer Selection or Fill New -->
+                        <div>
+                            <label style="font-size:0.8rem;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Auto-fill from Existing Dealer (Optional)</label>
+                            <select id="nvDealerSelect" class="filter-select" style="width:100%;" onchange="autoFillDealerInfo(this.value)">
+                                <option value="">-- Select an Existing Dealer or Fill New Details Below --</option>
+                            </select>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Firm / Shop Name <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="nvFirmName" required placeholder="e.g. Sree Lakshmi Agri Store" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Dealer Name (Contact Person) <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="nvDealerName" required placeholder="e.g. Ramesh Kumar" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Contact Number (Phone) <span style="color:#ef4444;">*</span></label>
+                                <input type="tel" id="nvContact" required placeholder="e.g. 9876543210" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Location / Town / Address <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="nvLocation" required placeholder="e.g. Tumkur Main Road, Tumkur" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Visited Date <span style="color:#ef4444;">*</span></label>
+                                <input type="date" id="nvVisitedDate" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Visited By Staff <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="nvVisitedBy" required placeholder="Staff representative" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                        </div>
+
+                        <!-- VISIT STATUS / DEALER CONVERSION FEATURE -->
+                        <div id="visitOutcomeSectionContainer" style="margin-top:0.25rem;">
+                            <label style="font-size:0.825rem;font-weight:800;color:#0f172a;display:block;margin-bottom:0.5rem;">
+                                Visit Status / Dealer Conversion <span style="color:#ef4444;">*</span>
+                            </label>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                                <label class="status-radio-card selected-converted" id="cardStatusConverted" onclick="selectVisitOutcome('converted')">
+                                    <input type="radio" name="visitOutcome" value="converted" checked style="margin-top:2px;accent-color:#16a34a;">
+                                    <div>
+                                        <div style="font-weight:800;font-size:0.85rem;color:#15803d;">
+                                            <i class="fa-solid fa-circle-check" style="margin-right:4px;"></i> OK to Order / Converted
+                                        </div>
+                                        <div style="font-size:0.75rem;color:#475569;margin-top:2px;">
+                                            Dealer agreed to order products. <strong>Add to official Dealers List</strong>.
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label class="status-radio-card" id="cardStatusProspect" onclick="selectVisitOutcome('prospect')">
+                                    <input type="radio" name="visitOutcome" value="prospect" style="margin-top:2px;accent-color:#f59e0b;">
+                                    <div>
+                                        <div style="font-weight:800;font-size:0.85rem;color:#d97706;">
+                                            <i class="fa-solid fa-user-clock" style="margin-right:4px;"></i> Just a Visit / Prospect Only
+                                        </div>
+                                        <div style="font-size:0.75rem;color:#475569;margin-top:2px;">
+                                            Save field visit questionnaire log. <strong>Do NOT add to Dealers List</strong>.
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 2: FIELD QUESTIONNAIRE (Q&A 1 to 11) -->
+                    <div style="display:flex;flex-direction:column;gap:1.25rem;">
+                        <h4 style="font-size:0.9rem;font-weight:800;color:#0f172a;margin:0;display:flex;align-items:center;gap:0.5rem;border-bottom:1px solid #e2e8f0;padding-bottom:0.6rem;">
+                            <i class="fa-solid fa-clipboard-question" style="color:#f59e0b;"></i> Step 2: Dealer Survey Questions & Answers
+                        </h4>
+
+                        <!-- Field 1 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                1. What are your main requirements from SGB Agro? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <textarea id="visitReq" rows="2" placeholder="Type your answer..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Field 2 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                2. What major crops do you grow/sell in your area? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <textarea id="visitCrops" rows="2" placeholder="Type your answer..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Field 3 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                3. Which products do you sell the most? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <textarea id="visitTopProducts" rows="2" placeholder="Type your answer..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Field 4 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                4. Approximately how many brush cutters do you sell per year? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="number" id="visitBrushCuttersQty" min="0" placeholder="Type a number..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                        </div>
+
+                        <!-- Field 5 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                5. Which companies/brands of brush cutters do you currently sell? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <textarea id="visitBrushCuttersBrands" rows="2" placeholder="Type your answer..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Field 6 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                6. Who are your major competitors? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <textarea id="visitCompetitors" rows="2" placeholder="Type your answer..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Field 7 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                7. How many branches do you have and where are they located? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <textarea id="visitBranches" rows="2" placeholder="Type your answer..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Field 8 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                8. How many people are working in your business? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="number" id="visitStaffCount" min="0" placeholder="Type a number..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                        </div>
+
+                        <!-- Field 9 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                9. How do you mainly sell your products? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.35rem;">
+                                <label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">
+                                    <input type="radio" name="visitSalesType" value="B2B – Business to Business" checked style="accent-color:#f59e0b;"> B2B – Business to Business
+                                </label>
+                                <label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">
+                                    <input type="radio" name="visitSalesType" value="B2C – Direct to Customers" style="accent-color:#f59e0b;"> B2C – Direct to Customers
+                                </label>
+                                <label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">
+                                    <input type="radio" name="visitSalesType" value="Both B2B & B2C" style="accent-color:#f59e0b;"> Both B2B & B2C
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Field 10 -->
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                10. How many years has your shop/business been running? <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="number" id="visitBusinessYears" min="0" placeholder="Type a number..." required style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                        </div>
+
+                        <!-- Field 11: Stock Check Table (Only shown for dealers with prior purchases) -->
+                        <div id="sectionCurrentStockContainer" style="display:none;">
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.25rem;">
+                                11. Current Stock – <span style="font-weight:400;font-size:0.825rem;color:#64748b;">Please enter the current stock of products purchased from us.</span>
+                            </label>
+                            <div style="border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto;max-width:560px;margin-top:0.5rem;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
+                                    <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                        <tr>
+                                            <th style="padding:0.6rem 0.85rem;font-weight:700;color:#475569;text-align:left;">Product</th>
+                                            <th style="padding:0.6rem 0.85rem;font-weight:700;color:#475569;text-align:center;">Purchased Qty</th>
+                                            <th style="padding:0.6rem 0.85rem;font-weight:700;color:#475569;text-align:center;">Current Stock (Qty) <span style="color:#ef4444;">*</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="visitCurrentStockTbody">
+                                        <!-- Dynamically loaded for dealers with prior purchases -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Custom Questions Container -->
+                        <div id="customQuestionsContainer" style="display:flex;flex-direction:column;gap:1rem;"></div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-card" onclick="closeNewVisitModal()">Cancel</button>
+                    <button type="submit" class="btn-amber">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Visit Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD CUSTOM QUESTION MODAL -->
+    <div id="addQuestionModal" class="modal-overlay">
+        <div class="modal-container" style="max-width:450px;">
+            <div class="modal-header">
+                <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0;">+ Add Custom Question</h3>
+                <button type="button" onclick="closeAddQuestionModal()" style="background:none;border:none;font-size:1.2rem;color:#94a3b8;cursor:pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size:0.8rem;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Question Prompt / Title *</label>
+                <input type="text" id="newQuestionTitleInput" placeholder="e.g. Any issues with existing stock?" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.65rem 0.85rem;font-size:0.85rem;outline:none;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline-card" onclick="closeAddQuestionModal()">Cancel</button>
+                <button type="button" class="btn-amber" onclick="handleAddCustomQuestion()">Add Question</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT VISIT RECORD MODAL -->
+    <div id="editVisitModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div>
+                    <h3 style="font-size:1.1rem;font-weight:800;color:#0f172a;margin:0;">Edit Visit Record</h3>
+                    <p style="margin:2px 0 0 0;font-size:0.8rem;color:#64748b;">Update visit details and questionnaire responses</p>
+                </div>
+                <button type="button" onclick="closeEditVisitModal()" style="background:none;border:none;font-size:1.25rem;color:#64748b;cursor:pointer;padding:4px 8px;border-radius:6px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="editVisitForm" onsubmit="handleEditVisitSubmit(event)" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                <input type="hidden" id="evVisitId">
+                <div class="modal-body" style="display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem 1.75rem;">
+                    
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+                        <h4 style="font-size:0.9rem;font-weight:800;color:#0f172a;margin:0;display:flex;align-items:center;gap:0.5rem;border-bottom:1px solid #e2e8f0;padding-bottom:0.6rem;">
+                            <i class="fa-solid fa-store" style="color:#f59e0b;"></i> Step 1: Firm & Dealer Information
+                        </h4>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Firm / Shop Name <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="evFirmName" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Dealer Name (Contact Person) <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="evDealerName" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Contact Number (Phone) <span style="color:#ef4444;">*</span></label>
+                                <input type="tel" id="evContact" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Location / Town / Address <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="evLocation" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Visited Date <span style="color:#ef4444;">*</span></label>
+                                <input type="date" id="evVisitedDate" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Visited By Staff <span style="color:#ef4444;">*</span></label>
+                                <input type="text" id="evVisitedBy" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:1.25rem;">
+                        <h4 style="font-size:0.9rem;font-weight:800;color:#0f172a;margin:0;display:flex;align-items:center;gap:0.5rem;border-bottom:1px solid #e2e8f0;padding-bottom:0.6rem;">
+                            <i class="fa-solid fa-clipboard-question" style="color:#f59e0b;"></i> Step 2: Survey Questions & Answers
+                        </h4>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                1. What are your main requirements from SGB Agro?
+                            </label>
+                            <textarea id="evVisitReq" rows="2" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                2. What major crops do you grow/sell in your area?
+                            </label>
+                            <textarea id="evVisitCrops" rows="2" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                3. Which products do you sell the most?
+                            </label>
+                            <textarea id="evVisitTopProducts" rows="2" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                4. Approximately how many brush cutters do you sell per year?
+                            </label>
+                            <input type="number" id="evVisitBrushCuttersQty" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                5. Which companies/brands of brush cutters do you currently sell?
+                            </label>
+                            <textarea id="evVisitBrushCuttersBrands" rows="2" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                6. Who are your major competitors?
+                            </label>
+                            <textarea id="evVisitCompetitors" rows="2" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                7. How many branches do you have and where are they located?
+                            </label>
+                            <textarea id="evVisitBranches" rows="2" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;resize:vertical;background:#f8fafc;font-family:inherit;"></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                8. How many people are working in your business?
+                            </label>
+                            <input type="number" id="evVisitStaffCount" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
+                                9. How many years has your shop/business been running?
+                            </label>
+                            <input type="number" id="evVisitBusinessYears" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-card" onclick="closeEditVisitModal()">Cancel</button>
+                    <button type="submit" class="btn-amber">
+                        <i class="fa-solid fa-floppy-disk"></i> Update Visit Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/visits.js"></script>
+</body>
+
+</html>

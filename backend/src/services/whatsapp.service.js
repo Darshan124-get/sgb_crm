@@ -1,6 +1,8 @@
 const axios = require('axios');
 const logger = require('../utils/whatsappLogger');
 
+const { formatForWhatsApp } = require('../utils/phoneUtils');
+
 const API_VERSION = 'v21.0';
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
 
@@ -12,10 +14,11 @@ const phoneNumberId = process.env.PHONE_NUMBER_ID;
  */
 const sendMessage = async (to, text, replyToMessageId = null) => {
   try {
+    const recipient = formatForWhatsApp(to);
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to,
+      to: recipient,
       type: 'text',
       text: { body: text },
     };
@@ -81,13 +84,14 @@ const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
  */
 const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null) => {
   try {
+    const recipient = formatForWhatsApp(to);
     const mediaObj = mediaId.startsWith('http') ? { link: mediaId } : { id: mediaId };
     if (caption) mediaObj.caption = caption;
 
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to,
+      to: recipient,
       type: type, // 'image', 'document', 'video', 'audio'
       [type]: mediaObj,
     };
@@ -144,10 +148,11 @@ const downloadMedia = async (mediaId) => {
  */
 const sendButtons = async (to, text, buttons) => {
   try {
+    const recipient = formatForWhatsApp(to);
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to,
+      to: recipient,
       type: 'interactive',
       interactive: {
         type: 'button',
@@ -180,10 +185,11 @@ const sendButtons = async (to, text, buttons) => {
  */
 const sendList = async (to, text, buttonLabel, rows) => {
   try {
+    const recipient = formatForWhatsApp(to);
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to,
+      to: recipient,
       type: 'interactive',
       interactive: {
         type: 'list',

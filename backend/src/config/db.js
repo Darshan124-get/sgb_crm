@@ -18,17 +18,33 @@ const pool = mysql.createPool({
     timezone: '+00:00'
 });
 
+// Helper to identify transient network / connection timeout errors
+function isRetryableDbError(err) {
+    if (!err) return false;
+    const code = err.code || '';
+    const msg = err.message || '';
+    return (
+        code === 'ECONNRESET' ||
+        code === 'PROTOCOL_CONNECTION_LOST' ||
+        code === 'ETIMEDOUT' ||
+        code === 'EPIPE' ||
+        msg.includes('ETIMEDOUT') ||
+        msg.includes('PROTOCOL_CONNECTION_LOST') ||
+        msg.includes('ECONNRESET')
+    );
+}
+
 // Intercept connection errors to prevent ECONNRESET/PROTOCOL_CONNECTION_LOST in pool
 pool.on('connection', (connection) => {
     connection.on('error', (err) => {
-        if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET') {
-            console.warn('[DB] Connection lost/reset in pool, destroying connection socket:', err.message);
+        if (isRetryableDbError(err)) {
+            console.warn('[DB] Connection socket error in pool, destroying socket:', err.message);
             connection.destroy();
         }
     });
 });
 
-// Wrap execute, query, and getConnection to auto-retry once on connection resets
+// Wrap execute, query, and getConnection to auto-retry once on connection resets/timeouts
 const originalQuery = pool.query.bind(pool);
 const originalExecute = pool.execute.bind(pool);
 const originalGetConnection = pool.getConnection.bind(pool);
@@ -37,8 +53,8 @@ pool.query = async function (...args) {
     try {
         return await originalQuery(...args);
     } catch (err) {
-        if (err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST') {
-            console.warn(`[DB] Query failed due to connection reset (${err.code}). Retrying query...`);
+        if (isRetryableDbError(err)) {
+            console.warn(`[DB] Query failed due to connection error (${err.code || err.message}). Retrying query...`);
             return await originalQuery(...args);
         }
         throw err;
@@ -49,8 +65,8 @@ pool.execute = async function (...args) {
     try {
         return await originalExecute(...args);
     } catch (err) {
-        if (err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST') {
-            console.warn(`[DB] Execute failed due to connection reset (${err.code}). Retrying execute...`);
+        if (isRetryableDbError(err)) {
+            console.warn(`[DB] Execute failed due to connection error (${err.code || err.message}). Retrying execute...`);
             return await originalExecute(...args);
         }
         throw err;
@@ -61,8 +77,8 @@ pool.getConnection = async function (...args) {
     try {
         return await originalGetConnection(...args);
     } catch (err) {
-        if (err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST') {
-            console.warn(`[DB] getConnection failed due to connection reset (${err.code}). Retrying...`);
+        if (isRetryableDbError(err)) {
+            console.warn(`[DB] getConnection failed due to connection error (${err.code || err.message}). Retrying...`);
             return await originalGetConnection(...args);
         }
         throw err;

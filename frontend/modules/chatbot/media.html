@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Products & Media | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="./css/products-media.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.SVG_PRODUCT_PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YxZjVmOSIvPjxwYXRoIGQ9Ik0zMCAzMGg0MHY0MEgzMHoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzk4YTNjOCIgc3Ryb2tlLXdpZHRoPSI0Ii8+PGNpcmNsZSBjeD0iNDIiIGN5PSI0MiIgcj0iNSIgZmlsbD0iIzk4YTNjOCIvPjxwYXRoIGQ9Ik0zMCA2MmwxMi0xMiAxMCAxMCAxMC0xMCA8IDEyIiBzdHJva2U9IiM5OGEzYzgiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==";
+        window.handleImageError = function(img) {
+            if (img) {
+                img.onerror = null;
+                img.src = window.SVG_PRODUCT_PLACEHOLDER;
+            }
+        };
+    </script>
+</head>
+<body>
+
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Navigation Container (Loaded dynamically by components.js) -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main CRM Content Area -->
+        <main class="main-content" style="height: 100vh; overflow: hidden;">
+            <div class="products-media-wrapper">
+
+                <!-- Breadcrumb Nav -->
+                <div class="pm-breadcrumb">
+                    <span>Chatbot</span>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 9px;"></i>
+                    <span class="current">Products & Media</span>
+                </div>
+
+                <!-- Page Header Flex -->
+                <div class="pm-header-flex">
+                    <div class="pm-header-title">
+                        <h1>Products & Media</h1>
+                        <p>Manage machinery products, images, videos and media catalog used across your chatbot flows.</p>
+                    </div>
+                    <div class="pm-header-actions">
+                        <button class="btn-pm-ghost" id="btn-how-it-works">
+                            <i class="fa-regular fa-circle-question"></i> How it works?
+                        </button>
+                        <button class="btn-pm-outline" id="btn-add-product-hdr">
+                            <i class="fa-solid fa-plus"></i> Add Product
+                        </button>
+                        <button class="btn-pm-outline" id="btn-open-media-lib">
+                            <i class="fa-regular fa-folder-open"></i> Media Library
+                        </button>
+                        <button class="btn-pm-primary" id="btn-import-products">
+                            <i class="fa-solid fa-file-import"></i> Import Products
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3-Column Layout Grid -->
+                <div class="pm-layout-grid" id="pm-main-grid">
+
+                    <!-- COLUMN 1: LEFT FILTER SIDEBAR PANEL -->
+                    <aside class="pm-sidebar-panel">
+
+                        <!-- Card 1: Product Categories -->
+                        <div class="pm-sidebar-card">
+                            <div class="pm-card-hdr">
+                                <h3>Product Categories</h3>
+                                <button class="btn-icon-add" id="btn-add-category" title="Add Category">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <ul class="pm-cat-list" id="pm-cat-list">
+                                <li class="pm-cat-item active" data-cat="all">
+                                    <span>All Categories</span>
+                                    <span class="pm-cat-badge" id="cat-count-all">48</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Full Set Machines">
+                                    <span>Full Set Machines</span>
+                                    <span class="pm-cat-badge">12</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Trolley">
+                                    <span>Trolley</span>
+                                    <span class="pm-cat-badge">8</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Dumper">
+                                    <span>Dumper</span>
+                                    <span class="pm-cat-badge">6</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Tractor">
+                                    <span>Tractor</span>
+                                    <span class="pm-cat-badge">7</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Brush Cutter">
+                                    <span>Brush Cutter</span>
+                                    <span class="pm-cat-badge">5</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Power Sprayer">
+                                    <span>Power Sprayer</span>
+                                    <span class="pm-cat-badge">4</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Attachments">
+                                    <span>Attachments</span>
+                                    <span class="pm-cat-badge">3</span>
+                                </li>
+                                <li class="pm-cat-item" data-cat="Accessories">
+                                    <span>Accessories</span>
+                                    <span class="pm-cat-badge">3</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Card 2: Media Types -->
+                        <div class="pm-sidebar-card">
+                            <div class="pm-card-hdr">
+                                <h3>Media Types</h3>
+                            </div>
+                            <ul class="pm-cat-list">
+                                <li class="pm-cat-item active" data-type="all">
+                                    <span><i class="fa-solid fa-layer-group" style="color: #4f46e5; margin-right: 8px;"></i> All Media</span>
+                                    <span class="pm-cat-badge" id="count-media-all">0</span>
+                                </li>
+                                <li class="pm-cat-item" data-type="images">
+                                    <span><i class="fa-regular fa-image" style="color: #6366f1; margin-right: 8px;"></i> Images</span>
+                                    <span class="pm-cat-badge" id="count-media-images">0</span>
+                                </li>
+                                <li class="pm-cat-item" data-type="videos">
+                                    <span><i class="fa-regular fa-circle-play" style="color: #06b6d4; margin-right: 8px;"></i> Videos</span>
+                                    <span class="pm-cat-badge" id="count-media-videos">0</span>
+                                </li>
+                                <li class="pm-cat-item" data-type="documents">
+                                    <span><i class="fa-regular fa-file-lines" style="color: #f59e0b; margin-right: 8px;"></i> Documents</span>
+                                    <span class="pm-cat-badge" id="count-media-documents">0</span>
+                                </li>
+                                <li class="pm-cat-item" data-type="gifs">
+                                    <span><i class="fa-solid fa-file-image" style="color: #ec4899; margin-right: 8px;"></i> GIFs</span>
+                                    <span class="pm-cat-badge" id="count-media-gifs">0</span>
+                                </li>
+                                <li class="pm-cat-item" data-type="audio">
+                                    <span><i class="fa-solid fa-headphones" style="color: #10b981; margin-right: 8px;"></i> Audio</span>
+                                    <span class="pm-cat-badge" id="count-media-audio">0</span>
+                                </li>
+                                <li class="pm-cat-item" data-type="other">
+                                    <span><i class="fa-solid fa-box-archive" style="color: #64748b; margin-right: 8px;"></i> Other Files</span>
+                                    <span class="pm-cat-badge" id="count-media-other">0</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Card 3: Storage Usage -->
+                        <div class="storage-widget">
+                            <div class="storage-stats">
+                                <span>Storage Usage</span>
+                                <span style="color: #4f46e5;" id="storage-percentage-lbl">0%</span>
+                            </div>
+                            <div class="storage-progress-bar">
+                                <div class="storage-progress-fill" id="storage-progress-fill" style="width: 0%;"></div>
+                            </div>
+                            <div style="font-size: 0.775rem; color: #64748b; margin-bottom: 12px; display: flex; justify-content: space-between;">
+                                <span id="storage-used-lbl">0 MB used</span>
+                                <span id="storage-total-lbl">5 GB total</span>
+                            </div>
+                            <button class="btn-manage-storage" id="btn-manage-storage">
+                                <i class="fa-solid fa-database" style="margin-right: 4px;"></i> Manage Storage
+                            </button>
+                        </div>
+
+                    </aside>
+
+                    <!-- COLUMN 2: MAIN CENTRAL WORKSPACE PANEL -->
+                    <main class="pm-main-panel">
+
+                        <!-- Top Tab Bar -->
+                        <div class="pm-top-tabs-card">
+                            <button class="pm-tab-btn active" id="tab-btn-products">
+                                <i class="fa-solid fa-box"></i> Products <span class="tab-count-badge" id="products-total-count">0</span>
+                            </button>
+                            <button class="pm-tab-btn" id="tab-btn-media">
+                                <i class="fa-regular fa-folder-open"></i> Media Library <span class="tab-count-badge" id="media-total-count">0</span>
+                            </button>
+                        </div>
+
+                        <!-- Filter & Search Controls Bar -->
+                        <div class="pm-filter-bar">
+                            <div class="pm-search-box">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="pm-search-input" name="pm_search_input" aria-label="Search products" placeholder="Search products by name, category or tags..." />
+                            </div>
+
+                            <select class="pm-select-filter" id="filter-status" name="filter_status" aria-label="Filter status">
+                                <option value="all">All Status</option>
+                                <option value="active">Active Only</option>
+                                <option value="draft">Draft Only</option>
+                            </select>
+
+                            <select class="pm-select-filter" id="filter-category" name="filter_category" aria-label="Filter category">
+                                <option value="all">All Categories</option>
+                                <!-- Rendered dynamically -->
+                            </select>
+
+                            <select class="pm-select-filter" id="filter-sort" name="filter_sort" aria-label="Sort products">
+                                <option value="latest">Sort by: Latest</option>
+                                <option value="price_low">Price: Low to High</option>
+                                <option value="price_high">Price: High to Low</option>
+                                <option value="name">Name: A-Z</option>
+                            </select>
+
+                            <div class="pm-view-switcher">
+                                <button class="pm-view-btn active" id="view-mode-list" title="List View">
+                                    <i class="fa-solid fa-list"></i>
+                                </button>
+                                <button class="pm-view-btn" id="view-mode-grid" title="Grid View">
+                                    <i class="fa-solid fa-border-all"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- TAB VIEW 1: PRODUCTS TABLE & GRID WORKSPACE -->
+                        <div id="products-view-container">
+                            <!-- Option A: Table View Card -->
+                            <div class="pm-table-card" id="products-table-card">
+                                <div class="pm-table-wrapper">
+                                    <table class="pm-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>Category</th>
+                                                <th>Price</th>
+                                                <th>Status</th>
+                                                <th>Used In Flows</th>
+                                                <th>Updated On</th>
+                                                <th style="width: 110px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="products-table-body">
+                                            <!-- Dynamically rendered by products-media.js -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination Footer -->
+                                <div class="pm-pagination-bar">
+                                    <div id="pm-pagination-info">Showing 0 of 0 products</div>
+                                    <div class="pm-page-numbers" id="pm-pagination-controls">
+                                        <button class="pm-page-btn active">1</button>
+                                    </div>
+                                    <select class="pm-select-filter" id="pm-per-page-select" name="pm_per_page_select" aria-label="Products per page" style="padding: 4px 8px; font-size: 0.8rem;">
+                                        <option value="10">10 / page</option>
+                                        <option value="25">25 / page</option>
+                                        <option value="50" selected>50 / page</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Option B: Grid View Card (Hidden by default) -->
+                            <div class="pm-table-card" id="products-grid-card" style="display: none; padding: 20px;">
+                                <div id="products-grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+                                    <!-- Dynamically rendered product cards -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB VIEW 2: MEDIA LIBRARY GRID (Hidden by Default) -->
+                        <div id="media-library-view-container" style="display: none;">
+                            <div class="pm-table-card" style="padding: 24px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                    <div>
+                                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Media Assets Grid</h3>
+                                        <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Uploaded images, spec PDFs, and videos stored for flow use.</p>
+                                    </div>
+                                    <button class="btn-pm-primary" id="btn-upload-media-lib" style="padding: 6px 14px; font-size: 0.85rem;">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload Media
+                                    </button>
+                                </div>
+
+                                <div id="media-library-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px;">
+                                    <!-- Rendered dynamically by products-media.js -->
+                                </div>
+                            </div>
+                        </div>
+
+                    </main>
+
+                    <!-- COLUMN 3: RIGHT PRODUCT DETAILS DRAWER PANEL -->
+                    <aside class="pm-details-drawer" id="pm-details-drawer">
+                        <!-- Drawer Header -->
+                        <div class="drawer-hdr">
+                            <h2>Product Details</h2>
+                            <button class="btn-drawer-close" id="btn-close-drawer" title="Close Panel">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Drawer Content Body -->
+                        <div class="drawer-body">
+                            <!-- Image / Video Main Gallery Preview -->
+                            <div class="drawer-gallery">
+                                <div id="drawer-main-preview-box" style="position: relative; width: 100%; height: 180px; border-radius: 8px; overflow: hidden; background: #0f172a; display: flex; align-items: center; justify-content: center;">
+                                    <img src="" id="drawer-main-img" class="main-preview-img" alt="Product Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="handleImageError(this)" />
+                                    <video id="drawer-main-video" controls style="width: 100%; height: 100%; display: none; object-fit: contain; background: #000;"></video>
+                                </div>
+                                <div class="thumb-strip" id="drawer-thumb-strip" style="margin-top: 8px; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
+                                    <!-- Dynamic Gallery Thumbnails rendered by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Product Title & Info -->
+                            <div class="drawer-title-box">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                                    <h3 id="drawer-title" style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #0f172a;">Machine 12K</h3>
+                                    <span class="badge-status active" id="drawer-status">• Active</span>
+                                </div>
+                                <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;" id="drawer-sku">Full Set Machine • SKU: FSM-12K</div>
+                                <div class="drawer-price" id="drawer-price" style="font-size: 1.25rem; font-weight: 800; color: #4f46e5; margin-top: 4px;">₹12,000</div>
+                            </div>
+
+                            <!-- Sub Tabs -->
+                            <div class="drawer-sub-tabs">
+                                <button class="drawer-sub-tab active" data-drawer-tab="overview">Overview</button>
+                                <button class="drawer-sub-tab" data-drawer-tab="media">Media (<span id="drawer-media-count">0</span>)</button>
+                                <button class="drawer-sub-tab" data-drawer-tab="flows">Used In Flows (<span id="drawer-flows-count">0</span>)</button>
+                            </div>
+
+                            <!-- Drawer Tab 1: Overview -->
+                            <div id="drawer-panel-overview">
+                                <div style="margin-bottom: 16px;">
+                                    <div class="drawer-section-title">Description</div>
+                                    <p style="font-size: 0.85rem; color: #334155; line-height: 1.5; margin: 0;" id="drawer-desc">
+                                        No description available.
+                                    </p>
+                                </div>
+
+                                <div style="margin-bottom: 16px;">
+                                    <div class="drawer-section-title">Specifications</div>
+                                    <div class="specs-list" id="drawer-specs">
+                                        <!-- Rendered dynamically -->
+                                    </div>
+                                </div>
+
+                                <div style="margin-bottom: 16px;">
+                                    <div class="drawer-section-title">Tags</div>
+                                    <div class="tags-flex" id="drawer-tags">
+                                        <!-- Rendered dynamically -->
+                                    </div>
+                                </div>
+
+                                <div style="font-size: 0.75rem; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 16px;">
+                                    <div id="drawer-created">Created On: --</div>
+                                    <div id="drawer-updated">Last Updated: --</div>
+                                </div>
+                            </div>
+
+                            <!-- Drawer Tab 2: Media Assets -->
+                            <div id="drawer-panel-media" style="display: none;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">Product Media Gallery</span>
+                                    <input type="file" id="inp-drawer-media-file" multiple accept="image/*,video/*,application/pdf" style="display: none;" />
+                                    <button type="button" class="btn-pm-outline" id="btn-upload-drawer-media" style="font-size: 0.75rem; padding: 4px 10px;">
+                                        <i class="fa-solid fa-plus"></i> Add Media
+                                    </button>
+                                </div>
+                                <div id="drawer-media-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                    <!-- Dynamic media items -->
+                                </div>
+                            </div>
+
+                            <!-- Drawer Tab 3: Used In Flows -->
+                            <div id="drawer-panel-flows" style="display: none;">
+                                <div class="drawer-section-title" style="margin-bottom: 8px;">Associated Chatbot Flows</div>
+                                <div id="drawer-flows-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- Dynamic flows items -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Drawer Footer -->
+                        <div class="drawer-footer">
+                            <button class="btn-drawer-outline" id="btn-drawer-edit">
+                                <i class="fa-regular fa-pen-to-square"></i> Edit Product
+                            </button>
+                            <button class="btn-drawer-danger" id="btn-drawer-delete" title="Delete Product">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </aside>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: ADD NEW PRODUCT (4-STEP WIZARD) -->
+    <div class="pm-modal-overlay" id="modal-add-product">
+        <div class="pm-modal-box">
+            <div class="pm-modal-hdr">
+                <h3>Add New Product</h3>
+                <button class="btn-drawer-close" id="btn-close-add-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="pm-modal-body">
+
+                <!-- Step Progress Header -->
+                <div class="wizard-steps-bar">
+                    <div class="wizard-step-item active" id="step-ind-1">
+                        <div class="step-num-circle">1</div>
+                        <span>Basic Info</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 9px; color: #cbd5e1;"></i>
+                    <div class="wizard-step-item" id="step-ind-2">
+                        <div class="step-num-circle">2</div>
+                        <span>Details & Specs</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 9px; color: #cbd5e1;"></i>
+                    <div class="wizard-step-item" id="step-ind-3">
+                        <div class="step-num-circle">3</div>
+                        <span>Media Upload</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 9px; color: #cbd5e1;"></i>
+                    <div class="wizard-step-item" id="step-ind-4">
+                        <div class="step-num-circle">4</div>
+                        <span>Success</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Basic Info -->
+                <div id="wizard-step-1">
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Product Name *</label>
+                            <input type="text" id="inp-prod-name" class="pm-search-box" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="e.g. Machine 12K Power Tiller" />
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div>
+                                <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Category *</label>
+                                <select id="inp-prod-cat" class="pm-select-filter" style="width: 100%; padding: 10px;">
+                                    <option value="Full Set Machines">Full Set Machines</option>
+                                    <option value="Trolley">Trolley</option>
+                                    <option value="Dumper">Dumper</option>
+                                    <option value="Tractor">Tractor</option>
+                                    <option value="Attachments">Attachments</option>
+                                    <option value="Accessories">Accessories</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Price (₹) *</label>
+                                <input type="number" id="inp-prod-price" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="12000" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">SKU Code</label>
+                            <input type="text" id="inp-prod-sku" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="e.g. FSM-12K" />
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                        <button class="btn-pm-outline" id="btn-cancel-add-wizard">Cancel</button>
+                        <button class="btn-pm-primary" id="btn-next-step1">Next: Details & Specs <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Product Details & Specs -->
+                <div id="wizard-step-2" style="display: none;">
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Product Description</label>
+                            <textarea id="inp-prod-desc" rows="3" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="Write product highlights, farm benefits, and key features..."></textarea>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Product Specifications</label>
+                                <button type="button" id="btn-add-wizard-spec" style="background: none; border: none; color: #4f46e5; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-plus"></i> Add Spec Row
+                                </button>
+                            </div>
+                            <div id="wizard-specs-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto;">
+                                <!-- Dynamic key-value spec input rows -->
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Tags (Comma separated)</label>
+                            <input type="text" id="inp-prod-tags" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="e.g. full set, power tiller, 12k, agriculture" />
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 24px;">
+                        <button class="btn-pm-outline" id="btn-prev-step2"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                        <button class="btn-pm-primary" id="btn-next-step2">Next: Media Upload <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Media Upload -->
+                <div id="wizard-step-3" style="display: none;">
+                    <input type="file" id="inp-wizard-media-files" multiple accept="image/*,video/*,.pdf" style="display: none;" />
+                    <div class="pm-dropzone" id="pm-dropzone-wizard" style="cursor: pointer;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: #4f46e5; margin-bottom: 8px;"></i>
+                        <h4 style="margin: 4px 0; font-size: 0.95rem; font-weight: 700; color: #0f172a;">Drag & drop product images or videos here</h4>
+                        <p style="margin: 0; font-size: 0.8rem; color: #64748b;">Supports JPG, PNG, MP4, PDF (Max 20MB per file)</p>
+                        <button type="button" class="btn-pm-outline" id="btn-browse-wizard-media" style="margin-top: 12px; font-size: 0.8rem;">
+                            <i class="fa-solid fa-folder-open"></i> Browse Files
+                        </button>
+                    </div>
+
+                    <!-- Uploaded Media Preview List -->
+                    <div id="wizard-media-previews-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px; max-height: 180px; overflow-y: auto;">
+                        <!-- Dynamically rendered upload items -->
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 24px;">
+                        <button class="btn-pm-outline" id="btn-prev-step3"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                        <button class="btn-pm-primary" id="btn-save-product"><i class="fa-solid fa-check"></i> Save Product</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Success Screen -->
+                <div id="wizard-step-4" style="display: none; text-align: center; padding: 24px 0;">
+                    <div style="width: 60px; height: 60px; border-radius: 50%; background: #ecfdf5; color: #10b981; display: inline-flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 14px;">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <h3 style="font-size: 1.3rem; font-weight: 800; color: #0f172a; margin-bottom: 6px;">Product Added Successfully!</h3>
+                    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 24px;">Product has been saved and can now be attached to WhatsApp chatbot flows.</p>
+                    <button class="btn-pm-primary" id="btn-done-success">Done & Close</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: IMPORT PRODUCTS BULK -->
+    <div class="pm-modal-overlay" id="modal-import-products">
+        <div class="pm-modal-box" style="max-width: 540px;">
+            <div class="pm-modal-hdr">
+                <h3><i class="fa-solid fa-file-import" style="color: #4f46e5; margin-right: 8px;"></i> Import Products</h3>
+                <button class="btn-drawer-close" id="btn-close-import-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="pm-modal-body">
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">
+                    Upload a JSON or CSV dataset of machinery products, or paste JSON data below to import into your catalog.
+                </p>
+                <div style="margin-bottom: 14px;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Paste JSON Data or Array</label>
+                    <textarea id="txt-import-json" rows="6" style="width: 100%; padding: 10px; font-family: monospace; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder='[
+  {
+    "name": "Machine 28K Heavy",
+    "category": "Full Set Machines",
+    "price": 28000,
+    "sku": "FSM-28K",
+    "description": "28 HP heavy diesel tiller for tough soils"
+  }
+]'></textarea>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn-pm-ghost" id="btn-load-sample-json" style="font-size: 0.8rem;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Load Sample Data
+                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-pm-outline" id="btn-cancel-import">Cancel</button>
+                        <button class="btn-pm-primary" id="btn-submit-import">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Import Products
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: MANAGE STORAGE & CLEANUP -->
+    <div class="pm-modal-overlay" id="modal-manage-storage">
+        <div class="pm-modal-box" style="max-width: 500px;">
+            <div class="pm-modal-hdr">
+                <h3><i class="fa-solid fa-database" style="color: #4f46e5; margin-right: 8px;"></i> Storage & Supabase Bucket Details</h3>
+                <button class="btn-drawer-close" id="btn-close-storage-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="pm-modal-body">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 700; font-size: 0.9rem; color: #0f172a;">
+                        <span>Supabase Bucket: <code style="color: #4f46e5;">chatbot-media</code></span>
+                        <span id="storage-modal-pct" style="color: #10b981;">0% Used</span>
+                    </div>
+                    <div class="storage-progress-bar" style="height: 10px; margin-bottom: 10px;">
+                        <div class="storage-progress-fill" id="storage-modal-fill" style="width: 0%; height: 100%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
+                        <span id="storage-modal-used">0 MB used</span>
+                        <span>5.0 GB total limit</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 8px 12px; background: #fff; border: 1px solid #f1f5f9; border-radius: 6px;">
+                        <span><i class="fa-regular fa-image" style="color: #6366f1; margin-right: 8px;"></i> Product Images & Thumbnails</span>
+                        <strong id="storage-count-images">Calculated dynamically</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 8px 12px; background: #fff; border: 1px solid #f1f5f9; border-radius: 6px;">
+                        <span><i class="fa-regular fa-circle-play" style="color: #06b6d4; margin-right: 8px;"></i> Demo Videos</span>
+                        <strong id="storage-count-videos">Calculated dynamically</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 8px 12px; background: #fff; border: 1px solid #f1f5f9; border-radius: 6px;">
+                        <span><i class="fa-regular fa-file-lines" style="color: #f59e0b; margin-right: 8px;"></i> Spec Manuals & PDFs</span>
+                        <strong id="storage-count-docs">Calculated dynamically</strong>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn-pm-outline" id="btn-clean-temp-storage"><i class="fa-solid fa-broom"></i> Clean Orphan Files</button>
+                    <button class="btn-pm-primary" id="btn-close-storage-done">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: EDIT PRODUCT -->
+    <div class="pm-modal-overlay" id="modal-edit-product">
+        <div class="pm-modal-box" style="max-width: 580px;">
+            <div class="pm-modal-hdr">
+                <h3>Edit Product</h3>
+                <button class="btn-modal-close" id="btn-close-edit-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="pm-modal-body" style="display: flex; flex-direction: column; gap: 14px; max-height: 480px; overflow-y: auto;">
+                <input type="hidden" id="edit-prod-id" />
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Product Name *</label>
+                        <input type="text" id="edit-prod-name" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" required />
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Category *</label>
+                        <select id="edit-prod-cat" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            <!-- Filled dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Price (₹) *</label>
+                        <input type="number" id="edit-prod-price" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" required />
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Status</label>
+                        <select id="edit-prod-status" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            <option value="active">Active</option>
+                            <option value="draft">Draft</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">SKU Code</label>
+                        <input type="text" id="edit-prod-sku" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" />
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Main Image URL</label>
+                        <input type="text" id="edit-prod-img" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="https://..." />
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Description</label>
+                    <textarea id="edit-prod-desc" rows="3" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;"></textarea>
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Specifications</label>
+                        <button type="button" id="btn-add-edit-spec" style="background: none; border: none; color: #4f46e5; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+                            <i class="fa-solid fa-plus"></i> Add Spec
+                        </button>
+                    </div>
+                    <div id="edit-specs-container" style="display: flex; flex-direction: column; gap: 6px;">
+                        <!-- Dynamic key value rows -->
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #1e293b; display: block; margin-bottom: 4px;">Tags (Comma separated)</label>
+                    <input type="text" id="edit-prod-tags" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" />
+                </div>
+            </div>
+            <div class="pm-modal-ftr" style="display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #e2e8f0;">
+                <button class="btn-pm-outline" id="btn-cancel-edit">Cancel</button>
+                <button class="btn-pm-primary" id="btn-save-edit-prod"><i class="fa-solid fa-check"></i> Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: HOW IT WORKS INSTRUCTIONS & GUIDE -->
+    <div class="pm-modal-overlay" id="modal-how-it-works">
+        <div class="pm-modal-box" style="max-width: 720px; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div class="pm-modal-hdr" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: #ffffff; padding: 18px 24px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                        <i class="fa-solid fa-circle-question"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #ffffff;">How Products & Media Catalog Works</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #e0e7ff;">Complete guide to managing products, media assets, and connecting to WhatsApp Chatbot flows</p>
+                    </div>
+                </div>
+                <button class="btn-drawer-close" id="btn-close-how-it-works" style="color: #ffffff; background: rgba(255,255,255,0.15); border: none; border-radius: 6px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="pm-modal-body" style="padding: 24px; max-height: 520px; overflow-y: auto;">
+                
+                <!-- Quick Summary Banner -->
+                <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start;">
+                    <i class="fa-solid fa-lightbulb" style="color: #4f46e5; font-size: 1.25rem; margin-top: 2px;"></i>
+                    <div style="font-size: 0.85rem; color: #312e81; line-height: 1.5;">
+                        <strong>Purpose of Products & Media Module:</strong>
+                        This module serves as the central inventory repository for all agricultural machinery, equipment, media files, and technical specifications. The WhatsApp Chatbot automatically fetches products, images, and spec sheets from here when responding to farmer inquiries.
+                    </div>
+                </div>
+
+                <!-- 4 Step Guide Cards Grid -->
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    
+                    <!-- Feature 1 -->
+                    <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; background: #ffffff; display: flex; gap: 14px; align-items: flex-start;">
+                        <div style="width: 40px; height: 40px; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+                            <i class="fa-solid fa-box-archive"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700; color: #0f172a;">1. Add & Manage Products</h4>
+                            <p style="margin: 0; font-size: 0.825rem; color: #475569; line-height: 1.5;">
+                                Create products using the <strong>+ Add Product Wizard</strong> or batch import using <strong>Import Products JSON</strong>. Categorize machines into <em>Full Set Machines, Trolley, Dumper, Attachments, or Accessories</em>. Set status to <strong>Active</strong> to enable them in WhatsApp sales workflows.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; background: #ffffff; display: flex; gap: 14px; align-items: flex-start;">
+                        <div style="width: 40px; height: 40px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+                            <i class="fa-solid fa-photo-film"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700; color: #0f172a;">2. Media Gallery & Cloud Storage</h4>
+                            <p style="margin: 0; font-size: 0.825rem; color: #475569; line-height: 1.5;">
+                                Upload images (JPG/PNG), demonstration videos (MP4), and technical manuals (PDF) directly to products or the Media Library. All files are securely saved in <strong>Supabase Storage</strong> (`chatbot-media` bucket) with local storage backup.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; background: #ffffff; display: flex; gap: 14px; align-items: flex-start;">
+                        <div style="width: 40px; height: 40px; border-radius: 8px; background: #faf5ff; border: 1px solid #e9d5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+                            <i class="fa-solid fa-diagram-project"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700; color: #0f172a;">3. WhatsApp Flow Integration</h4>
+                            <p style="margin: 0; font-size: 0.825rem; color: #475569; line-height: 1.5;">
+                                In the <strong>Flow Builder</strong>, chatbot nodes reference products via SKU, ID, or trigger keywords (e.g. <em>"tiller"</em>, <em>"price"</em>). When triggered, the bot automatically formats and sends image cards, price tags, and specification sheets to the customer's WhatsApp chat.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; background: #ffffff; display: flex; gap: 14px; align-items: flex-start;">
+                        <div style="width: 40px; height: 40px; border-radius: 8px; background: #fff7ed; border: 1px solid #ffedd5; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+                            <i class="fa-solid fa-chart-pie"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700; color: #0f172a;">4. Storage & Usage Tracking</h4>
+                            <p style="margin: 0; font-size: 0.825rem; color: #475569; line-height: 1.5;">
+                                Track storage consumption in real-time with the <strong>Storage Usage Widget</strong>. Use <strong>Manage Storage</strong> to view asset counts or clean orphan files. View the <strong>Used In Flows</strong> tab inside product details to monitor active bot usage.
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+            
+            <div class="pm-modal-ftr" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <button class="btn-pm-outline" id="btn-how-start-wizard">
+                    <i class="fa-solid fa-plus"></i> Open Product Wizard
+                </button>
+                <button class="btn-pm-primary" id="btn-close-how-it-works-ftr">
+                    <i class="fa-solid fa-check"></i> Got It, Let's Start
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Core Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="./js/products-media.js"></script>
+</body>
+</html>

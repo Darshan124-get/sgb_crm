@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dealer Settings | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        html, body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden !important;
+            max-width: 100vw;
+        }
+
+        .dashboard-wrapper {
+            display: flex;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Container -->
+        <div id="sidebar-container" style="flex-shrink: 0;"></div>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Bar Header -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" placeholder="Search parameters...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">admin</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="content-body" style="padding: 1.5rem 2rem;">
+                <!-- Title Row -->
+                <div style="margin-bottom:1.5rem;">
+                    <h1 style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:0.25rem;">Dealer Settings</h1>
+                    <p style="color:#64748b;font-size:0.875rem;">Manage dealer panel preferences and configuration.</p>
+                </div>
+
+                <!-- Empty Settings Container (Ready for future settings) -->
+                <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:4rem 2rem;text-align:center;min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <div style="width:64px;height:64px;border-radius:50%;background:#F8FAFC;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                        <i class="fa-solid fa-sliders" style="color:#94A3B8;font-size:1.5rem;"></i>
+                    </div>
+                    <h3 style="margin:0 0 0.5rem 0;color:#334155;font-weight:700;font-size:1.1rem;">Dealer Settings</h3>
+                    <p style="margin:0;color:#64748b;font-size:0.875rem;max-width:420px;line-height:1.5;">This section is reserved for future dealer module configuration and custom settings.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/components.js"></script>
+</body>
+
+</html>

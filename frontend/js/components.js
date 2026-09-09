@@ -227,28 +227,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Inject Notification Bell dynamically ──
     const profileSection = document.querySelector('.profile-section');
-    if (profileSection && !profileSection.querySelector('.notif-bell')) {
-        const bellDiv = document.createElement('div');
-        bellDiv.className = 'notif-bell';
-        bellDiv.style.cssText = `
-            margin-right: 1.25rem;
-            position: relative;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        bellDiv.innerHTML = `
-            <i class="far fa-bell" style="font-size: 1.2rem; color: #6b7280; transition: color 0.2s;"></i>
-            <span id="notifBadge" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border-radius: 50%; width: 14px; height: 14px; font-size: 8px; display: none; align-items: center; justify-content: center; font-weight: 700; border: 1.5px solid white;">0</span>
-        `;
+    if (profileSection) {
+        const legacyBell = profileSection.querySelector('.notification-bell');
+        if (legacyBell) {
+            legacyBell.remove();
+        }
 
-        // Hover styling
-        const bellIcon = bellDiv.querySelector('i');
-        bellDiv.onmouseenter = () => bellIcon.style.color = '#1e293b';
-        bellDiv.onmouseleave = () => bellIcon.style.color = '#6b7280';
+        if (!profileSection.querySelector('.notif-bell')) {
+            const bellDiv = document.createElement('div');
+            bellDiv.className = 'notif-bell';
+            bellDiv.style.cssText = `
+                margin-right: 1.25rem;
+                position: relative;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            bellDiv.innerHTML = `
+                <i class="far fa-bell" style="font-size: 1.2rem; color: #6b7280; transition: color 0.2s;"></i>
+                <span id="notifBadge" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border-radius: 50%; width: 14px; height: 14px; font-size: 8px; display: none; align-items: center; justify-content: center; font-weight: 700; border: 1.5px solid white;">0</span>
+            `;
 
-        profileSection.prepend(bellDiv);
+            // Hover styling
+            const bellIcon = bellDiv.querySelector('i');
+            bellDiv.onmouseenter = () => bellIcon.style.color = '#1e293b';
+            bellDiv.onmouseleave = () => bellIcon.style.color = '#6b7280';
+
+            profileSection.prepend(bellDiv);
+        }
     }
 
     // ── Initialize FCM for Authenticated Users ──
@@ -319,6 +326,37 @@ function initSidebar(links) {
             }
         }
     });
+
+    // ── Dropdown Menu Toggling ──
+    const sidebarElement = document.querySelector('.sidebar');
+    if (sidebarElement) {
+        const dropdownToggles = sidebarElement.querySelectorAll('.dropdown-toggle');
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const navItem = toggle.closest('.nav-item.dropdown');
+                if (navItem) {
+                    // Close other dropdowns if any
+                    sidebarElement.querySelectorAll('.nav-item.dropdown').forEach(item => {
+                        if (item !== navItem) {
+                            item.classList.remove('open');
+                        }
+                    });
+                    navItem.classList.toggle('open');
+                }
+            });
+        });
+
+        // Automatically open dropdown if a child link is active
+        const activeSubLink = sidebarElement.querySelector('.nav-sub-bar a.active');
+        if (activeSubLink) {
+            const parentNavItem = activeSubLink.closest('.nav-item.dropdown');
+            if (parentNavItem) {
+                parentNavItem.classList.add('open');
+            }
+        }
+    }
 
     // Logout binding
     const logoutBtn = document.getElementById('logoutBtn');
@@ -2048,3 +2086,11 @@ function initGlobalSearch() {
         input.addEventListener('focus', () => console.log('Search focus...'));
     });
 }
+
+// Global protection: Prevent mouse wheel scroll from incrementing/decrementing number inputs
+document.addEventListener('wheel', function(e) {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+    }
+}, { passive: true });
+

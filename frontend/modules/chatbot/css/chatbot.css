@@ -1,0 +1,1416 @@
+/* ============================================================
+   chatbot.css — Redesigned Premium WhatsApp Flow Builder Stylesheet
+   ============================================================ */
+
+/* ─── Global Design Tokens ─── */
+:root {
+    --bg-main: #f8fafc;
+    --bg-canvas: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
+    --border-hover: #cbd5e1;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    
+    --primary-color: #6366f1; /* Indigo Accent */
+    --primary-hover: #4f46e5;
+    --success-color: #10b981; /* Emerald Green */
+    --success-bg: #ecfdf5;
+    --warning-color: #f97316; /* Safety Orange */
+    --warning-bg: #fff7ed;
+    --danger-color: #ef4444; /* Coral Red */
+    --danger-bg: #fef2f2;
+    --info-color: #06b6d4; /* Cyan/Teal */
+    --info-bg: #ecfeff;
+    
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    
+    --topbar-height: 60px;
+}
+
+/* ─── Page Layout & Workspace Structure ─── */
+#chatbot-page-body {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--topbar-height));
+    padding: 1rem 1.5rem;
+    gap: 1rem;
+    overflow: hidden;
+    background-color: var(--bg-main);
+}
+
+.workspace-container {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    display: block;
+    width: 100%;
+}
+
+/* ─── Side Panels (Toolbox & Inspector Drawers) ─── */
+.flow-toolbox {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 280px;
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+}
+
+.flow-toolbox.active {
+    transform: translateX(0);
+}
+
+.flow-inspector {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 320px;
+    background: var(--card-bg);
+    border-left: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+.flow-inspector.active {
+    transform: translateX(0);
+}
+
+/* Toolbox Search Box */
+.toolbox-search {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+
+.toolbox-search input {
+    width: 100%;
+    padding: 0.55rem 0.75rem 0.55rem 2.25rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    background-color: #f8fafc;
+}
+
+.toolbox-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.toolbox-search i {
+    position: absolute;
+    left: 1.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+/* Node Groups */
+.flow-toolbox .node-group {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    overflow-y: auto;
+}
+
+.flow-toolbox .node-group:last-child {
+    border-bottom: none;
+}
+
+.flow-toolbox .group-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.75rem;
+}
+
+/* Draggable Node Item Cards */
+.draggable-node-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    cursor: grab;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-sm);
+}
+
+.draggable-node-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.draggable-node-item:active {
+    cursor: grabbing;
+}
+
+/* ─── Node Categories Icons styling ─── */
+.node-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    color: #ffffff;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+/* Colour system representing node groups */
+.purple-node-icon { background: linear-gradient(135deg, #a855f7, #7e22ce); } /* Question / Input */
+.blue-node-icon { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }   /* Message */
+.orange-node-icon { background: linear-gradient(135deg, #f97316, #c2410c); } /* Product */
+.green-node-icon { background: linear-gradient(135deg, #10b981, #047857); }  /* Media */
+.pink-node-icon { background: linear-gradient(135deg, #ec4899, #be185d); }   /* Logic */
+.indigo-node-icon { background: linear-gradient(135deg, #6366f1, #4338ca); } /* Integration */
+
+.node-item-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.node-item-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-item-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ─── Canvas Workspace (White Theme) ─── */
+.flow-canvas-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #f8fafc;
+    background-image: radial-gradient(#cbd5e1 1.3px, transparent 1.3px);
+    background-size: 20px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    outline: none;
+    box-shadow: var(--shadow-sm);
+    z-index: 1;
+}
+
+.flow-canvas-wrapper.no-grid {
+    background-image: none !important;
+}
+
+/* Light Theme Infinite Dotted Grid Pattern */
+.canvas-grid {
+    width: 200000px;
+    height: 200000px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    transition: transform 0.05s linear;
+}
+
+.canvas-grid.no-grid {
+    background-image: none !important;
+}
+
+/* Connection Paths SVG Overlay */
+.connection-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.connection-path {
+    fill: none;
+    stroke: #94a3b8;
+    stroke-width: 2;
+    stroke-linecap: round;
+    marker-end: url(#arrow);
+    transition: stroke 0.2s, stroke-width 0.2s;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+.connection-path:hover {
+    stroke: var(--primary-color);
+    stroke-width: 3;
+}
+
+.connection-path.active {
+    stroke: var(--primary-color);
+    stroke-width: 3;
+    marker-end: url(#arrow-active);
+}
+
+/* ─── Node Cards on Canvas ─── */
+.canvas-node {
+    position: absolute;
+    width: 250px;
+    background: #ffffff;
+    border: 1.5px solid var(--border-color);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-md);
+    z-index: 2;
+    cursor: move;
+    user-select: none;
+    transition: border-color 0.25s, box-shadow 0.25s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+}
+
+.canvas-node:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg);
+}
+
+.canvas-node.selected {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 1.5px var(--primary-color), var(--shadow-lg);
+}
+
+/* Node Headers - Category Accent Rings */
+.canvas-node .node-header {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8fafc;
+    border-top-left-radius: 0.7rem;
+    border-top-right-radius: 0.7rem;
+}
+
+/* Accent strip according to Node Types */
+.question-node-accent { border-top: 4px solid #a855f7; }
+.message-node-accent { border-top: 4px solid #3b82f6; }
+.product-node-accent { border-top: 4px solid #f97316; }
+.media-node-accent { border-top: 4px solid #10b981; }
+.logic-node-accent { border-top: 4px solid #ec4899; }
+.integration-node-accent { border-top: 4px solid #6366f1; }
+
+.node-header-icon {
+    font-size: 0.85rem;
+}
+.question-node-accent .node-header-icon { color: #a855f7; }
+.message-node-accent .node-header-icon { color: #3b82f6; }
+.product-node-accent .node-header-icon { color: #f97316; }
+.media-node-accent .node-header-icon { color: #10b981; }
+.logic-node-accent .node-header-icon { color: #ec4899; }
+.integration-node-accent .node-header-icon { color: #6366f1; }
+
+.node-header .node-type {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.node-header .node-number {
+    background: #e2e8f0;
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+}
+
+/* Node Body content */
+.canvas-node .node-body {
+    padding: 0.8rem;
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+}
+
+.node-body .node-title {
+    font-weight: 700;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-family: 'Outfit', sans-serif;
+}
+
+.node-body .node-preview {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+/* Node Previews for options/buttons */
+.node-preview-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.choice-pill-item {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border-color);
+    background: #f1f5f9;
+    color: var(--text-muted);
+    border-radius: 0.25rem;
+    white-space: nowrap;
+}
+
+/* Product node specific */
+.product-card-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background: #fff7ed;
+}
+.product-card-preview img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 0.25rem;
+    background-color: #ffffff;
+}
+
+/* media icon badge style */
+.media-badge-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #10b981;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* Connection ports dots */
+.port {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #ffffff;
+    border: 2px solid var(--text-light);
+    border-radius: 50%;
+    z-index: 10;
+    cursor: crosshair;
+    transition: background 0.15s, transform 0.15s, border-color 0.15s;
+}
+
+.port:hover {
+    transform: scale(1.4);
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+}
+
+.port-in {
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-color: var(--primary-color);
+}
+
+/* Input port with multiple incoming connections — orange indicator */
+.port-in-multi {
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-color: #f59e0b !important;
+    background: #fffbeb !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 0 0 6px rgba(245, 158, 11, 0.08);
+    width: 12px !important;
+    height: 12px !important;
+    cursor: pointer !important;
+}
+
+.port-in-multi:hover {
+    background: #f59e0b !important;
+    border-color: #d97706 !important;
+    transform: translateY(-50%) scale(1.4);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+
+.port-out {
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    border-color: var(--success-color);
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.port-out::after,
+.branch-port::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--success-color);
+    line-height: 1;
+    pointer-events: none;
+}
+
+.port-out:hover::after,
+.branch-port:hover::after {
+    color: #ffffff !important;
+}
+
+/* Conditional ports handles */
+.branch-port-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 0.5rem;
+}
+
+.branch-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.15rem 0;
+}
+
+.branch-port {
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    border-color: #ec4899;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Start / End Nodes styling */
+.start-node-accent {
+    border: 2px solid var(--success-color) !important;
+    background: var(--success-bg) !important;
+    width: 120px !important;
+}
+.start-node-accent .node-header {
+    background: transparent !important;
+    border-bottom: none !important;
+    padding: 0.5rem !important;
+}
+.start-node-accent .node-body {
+    display: none !important;
+}
+
+/* ─── Canvas Controls Floating Toolbar ─── */
+.canvas-controls {
+    position: absolute;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.6rem;
+    border-radius: 2rem;
+    box-shadow: var(--shadow-md);
+    z-index: 5;
+}
+
+.canvas-controls button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.canvas-controls button:hover {
+    color: var(--text-main);
+    background: #f1f5f9;
+}
+
+.canvas-controls button.active {
+    color: var(--primary-color);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.canvas-controls #ctrl-zoom-percentage {
+    color: var(--text-main);
+    font-size: 0.75rem;
+    font-weight: 700;
+    min-width: 35px;
+    text-align: center;
+}
+
+.ctrl-divider {
+    width: 1px;
+    height: 14px;
+    background: var(--border-color);
+    margin: 0 0.25rem;
+}
+
+/* ─── Minimap View Component ─── */
+.minimap-container {
+    position: absolute;
+    bottom: 1.25rem;
+    left: 1.25rem;
+    width: 150px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-md);
+    z-index: 5;
+    overflow: hidden;
+}
+
+.minimap-view {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform: scale(0.045);
+    transform-origin: 0 0;
+}
+
+/* ─── Tabbed Inspector settings Panel ─── */
+.flow-inspector .inspector-tabs-header {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8fafc;
+}
+
+.flow-inspector .inspector-tab-btn {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.flow-inspector .inspector-tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: #ffffff;
+}
+
+.inspector-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 1.5rem;
+    text-align: center;
+    color: var(--text-light);
+    gap: 0.75rem;
+    flex: 1;
+}
+
+.inspector-placeholder i {
+    font-size: 2.25rem;
+    opacity: 0.35;
+}
+
+.inspector-placeholder p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* Inspector Forms */
+.inspector-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.inspector-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.inspector-form-group label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.inspector-form-group input,
+.inspector-form-group select,
+.inspector-form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    background-color: #ffffff;
+}
+
+.inspector-form-group input:focus,
+.inspector-form-group select:focus,
+.inspector-form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.inspector-form-group textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+.inspector-choices-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    background: #f8fafc;
+    padding: 0.65rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.inspector-choice-row {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.btn-icon-danger {
+    background: none;
+    border: 1px solid #fee2e2;
+    color: var(--danger-color);
+    border-radius: 0.375rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-icon-danger:hover {
+    background: var(--danger-bg);
+}
+
+.btn-add-choice {
+    background: none;
+    border: 1px dashed #cbd5e1;
+    color: var(--primary-color);
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 0.4rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    transition: all 0.2s;
+}
+
+.btn-add-choice:hover {
+    border-color: var(--primary-color);
+    background: #f5f3ff;
+}
+
+/* ─── Bottom Documentation Section (Node Creation) ─── */
+.doc-section-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-sm);
+    margin-top: 0.5rem;
+}
+
+.doc-section-header {
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.doc-section-header h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+.doc-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #f8fafc;
+}
+
+.doc-node-card {
+    background: #ffffff;
+    border: 1.5px solid var(--border-color);
+    border-radius: 0.625rem;
+    padding: 1rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.doc-node-card h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* ─── WhatsApp Test Bot Drawer ─── */
+.test-bot-drawer {
+    position: fixed;
+    bottom: 0;
+    right: 340px; /* offset the right inspector panel */
+    width: 360px;
+    height: 480px;
+    background: #efeae2; /* WhatsApp background */
+    border: 1px solid var(--border-color);
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.test-bot-drawer.active {
+    transform: translateY(0);
+}
+
+.test-bot-drawer .drawer-header {
+    background: #075e54; /* WhatsApp Green */
+    color: #ffffff;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top-left-radius: 0.7rem;
+    border-top-right-radius: 0.7rem;
+}
+
+.test-bot-drawer .drawer-header h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.test-bot-drawer .drawer-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-simulator {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 1rem;
+}
+
+.chat-messages-container {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+}
+
+/* WhatsApp Message Bubbles */
+.chat-bubble {
+    max-width: 80%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    word-break: break-word;
+    position: relative;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+}
+
+.chat-bubble.bot {
+    background: #ffffff;
+    align-self: flex-start;
+    border-top-left-radius: 0;
+}
+
+.chat-bubble.user {
+    background: #d9fdd3; /* WhatsApp User bubble */
+    align-self: flex-end;
+    border-top-right-radius: 0;
+}
+
+.chat-bubble-timestamp {
+    display: block;
+    text-align: right;
+    font-size: 0.6rem;
+    color: var(--text-light);
+    margin-top: 0.25rem;
+}
+
+.chat-choices-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.chat-choice-btn {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #0084ff;
+    font-weight: 600;
+    padding: 0.45rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.78rem;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.chat-choice-btn:hover {
+    background: #f1f5f9;
+}
+
+/* Simulator Input */
+.chat-simulator-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f0f2f5;
+    padding: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.chat-simulator-input input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 1.5rem;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.chat-simulator-input button {
+    background: #00a884; /* WhatsApp Teal */
+    color: #ffffff;
+    border: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.chat-simulator-input button:hover {
+    background: #008f72;
+}
+
+/* ─── Modals Backdrop Blur ─── */
+.create-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    animation: modalFadeIn 0.25s ease-out;
+}
+
+.modal-card {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: var(--shadow-lg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.modal-header h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+/* ─── Flows list Page Cards Redesign ─── */
+.flows-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.flows-header {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    padding: 1.25rem 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flows-header h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.flows-header p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.15rem;
+}
+
+/* Flows Table Card */
+.flows-table-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.flows-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.85rem;
+}
+
+.flows-table th {
+    background: #f8fafc;
+    padding: 0.85rem 1.25rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+}
+
+.flows-table td {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+.flows-table tr:hover td {
+    background: #f8fafc;
+}
+
+/* Status pills */
+.flow-status-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.status-active { background: #dcfce7; color: #15803d; }
+.status-draft { background: #e2e8f0; color: #475569; }
+.status-paused { background: #fee2e2; color: #b91c1c; }
+
+/* Custom Action Buttons overrides */
+.btn-action {
+    width: 1.85rem;
+    height: 1.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    margin-right: 0.2rem;
+}
+
+.btn-action:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: #f5f3ff;
+}
+
+.btn-action.btn-danger:hover {
+    background: var(--danger-bg);
+    border-color: var(--danger-color);
+    color: var(--danger-color);
+}
+
+/* Primary buttons standard */
+.btn-primary {
+    background: var(--primary-color) !important;
+    border: none;
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.15) !important;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover) !important;
+}
+
+/* ─── Node Picker Popover ─── */
+.node-picker-popover {
+    display: none;
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-lg);
+    width: 220px;
+    z-index: 2000;
+    padding: 0.5rem;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.popover-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--text-main);
+    transition: all 0.15s;
+}
+
+.popover-item:hover {
+    background: #f1f5f9;
+    color: var(--primary-color);
+}
+
+/* ─── Custom Context Menu ─── */
+.custom-context-menu {
+    display: none;
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: var(--shadow-md);
+    z-index: 2000;
+    padding: 0.25rem 0;
+    width: 140px;
+}
+
+.context-menu-item {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.context-menu-item:hover {
+    background: #f1f5f9;
+    color: var(--primary-color);
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.25rem 0;
+}
+
+/* ─── Live Validation Panel ─── */
+.val-issues-dropdown {
+    display: none;
+    position: absolute;
+    top: 2.25rem;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-lg);
+    width: 260px;
+    z-index: 1000;
+    padding: 0.75rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.val-issue-item {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.val-issue-item:hover {
+    border-color: #fca5a5;
+    background: #fef2f2;
+    box-shadow: var(--shadow-sm);
+}
+
+.val-issue-item i {
+    margin-top: 0.1rem;
+}
+
+/* ─── Simulation Active Highlights ─── */
+.passed-node {
+    border-color: var(--success-color) !important;
+    box-shadow: 0 0 0 1.5px var(--success-color), var(--shadow-md) !important;
+}
+
+.active-node {
+    border-color: #eab308 !important; /* Yellow-Orange outline */
+    box-shadow: 0 0 0 2px #eab308, 0 0 12px rgba(234, 179, 8, 0.4) !important;
+    animation: nodePulse 1.5s infinite alternate;
+}
+
+@keyframes nodePulse {
+    from {
+        transform: scale(1);
+    }
+    to {
+        transform: scale(1.02);
+    }
+}
+
+.connection-path.active-edge {
+    stroke: #eab308 !important;
+    stroke-width: 3.5;
+    stroke-dasharray: 6;
+    animation: edgeFlow 1s linear infinite;
+}
+
+@keyframes edgeFlow {
+    from {
+        stroke-dashoffset: 24;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* ─── Disabled Node state ─── */
+.disabled-node {
+    opacity: 0.55 !important;
+    border: 1.5px dashed #94a3b8 !important;
+    background: #f1f5f9 !important;
+    pointer-events: auto !important; /* allow select/rightclick */
+}
+
+.disabled-node-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-12deg);
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+
+.connection-path.disabled-edge {
+    stroke: #cbd5e1 !important;
+    stroke-width: 2;
+    stroke-dasharray: 4;
+}
+
+.edge-delete-btn {
+    pointer-events: auto !important;
+}
+
+/* ─── Add Button inline option row ─── */
+.branch-row .btn-add-next {
+    visibility: hidden;
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    background: var(--primary-color);
+    color: #ffffff;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    cursor: pointer;
+    z-index: 12;
+}
+
+.branch-row:hover .btn-add-next {
+    visibility: visible;
+}
+
+.port-out-add {
+    right: -24px !important; /* shift the port out to make room for plus */
+}
+
+/* Variables Logger in Test Bot */
+.test-bot-variables {
+    background: #ffffff;
+    border-top: 1px solid var(--border-color);
+    padding: 0.5rem;
+    font-size: 0.72rem;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.variable-tag {
+    display: inline-block;
+    background: #f3e8ff;
+    color: #6b21a8;
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-weight: 600;
+    margin: 0.15rem;
+}

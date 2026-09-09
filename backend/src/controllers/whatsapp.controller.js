@@ -99,6 +99,18 @@ const receiveMessage = async (req, res) => {
             // 3. Log to Chat History (pass msg.id as the messageId parameter, and replyToChatId)
             await messageService.logChatMessage(fromNumber, 'incoming', msg.type, inputText, mediaBuffer, mimeType, null, msg.id, 'sent', replyToChatId);
 
+            // 3b. Trigger Chatbot Flow Engine
+            try {
+              const FlowEngine = require('../services/FlowEngine');
+              let mediaUrl = null;
+              if (msg.type && ['image', 'document', 'audio', 'video'].includes(msg.type)) {
+                mediaUrl = `https://graph.facebook.com/v21.0/${msg[msg.type].id}`;
+              }
+              await FlowEngine.handleMessage(fromNumber, inputText, mediaUrl);
+            } catch (err) {
+              logger.error(`FlowEngine execution failed for ${fromNumber}:`, err.message);
+            }
+
             // 4. Campaign Auto-Replies Check
             logger.info(`Message received from ${fromNumber}: ${inputText}`);
 

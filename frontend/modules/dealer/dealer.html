@@ -1,73 +1,2168 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dealers | SGB Agro CRM</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        .visit-qna-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            font-size: 0.825rem;
+        }
+
+        @media (min-width: 768px) {
+            .visit-qna-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .dp-stats-cards {
+                display: none !important;
+            }
+        }
+
+        .status-pill {
+            border-radius: 6px !important;
+            box-shadow: none !important;
+            font-weight: 700 !important;
+            padding: 0.3rem 0.65rem !important;
+        }
+
+        .status-pill.active,
+        .status-pill.safe {
+            background-color: #ECFDF5 !important;
+            color: #059669 !important;
+            border: 1px solid #A7F3D0 !important;
+            box-shadow: none !important;
+        }
+
+        .status-pill.attention {
+            background-color: #FEF9C3 !important;
+            color: #CA8A04 !important;
+            border: 1px solid #FDE047 !important;
+            box-shadow: none !important;
+        }
+
+        .status-pill.urgent {
+            background-color: #FFEDD5 !important;
+            color: #C2410C !important;
+            border: 1px solid #FDBA74 !important;
+            box-shadow: none !important;
+        }
+
+        .status-pill.inactive {
+            background-color: #FEF2F2 !important;
+            color: #DC2626 !important;
+            border: 1px solid #FECACA !important;
+            box-shadow: none !important;
+        }
+
+        /* Product Selection Grid in Orange Theme (Compact Sleek UI) */
+        .product-select-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        .product-select-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 0.65rem 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #ffffff;
+            position: relative;
+            user-select: none;
+            min-height: auto;
+        }
+
+        .product-select-card:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .product-select-card.selected {
+            border-color: #FF6B00;
+            background: #fffaf5;
+            box-shadow: 0 0 0 1.5px #FF6B00, 0 3px 8px rgba(255, 107, 0, 0.1);
+        }
+
+        .product-select-card .check-indicator {
+            position: absolute;
+            top: 0.65rem;
+            right: 0.75rem;
+            opacity: 0;
+            color: #FF6B00;
+            font-size: 1.05rem;
+            transition: all 0.2s ease;
+            transform: scale(0.8);
+        }
+
+        .product-select-card.selected .check-indicator {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .product-select-card .product-name {
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.15rem;
+            font-size: 0.875rem;
+            padding-right: 1.4rem;
+            line-height: 1.25;
+        }
+
+        .product-select-card .product-price {
+            font-size: 0.825rem;
+            color: #059669;
+            font-weight: 700;
+            margin-bottom: 0;
+        }
+
+        .product-select-card.selected .product-price {
+            margin-bottom: 0.35rem;
+        }
+
+        .product-select-card .quantity-controls {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 0.35rem;
+            width: 100%;
+        }
+
+        .product-select-card.selected .quantity-controls {
+            display: flex;
+            animation: slideUpFade 0.2s ease-out forwards;
+        }
+
+        @keyframes slideUpFade {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .product-select-card .qty-btn {
+            background: #f1f5f9;
+            border: none;
+            color: #475569;
+            padding: 0.2rem 0.65rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .product-select-card .qty-btn:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .product-select-card .qty-val {
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 0.85rem;
+            padding: 0 0.4rem;
+        }
+    </style>
 </head>
+
 <body>
-<div class="dashboard-wrapper">
-    <div id="sidebar-container"></div>
-    <main class="main-content">
-        <header class="topbar">
-            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="dealerSearch" oninput="filterDealers()" placeholder="Search dealers..."></div>
-            <div class="profile-section"><span class="profile-name" id="profileName">User</span><div class="avatar"><i class="fa-solid fa-user"></i></div></div>
-        </header>
-        <div class="content-body">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-                <div><h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Dealers</h1><p style="color:#64748b;font-size:0.875rem;">Manage all dealer accounts and their orders.</p></div>
-                <button class="btn-primary" id="addDealerBtn" onclick="openModal()" style="display:none;align-items:center;gap:0.5rem;"><i class="fas fa-plus"></i> Add Dealer</button>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Container (Dynamically Injected) -->
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <!-- Top Bar Header -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavSearch" oninput="handleTopSearch()" placeholder="Search...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">admin</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="content-body" style="padding: 1.5rem 2rem;">
+
+                <!-- ==========================================
+                 VIEW 1: DEALERS LIST VIEW
+                 ========================================== -->
+                <div id="dealers-list-view">
+                    <!-- Page Title Row -->
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <h1 style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:0.25rem;">Dealers
+                            </h1>
+                            <p style="color:#64748b;font-size:0.875rem;">Manage all dealer accounts and their orders.
+                            </p>
+                        </div>
+                        <button class="btn-orange" id="addDealerBtn" onclick="openAddDealerView()">
+                            <i class="fa-solid fa-plus"></i> Add Dealer
+                        </button>
+                    </div>
+
+                    <!-- Filter & Stat Cards Row -->
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                        <!-- Left: Action Controls -->
+                        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                            <div style="position:relative;width:240px;display:inline-block;">
+                                <i class="fa-solid fa-magnifying-glass"
+                                    style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;"></i>
+                                <input type="text" id="dealerTableSearch" oninput="filterDealers()"
+                                    placeholder="Search dealer name, phone, city..."
+                                    style="width:100%;padding:0.4rem 0.75rem 0.4rem 2.2rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.825rem;outline:none;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.03);font-weight:600;color:#0f172a;">
+                            </div>
+                            <div
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:0.25rem 0.5rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <span
+                                    style="font-size:0.75rem;font-weight:700;color:#64748b;padding-left:0.35rem;display:inline-flex;align-items:center;gap:4px;">
+                                    <i class="fa-solid fa-filter" style="color:#FF6B00;"></i> Status:
+                                </span>
+                                <select id="dealerStatusFilter" onchange="handleStatusFilterChange(this.value)"
+                                    style="border:none;background:transparent;font-size:0.825rem;font-weight:700;color:#0F172A;padding:0.25rem 0.4rem;outline:none;cursor:pointer;">
+                                    <option value="ALL" selected>All Status</option>
+                                    <option value="ACTIVE">Active Only (≤ 45 Days)</option>
+                                    <option value="SAFE">🟢 Safe (> 30 Days)</option>
+                                    <option value="ATTENTION">🟡 Attention (16–30 Days)</option>
+                                    <option value="URGENT">🟠 Urgent (1–15 Days)</option>
+                                    <option value="INACTIVE">🔴 Inactive Only (0 Days)</option>
+                                </select>
+                            </div>
+                            <div
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:0.25rem 0.5rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <span
+                                    style="font-size:0.75rem;font-weight:700;color:#64748b;padding-left:0.35rem;display:inline-flex;align-items:center;gap:4px;">
+                                    <i class="fa-solid fa-hourglass-half" style="color:#FF6B00;"></i> Days:
+                                </span>
+                                <select id="dealerDaysFilter" onchange="handleDaysFilterChange(this.value)"
+                                    style="border:none;background:transparent;font-size:0.825rem;font-weight:700;color:#0F172A;padding:0.25rem 0.4rem;outline:none;cursor:pointer;">
+                                    <option value="ALL" selected>All Days</option>
+                                    <option value="1_10">1 – 10 Days (Urgent)</option>
+                                    <option value="11_25">11 – 25 Days (Attention)</option>
+                                    <option value="26_35">26 – 35 Days (Moderate)</option>
+                                    <option value="36_45">36 – 45 Days (Safe)</option>
+                                    <option value="0">0 Days (Expired / Inactive)</option>
+                                </select>
+                            </div>
+                            <div
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:0.25rem 0.5rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <span
+                                    style="font-size:0.75rem;font-weight:700;color:#64748b;padding-left:0.35rem;display:inline-flex;align-items:center;gap:4px;">
+                                    <i class="fa-solid fa-arrow-down-a-z" style="color:#FF6B00;"></i> Sort:
+                                </span>
+                                <select id="dealerSortFilter" onchange="handleSortFilterChange(this.value)"
+                                    style="border:none;background:transparent;font-size:0.825rem;font-weight:700;color:#0F172A;padding:0.25rem 0.4rem;outline:none;cursor:pointer;">
+                                    <option value="ALL" selected>All / Default</option>
+                                    <option value="A_Z">A to Z (Firm Name)</option>
+                                    <option value="Z_A">Z to A (Firm Name)</option>
+                                </select>
+                            </div>
+                            <div id="selectedDealersBadge"
+                                style="display:none;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;padding:0.45rem 0.85rem;border-radius:8px;font-size:0.8rem;font-weight:700;align-items:center;gap:6px;">
+                                <i class="fa-solid fa-check-double"></i> <span id="selectedDealersCount">0</span>
+                                Selected
+                            </div>
+                            <button class="btn-outline-card" id="btnExportDealers" onclick="exportDealersData()">
+                                <i class="fa-solid fa-download"></i> <span id="btnExportDealersLabel">Export</span>
+                            </button>
+                            <button class="btn-outline-card" id="btnDeleteSelectedDealers"
+                                onclick="deleteSelectedDealers()"
+                                style="display:none;padding:0.4rem 0.85rem;background:#FEE2E2;color:#DC2626;border-color:#FCA5A5;font-weight:700;transition:all 0.15s ease;"
+                                onmouseover="this.style.background='#FCA5A5';"
+                                onmouseout="this.style.background='#FEE2E2';" title="Delete Selected Dealers">
+                                <i class="fa-solid fa-trash-can"></i> Delete Selected
+                            </button>
+                            <button class="btn-outline-card" id="btnImportDealers"
+                                onclick="openImportDealersModal(event)"
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;font-weight:600;padding:0.4rem 0.85rem;border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <i class="fa-solid fa-file-import" style="color:#10b981;"></i> Import Dealers
+                            </button>
+                            <button class="btn-outline-card" id="btnImportOrders" onclick="openImportOrdersModal(event)"
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;font-weight:600;padding:0.4rem 0.85rem;border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <i class="fa-solid fa-boxes-packing" style="color:#FF6B00;"></i> Import Bulk Orders
+                            </button>
+                        </div>
+
+                        <!-- Right: Quick Stat Summary Cards -->
+                        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+                            <div class="stat-card-box">
+                                <div class="stat-icon-wrapper blue">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.725rem;color:#64748b;font-weight:600;">Total Dealers</div>
+                                    <div style="font-size:1.25rem;font-weight:800;color:#0f172a;line-height:1.2;"
+                                        id="totalDealersCount">0</div>
+                                </div>
+                            </div>
+
+                            <div class="stat-card-box">
+                                <div class="stat-icon-wrapper green">
+                                    <i class="fa-solid fa-user-group"></i>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.725rem;color:#64748b;font-weight:600;">Active</div>
+                                    <div style="font-size:1.25rem;font-weight:800;color:#0f172a;line-height:1.2;"
+                                        id="activeDealersCount">0</div>
+                                </div>
+                            </div>
+
+                            <div class="stat-card-box">
+                                <div class="stat-icon-wrapper red">
+                                    <i class="fa-solid fa-user-slash"></i>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.725rem;color:#64748b;font-weight:600;">Inactive</div>
+                                    <div style="font-size:1.25rem;font-weight:800;color:#0f172a;line-height:1.2;"
+                                        id="inactiveDealersCount">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table Card Container -->
+                    <div class="premium-card"
+                        style="overflow:hidden;border-radius:12px;box-shadow: 0 1px 3px rgba(0,0,0,0.05);background:#ffffff;">
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;text-align:left;">
+                                <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                    <tr>
+                                        <th style="padding:1rem 0.75rem;width:40px;text-align:center;">
+                                            <input type="checkbox" id="selectAllDealersCheckbox"
+                                                onchange="toggleSelectAllDealers(this)"
+                                                style="width:16px;height:16px;cursor:pointer;accent-color:#FF6B00;"
+                                                title="Select All Dealers">
+                                        </th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            DEALER ID</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            FIRM / SHOP NAME</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            CONTACT</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            ADDRESS</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;text-align:center;">
+                                            TOTAL ORDERS</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            TOTAL BUSINESS</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            LAST ORDER</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            GST NO.</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">
+                                            CURRENT STATUS</th>
+                                        <th
+                                            style="padding:1rem 1.25rem;font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;text-align:center;">
+                                            ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dealerTableBody">
+                                    <tr>
+                                        <td colspan="9" style="padding:3rem;text-align:center;color:#94a3b8;">
+                                            <i class="fas fa-circle-notch fa-spin fa-2x"
+                                                style="color:#FF6B00;margin-bottom:0.5rem;"></i>
+                                            <p style="font-size:0.875rem;">Loading dealers network...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination Footer -->
+                        <div class="pagination-container">
+                            <div id="paginationInfo">Showing 0 entries</div>
+                            <div style="display:flex;align-items:center;gap:1rem;">
+                                <div class="pagination-pages" id="paginationPages">
+                                    <button class="page-btn" onclick="changePage('prev')"><i
+                                            class="fa-solid fa-chevron-left"></i></button>
+                                    <button class="page-btn active">1</button>
+                                    <button class="page-btn" onclick="changePage(2)">2</button>
+                                    <button class="page-btn" onclick="changePage(3)">3</button>
+                                    <span style="color:#94a3b8;padding:0 2px;">...</span>
+                                    <button class="page-btn" onclick="changePage(13)">13</button>
+                                    <button class="page-btn" onclick="changePage('next')"><i
+                                            class="fa-solid fa-chevron-right"></i></button>
+                                </div>
+                                <select id="pageSizeSelect" onchange="changePageSize(this.value)"
+                                    style="padding:0.35rem 0.6rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.8rem;color:#334155;background:#ffffff;outline:none;cursor:pointer;">
+                                    <option value="10" selected>10 / page</option>
+                                    <option value="25">25 / page</option>
+                                    <option value="50">50 / page</option>
+                                    <option value="100">100 / page</option>
+                                    <option value="250">250 / page</option>
+                                    <option value="500">500 / page</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ==========================================
+                 VIEW 2: ADD / EDIT DEALER PAGE VIEW
+                 ========================================== -->
+                <div id="add-dealer-view" style="display: none;">
+                    <!-- Page Title & Back Button Header -->
+                    <div
+                        style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                        <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+                            <button class="btn-back" onclick="openDealersListView()"
+                                style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1.1rem;border-radius:10px;font-weight:700;background:#ffffff;border:1px solid #cbd5e1;cursor:pointer;color:#334155;">
+                                <i class="fa-solid fa-arrow-left"></i> Back to Dealers
+                            </button>
+                            <div>
+                                <h1 style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:0.15rem;"
+                                    id="formPageTitle">Add Dealer</h1>
+                                <p style="color:#64748b;font-size:0.875rem;" id="formPageSubTitle">Enter the dealer
+                                    details to add a new dealer to your network.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Card Container -->
+                    <div
+                        style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:2rem;box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <form id="dealerForm" onsubmit="handleDealerSubmit(event)">
+                            <input type="hidden" id="edit-id">
+
+                            <!-- SECTION 1: Basic Information -->
+                            <div class="form-section-title" style="margin-top:0;">
+                                <span class="orange-bar"></span> Basic Information
+                            </div>
+
+                            <!-- Row 1 -->
+                            <div class="form-grid-3">
+                                <div class="form-group-custom">
+                                    <label for="firm_name">Firm / Shop Name <span class="req">*</span></label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-store input-icon"></i>
+                                        <input type="text" id="firm_name" required
+                                            placeholder="Enter firm or shop name">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="owner_name">Dealer Name <span class="req">*</span></label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-user input-icon"></i>
+                                        <input type="text" id="owner_name" required placeholder="Enter dealer name">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="phone_number">Contact <span class="req">*</span></label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-phone input-icon"></i>
+                                        <input type="tel" id="phone_number" required placeholder="Enter contact number">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Row 2 -->
+                            <div class="form-grid-3">
+                                <div class="form-group-custom">
+                                    <label for="gst_no">GST No.</label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-file-invoice input-icon"></i>
+                                        <input type="text" id="gst_no" placeholder="Enter GST number">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="dealer_image">Shop / Dealer Image</label>
+                                    <div
+                                        style="display:flex;align-items:center;gap:0.75rem;background:#f8fafc;padding:0.4rem 0.75rem;border:1px solid #cbd5e1;border-radius:10px;">
+                                        <div id="dealerImagePreviewBox"
+                                            style="width:40px;height:40px;border-radius:8px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;border:1px solid #cbd5e1;">
+                                            <i class="fa-solid fa-store" style="color:#64748b;font-size:1rem;"
+                                                id="dealerImageDefaultIcon"></i>
+                                            <img id="dealerImagePreviewImg" src=""
+                                                style="width:100%;height:100%;object-fit:cover;display:none;">
+                                        </div>
+                                        <input type="file" id="dealer_image_input" accept="image/*"
+                                            onchange="handleDealerImageFileSelect(event)"
+                                            style="font-size:0.75rem;color:#475569;flex:1;">
+                                        <button type="button" id="dealerImageRemoveBtn" onclick="removeDealerImage()"
+                                            style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#ef4444;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:700;cursor:pointer;align-items:center;gap:4px;flex-shrink:0;">
+                                            <i class="fa-solid fa-trash"></i> Remove
+                                        </button>
+                                        <input type="hidden" id="dealer_image_url">
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <!-- SECTION 2: Address / Location -->
+                            <div class="form-section-title">
+                                <span class="orange-bar"></span> Address / Location
+                            </div>
+
+                            <!-- Row 1 -->
+                            <div class="form-grid-3">
+                                <div class="form-group-custom">
+                                    <label for="town_village">Town / Village</label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-location-dot input-icon"></i>
+                                        <input type="text" id="town_village" placeholder="Enter town or village">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="city">City <span class="req">*</span></label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-location-dot input-icon"></i>
+                                        <input type="text" id="city" required placeholder="Enter city">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="taluk">Taluk</label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-location-dot input-icon"></i>
+                                        <input type="text" id="taluk" placeholder="Enter taluk">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Row 2 -->
+                            <div class="form-grid-3">
+                                <div class="form-group-custom">
+                                    <label for="district">District</label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-location-dot input-icon"></i>
+                                        <input type="text" id="district" placeholder="Enter district">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="state">State <span class="req">*</span></label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-building input-icon"></i>
+                                        <select id="state" required>
+                                            <option value="" disabled selected>Select state</option>
+                                            <option value="Karnataka">Karnataka</option>
+                                            <option value="Maharashtra">Maharashtra</option>
+                                            <option value="Andhra Pradesh">Andhra Pradesh</option>
+                                            <option value="Tamil Nadu">Tamil Nadu</option>
+                                            <option value="Telangana">Telangana</option>
+                                            <option value="Gujarat">Gujarat</option>
+                                            <option value="Kerala">Kerala</option>
+                                            <option value="Goa">Goa</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="pincode">Pin Code <span class="req">*</span></label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-landmark input-icon"></i>
+                                        <input type="text" id="pincode" required placeholder="Enter pin code">
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <!-- SECTION 3: Nearest VRL Location -->
+                            <div class="form-section-title">
+                                <span class="orange-bar"></span> Nearest VRL Location
+                            </div>
+
+                            <!-- Row 1 -->
+                            <div class="form-grid-2">
+                                <div class="form-group-custom">
+                                    <label for="nearest_vrl">Nearest VRL Location</label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-location-dot input-icon"></i>
+                                        <input type="text" id="nearest_vrl" placeholder="Enter nearest VRL location">
+                                    </div>
+                                </div>
+
+                                <div class="form-group-custom">
+                                    <label for="vrl_code">VRL Code</label>
+                                    <div class="input-with-icon">
+                                        <i class="fa-solid fa-barcode input-icon"></i>
+                                        <input type="text" id="vrl_code" placeholder="Enter VRL code">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Extra: Status field for editing mode -->
+                            <div id="statusGroup" class="form-group-custom"
+                                style="display:none;margin-bottom:1.5rem;max-width:300px;">
+                                <label for="dealer_status">Current Status</label>
+                                <div class="input-with-icon">
+                                    <i class="fa-solid fa-toggle-on input-icon"></i>
+                                    <select id="dealer_status">
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Form Actions Footer -->
+                            <div
+                                style="display:flex;justify-content:flex-end;align-items:center;gap:1rem;margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid #f1f5f9;">
+                                <button type="button" class="btn-cancel" onclick="openDealersListView()">Cancel</button>
+                                <button type="submit" class="btn-save-dealer" id="saveDealerSubmitBtn">
+                                    <i class="fa-regular fa-floppy-disk"></i> Save Dealer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ==========================================
+                 VIEW 3: PLACE DEALER ORDER PAGE VIEW (1-Click UI)
+                 ========================================== -->
+                <div id="order-dealer-view" style="display: none;">
+                    <!-- Header -->
+                    <div
+                        style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:1rem;">
+                        <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+                            <button class="btn-back" onclick="openDealersListView()"
+                                style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1.1rem;border-radius:10px;font-weight:700;background:#ffffff;border:1px solid #cbd5e1;cursor:pointer;color:#334155;">
+                                <i class="fa-solid fa-arrow-left"></i> Back to Dealers
+                            </button>
+                            <div>
+                                <h1 style="font-size:1.5rem;font-weight:800;color:#0f172a;margin-bottom:0.15rem;">
+                                    Product Selection & Order</h1>
+                                <p style="color:#64748b;font-size:0.875rem;">Select products and configure order details
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dealer Information Banner -->
+                    <div
+                        style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                        <div style="display:flex;align-items:center;gap:1rem;">
+                            <div
+                                style="width:42px;height:42px;border-radius:10px;background:#FFEDD5;color:#FF6B00;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0;">
+                                <i class="fa-solid fa-store"></i>
+                            </div>
+                            <div>
+                                <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                                    <h3 id="orderPageFirmName"
+                                        style="font-size:1.05rem;font-weight:800;color:#0F172A;margin:0;">Dealer Firm
+                                        Name</h3>
+                                    <span id="orderPageOwnerName"
+                                        style="font-size:0.85rem;color:#475569;font-weight:600;">Owner Name</span>
+                                </div>
+                                <div
+                                    style="font-size:0.8rem;color:#64748B;margin-top:2px;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+                                    <span><i class="fa-solid fa-phone" style="color:#FF6B00;font-size:0.75rem;"></i>
+                                        <span id="orderPagePhone">—</span></span>
+                                    <span><i class="fa-solid fa-location-dot"
+                                            style="color:#ef4444;font-size:0.75rem;"></i> <span
+                                            id="orderPageAddress">—</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-outline-card"
+                            style="padding:0.4rem 0.85rem;font-size:0.8rem;border-color:#FFEDD5;color:#C2410C;"
+                            onclick="openDealersListView()">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i> Change Dealer
+                        </button>
+                    </div>
+
+                    <!-- 3-STAGE GRID LAYOUT FORM -->
+                    <form id="dealerOrderPageForm" onsubmit="handleConfirmDealerOrderSubmit(event)">
+                        <input type="hidden" id="order_page_dealer_id">
+
+                        <div
+                            style="display:grid;grid-template-columns: minmax(0, 1fr) 360px;gap:1.5rem;align-items:flex-start;">
+                            <!-- LEFT COLUMN: STAGE 1 & STAGE 2 -->
+                            <div style="display:flex;flex-direction:column;gap:1.5rem;min-width:0;">
+
+                                <!-- STAGE 1: SELECT PRODUCTS (CLICK TO ADD) -->
+                                <div
+                                    style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                    <div style="margin-bottom:1rem;display:flex;align-items:center;gap:0.6rem;">
+                                        <span
+                                            style="width:24px;height:24px;border-radius:50%;background:#0f172a;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.75rem;flex-shrink:0;">1</span>
+                                        <div>
+                                            <label
+                                                style="font-size:0.875rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.03em;display:block;">
+                                                SELECT PRODUCTS (CLICK TO ADD)
+                                            </label>
+                                            <p style="font-size:0.8rem;color:#64748b;margin:2px 0 0 0;">Click product
+                                                cards to select. You can edit price for individual items in the list
+                                                below.</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product Select Cards Grid -->
+                                    <div id="dealer-products-container" class="product-select-grid">
+                                        <!-- Dynamic Product & Bundle Cards -->
+                                    </div>
+                                </div>
+
+                                <!-- STAGE 2: ORDER ITEMS (Price & Discount Edit) -->
+                                <div
+                                    style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                    <div style="margin-bottom:1rem;display:flex;align-items:center;gap:0.6rem;">
+                                        <span
+                                            style="width:24px;height:24px;border-radius:50%;background:#0f172a;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.75rem;flex-shrink:0;">2</span>
+                                        <div>
+                                            <label
+                                                style="font-size:0.875rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.03em;display:block;">
+                                                ORDER ITEMS
+                                            </label>
+                                            <p style="font-size:0.8rem;color:#64748b;margin:2px 0 0 0;">Edit price for
+                                                individual products</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Stage 2 Table -->
+                                    <div style="overflow-x:auto;">
+                                        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                                            <thead
+                                                style="background:#f8fafc;border-bottom:1px solid #e2e8f0;color:#475569;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;">
+                                                <tr>
+                                                    <th style="padding:0.75rem 0.5rem;text-align:center;width:30px;">#
+                                                    </th>
+                                                    <th style="padding:0.75rem 0.75rem;text-align:left;">Product</th>
+                                                    <th style="padding:0.75rem 0.75rem;text-align:left;">Unit Price (₹)
+                                                    </th>
+                                                    <th style="padding:0.75rem 0.75rem;text-align:left;">Discount (₹)
+                                                    </th>
+                                                    <th style="padding:0.75rem 0.75rem;text-align:left;">Total (₹)</th>
+                                                    <th style="padding:0.75rem 0.5rem;text-align:center;width:50px;">
+                                                        Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="stage2OrderItemsTbody">
+                                                <tr>
+                                                    <td colspan="6"
+                                                        style="padding:2.5rem;text-align:center;color:#94a3b8;">
+                                                        <i class="fa-solid fa-basket-shopping"
+                                                            style="font-size:1.5rem;margin-bottom:0.5rem;display:block;"></i>
+                                                        No products added yet. Click product cards above to add items.
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Stage 2 Footer -->
+                                    <div
+                                        style="display:flex;justify-content:space-between;align-items:center;margin-top:1.25rem;padding-top:1rem;border-top:1px solid #f1f5f9;flex-wrap:wrap;gap:1rem;">
+                                        <button type="button" onclick="clearAllStage2OrderItems()"
+                                            style="border:1px solid #fca5a5;color:#ef4444;background:#fff5f5;border-radius:8px;padding:0.45rem 1rem;font-weight:700;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+                                            <i class="fa-solid fa-trash"></i> Clear All
+                                        </button>
+                                        <div style="display:flex;align-items:center;gap:1.5rem;font-size:0.9rem;">
+                                            <span style="color:#64748b;font-weight:600;">Total Items: <strong
+                                                    id="stage2TotalItemsCount" style="color:#0f172a;">0</strong></span>
+                                            <span style="color:#64748b;font-weight:600;">Sub Total: <strong
+                                                    id="stage2SubTotalDisplay"
+                                                    style="color:#16a34a;font-size:1.1rem;font-weight:800;">₹0.00</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <!-- RIGHT COLUMN: STAGE 3 (ORDER SUMMARY & CONFIGURATION) -->
+                            <div
+                                style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);position:sticky;top:1.5rem;display:flex;flex-direction:column;gap:1.15rem;">
+                                <div
+                                    style="display:flex;align-items:center;gap:0.6rem;padding-bottom:0.75rem;border-bottom:1px solid #e2e8f0;">
+                                    <span
+                                        style="width:24px;height:24px;border-radius:50%;background:#0f172a;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.75rem;flex-shrink:0;">3</span>
+                                    <h4
+                                        style="font-size:0.875rem;font-weight:800;color:#0f172a;margin:0;text-transform:uppercase;letter-spacing:0.03em;">
+                                        ORDER SUMMARY & CONFIGURATION
+                                    </h4>
+                                </div>
+
+                                <!-- Price Calculations breakdown -->
+                                <div style="display:flex;flex-direction:column;gap:0.65rem;font-size:0.875rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="color:#64748b;font-weight:600;">Sub Total</span>
+                                        <span id="stage3SubTotal" style="font-weight:700;color:#0f172a;">₹0.00</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="color:#64748b;font-weight:600;">Total Discount</span>
+                                        <span id="stage3TotalDiscount"
+                                            style="font-weight:700;color:#ef4444;">₹0.00</span>
+                                    </div>
+                                    <div
+                                        style="display:flex;justify-content:space-between;align-items:center;padding-top:0.65rem;border-top:1px solid #f1f5f9;">
+                                        <span style="font-weight:800;color:#0f172a;font-size:0.95rem;">Total
+                                            Amount</span>
+                                        <span id="stage3TotalAmount"
+                                            style="font-weight:800;color:#0f172a;font-size:1.2rem;">₹0.00</span>
+                                    </div>
+                                </div>
+
+                                <!-- Hidden inputs for legacy handler compatibility -->
+                                <input type="hidden" id="dealer-order-total" value="0">
+                                <input type="hidden" id="dealer-order-discount" value="0">
+                                <input type="hidden" id="dealer-order-final" value="0">
+                                <input type="hidden" id="dealer-order-due" value="0">
+
+                                <!-- Advance Amount Input -->
+                                <div class="form-group-custom">
+                                    <label
+                                        style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Advance
+                                        Amount (₹)</label>
+                                    <input type="number" id="dealer-order-advance" value="0" min="0"
+                                        oninput="recalcStage3Amounts()" onwheel="this.blur()"
+                                        style="width:100%;max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.9rem;font-weight:700;outline:none;">
+                                </div>
+
+                                <!-- Final & Due Amounts -->
+                                <div style="display:flex;flex-direction:column;gap:0.5rem;padding-top:0.25rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-weight:700;color:#475569;font-size:0.85rem;">Final Amount
+                                            (₹)</span>
+                                        <span id="stage3FinalAmount"
+                                            style="font-weight:800;color:#ea580c;font-size:1.1rem;">₹0.00</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-weight:700;color:#475569;font-size:0.85rem;">Due Amount
+                                            (₹)</span>
+                                        <span id="stage3DueAmount"
+                                            style="font-weight:800;color:#16a34a;font-size:1.1rem;">₹0.00</span>
+                                    </div>
+                                </div>
+
+                                <!-- Delivery Type -->
+                                <div class="form-group-custom">
+                                    <label
+                                        style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Delivery
+                                        Type <span style="color:#ef4444;">*</span></label>
+                                    <select id="dealer-delivery-type" class="filter-select"
+                                        style="width:100%;max-width:100%;box-sizing:border-box;padding:0.55rem 0.75rem;"
+                                        onchange="toggleDealerOtherDelivery(this.value)" required>
+                                        <option value="" disabled selected>-- Select Delivery Type --</option>
+                                        <option value="VRL">VRL</option>
+                                        <option value="INDIA POST">INDIA POST</option>
+                                        <option value="OTHERS">OTHERS</option>
+                                    </select>
+                                </div>
+
+                                <div id="dealer-delivery-other-wrapper" class="form-group-custom" style="display:none;">
+                                    <label
+                                        style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Specify
+                                        Delivery Details <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" id="dealer-delivery-other"
+                                        style="width:100%;max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.85rem;outline:none;"
+                                        placeholder="Enter transport details...">
+                                </div>
+
+                                <!-- Payment Method (Shown only when Advance Amount > 0) -->
+                                <div id="dealer-payment-method-wrapper" class="form-group-custom" style="display:none;">
+                                    <label
+                                        style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Payment
+                                        Method <span style="color:#ef4444;">*</span></label>
+                                    <select id="dealer-order-payment-method" class="filter-select"
+                                        style="width:100%;max-width:100%;box-sizing:border-box;padding:0.55rem 0.75rem;">
+                                        <option value="" disabled selected>-- Select Payment Method --</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                        <option value="UPI">UPI / GPay / PhonePe</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="Credit">Credit (15 Days)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Purchase Date -->
+                                <div class="form-group-custom">
+                                    <label
+                                        style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Purchase
+                                        Date <span style="color:#ef4444;">*</span></label>
+                                    <input type="date" id="dealer-order-payment-date"
+                                        style="width:100%;max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.85rem;outline:none;"
+                                        required>
+                                </div>
+
+                                <!-- Order Notes -->
+                                <div class="form-group-custom">
+                                    <label
+                                        style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Order
+                                        Notes (Optional)</label>
+                                    <textarea id="dealer-order-notes" rows="2"
+                                        style="width:100%;max-width:100%;box-sizing:border-box;resize:vertical;min-height:60px;border:1px solid #cbd5e1;border-radius:8px;padding:0.5rem 0.75rem;font-size:0.85rem;outline:none;font-family:inherit;"
+                                        placeholder="Enter any notes for this order..."></textarea>
+                                </div>
+
+                                <!-- Action Buttons Footer -->
+                                <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+                                    <button type="button" class="btn-outline-card" onclick="openDealersListView()"
+                                        style="padding:0.55rem 1rem;">
+                                        <i class="fa-solid fa-xmark"></i> Cancel
+                                    </button>
+                                    <button type="submit" id="dealer-submit-order-btn" class="btn-amber"
+                                        style="padding:0.55rem 1.25rem;">
+                                        <i class="fa-solid fa-check"></i> Save & Convert Order
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ==========================================
+                 PAGE: DEALER DETAILS (FULL PAGE VIEW)
+                 ========================================== -->
+                <div id="dealer-details-page-view" style="display: none;">
+                    <!-- Top Action / Breadcrumb Bar -->
+                    <div
+                        style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                        <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+                            <button class="btn-cancel" onclick="openDealersListView()"
+                                style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1.1rem;border-radius:10px;font-weight:700;background:#ffffff;border:1px solid #cbd5e1;cursor:pointer;color:#334155;">
+                                <i class="fa-solid fa-arrow-left"></i> Back to Dealers
+                            </button>
+                            <div>
+                                <h1 style="font-size:1.6rem;font-weight:800;color:#0F172A;margin-bottom:0.15rem;">Dealer
+                                    Details</h1>
+                                <div
+                                    style="color:#64748B;font-size:0.85rem;display:flex;align-items:center;gap:0.5rem;">
+                                    <span>Home</span> / <span>Dealers</span> / <span
+                                        style="color:#0F172A;font-weight:600;">Dealer Details</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards Grid (4 Cards) -->
+                    <div class="dp-stats-cards"
+                        style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:1.25rem;margin-bottom:1.5rem;">
+                        <!-- Card 1: Total Orders -->
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:#eff6ff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0;">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            <div>
+                                <div
+                                    style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:2px;">
+                                    Total Orders</div>
+                                <div style="font-size:1.4rem;font-weight:800;color:#0f172a;" id="dpTotalOrders">0</div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Total Purchased -->
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:#f0fdf4;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0;">
+                                <i class="fa-solid fa-store"></i>
+                            </div>
+                            <div>
+                                <div
+                                    style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:2px;">
+                                    Total Purchased (₹)</div>
+                                <div style="font-size:1.4rem;font-weight:800;color:#0f172a;" id="dpTotalPurchased">₹0.00
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Total Paid -->
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:#f0fdf4;color:#059669;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0;">
+                                <i class="fa-solid fa-wallet"></i>
+                            </div>
+                            <div>
+                                <div
+                                    style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:2px;">
+                                    Total Paid (₹)</div>
+                                <div style="font-size:1.4rem;font-weight:800;color:#0f172a;" id="dpTotalPaid">₹0.00
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Outstanding -->
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:#fef2f2;color:#ef4444;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0;">
+                                <i class="fa-solid fa-magnifying-glass-dollar"></i>
+                            </div>
+                            <div>
+                                <div
+                                    style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:2px;">
+                                    Outstanding (₹)</div>
+                                <div style="font-size:1.4rem;font-weight:800;color:#ef4444;" id="dpOutstanding">₹0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Dealer Header Profile Banner -->
+                    <div
+                        style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1.25rem;">
+                        <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+                            <div id="dpHeaderAvatarBox"
+                                style="width:64px;height:64px;border-radius:16px;background:#F0FDF4;color:#16A34A;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;overflow:hidden;border:1px solid #bbf7d0;">
+                                <i class="fa-solid fa-store" id="dpHeaderAvatarIcon"></i>
+                                <img id="dpHeaderAvatarImg" src=""
+                                    onerror="this.style.display='none'; const icon=document.getElementById('dpHeaderAvatarIcon'); if(icon) icon.style.display='block';"
+                                    style="width:100%;height:100%;object-fit:cover;display:none;">
+                            </div>
+                            <div>
+                                <div
+                                    style="display:flex;align-items:center;gap:0.75rem;margin-bottom:4px;flex-wrap:wrap;">
+                                    <h2 id="dpFirmName"
+                                        style="font-size:1.4rem;font-weight:800;color:#0F172A;margin:0;">—</h2>
+                                    <span id="dpStatusBadge" class="status-pill active">ACTIVE</span>
+                                    <span id="dpStatusDaysText"
+                                        style="font-size:0.8rem;font-weight:700;color:#16a34a;"></span>
+                                </div>
+                                <div
+                                    style="font-size:0.875rem;color:#334155;display:flex;align-items:center;gap:1rem;margin-bottom:6px;flex-wrap:wrap;">
+                                    <span><i class="fa-regular fa-user" style="color:#64748b;margin-right:4px;"></i>
+                                        <span id="dpOwnerName">—</span></span>
+                                    <span><i class="fa-solid fa-phone" style="color:#64748b;margin-right:4px;"></i>
+                                        <span id="dpPhone">—</span></span>
+                                </div>
+                                <div style="font-size:0.825rem;color:#64748b;margin-bottom:8px;" id="dpAddress">
+                                    <i class="fa-solid fa-location-dot" style="color:#ef4444;margin-right:4px;"></i> —
+                                </div>
+                                <div
+                                    style="font-size:0.78rem;color:#475569;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+                                    <span><strong>GST No:</strong> <span id="dpGstNo">—</span></span>
+                                    <span><strong>VRL Code:</strong> <span id="dpVrlCode">—</span></span>
+                                    <span><strong>Nearest VRL:</strong> <span id="dpNearestVrl">—</span></span>
+                                    <span><strong>Last Order:</strong> <span id="dpLastOrderDate"
+                                            style="color:#0F172A;font-weight:700;">—</span></span>
+                                    <span><strong>Active Until:</strong> <span id="dpActiveUntil"
+                                            style="color:#0F172A;font-weight:700;">—</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <button id="dpEditBtn" class="btn-cancel"
+                                style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1.25rem;border-radius:10px;font-weight:700;color:#0f172a;border:1px solid #cbd5e1;background:#ffffff;cursor:pointer;">
+                                <i class="fa-regular fa-pen-to-square"></i> Edit Dealer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Tabs -->
+                    <div
+                        style="border-bottom:1px solid #e2e8f0;margin-bottom:1.5rem;display:flex;gap:0.5rem;overflow-x:auto;">
+                        <button class="dealer-dp-tab active" onclick="switchDpTab('overview', this)"
+                            style="padding:0.75rem 1.25rem;font-weight:700;font-size:0.875rem;border:none;background:none;cursor:pointer;color:#ff6b00;border-bottom:2px solid #ff6b00;display:flex;align-items:center;gap:0.5rem;">
+                            <i class="fa-solid fa-circle-info"></i> Overview
+                        </button>
+                        <button class="dealer-dp-tab" onclick="switchDpTab('orders', this)"
+                            style="padding:0.75rem 1.25rem;font-weight:600;font-size:0.875rem;border:none;background:none;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;display:flex;align-items:center;gap:0.5rem;">
+                            <i class="fa-regular fa-calendar-check"></i> Order History
+                        </button>
+                        <button class="dealer-dp-tab" onclick="switchDpTab('payments', this)"
+                            style="padding:0.75rem 1.25rem;font-weight:600;font-size:0.875rem;border:none;background:none;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;display:flex;align-items:center;gap:0.5rem;">
+                            <i class="fa-regular fa-credit-card"></i> Payments
+                        </button>
+                        <button class="dealer-dp-tab" onclick="switchDpTab('visits', this)"
+                            style="padding:0.75rem 1.25rem;font-weight:600;font-size:0.875rem;border:none;background:none;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;display:flex;align-items:center;gap:0.5rem;">
+                            <i class="fa-solid fa-user-clock"></i> Visit Details
+                        </button>
+                    </div>
+
+                    <!-- Tab Section 1: Overview -->
+                    <div id="dpTabOverview" class="dp-tab-content">
+                        <div
+                            style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:1.5rem;align-items:start;">
+                            <!-- Basic Info Card -->
+                            <div
+                                style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                                <h3
+                                    style="font-size:1rem;font-weight:800;color:#0F172A;margin:0 0 1rem 0;padding-bottom:0.5rem;border-bottom:1px solid #f1f5f9;">
+                                    Basic Information</h3>
+                                <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.85rem;">
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Firm / Shop Name</span><strong
+                                            id="dpInfoFirm">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Dealer Name</span><strong id="dpInfoOwner">—</strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Contact Number</span><strong
+                                            id="dpInfoPhone">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">GST No.</span><strong id="dpInfoGst">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">VRL Code</span><strong id="dpInfoVrlCode">—</strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Nearest VRL Location</span><strong
+                                            id="dpInfoNearestVrl">—</strong></div>
+                                </div>
+                            </div>
+
+                            <!-- Address Info Card -->
+                            <div
+                                style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                                <h3
+                                    style="font-size:1rem;font-weight:800;color:#0F172A;margin:0 0 1rem 0;padding-bottom:0.5rem;border-bottom:1px solid #f1f5f9;">
+                                    Address Information</h3>
+                                <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.85rem;">
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Address</span><strong id="dpInfoAddress">—</strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">City</span><strong id="dpInfoCity">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">District</span><strong id="dpInfoDistrict">—</strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">State</span><strong id="dpInfoState">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">PIN Code</span><strong id="dpInfoPincode">—</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Account & 45-Day Activity Status Card -->
+                            <div
+                                style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                                <h3
+                                    style="font-size:1rem;font-weight:800;color:#0F172A;margin:0 0 1rem 0;padding-bottom:0.5rem;border-bottom:1px solid #f1f5f9;">
+                                    <i class="fa-solid fa-clock-rotate-left"
+                                        style="color:#FF6B00;margin-right:6px;"></i> Activity & 45-Day Validity
+                                </h3>
+                                <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.85rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="color:#64748b;">Current Status</span>
+                                        <span id="dpOverviewStatusBadge" class="status-pill active">ACTIVE</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Days Remaining</span><strong
+                                            id="dpOverviewDaysRemaining">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Last Order Date</span><strong
+                                            id="dpOverviewLastOrderDate">—</strong></div>
+                                    <div style="display:flex;justify-content:space-between;"><span
+                                            style="color:#64748b;">Active Until (45 Days)</span><strong
+                                            id="dpOverviewActiveUntil">—</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab Section 2: Order History -->
+                    <div id="dpTabOrders" class="dp-tab-content" style="display:none;">
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <h3 style="font-size:1rem;font-weight:800;color:#0F172A;margin:0 0 1rem 0;">All Dealer
+                                Orders</h3>
+                            <div style="overflow-x:auto;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
+                                    <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                        <tr>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Order ID</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Order Date</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Products & Quantity</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Delivery Type</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:right;">
+                                                Total (₹)</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:right;">
+                                                Paid (₹)</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:right;">
+                                                Balance (₹)</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:center;">
+                                                Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dpAllOrdersTbody">
+                                        <tr>
+                                            <td colspan="8" style="padding:2rem;text-align:center;color:#94a3b8;">No
+                                                orders recorded yet.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab Section 3: Payments -->
+                    <div id="dpTabPayments" class="dp-tab-content" style="display:none;">
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <h3 style="font-size:1rem;font-weight:800;color:#0F172A;margin:0 0 1rem 0;">Payment
+                                Transactions</h3>
+                            <div style="overflow-x:auto;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
+                                    <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                        <tr>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Order ID</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Payment Date</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:right;">
+                                                Amount (₹)</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Payment Method</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Notes / Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dpPaymentsTbody">
+                                        <tr>
+                                            <td colspan="5" style="padding:2rem;text-align:center;color:#94a3b8;">No
+                                                payment records found.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab Section 4: Visit Details -->
+                    <div id="dpTabVisits" class="dp-tab-content" style="display:none;">
+                        <div
+                            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                            <div
+                                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
+                                <h3 style="font-size:1rem;font-weight:800;color:#0F172A;margin:0;">Field Visit Log</h3>
+                                <button type="button" onclick="openDealerVisitModal()"
+                                    style="background:#FF6B00;color:#ffffff;border:none;padding:0.5rem 1.15rem;border-radius:8px;font-weight:700;font-size:0.875rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;box-shadow:0 2px 4px rgba(255,107,0,0.2);transition:all 0.2s;">
+                                    <i class="fa-solid fa-plus"></i> New Visit
+                                </button>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
+                                    <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                        <tr>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Visited Date</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
+                                                Visited By</th>
+                                            <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:center;">
+                                                Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dpVisitsTbody">
+                                        <tr>
+                                            <td colspan="3" style="padding:2rem;text-align:center;color:#94a3b8;">No
+                                                visit logs recorded.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-            <div class="premium-card" style="overflow:hidden;">
-                <table style="width:100%;border-collapse:collapse;">
-                    <thead style="background:#f8fafc;"><tr>
-                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Firm Name</th>
-                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Owner</th>
-                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Phone</th>
-                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">City</th>
-                        <th style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Joined</th>
-                        <th id="actionsHeader" style="padding:1rem 1.25rem;text-align:left;font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;display:none;">Actions</th>
-                    </tr></thead>
-                    <tbody id="dealerTableBody"><tr><td colspan="6" style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin"></i></td></tr></tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-</div>
-<!-- Add/Edit Modal -->
-<div id="dealerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
-    <div class="premium-card" style="width:500px;padding:2rem;max-height:90vh;overflow-y:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-            <h2 style="font-size:1.25rem;font-weight:700;" id="modalTitle">Add Dealer</h2>
-            <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#64748b;">&times;</button>
-        </div>
-        <form id="dealerForm">
-            <input type="hidden" id="edit-id">
-            <div class="form-group" style="margin-bottom:1rem;">
-                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Firm Name *</label>
-                <input id="firm_name" required style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
-            </div>
-            <div class="form-group" style="margin-bottom:1rem;">
-                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Owner Name</label>
-                <input id="owner_name" style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
-            </div>
-            <div class="form-group" style="margin-bottom:1rem;">
-                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">Phone *</label>
-                <input id="phone_number" required style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
-            </div>
-            <div class="form-group" style="margin-bottom:1.5rem;">
-                <label style="font-size:0.8rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem;">City</label>
-                <input id="city" style="width:100%;padding:0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875rem;color:#111827;">
-            </div>
-            <button type="submit" class="btn-primary" style="width:100%;" id="saveBtn">Save Dealer</button>
-        </form>
+        </main>
     </div>
-</div>
-<script src="../../js/config.js"></script>
-<script src="../../js/components.js"></script>
-<script src="../../js/decision-engine.js"></script>
-<script src="js/dealer.js"></script>
+
+    <!-- ==========================================
+     MODAL: DEALER VISIT FORM
+     ========================================== -->
+    <div id="dealerVisitModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:1150;align-items:center;justify-content:center;padding:1.5rem 1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:760px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:entrance 0.25s ease-out;max-height:90vh;display:flex;flex-direction:column;">
+
+            <!-- Header -->
+            <div
+                style="padding:1.25rem 1.75rem;background:#ffffff;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:0.85rem;">
+                    <div
+                        style="width:42px;height:42px;border-radius:10px;background:#FFF7ED;color:#FF6B00;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
+                        <i class="fa-solid fa-clipboard-question"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size:1.15rem;font-weight:800;color:#0F172A;margin:0;">Dealer Visit Form</h3>
+                        <p style="margin:2px 0 0 0;font-size:0.8rem;color:#64748B;">Please fill in the information
+                            collected during this dealer visit.</p>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <button type="button" id="addQuestionBtn" onclick="openAddQuestionModal()"
+                        style="border:1.5px solid #FF6B00;color:#FF6B00;background:transparent;border-radius:8px;padding:0.45rem 1rem;font-weight:700;font-size:0.825rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;transition:all 0.2s;">
+                        <i class="fa-solid fa-plus"></i> Add Question
+                    </button>
+                    <button type="button" onclick="closeDealerVisitModal()"
+                        style="background:none;border:none;cursor:pointer;font-size:1.35rem;color:#94A3B8;padding:4px;line-height:1;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Body -->
+            <form id="dealerVisitForm" onsubmit="saveDealerVisitForm(event)"
+                style="padding:1.5rem 1.75rem;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:1.25rem;">
+                <input type="hidden" id="visit_dealer_id">
+
+                <!-- Field 1 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        1. What are your main requirements from SGB Agro? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <textarea id="visitReq" rows="2" placeholder="Type your answer..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;resize:vertical;background:#F8FAFC;font-family:inherit;"></textarea>
+                </div>
+
+                <!-- Field 2 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        2. What major crops do you grow/sell in your area? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <textarea id="visitCrops" rows="2" placeholder="Type your answer..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;resize:vertical;background:#F8FAFC;font-family:inherit;"></textarea>
+                </div>
+
+                <!-- Field 3 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        3. Which products do you sell the most? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <textarea id="visitTopProducts" rows="2" placeholder="Type your answer..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;resize:vertical;background:#F8FAFC;font-family:inherit;"></textarea>
+                </div>
+
+                <!-- Field 4 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        4. Approximately how many brush cutters do you sell per year? <span
+                            style="color:#EF4444;">*</span>
+                    </label>
+                    <input type="number" id="visitBrushCuttersQty" min="0" placeholder="Type a number..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#F8FAFC;">
+                </div>
+
+                <!-- Field 5 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        5. Which companies/brands of brush cutters do you currently sell? <span
+                            style="color:#EF4444;">*</span>
+                    </label>
+                    <textarea id="visitBrushCuttersBrands" rows="2" placeholder="Type your answer..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;resize:vertical;background:#F8FAFC;font-family:inherit;"></textarea>
+                </div>
+
+                <!-- Field 6 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        6. Who are your major competitors? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <textarea id="visitCompetitors" rows="2" placeholder="Type your answer..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;resize:vertical;background:#F8FAFC;font-family:inherit;"></textarea>
+                </div>
+
+                <!-- Field 7 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        7. How many branches do you have and where are they located? <span
+                            style="color:#EF4444;">*</span>
+                    </label>
+                    <textarea id="visitBranches" rows="2" placeholder="Type your answer..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;resize:vertical;background:#F8FAFC;font-family:inherit;"></textarea>
+                </div>
+
+                <!-- Field 8 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        8. How many people are working in your business? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <input type="number" id="visitStaffCount" min="0" placeholder="Type a number..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#F8FAFC;">
+                </div>
+
+                <!-- Field 9 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        9. How do you mainly sell your products? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.35rem;">
+                        <label
+                            style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">
+                            <input type="radio" name="visitSalesType" value="B2B – Business to Business" checked
+                                style="accent-color:#FF6B00;"> B2B – Business to Business
+                        </label>
+                        <label
+                            style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">
+                            <input type="radio" name="visitSalesType" value="B2C – Direct to Customers"
+                                style="accent-color:#FF6B00;"> B2C – Direct to Customers
+                        </label>
+                        <label
+                            style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">
+                            <input type="radio" name="visitSalesType" value="Both B2B & B2C"
+                                style="accent-color:#FF6B00;"> Both B2B & B2C
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Field 10 -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
+                        10. How many years has your shop/business been running? <span style="color:#EF4444;">*</span>
+                    </label>
+                    <input type="number" id="visitBusinessYears" min="0" placeholder="Type a number..." required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#F8FAFC;">
+                </div>
+
+                <!-- Field 11: Current Stock Table -->
+                <div>
+                    <label
+                        style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.25rem;">
+                        11. Current Stock – <span style="font-weight:400;font-size:0.825rem;color:#64748B;">Please enter
+                            the current stock of products purchased from us.</span>
+                    </label>
+                    <div
+                        style="border:1px solid #E2E8F0;border-radius:10px;overflow-x:auto;max-width:520px;margin-top:0.5rem;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
+                            <thead style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+                                <tr>
+                                    <th
+                                        style="padding:0.6rem 0.85rem;font-weight:700;color:#475569;text-align:left;white-space:nowrap;">
+                                        Product</th>
+                                    <th
+                                        style="padding:0.6rem 0.85rem;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">
+                                        Purchased Qty</th>
+                                    <th
+                                        style="padding:0.6rem 0.85rem;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">
+                                        Current Stock (Qty) <span style="color:#EF4444;">*</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="visitCurrentStockTbody">
+                                <tr style="border-bottom:1px solid #F1F5F9;">
+                                    <td
+                                        style="padding:0.5rem 0.85rem;font-weight:700;color:#1E293B;white-space:nowrap;">
+                                        Brush Cutter</td>
+                                    <td style="padding:0.5rem 0.85rem;font-weight:700;color:#475569;text-align:center;">
+                                        20</td>
+                                    <td style="padding:0.4rem 0.6rem;text-align:center;"><input type="number" min="0"
+                                            class="stock-input" data-product="Brush Cutter" data-purchased="20"
+                                            placeholder="Qty" required
+                                            style="width:90px;border:1px solid #E2E8F0;border-radius:6px;padding:0.4rem 0.5rem;font-size:0.825rem;text-align:center;">
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #F1F5F9;">
+                                    <td
+                                        style="padding:0.5rem 0.85rem;font-weight:700;color:#1E293B;white-space:nowrap;">
+                                        Trolley</td>
+                                    <td style="padding:0.5rem 0.85rem;font-weight:700;color:#475569;text-align:center;">
+                                        10</td>
+                                    <td style="padding:0.4rem 0.6rem;text-align:center;"><input type="number" min="0"
+                                            class="stock-input" data-product="Trolley" data-purchased="10"
+                                            placeholder="Qty" required
+                                            style="width:90px;border:1px solid #E2E8F0;border-radius:6px;padding:0.4rem 0.5rem;font-size:0.825rem;text-align:center;">
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #F1F5F9;">
+                                    <td
+                                        style="padding:0.5rem 0.85rem;font-weight:700;color:#1E293B;white-space:nowrap;">
+                                        Side Pack</td>
+                                    <td style="padding:0.5rem 0.85rem;font-weight:700;color:#475569;text-align:center;">
+                                        15</td>
+                                    <td style="padding:0.4rem 0.6rem;text-align:center;"><input type="number" min="0"
+                                            class="stock-input" data-product="Side Pack" data-purchased="15"
+                                            placeholder="Qty" required
+                                            style="width:90px;border:1px solid #E2E8F0;border-radius:6px;padding:0.4rem 0.5rem;font-size:0.825rem;text-align:center;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td
+                                        style="padding:0.5rem 0.85rem;font-weight:700;color:#1E293B;white-space:nowrap;">
+                                        Water Pump</td>
+                                    <td style="padding:0.5rem 0.85rem;font-weight:700;color:#475569;text-align:center;">
+                                        5</td>
+                                    <td style="padding:0.4rem 0.6rem;text-align:center;"><input type="number" min="0"
+                                            class="stock-input" data-product="Water Pump" data-purchased="5"
+                                            placeholder="Qty" required
+                                            style="width:90px;border:1px solid #E2E8F0;border-radius:6px;padding:0.4rem 0.5rem;font-size:0.825rem;text-align:center;">
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p
+                        style="font-size:0.75rem;color:#64748B;margin-top:0.5rem;display:flex;align-items:center;gap:0.35rem;">
+                        <i class="fa-solid fa-circle-info" style="color:#94A3B8;"></i> Only products purchased by this
+                        dealer are shown above. Please enter the current remaining stock.
+                    </p>
+                </div>
+
+                <!-- Container for dynamically added questions -->
+                <div id="customVisitQuestionsContainer" style="display:flex;flex-direction:column;gap:1.25rem;"></div>
+
+                <!-- Footer buttons -->
+                <div
+                    style="padding-top:1rem;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.5rem;flex-shrink:0;">
+                    <button type="button" onclick="closeDealerVisitModal()"
+                        style="border:1px solid #CBD5E1;background:#ffffff;color:#475569;padding:0.6rem 1.35rem;border-radius:8px;font-weight:700;font-size:0.875rem;cursor:pointer;">
+                        Cancel
+                    </button>
+                    <button type="submit" id="saveVisitSubmitBtn"
+                        style="background:#FF6B00;color:#ffffff;border:none;padding:0.6rem 1.5rem;border-radius:8px;font-weight:700;font-size:0.875rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.5rem;box-shadow:0 2px 4px rgba(255,107,0,0.25);">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Visit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+     MODAL: ADD NEW CUSTOM QUESTION
+     ========================================== -->
+    <div id="addQuestionModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:1250;align-items:center;justify-content:center;padding:1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:500px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:entrance 0.25s ease-out;">
+            <!-- Header -->
+            <div
+                style="padding:1.25rem 1.5rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div
+                        style="width:40px;height:40px;border-radius:10px;background:#FFF7ED;color:#FF6B00;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fa-solid fa-file-circle-plus"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size:1.1rem;font-weight:800;color:#0F172A;margin:0;">Add New Question</h3>
+                        <p style="margin:2px 0 0 0;font-size:0.775rem;color:#64748B;">Enter your question text and
+                            choose the answer type.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeAddQuestionModal()"
+                    style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#94A3B8;padding:4px;line-height:1;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Form Body -->
+            <form id="addQuestionForm" onsubmit="handleAddQuestionSubmit(event)"
+                style="padding:1.5rem;display:flex;flex-direction:column;gap:1.1rem;">
+                <!-- Question Title -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.85rem;color:#0F172A;margin-bottom:0.4rem;">
+                        Question Text <span style="color:#EF4444;">*</span>
+                    </label>
+                    <input type="text" id="newQTitle" placeholder="e.g. What is your preferred delivery day?" required
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#ffffff;">
+                </div>
+
+                <!-- Answer Type -->
+                <div>
+                    <label style="display:block;font-weight:700;font-size:0.85rem;color:#0F172A;margin-bottom:0.4rem;">
+                        Answer Type <span style="color:#EF4444;">*</span>
+                    </label>
+                    <select id="newQType" onchange="handleAnswerTypeChange()"
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#ffffff;font-weight:600;">
+                        <option value="textarea" selected>Text Area (Multi-line text)</option>
+                        <option value="text">Short Text (Single line)</option>
+                        <option value="number">Number Input</option>
+                        <option value="radio">Radio Buttons (Single Selection)</option>
+                        <option value="checkbox">Checkboxes (Multiple Selection)</option>
+                        <option value="dropdown">Dropdown Select</option>
+                    </select>
+                </div>
+
+                <!-- Options Section (For radio / checkbox / dropdown) -->
+                <div id="newQOptionsSection"
+                    style="display:none;background:#F8FAFC;border:1px solid #E2E8F0;padding:0.85rem;border-radius:10px;">
+                    <label
+                        style="display:block;font-weight:700;font-size:0.825rem;color:#0F172A;margin-bottom:0.35rem;">
+                        Options List <span style="color:#EF4444;">*</span>
+                    </label>
+                    <input type="text" id="newQOptionsInput" placeholder="Option 1, Option 2, Option 3"
+                        style="width:100%;border:1px solid #E2E8F0;border-radius:6px;padding:0.5rem 0.75rem;font-size:0.825rem;color:#1E293B;background:#ffffff;">
+                    <p style="margin:4px 0 0 0;font-size:0.725rem;color:#64748B;">Separate multiple options with commas
+                        (e.g. Morning, Afternoon, Evening)</p>
+                </div>
+
+                <!-- Required Checkbox -->
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.2rem;">
+                    <input type="checkbox" id="newQIsRequired" checked
+                        style="width:16px;height:16px;accent-color:#FF6B00;cursor:pointer;">
+                    <label for="newQIsRequired"
+                        style="font-size:0.85rem;font-weight:600;color:#334155;cursor:pointer;">Is Required
+                        Question</label>
+                </div>
+
+                <!-- Modal Footer Buttons -->
+                <div
+                    style="padding-top:1rem;border-top:1px solid #F1F5F9;display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.5rem;">
+                    <button type="button" onclick="closeAddQuestionModal()"
+                        style="border:1px solid #CBD5E1;background:#ffffff;color:#475569;padding:0.55rem 1.25rem;border-radius:8px;font-weight:700;font-size:0.85rem;cursor:pointer;">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        style="background:#FF6B00;color:#ffffff;border:none;padding:0.55rem 1.35rem;border-radius:8px;font-weight:700;font-size:0.85rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;box-shadow:0 2px 4px rgba(255,107,0,0.25);">
+                        <i class="fa-solid fa-plus"></i> Add Question to Form
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+     MODAL: VIEW DEALER DETAILS
+     ========================================== -->
+    <div id="dealerDetailsModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:580px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);overflow:hidden;animation:entrance 0.25s ease-out;">
+            <div
+                style="padding:1.25rem 1.5rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div
+                        style="width:40px;height:40px;border-radius:10px;background:#FFF7ED;color:#FF6B00;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fa-solid fa-store"></i>
+                    </div>
+                    <div>
+                        <h3 id="viewFirmName" style="font-size:1.1rem;font-weight:700;color:#0F172A;margin:0;">Dealer
+                            Details</h3>
+                        <p id="viewStatusBadge" style="margin:0;font-size:0.75rem;color:#64748B;">View profile &
+                            logistics data</p>
+                    </div>
+                </div>
+                <button onclick="closeDealerDetailsModal()"
+                    style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#94A3B8;padding:4px;"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div style="padding:1.5rem;max-height:75vh;overflow-y:auto;" id="viewDealerContent">
+                <!-- Dynamic Content -->
+            </div>
+
+            <div
+                style="padding:1rem 1.5rem;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:0.75rem;">
+                <button onclick="closeDealerDetailsModal()" class="btn-cancel"
+                    style="padding:0.5rem 1.25rem;">Close</button>
+                <button id="modalEditBtn" onclick="" class="btn-orange" style="padding:0.5rem 1.25rem;">
+                    <i class="fa-regular fa-pen-to-square"></i> Edit Dealer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+     MODAL: CREATE DEALER PRODUCT ORDER
+     ========================================== -->
+    <div id="createDealerOrderModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:620px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);overflow:hidden;animation:entrance 0.25s ease-out;">
+            <!-- Header -->
+            <div
+                style="padding:1.25rem 1.5rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div
+                        style="width:40px;height:40px;border-radius:10px;background:#F0FDF4;color:#16A34A;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fa-solid fa-cart-plus"></i>
+                    </div>
+                    <div>
+                        <h3 id="orderModalFirmName" style="font-size:1.1rem;font-weight:700;color:#0F172A;margin:0;">
+                            Place Product Order</h3>
+                        <p id="orderModalSubTitle" style="margin:0;font-size:0.75rem;color:#64748B;">Order products
+                            directly for dealer account</p>
+                    </div>
+                </div>
+                <button onclick="closeDealerOrderModal()"
+                    style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#94A3B8;padding:4px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Form Body -->
+            <form id="dealerOrderForm" onsubmit="handleDealerOrderSubmit(event)" style="padding:1.5rem;">
+                <input type="hidden" id="order_dealer_id">
+
+                <!-- Dealer Summary Pill -->
+                <div
+                    style="background:#FFF7ED;border:1px solid #FFEDD5;padding:0.875rem 1rem;border-radius:10px;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:0.725rem;color:#C2410C;font-weight:700;text-transform:uppercase;">SELECTED
+                            DEALER</div>
+                        <div id="orderDealerInfo" style="font-size:0.95rem;font-weight:700;color:#9A3412;">—</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.725rem;color:#C2410C;font-weight:700;text-transform:uppercase;">CONTACT
+                        </div>
+                        <div id="orderDealerPhone" style="font-size:0.875rem;font-weight:600;color:#9A3412;">—</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-bottom:1.25rem;">
+                    <div class="form-group-custom">
+                        <label for="order_product">Select Product <span class="req">*</span></label>
+                        <div class="input-with-icon">
+                            <i class="fa-solid fa-box input-icon"></i>
+                            <select id="order_product" required onchange="calculateOrderTotal()">
+                                <option value="" disabled>Select product...</option>
+                                <option value="SGB Bio-Fertilizer 1L" data-price="450" selected>SGB Bio-Fertilizer 1L —
+                                    ₹450</option>
+                                <option value="SGB Crop Booster 500ml" data-price="650">SGB Crop Booster 500ml — ₹650
+                                </option>
+                                <option value="Organic Soil Enhancer 5kg" data-price="850">Organic Soil Enhancer 5kg —
+                                    ₹850</option>
+                                <option value="Neem Shield Insecticide 1L" data-price="550">Neem Shield Insecticide 1L —
+                                    ₹550</option>
+                                <option value="Granular Micro-Nutrients 10kg" data-price="1200">Granular Micro-Nutrients
+                                    10kg — ₹1,200</option>
+                                <option value="SGB Growth Tonic 250ml" data-price="350">SGB Growth Tonic 250ml — ₹350
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group-custom">
+                        <label for="order_quantity">Quantity (Units) <span class="req">*</span></label>
+                        <div class="input-with-icon">
+                            <i class="fa-solid fa-calculator input-icon"></i>
+                            <input type="number" id="order_quantity" required min="1" value="10"
+                                oninput="calculateOrderTotal()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-bottom:1.25rem;">
+                    <div class="form-group-custom">
+                        <label for="order_payment_terms">Payment Terms</label>
+                        <div class="input-with-icon">
+                            <i class="fa-solid fa-wallet input-icon"></i>
+                            <select id="order_payment_terms">
+                                <option value="Credit (15 Days)">Credit (15 Days)</option>
+                                <option value="Advance Payment">Advance Payment</option>
+                                <option value="Cash on Delivery">Cash on Delivery (COD)</option>
+                                <option value="Paid Online">Paid Online</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group-custom">
+                        <label for="order_transport">Logistics / Transport</label>
+                        <div class="input-with-icon">
+                            <i class="fa-solid fa-truck input-icon"></i>
+                            <select id="order_transport">
+                                <option value="VRL Logistics">VRL Logistics</option>
+                                <option value="Self Pickup">Self Pickup</option>
+                                <option value="Local Transport">Local Transport Hub</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Amount Calculation Box -->
+                <div
+                    style="background:#F8FAFC;border:1px solid #E2E8F0;padding:1rem;border-radius:10px;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:0.875rem;font-weight:600;color:#64748B;">Total Order Value:</div>
+                    <div style="font-size:1.4rem;font-weight:800;color:#16A34A;" id="orderTotalDisplay">₹4,500.00</div>
+                </div>
+
+                <!-- Form Actions -->
+                <div
+                    style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:1rem;border-top:1px solid #F1F5F9;">
+                    <button type="button" onclick="closeDealerOrderModal()" class="btn-cancel"
+                        style="padding:0.5rem 1.25rem;">Cancel</button>
+                    <button type="submit" id="saveOrderBtn" class="btn-orange"
+                        style="padding:0.5rem 1.25rem;background:#16a34a;border-color:#16a34a;">
+                        <i class="fa-solid fa-check"></i> Place Order Now
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+     MODAL: BULK IMPORT DEALERS (EXCEL / CSV)
+     ========================================== -->
+    <div id="importDealersModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:650px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;animation:entrance 0.25s ease-out;">
+            <!-- Header -->
+            <div
+                style="padding:1.25rem 1.5rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div
+                        style="width:40px;height:40px;border-radius:10px;background:#ECFDF5;color:#10B981;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fa-solid fa-file-excel"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin:0;font-size:1.1rem;font-weight:700;color:#0F172A;">Bulk Import Dealers</h3>
+                        <p style="margin:0;font-size:0.75rem;color:#64748B;">Upload an Excel (.xlsx, .xls) or CSV file
+                            to import dealers in bulk.</p>
+                    </div>
+                </div>
+                <button onclick="closeImportDealersModal()"
+                    style="border:none;background:transparent;color:#94A3B8;cursor:pointer;font-size:1.2rem;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="padding:1.5rem;">
+                <!-- Download Sample Template Section -->
+                <div
+                    style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:1rem;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:700;color:#166534;">Need an Excel Template?</div>
+                        <div style="font-size:0.75rem;color:#15803D;">Download a sample template pre-filled with
+                            required column headers.</div>
+                    </div>
+                    <button onclick="downloadDealerImportTemplate()"
+                        style="background:#16A34A;color:#ffffff;border:none;padding:0.45rem 0.9rem;border-radius:8px;font-size:0.775rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.4rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <i class="fa-solid fa-download"></i> Sample Template
+                    </button>
+                </div>
+
+                <!-- Drag & Drop Upload Zone -->
+                <div id="importDropZone"
+                    style="border:2px dashed #CBD5E1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#F8FAFC;cursor:pointer;transition:all 0.2s ease;"
+                    onclick="document.getElementById('dealerImportFileInput').click()">
+                    <input type="file" id="dealerImportFileInput" accept=".xlsx, .xls, .csv" style="display:none;"
+                        onchange="handleImportFileSelect(event)">
+                    <i class="fa-solid fa-cloud-arrow-up"
+                        style="font-size:2.2rem;color:#10B981;margin-bottom:0.75rem;display:block;"></i>
+                    <div style="font-size:0.9rem;font-weight:700;color:#0F172A;margin-bottom:4px;"
+                        id="importFilePrompt">Click or Drag & Drop Excel / CSV file here</div>
+                    <div style="font-size:0.75rem;color:#64748B;">Supports .xlsx, .xls, and .csv files</div>
+                </div>
+
+                <!-- Preview & Status Area -->
+                <div id="importPreviewContainer" style="display:none;margin-top:1.25rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <div style="font-size:0.825rem;font-weight:700;color:#0F172A;" id="importRecordCountBadge">
+                            Parsed 0 Records</div>
+                        <button type="button" onclick="clearImportFileSelection()"
+                            style="background:transparent;border:none;color:#EF4444;font-size:0.75rem;font-weight:600;cursor:pointer;">Clear
+                            Selection</button>
+                    </div>
+                    <div
+                        style="max-height:260px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#ffffff;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+                            <thead style="background:#F8FAFC;position:sticky;top:0;border-bottom:1px solid #E2E8F0;">
+                                <tr>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">#</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Firm / Shop Name</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Dealer Name</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Contact</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">City / Address</th>
+                                </tr>
+                            </thead>
+                            <tbody id="importPreviewTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actions Footer -->
+                <div
+                    style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #F1F5F9;">
+                    <button type="button" onclick="closeImportDealersModal()" class="btn-cancel"
+                        style="padding:0.5rem 1.25rem;">Cancel</button>
+                    <button type="button" id="btnSubmitBulkImport" onclick="executeDealerBulkImport()" disabled
+                        style="padding:0.5rem 1.25rem;background:#10B981;color:#ffffff;border:none;border-radius:8px;font-weight:700;cursor:pointer;opacity:0.5;">
+                        <i class="fa-solid fa-file-import"></i> Import Dealers Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+     MODAL: BULK IMPORT DEALERS & ORDERS
+     ========================================== -->
+    <div id="importOrdersModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:780px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;animation:entrance 0.25s ease-out;max-height:90vh;display:flex;flex-direction:column;">
+            <!-- Header -->
+            <div
+                style="padding:1.25rem 1.5rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div
+                        style="width:42px;height:42px;border-radius:10px;background:#FFF7ED;color:#FF6B00;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
+                        <i class="fa-solid fa-boxes-packing"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin:0;font-size:1.1rem;font-weight:700;color:#0F172A;">Bulk Import Dealers &
+                            Orders</h3>
+                        <p style="margin:2px 0 0 0;font-size:0.75rem;color:#64748B;">Upload one Excel file containing
+                            dealer and historical order data. Dealers will be automatically matched and orders will be
+                            linked to the correct dealer.</p>
+                    </div>
+                </div>
+                <button onclick="closeImportOrdersModal()"
+                    style="border:none;background:transparent;color:#94A3B8;cursor:pointer;font-size:1.2rem;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+                <!-- Download Sample Template Section -->
+                <div
+                    style="background:#FFF7ED;border:1px solid #FFEDD5;border-radius:10px;padding:1rem;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:700;color:#9A3412;">📄 Download Excel Template</div>
+                        <div style="font-size:0.75rem;color:#C2410C;">Includes pre-formatted columns for Dealer ID, Firm
+                            Name, Phone, GST No, Products, Amounts, Dates & Status.</div>
+                    </div>
+                    <button onclick="downloadOrderImportTemplate()"
+                        style="background:#FF6B00;color:#ffffff;border:none;padding:0.45rem 0.9rem;border-radius:8px;font-size:0.775rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.4rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <i class="fa-solid fa-download"></i> Sample Template
+                    </button>
+                </div>
+
+                <!-- Import Configuration Switches -->
+                <div
+                    style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;background:#F8FAFC;padding:0.85rem 1.1rem;border-radius:10px;border:1px solid #E2E8F0;">
+                    <label
+                        style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.825rem;font-weight:700;color:#0F172A;cursor:pointer;">
+                        <input type="checkbox" id="chkAutoCreateDealers" checked
+                            style="accent-color:#FF6B00;width:17px;height:17px;margin-top:2px;">
+                        <div>
+                            <div>Create missing dealers automatically</div>
+                            <div style="font-weight:400;font-size:0.75rem;color:#64748B;">Create a dealer profile when
+                                no matching dealer exists in the CRM.</div>
+                        </div>
+                    </label>
+                    <label
+                        style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.825rem;font-weight:700;color:#0F172A;cursor:pointer;">
+                        <input type="checkbox" id="chkDryRunOrders"
+                            style="accent-color:#FF6B00;width:17px;height:17px;margin-top:2px;">
+                        <div>
+                            <div>Preview & Validate before importing (Dry Run)</div>
+                            <div style="font-weight:400;font-size:0.75rem;color:#64748B;">Validate the entire Excel
+                                sheet and display detailed breakdown without saving data.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Drag & Drop Upload Zone -->
+                <div id="orderImportDropZone"
+                    style="border:2px dashed #CBD5E1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#F8FAFC;cursor:pointer;transition:all 0.2s ease;"
+                    onclick="document.getElementById('orderImportFileInput').click()">
+                    <input type="file" id="orderImportFileInput" accept=".xlsx, .xls, .csv" style="display:none;"
+                        onchange="handleOrderImportFileSelect(event)">
+                    <i class="fa-solid fa-cloud-arrow-up"
+                        style="font-size:2.4rem;color:#FF6B00;margin-bottom:0.75rem;display:block;"></i>
+                    <div style="font-size:0.925rem;font-weight:700;color:#0F172A;margin-bottom:4px;"
+                        id="orderImportFilePrompt">Drop Excel file here or Click to Browse</div>
+                    <div style="font-size:0.75rem;color:#64748B;">Supports .xlsx, .xls, and .csv files containing dealer
+                        + order data</div>
+                </div>
+
+                <!-- Dry Run / Import Summary Dashboard Cards -->
+                <div id="dryRunSummaryView"
+                    style="display:none;margin-top:1.25rem;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:1rem;">
+                    <div
+                        style="font-size:0.85rem;font-weight:700;color:#0F172A;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center;">
+                        <span><i class="fa-solid fa-chart-pie" style="color:#FF6B00;"></i> Import Analysis & Validation
+                            Report</span>
+                        <span id="dryRunStatusBadge"
+                            style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:4px;background:#FEF3C7;color:#D97706;">PREVIEW
+                            MODE</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.75rem;">
+                        <div
+                            style="background:#ffffff;border:1px solid #E2E8F0;padding:0.6rem 0.8rem;border-radius:8px;">
+                            <div style="font-size:0.7rem;color:#64748B;font-weight:600;">Total Rows</div>
+                            <div style="font-size:1.15rem;font-weight:800;color:#0F172A;" id="statTotalRows">0</div>
+                        </div>
+                        <div
+                            style="background:#ffffff;border:1px solid #E2E8F0;padding:0.6rem 0.8rem;border-radius:8px;">
+                            <div style="font-size:0.7rem;color:#64748B;font-weight:600;">Dealers Found</div>
+                            <div style="font-size:1.15rem;font-weight:800;color:#2563EB;" id="statDealersFound">0</div>
+                        </div>
+                        <div
+                            style="background:#ffffff;border:1px solid #E2E8F0;padding:0.6rem 0.8rem;border-radius:8px;">
+                            <div style="font-size:0.7rem;color:#64748B;font-weight:600;">New Dealers</div>
+                            <div style="font-size:1.15rem;font-weight:800;color:#059669;" id="statNewDealers">0</div>
+                        </div>
+                        <div
+                            style="background:#ffffff;border:1px solid #E2E8F0;padding:0.6rem 0.8rem;border-radius:8px;">
+                            <div style="font-size:0.7rem;color:#64748B;font-weight:600;">Orders to Create</div>
+                            <div style="font-size:1.15rem;font-weight:800;color:#7E22CE;" id="statOrdersToCreate">0
+                            </div>
+                        </div>
+                        <div
+                            style="background:#ffffff;border:1px solid #E2E8F0;padding:0.6rem 0.8rem;border-radius:8px;">
+                            <div style="font-size:0.7rem;color:#64748B;font-weight:600;">Errors / Skipped</div>
+                            <div style="font-size:1.15rem;font-weight:800;color:#DC2626;" id="statErrors">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar during Import -->
+                <div id="importProgressBarContainer" style="display:none;margin-top:1.25rem;">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;font-size:0.775rem;font-weight:700;color:#0F172A;margin-bottom:0.35rem;">
+                        <span id="importProgressStatus">Processing batch 1...</span>
+                        <span id="importProgressPct">0%</span>
+                    </div>
+                    <div style="width:100%;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                        <div id="importProgressBarFill"
+                            style="width:0%;height:100%;background:#FF6B00;transition:width 0.2s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Table Preview & Status Area -->
+                <div id="orderImportPreviewContainer" style="display:none;margin-top:1.25rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <div style="font-size:0.825rem;font-weight:700;color:#0F172A;" id="orderImportRecordCountBadge">
+                            Parsed 0 Order Records</div>
+                        <button type="button" onclick="clearOrderImportFileSelection()"
+                            style="background:transparent;border:none;color:#EF4444;font-size:0.75rem;font-weight:600;cursor:pointer;">Clear
+                            Selection</button>
+                    </div>
+                    <div
+                        style="max-height:260px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#ffffff;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+                            <thead style="background:#F8FAFC;position:sticky;top:0;border-bottom:1px solid #E2E8F0;">
+                                <tr>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">#</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Dealer / Firm Name</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Phone / GSTIN</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Order Date</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Amount (₹)</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderImportPreviewTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actions Footer -->
+                <div
+                    style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #F1F5F9;">
+                    <button type="button" onclick="closeImportOrdersModal()" class="btn-cancel"
+                        style="padding:0.5rem 1.25rem;">Cancel</button>
+                    <button type="button" id="btnSubmitOrdersBulkImport" onclick="executeOrdersBulkImport()" disabled
+                        style="padding:0.5rem 1.25rem;background:#FF6B00;color:#ffffff;border:none;border-radius:8px;font-weight:700;cursor:pointer;opacity:0.5;">
+                        <i class="fa-solid fa-boxes-packing"></i> Import Records Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MISSING DEALERS CONFIRMATION MODAL -->
+    <div id="missingDealersConfirmModal"
+        style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:1200;align-items:center;justify-content:center;padding:1rem;">
+        <div
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:520px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.15);overflow:hidden;animation:entrance 0.2s ease-out;padding:1.75rem;">
+            <div style="text-align:center;margin-bottom:1.25rem;">
+                <div
+                    style="width:54px;height:54px;border-radius:50%;background:#FFF7ED;color:#EA580C;display:inline-flex;align-items:center;justify-content:center;font-size:1.6rem;margin-bottom:0.75rem;border:1px solid #FFEDD5;">
+                    <i class="fa-solid fa-store-slash"></i>
+                </div>
+                <h3 style="margin:0 0 0.4rem 0;font-size:1.25rem;font-weight:800;color:#0F172A;">Dealer Not Found in
+                    List!</h3>
+                <p style="margin:0;font-size:0.85rem;color:#64748B;line-height:1.45;">
+                    The following dealer(s) in your Excel file do <strong style="color:#DC2626;">not exist</strong> in
+                    your CRM Dealers list:
+                </p>
+            </div>
+
+            <!-- Scrollable Missing Dealers List -->
+            <div id="missingDealersScrollList"
+                style="max-height:250px;overflow-y:auto;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:0.75rem;margin-bottom:1.25rem;">
+            </div>
+
+            <!-- Callout Banner -->
+            <div
+                style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:0.85rem 1rem;margin-bottom:1.5rem;display:flex;align-items:flex-start;gap:0.75rem;">
+                <i class="fa-solid fa-circle-question" style="color:#2563EB;font-size:1.2rem;margin-top:2px;"></i>
+                <div style="font-size:0.825rem;color:#1E40AF;line-height:1.4;">
+                    <strong>Select missing dealer(s) you wish to automatically create & import:</strong>
+                    <div style="font-size:0.75rem;color:#3B82F6;margin-top:2px;">Checked dealers will be added to your CRM Dealer list along with their orders.</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display:flex;flex-direction:column;gap:0.6rem;">
+                <button type="button" onclick="confirmAutoCreateDealersAndImport(true)" id="btnConfirmCreateMissingDealers"
+                    style="width:100%;padding:0.75rem;background:#10B981;color:#ffffff;border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;box-shadow:0 2px 4px rgba(16,185,129,0.2);">
+                    <i class="fa-solid fa-user-plus"></i> <span id="lblConfirmCreateMissingDealers">Yes, Create Dealers & Import Orders</span>
+                </button>
+                <button type="button" onclick="confirmAutoCreateDealersAndImport(false)"
+                    style="width:100%;padding:0.65rem;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;border-radius:10px;font-size:0.825rem;font-weight:600;cursor:pointer;">
+                    Skip Missing Dealers (Import Matched Only)
+                </button>
+                <button type="button" onclick="closeMissingDealersConfirmModal()"
+                    style="width:100%;padding:0.5rem;background:transparent;color:#94A3B8;border:none;font-size:0.8rem;font-weight:600;cursor:pointer;">
+                    Cancel Import
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="../../js/decision-engine.js"></script>
+    <script src="js/dealer.js"></script>
 </body>
+
 </html>

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chatbot Builder | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/chatbot.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Container (Loaded dynamically via components.js) -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main Content Area -->
+        <main class="main-content" style="position: relative; display: flex; flex-direction: column;">
+            <!-- Top Header -->
+            <header class="topbar"
+                style="border-bottom: 1px solid var(--border-color); background: #ffffff; padding: 0.5rem 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <div class="breadcrumbs" style="display:flex; align-items:center; gap:0.5rem; font-size:0.875rem;">
+                    <a href="flows.html" onclick="goBackToFlows(event)" class="btn-secondary"
+                        style="width:auto; padding:0 0.5rem; font-size:0.78rem; font-weight:600; height:1.85rem; gap:0.25rem; border-radius:0.375rem; cursor:pointer;"
+                        title="Back to Flows List">
+                        <i class="fa-solid fa-arrow-left"></i> Flows
+                    </a>
+                    <span style="color:#94a3b8; margin: 0 0.25rem;">&gt;</span>
+                    <a href="flows.html" onclick="goBackToFlows(event)" style="color:#64748b; font-weight:500; text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#64748b'" title="Back to Chatbot Flows">Chatbot</a>
+                    <span style="color:#94a3b8; margin: 0 0.25rem;">&gt;</span>
+                    <a href="flows.html" onclick="goBackToFlows(event)" style="color:#64748b; font-weight:500; text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#64748b'" title="Back to Flows List">Flow Builder</a>
+                    <span style="color:#94a3b8; margin: 0 0.25rem;">&gt;</span>
+                    <span style="font-weight:700; color:var(--text-main);" id="headerFlowName">Dumper Wheelbarrow Enquiry</span>
+                    <span class="flow-status-badge status-active"
+                        style="font-size:0.65rem; padding:0.15rem 0.4rem; margin-left:0.5rem; border-radius: 0.25rem;"
+                        id="headerFlowStatus">Active</span>
+                    <span
+                        style="font-family:monospace; background:#e2e8f0; color:var(--text-muted); font-size:0.7rem; padding:0.15rem 0.4rem; border-radius:0.25rem; font-weight:700; margin-left:0.25rem;"
+                        id="headerFlowVersion">v1.2</span>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:0.6rem;">
+                    <!-- Auto-Save Toggle Mode Widget -->
+                    <div id="autoSaveToggleContainer" class="autosave-toggle-container"
+                        style="display:flex; align-items:center; gap:0.4rem; background:#f1f5f9; padding:4px 10px; border-radius:20px; border:1px solid #cbd5e1; cursor:pointer; user-select:none;"
+                        onclick="toggleAutoSaveMode()" title="Click to toggle Real-time Auto-Save ON/OFF">
+                        <span id="autoSaveBadgeDot" style="width:8px; height:8px; border-radius:50%; background-color:#10b981; display:inline-block;"></span>
+                        <span id="autoSaveToggleLabel" style="font-size:0.75rem; font-weight:700; color:#0f172a; white-space:nowrap;">Auto-Save: ON</span>
+                    </div>
+                    <span id="saveStatusIndicator"
+                        style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; margin-right: 0.25rem;">
+                        <i class="fa-solid fa-cloud-check" style="color:var(--success-color);"></i> All changes saved
+                    </span>
+                    <div style="position: relative;">
+                        <button id="btn-validation-warning" class="btn-secondary"
+                            style="width:auto; padding:0 0.5rem; font-size:0.75rem; font-weight:700; height:2rem; gap:0.25rem; border-radius: 0.375rem; color: #d97706; border-color: #fcd34d; background: #fffbeb; display: none;"
+                            onclick="toggleValidationDropdown()">
+                            <i class="fa-solid fa-triangle-exclamation"></i> <span id="valWarningCount">0</span> Issues
+                        </button>
+                        <div id="valIssuesDropdown" class="val-issues-dropdown"
+                            style="display:none; position: absolute; top: 2.25rem; right: 0; background: #ffffff; border: 1px solid var(--border-color); border-radius: 0.5rem; box-shadow: var(--shadow-lg); width: 260px; z-index: 1000; padding: 0.75rem; max-height: 200px; overflow-y: auto;">
+                            <!-- populated dynamically -->
+                        </div>
+                    </div>
+                    <button class="btn-secondary"
+                        style="width:auto; padding:0 0.65rem; font-size:0.78rem; font-weight:600; height:2rem; gap:0.25rem; border-radius: 0.375rem;"
+                        onclick="openHelpPanel()">
+                        <i class="fa-solid fa-circle-question"></i> How it works?
+                    </button>
+                    <button class="btn-secondary"
+                        style="width:auto; padding:0 0.65rem; font-size:0.78rem; font-weight:600; height:2rem; gap:0.25rem; background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; border-radius: 0.375rem;"
+                        onclick="toggleTestBotDrawer()">
+                        <i class="fa-solid fa-play"></i> Test Bot
+                    </button>
+                    <button class="btn-secondary"
+                        style="width:auto; padding:0 0.65rem; font-size:0.78rem; font-weight:600; height:2rem; gap:0.25rem; border-radius: 0.375rem;"
+                        onclick="triggerPreview()">
+                        <i class="fa-solid fa-mobile-screen"></i> Preview
+                    </button>
+                    <button class="btn-primary"
+                        style="padding:0.4rem 0.85rem; font-size:0.78rem; height:2rem; background:#8b5cf6; border-radius: 0.375rem;"
+                        id="btn-save-draft" onclick="saveFlowDraft()">
+                        <i class="fa-solid fa-save"></i> Save Draft
+                    </button>
+                    <button class="btn-primary"
+                        style="padding:0.4rem 0.85rem; font-size:0.78rem; height:2rem; background:#10b981; border-radius: 0.375rem;"
+                        id="btn-publish-flow" onclick="publishActiveFlow()">
+                        <i class="fa-solid fa-circle-arrow-up"></i> Publish
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page Body -->
+            <div class="content-body" id="chatbot-page-body">
+                <!-- Main Flow Workspace -->
+                <div class="workspace-container" style="position:relative; overflow:hidden;">
+                    <!-- Floating Toolbox Toggle Handle -->
+                    <button id="toolbox-toggle-btn" class="toolbox-toggle-btn" onclick="toggleToolbox()"
+                        title="Toggle Node Library"
+                        style="position: absolute; top: 50%; left: 0; transform: translateY(-50%); z-index: 100; width: 20px; height: 48px; background: #ffffff; border: 1px solid var(--border-color); border-left: none; border-radius: 0 0.5rem 0.5rem 0; box-shadow: var(--shadow-md); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: all 0.2s;">
+                        <i class="fa-solid fa-chevron-right" id="toolbox-toggle-icon"></i>
+                    </button>
+
+                    <!-- Left Node Library (Toolbox) -->
+                    <aside class="flow-toolbox" id="flow-toolbox">
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; border-bottom:1px solid var(--border-color);">
+                            <h3 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-main);">Node
+                                Library</h3>
+                            <button class="btn-action" style="border:none; margin:0; width:1.5rem; height:1.5rem;"
+                                onclick="toggleToolbox()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="toolbox-search" style="margin: 0.75rem 1rem 0.5rem 1rem;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" placeholder="Search components..." id="componentSearch">
+                        </div>
+
+                        <div style="overflow-y:auto; flex:1;" id="nodeLibraryContainer">
+                            <!-- Category: Trigger Nodes -->
+                            <div class="node-group">
+                                <h3 class="group-title">Trigger Nodes</h3>
+                                <div class="draggable-node-item" data-type="start" onclick="addNodeToCanvas('start')">
+                                    <span class="node-icon orange-node-icon"
+                                        style="background:#fff7ed; color:#ea580c; border:1px solid #ffedd5;"><i
+                                            class="fa-solid fa-play"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Start</span>
+                                        <span class="node-item-desc">Trigger keywords flow</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 1: Question / Input Nodes -->
+                            <div class="node-group">
+                                <h3 class="group-title">Question / Input Nodes</h3>
+                                <div class="draggable-node-item" data-type="question"
+                                    onclick="addNodeToCanvas('question')">
+                                    <span class="node-icon purple-node-icon"><i
+                                            class="fa-solid fa-circle-question"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Question</span>
+                                        <span class="node-item-desc">Ask user choice / text</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="buttons"
+                                    onclick="addNodeToCanvas('buttons')">
+                                    <span class="node-icon purple-node-icon"><i
+                                            class="fa-solid fa-circle-nodes"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Buttons</span>
+                                        <span class="node-item-desc">Button options</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="list" onclick="addNodeToCanvas('list')">
+                                    <span class="node-icon purple-node-icon"><i class="fa-solid fa-list-ul"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">List</span>
+                                        <span class="node-item-desc">List of options</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="text_input"
+                                    onclick="addNodeToCanvas('text_input')">
+                                    <span class="node-icon purple-node-icon"><i class="fa-solid fa-keyboard"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Text Input</span>
+                                        <span class="node-item-desc">Text answer</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="number_input"
+                                    onclick="addNodeToCanvas('number_input')">
+                                    <span class="node-icon purple-node-icon"><i class="fa-solid fa-hashtag"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Number Input</span>
+                                        <span class="node-item-desc">Numeric answer</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="contact_time"
+                                    onclick="addNodeToCanvas('contact_time')">
+                                    <span class="node-icon purple-node-icon"><i class="fa-solid fa-clock"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Contact Time</span>
+                                        <span class="node-item-desc">Choose time slot</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 2: Message Nodes -->
+                            <div class="node-group">
+                                <h3 class="group-title">Message Nodes</h3>
+                                <div class="draggable-node-item" data-type="message"
+                                    onclick="addNodeToCanvas('message')">
+                                    <span class="node-icon blue-node-icon"><i class="fa-solid fa-message"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Message</span>
+                                        <span class="node-item-desc">Send text message</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="image" onclick="addNodeToCanvas('image')">
+                                    <span class="node-icon green-node-icon"><i class="fa-solid fa-image"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Image</span>
+                                        <span class="node-item-desc">Send image</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="video" onclick="addNodeToCanvas('video')">
+                                    <span class="node-icon green-node-icon"><i class="fa-solid fa-video"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Video</span>
+                                        <span class="node-item-desc">Send video</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="document"
+                                    onclick="addNodeToCanvas('document')">
+                                    <span class="node-icon green-node-icon"><i
+                                            class="fa-solid fa-file-invoice"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Document</span>
+                                        <span class="node-item-desc">Send document</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="audio" onclick="addNodeToCanvas('audio')">
+                                    <span class="node-icon green-node-icon"><i class="fa-solid fa-music"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Audio</span>
+                                        <span class="node-item-desc">Send audio</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="product"
+                                    onclick="addNodeToCanvas('product')">
+                                    <span class="node-icon orange-node-icon"><i class="fa-solid fa-box-open"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Product</span>
+                                        <span class="node-item-desc">Send product card</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="multi_media"
+                                    onclick="addNodeToCanvas('multi_media')">
+                                    <span class="node-icon green-node-icon"><i class="fa-solid fa-images"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Multi Media</span>
+                                        <span class="node-item-desc">Send multiple media</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 3: Flow Logic -->
+                            <div class="node-group">
+                                <h3 class="group-title">Flow Logic</h3>
+                                <div class="draggable-node-item" data-type="condition"
+                                    onclick="addNodeToCanvas('condition')">
+                                    <span class="node-icon pink-node-icon"><i
+                                            class="fa-solid fa-code-branch"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Condition</span>
+                                        <span class="node-item-desc">Set conditions</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="goto" onclick="addNodeToCanvas('goto')">
+                                    <span class="node-icon indigo-node-icon"><i class="fa-solid fa-share"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Go To</span>
+                                        <span class="node-item-desc">Jump to another node</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="delay" onclick="addNodeToCanvas('delay')">
+                                    <span class="node-icon pink-node-icon"><i
+                                            class="fa-solid fa-hourglass-half"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Delay</span>
+                                        <span class="node-item-desc">Wait for a moment</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="end" onclick="addNodeToCanvas('end')">
+                                    <span class="node-icon pink-node-icon"><i class="fa-solid fa-ban"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">End</span>
+                                        <span class="node-item-desc">End of flow</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 4: Integration -->
+                            <div class="node-group">
+                                <h3 class="group-title">Integration</h3>
+                                <div class="draggable-node-item" data-type="save_lead_field"
+                                    onclick="addNodeToCanvas('save_lead_field')">
+                                    <span class="node-icon indigo-node-icon"><i
+                                            class="fa-solid fa-floppy-disk"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Save Lead Field</span>
+                                        <span class="node-item-desc">Save data to field</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="create_lead"
+                                    onclick="addNodeToCanvas('create_lead')">
+                                    <span class="node-icon indigo-node-icon"><i
+                                            class="fa-solid fa-address-card"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Create Lead</span>
+                                        <span class="node-item-desc">Create/update lead</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="assign_to_user"
+                                    onclick="addNodeToCanvas('assign_to_user')">
+                                    <span class="node-icon indigo-node-icon"><i
+                                            class="fa-solid fa-user-plus"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Assign To User</span>
+                                        <span class="node-item-desc">Assign to sales team</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="webhook"
+                                    onclick="addNodeToCanvas('webhook')">
+                                    <span class="node-icon indigo-node-icon"><i class="fa-solid fa-globe"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Webhook</span>
+                                        <span class="node-item-desc">Send data to webhook</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Center Flow Canvas (Middle Workspace) -->
+                    <div class="flow-canvas-wrapper" id="canvas-viewport">
+                        <!-- Canvas Grid Pattern -->
+                        <div class="canvas-grid" id="flow-canvas">
+                            <!-- SVGs for Connection Lines -->
+                            <svg class="connection-svg" id="connection-svg">
+                                <defs>
+                                    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6"
+                                        markerHeight="6" orient="auto-start-reverse">
+                                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+                                    </marker>
+                                    <marker id="arrow-active" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6"
+                                        markerHeight="6" orient="auto-start-reverse">
+                                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#6366f1" />
+                                    </marker>
+                                </defs>
+                                <g id="edge-paths-container"></g>
+                            </svg>
+
+                            <div id="nodes-container">
+                                <!-- Nodes rendered dynamically by chatbot.js -->
+                            </div>
+                        </div>
+
+                        <!-- Mini Map Widget (Hidden to remove empty bottom-left ghost box) -->
+                        <div class="minimap-container" style="display: none !important;">
+                            <div class="minimap-view" id="minimap-view"></div>
+                        </div>
+
+                        <!-- Canvas Zoom Controls Widget -->
+                        <div class="canvas-controls">
+                            <button onclick="changeZoom(-0.1)" title="Zoom Out"><i
+                                    class="fa-solid fa-minus"></i></button>
+                            <span id="ctrl-zoom-percentage">100%</span>
+                            <button onclick="changeZoom(0.1)" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+                            <div class="ctrl-divider"></div>
+                            <button onclick="autoOrganizeLayout()" title="Auto-Align / Untangle Nodes" style="color: #7c3aed; font-weight: bold;"><i
+                                    class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            <button onclick="fitCanvasView()" title="Fit View"><i
+                                    class="fa-solid fa-compress"></i></button>
+                            <button onclick="toggleCanvasGrid()" title="Toggle Grid" id="gridToggleBtn"
+                                class="active"><i class="fa-solid fa-border-all"></i></button>
+                            <button onclick="triggerUndo()" title="Undo"><i
+                                    class="fa-solid fa-arrow-rotate-left"></i></button>
+                            <button onclick="triggerRedo()" title="Redo"><i
+                                    class="fa-solid fa-arrow-rotate-right"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Global CRM Variable Selection Datalist -->
+                    <datalist id="crm-variables-list">
+                        <option value="name_place">Name & Place (Customer Name)</option>
+                        <option value="product_interest">Product Interest (Selected Product)</option>
+                        <option value="land_acres">Land Size in Acres</option>
+                        <option value="brush_cutter_type">Brush Cutter Model / Type</option>
+                        <option value="preferred_contact_time">Preferred Contact Time</option>
+                        <option value="customer_phone">Customer Phone Number</option>
+                        <option value="customer_address">Customer Address / City</option>
+                        <option value="usage_purpose">Usage / Purpose</option>
+                    </datalist>
+
+                    <!-- Right Inspector Panel -->
+                    <aside class="flow-inspector" id="flow-inspector">
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding:0 0.5rem 0 0;">
+                            <div class="inspector-tabs-header" style="border:none; margin:0;">
+                                <div class="inspector-tab-btn active" id="tabNodeSettings"
+                                    onclick="selectInspectorTab('node')">Node Settings</div>
+                                <div class="inspector-tab-btn" id="tabFlowSettings"
+                                    onclick="selectInspectorTab('flow')">Flow Settings</div>
+                            </div>
+                            <button class="btn-action" style="border:none; margin:0; width:1.5rem; height:1.5rem;"
+                                onclick="closeInspector()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+
+                        <div class="inspector-body" id="inspector-content">
+                            <!-- Populated dynamically by chatbot.js -->
+                        </div>
+                    </aside>
+                </div>
+
+                <!-- Bottom Node Documentation Area -->
+                <div class="doc-section-card">
+                    <div class="doc-section-header" onclick="toggleDocPanel()">
+                        <h2><i class="fa-solid fa-circle-info"></i> Node Creation — How Each Node Works</h2>
+                        <i class="fa-solid fa-chevron-down" id="docToggleIcon"></i>
+                    </div>
+                    <div class="doc-cards-grid" id="docCardsGrid" style="display: none;">
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon purple-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-circle-question"></i></span> 1. Question Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Allows creating
+                                interactive options for customers (e.g. Buttons or Lists). Redirects conversations along
+                                different paths according to their selection.</p>
+                        </div>
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon orange-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-box-open"></i></span> 2. Product Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Displays items
+                                directly from the CRM product inventory, showcasing details, price cards, and product
+                                image attachments.</p>
+                        </div>
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon green-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-image"></i></span> 3. Image Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Sends structured
+                                photo attachments (JPG, PNG) with optional caption texts to customers.</p>
+                        </div>
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon green-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-video"></i></span> 4. Video Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Shares MP4 video
+                                files, tutorials, or demonstrations directly inside the chat feed.</p>
+                        </div>
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon green-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-file-invoice"></i></span> 5. Document Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Attaches catalogs,
+                                invoice sheets, manuals, or PDF documents to customer messages.</p>
+                        </div>
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon green-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-images"></i></span> 6. Multi Media Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Enables bundle sends
+                                containing images, video, and text captions in a single response block.</p>
+                        </div>
+                        <div class="doc-node-card">
+                            <h3><span class="node-icon purple-node-icon"
+                                    style="width:1.5rem; height:1.5rem; font-size:0.75rem;"><i
+                                        class="fa-solid fa-keyboard"></i></span> 7. Text Input Node</h3>
+                            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Prompts users to
+                                enter text values (e.g. Name, Address, Phone) and stores their replies directly inside
+                                CRM variables.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Your Bot Simulator Panel Drawer -->
+            <div class="test-bot-drawer" id="testBotDrawer">
+                <div class="drawer-header">
+                    <h3><i class="fa-solid fa-robot"></i> Test Your Bot</h3>
+                    <div style="display:flex; align-items:center; gap:0.4rem;">
+                        <input type="text" id="testPhoneNumber" value="+91 98765 43210"
+                            style="padding:0.2rem 0.4rem; border:none; border-radius:0.25rem; font-size:0.75rem; width:110px; color:#334155;">
+                        <button class="btn-secondary"
+                            style="height:1.6rem; width:auto; padding:0 0.4rem; font-size:0.68rem; background:#ffffff; color:#075e54; border:none; font-weight:700;"
+                            onclick="resetTestChat()">Reset</button>
+                        <button class="btn-action" style="border:none; background:none; color:#ffffff;"
+                            onclick="toggleTestBotDrawer()"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+                <div class="drawer-body">
+                    <!-- Chat simulator feed -->
+                    <div class="chat-simulator">
+                        <div class="chat-messages-container" id="chatMessageContainer">
+                            <!-- bubbles rendered dynamically -->
+                        </div>
+                        <div class="chat-simulator-input">
+                            <input type="text" id="chatInputMessage" placeholder="Type message..."
+                                onkeypress="handleChatEnter(event)">
+                            <button onclick="sendChatMessageSim()"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modals Overlay -->
+            <!-- Help Overlay Modal -->
+            <div class="create-modal" id="helpModal">
+                <div class="modal-card" style="max-width:520px;">
+                    <div class="modal-header">
+                        <h3>How It Works — Chatbot Flows</h3>
+                        <button class="btn-action" style="border:none;" onclick="closeHelpPanel()"><i
+                                class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div style="font-size:0.82rem; color:#475569; display:flex; flex-direction:column; gap:0.75rem;">
+                        <p>Follow these 8 steps to visually design and run your WhatsApp flows:</p>
+                        <ol
+                            style="margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; padding: 0;">
+                            <li><strong>1. Start Node:</strong> The flow always enters at the default Start node.</li>
+                            <li><strong>2. Add Nodes:</strong> Click on components inside the sliding Node Library
+                                drawer OR click the inline <strong>"+"</strong> button next to any handle or option row.
+                            </li>
+                            <li><strong>3. Configure Nodes:</strong> Click any node to slide in the Settings panel and
+                                customize questions, replies, or CRM actions.</li>
+                            <li><strong>4. Connect Nodes:</strong> Drag from output handles to target input handles, or
+                                select target next steps directly inside Node Settings.</li>
+                            <li><strong>5. Create Branches:</strong> Add choices (e.g. Full Set, Trolley) inside
+                                question node settings. Each choice dynamically generates its own branch connector.</li>
+                            <li><strong>6. Test Bot:</strong> Open "Test Bot" simulator overlay to test conversation
+                                paths, inspect variables, and watch active nodes glow in real-time.</li>
+                            <li><strong>7. Save Draft:</strong> Save your draft to persist coordinates, connections, and
+                                forms configuration locally.</li>
+                            <li><strong>8. Publish:</strong> Runs full flow validation (e.g. checks for disconnected
+                                paths, missing fields) before deploying.</li>
+                        </ol>
+                        <div
+                            style="background:#f8fafc; padding:0.6rem; border-radius:0.375rem; border:1px solid var(--border-color); font-size:0.7rem; margin-top:0.25rem; font-family:monospace; line-height:1.3; text-align:center;">
+                            START &rarr; Question (Full Set / Trolley) &rarr; Product recommendation &rarr; CRM Lead
+                            Creation &rarr; END
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Publish Modal -->
+            <div class="create-modal" id="publishModal">
+                <div class="modal-card" style="max-width: 440px;">
+                    <div class="modal-header">
+                        <h3>Publish Flow</h3>
+                        <button class="btn-action" style="border:none;" onclick="closePublishModal()"><i
+                                class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div style="font-size:0.85rem; color:#475569; display:flex; flex-direction:column; gap:0.75rem;">
+                        <p>You are about to publish this chatbot workflow live to production.</p>
+                        <div
+                            style="background:#f8fafc; padding:0.75rem; border-radius:0.5rem; display:flex; flex-direction:column; gap:0.5rem; border: 1px solid var(--border-color);">
+                            <div><strong>Flow Name:</strong> <span id="pubModalFlowName">Full Set / Trolley
+                                    Enquiry</span></div>
+                            <div><strong>Status:</strong> <span class="flow-status-badge status-active">Active</span>
+                            </div>
+                            <div><strong>Version:</strong> <span style="font-family:monospace;"
+                                    id="pubModalVersion">1.0.0</span></div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                        <button class="btn-secondary" style="width:auto; padding:0.5rem 1rem;"
+                            onclick="closePublishModal()">Cancel</button>
+                        <button class="btn-primary"
+                            style="padding:0.5rem 1.25rem; font-size:0.85rem; background:#10b981; border-radius:0.5rem;"
+                            onclick="confirmPublishFlow()">Publish</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Modal -->
+            <div class="create-modal" id="previewModal">
+                <div class="modal-card" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>Flow Customer Preview</h3>
+                        <button class="btn-action" style="border:none;" onclick="closePreviewModal()"><i
+                                class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div style="font-size:0.85rem; color:#475569; display:flex; flex-direction:column; gap:0.75rem;">
+                        <p>This is how your customer will experience this flow in their WhatsApp client.</p>
+                        <div style="background:#efeae2; border: 1px solid #cbd5e1; border-radius: 0.5rem; height: 260px; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;"
+                            id="previewChatFeed">
+                            <!-- Populated dynamically -->
+                        </div>
+            <!-- Unsaved Changes Confirmation Modal -->
+            <div class="create-modal" id="unsavedChangesModal" style="display:none;">
+                <div class="modal-card" style="max-width: 440px;">
+                    <div class="modal-header">
+                        <h3 style="display:flex; align-items:center; gap:0.5rem; color:#d97706; font-size:1.1rem;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Unsaved Changes
+                        </h3>
+                        <button class="btn-action" style="border:none;" onclick="closeUnsavedChangesModal()"><i
+                                class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div style="font-size:0.85rem; color:#475569; display:flex; flex-direction:column; gap:0.75rem; margin-top:0.5rem;">
+                        <p>You have unsaved changes in this chatbot workflow. What would you like to do before leaving?</p>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem;">
+                        <button class="btn-secondary" style="width:auto; padding:0.5rem 0.85rem; font-size:0.8rem;"
+                            onclick="closeUnsavedChangesModal()">Cancel</button>
+                        <button class="btn-secondary" style="width:auto; padding:0.5rem 0.85rem; font-size:0.8rem; color:#ef4444; border-color:#fca5a5;"
+                            onclick="confirmLeaveWithoutSaving()">Leave Without Saving</button>
+                        <button class="btn-primary" style="width:auto; padding:0.5rem 1rem; font-size:0.8rem; background:#6366f1;"
+                            onclick="confirmSaveAndLeave()">Save & Leave</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating Popovers & Context Menus -->
+    <div id="node-picker-popover" class="node-picker-popover"
+        style="display: none; position: absolute; background: #ffffff; border: 1px solid var(--border-color); border-radius: 0.5rem; box-shadow: var(--shadow-lg); width: 220px; z-index: 2000; padding: 0.5rem; max-height: 280px; overflow-y: auto;">
+        <input type="text" id="popoverSearch" placeholder="Search nodes..."
+            style="width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 0.375rem; font-size: 0.75rem; margin-bottom: 0.4rem; outline: none;">
+        <div id="popoverNodesList" style="display:flex; flex-direction:column; gap:0.25rem;">
+            <!-- filled dynamically -->
+        </div>
+    </div>
+
+    <div id="custom-context-menu" class="custom-context-menu"
+        style="display: none; position: absolute; background: #ffffff; border: 1px solid var(--border-color); border-radius: 0.375rem; box-shadow: var(--shadow-md); z-index: 2000; padding: 0.25rem 0; width: 140px;">
+        <!-- filled dynamically -->
+    </div>
+
+    <!-- Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="../../js/decision-engine.js"></script>
+    <script src="js/chatbot.js"></script>
+</body>
+
+</html>

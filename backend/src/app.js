@@ -35,6 +35,8 @@ app.set('trust proxy', 1); // Trust first proxy (Fixes express-rate-limit X-Forw
 // Security & Performance Middleware
 app.use(helmet({
     contentSecurityPolicy: false, // Allow external assets
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false
 }));
 app.use(compression());
 app.use(cors());

@@ -1566,7 +1566,7 @@ async function handleSendMedia() {
             phone: phone,
             mediaData: reader.result,
             mimeType: mimeType,
-            message: caption || fileName
+            message: caption || ''
         }));
     };
 }
@@ -1969,6 +1969,15 @@ window.initForwardAndReplyEvents = function () {
     }
 };
 
+function isRawFileName(str) {
+    if (!str || typeof str !== 'string') return true;
+    const trimmed = str.trim();
+    if (!trimmed || trimmed === 'Sent a image' || trimmed === 'Sent a video' || trimmed === 'Sent a audio' || trimmed === 'Sent a document') return true;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return true;
+    if (/\.(jpg|jpeg|png|gif|webp|mp4|3gp|mov|pdf|doc|docx|mp3|ogg|m4a|aac)$/i.test(trimmed)) return true;
+    return false;
+}
+
 function renderMessages(history) {
     if (!messageContainerEl) return;
 
@@ -2065,7 +2074,9 @@ function renderMessages(history) {
 
         const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : ((msg.message_type === 'audio' || msg.message_type === 'voice') ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
 
-        if (effectiveMimeType) {
+        const hasMedia = !!(msg.media_url || msg.media_data);
+
+        if (effectiveMimeType && hasMedia) {
             let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
             let mediaUrl = msg.media_url || proxyUrl;
 
@@ -2074,9 +2085,8 @@ function renderMessages(history) {
                 contentHtml = `
                     <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
                         <img src="${mediaUrl}" alt="Attachment" 
-                             crossorigin="anonymous"
-                             onerror="if(this.src !== '${proxyUrl}') { console.log('Supabase load failed, falling back to proxy'); this.src='${proxyUrl}'; } else { this.src='https://placehold.co/200?text=Image+Not+Available'; }">
-                        ${msg.body && msg.body !== 'Sent a image' && !msg.body.includes('http') ? `<div class="message-content">${msg.body}</div>` : ''}
+                             onerror="if(this.src !== '${proxyUrl}') { console.log('Supabase load failed, falling back to proxy'); this.src='${proxyUrl}'; } else { this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22 viewBox=%220 0 200 150%22%3E%3Crect width=%22200%22 height=%22150%22 fill=%22%23202c33%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%238696a0%22 font-family=%22sans-serif%22 font-size=%2214%22%3EImage Unavailable%3C/text%3E%3C/svg%3E'; }">
+                        ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content">${msg.body}</div>` : ''}
                     </div>`;
             } else if (effectiveMimeType.startsWith('video')) {
                 msgEl.classList.add('has-media');
@@ -2086,7 +2096,7 @@ function renderMessages(history) {
                             <source src="${mediaUrl}" type="${effectiveMimeType === 'video' ? 'video/mp4' : effectiveMimeType}">
                             Your browser does not support the video tag.
                         </video>
-                        ${msg.body && !msg.body.includes('http') ? `<div class="message-content">${msg.body}</div>` : ''}
+                        ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content">${msg.body}</div>` : ''}
                     </div>`;
             } else if (effectiveMimeType.startsWith('audio')) {
                 contentHtml = `
@@ -2105,8 +2115,18 @@ function renderMessages(history) {
                     </div>`;
             }
         } else {
-            const formattedText = (msg.body || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-            contentHtml = `<div class="message-content" style="white-space: pre-wrap; word-break: break-word; line-height: 1.45;">${formattedText || '(Empty message)'}</div>`;
+            let displayText = msg.body || '';
+            if (!displayText || displayText === 'Sent a image' || displayText === 'Sent a video' || displayText === 'Sent a audio' || displayText === 'Sent a document') {
+                if (effectiveMimeType) {
+                    const typeLabel = effectiveMimeType.startsWith('image') ? '📷 Photo' : (effectiveMimeType.startsWith('video') ? '🎥 Video' : (effectiveMimeType.startsWith('audio') ? '🎵 Audio' : '📎 Document'));
+                    displayText = `<span style="font-style: italic; opacity: 0.7;">${typeLabel} (Media Unavailable)</span>`;
+                } else {
+                    displayText = '(Empty message)';
+                }
+            } else {
+                displayText = displayText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            }
+            contentHtml = `<div class="message-content" style="white-space: pre-wrap; word-break: break-word; line-height: 1.45;">${displayText}</div>`;
         }
 
         let tickHtml = '';
@@ -2126,8 +2146,11 @@ function renderMessages(history) {
 
         let senderTagHtml = '';
         if (msg.direction === 'outgoing') {
-            const isBot = msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1;
-            if (isBot) {
+            const isCampaign = msg.sender_name === 'Campaign' || msg.sender_id === -2;
+            const isBot = (msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1) && !isCampaign;
+            if (isCampaign) {
+                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #8b5cf6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-bullhorn" style="font-size: 0.75rem;"></i> Campaign</div>`;
+            } else if (isBot) {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
             } else if (msg.sender_name && msg.sender_name !== 'Staff') {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px;">${msg.sender_name}</div>`;
@@ -2358,6 +2381,173 @@ const qrEditMediaBtn = document.getElementById('qr-edit-media-btn');
 const qrEditMediaName = document.getElementById('qr-edit-media-name');
 const qrEditMediaRemove = document.getElementById('qr-edit-media-remove');
 let qrSelectedFiles = [];
+let qrExistingMediaUrls = [];
+
+function renderQrMediaChips() {
+    const container = document.getElementById('qr-media-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // 1. Render Existing Stored Supabase URLs
+    qrExistingMediaUrls.forEach((item, index) => {
+        const chip = document.createElement('div');
+        chip.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); border-radius: 20px; padding: 5px 12px; font-size: 0.82rem; color: var(--whatsapp-text); box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+        
+        const fileName = (item.url || '').split('/').pop().split('?')[0] || 'Media File';
+        const isImage = (item.type || '').startsWith('image') || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName);
+        const isVideo = (item.type || '').startsWith('video') || /\.(mp4|3gp|mov)$/i.test(fileName);
+        const iconClass = isImage ? 'fas fa-image' : (isVideo ? 'fas fa-video' : 'fas fa-file-alt');
+        
+        chip.innerHTML = `
+            <i class="${iconClass}" style="color: var(--whatsapp-green); font-size: 0.85rem;"></i>
+            <span style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${fileName}">${fileName}</span>
+            <button type="button" style="background: none; border: none; color: #f15c6d; cursor: pointer; padding: 0 2px; font-size: 0.95rem; font-weight: bold; display: flex; align-items: center; margin-left: 2px;" title="Remove media">&times;</button>
+        `;
+
+        chip.querySelector('button').onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            qrExistingMediaUrls.splice(index, 1);
+            renderQrMediaChips();
+        };
+
+        container.appendChild(chip);
+    });
+
+    // 2. Render Newly Selected Local Files
+    qrSelectedFiles.forEach((file, index) => {
+        const chip = document.createElement('div');
+        chip.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 128, 105, 0.15); border: 1px solid var(--whatsapp-green); border-radius: 20px; padding: 5px 12px; font-size: 0.82rem; color: var(--whatsapp-text); box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+        
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        const iconClass = isImage ? 'fas fa-image' : (isVideo ? 'fas fa-video' : 'fas fa-file-alt');
+        
+        chip.innerHTML = `
+            <i class="${iconClass}" style="color: var(--whatsapp-green); font-size: 0.85rem;"></i>
+            <span style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">${file.name}</span>
+            <button type="button" style="background: none; border: none; color: #f15c6d; cursor: pointer; padding: 0 2px; font-size: 0.95rem; font-weight: bold; display: flex; align-items: center; margin-left: 2px;" title="Remove media">&times;</button>
+        `;
+
+        chip.querySelector('button').onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            qrSelectedFiles.splice(index, 1);
+            renderQrMediaChips();
+        };
+
+        container.appendChild(chip);
+    });
+}
+
+function showQrEdit(index = -1) {
+    qrListView.classList.add('hidden');
+    qrEditView.classList.remove('hidden');
+    qrEditIndex.value = index;
+    qrSelectedFiles = [];
+    qrExistingMediaUrls = [];
+    if (qrEditMedia) qrEditMedia.value = '';
+
+    if (index >= 0) {
+        qrEditShortcut.dataset.id = quickReplies[index].id || '';
+        qrEditShortcut.value = quickReplies[index].shortcut;
+        qrEditMessage.value = quickReplies[index].message;
+        qrDeleteBtn.classList.remove('hidden');
+
+        if (quickReplies[index].media_url && quickReplies[index].media_url !== '[]') {
+            try {
+                let urls = JSON.parse(quickReplies[index].media_url);
+                let types = JSON.parse(quickReplies[index].media_type);
+                if (Array.isArray(urls)) {
+                    urls.forEach((url, idx) => {
+                        qrExistingMediaUrls.push({
+                            url: url,
+                            type: (types && types[idx]) ? types[idx] : 'image'
+                        });
+                    });
+                } else {
+                    qrExistingMediaUrls.push({
+                        url: quickReplies[index].media_url,
+                        type: quickReplies[index].media_type || 'image'
+                    });
+                }
+            } catch (e) {
+                qrExistingMediaUrls.push({
+                    url: quickReplies[index].media_url,
+                    type: quickReplies[index].media_type || 'image'
+                });
+            }
+        }
+    } else {
+        qrEditShortcut.dataset.id = '';
+        qrEditShortcut.value = '';
+        qrEditMessage.value = '';
+        qrDeleteBtn.classList.add('hidden');
+    }
+
+    renderQrMediaChips();
+}
+
+function saveQrEdit() {
+    const shortcut = qrEditShortcut.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const message = qrEditMessage.value.trim();
+    if (!shortcut) {
+        window.showAlert('Error', 'Shortcut is required', 'error');
+        return;
+    }
+    
+    const hasMedia = qrExistingMediaUrls.length > 0 || qrSelectedFiles.length > 0;
+    if (!message && !hasMedia) {
+        window.showAlert('Error', 'Message or media is required', 'error');
+        return;
+    }
+
+    if (qrSaveBtn) {
+        qrSaveBtn.disabled = true;
+        qrSaveBtn.innerText = 'SAVING...';
+    }
+
+    const id = qrEditShortcut.dataset.id;
+
+    const performSave = (mediaDataArray, mimeTypeArray) => {
+        saveQuickReplyAPI({ 
+            id: id || undefined, 
+            shortcut, 
+            message, 
+            mediaData: mediaDataArray, 
+            mimeType: mimeTypeArray 
+        }).finally(() => {
+            if (qrSaveBtn) {
+                qrSaveBtn.disabled = false;
+                qrSaveBtn.innerText = 'SAVE';
+            }
+        });
+    };
+
+    if (qrSelectedFiles.length > 0) {
+        const promises = qrSelectedFiles.map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve({ data: reader.result, type: file.type });
+            });
+        });
+
+        Promise.all(promises).then(results => {
+            const newMediaData = results.map(r => r.data);
+            const newMimeType = results.map(r => r.type);
+
+            const finalMediaData = qrExistingMediaUrls.map(m => m.url).concat(newMediaData);
+            const finalMimeType = qrExistingMediaUrls.map(m => m.type).concat(newMimeType);
+
+            performSave(finalMediaData, finalMimeType);
+        });
+    } else {
+        const finalMediaData = qrExistingMediaUrls.map(m => m.url);
+        const finalMimeType = qrExistingMediaUrls.map(m => m.type);
+        performSave(finalMediaData, finalMimeType);
+    }
+}
 
 const quickRepliesPopover = document.getElementById('quick-replies-popover');
 const qrPopoverList = document.getElementById('qr-popover-list');
@@ -2622,12 +2812,15 @@ function filterAndShowPopover(searchTerm) {
             </div>
         `;
         item.onclick = async () => {
-            if (qr.media_url && qr.media_url !== '[]') {
-                quickRepliesPopover.style.display = 'none';
+            quickRepliesPopover.style.display = 'none';
+            if (messageInputEl) {
                 messageInputEl.value = '';
-                if (!activeCustomer) return;
+                messageInputEl.style.height = 'auto';
+            }
+            if (!activeCustomer) return;
 
-                try {
+            try {
+                if (qr.media_url && qr.media_url !== '[]') {
                     let urls = [];
                     let types = [];
                     try {
@@ -2667,16 +2860,22 @@ function filterAndShowPopover(searchTerm) {
                             })
                         });
                     }
-
-                    loadChatHistory(activeCustomer.phone);
-                } catch (err) {
-                    console.error('Send QR media error:', err);
-                    window.showAlert('Error', 'Failed to send quick reply media', 'error');
+                } else if (qr.message) {
+                    // Send text-only quick reply immediately
+                    await fetch(`${API_BASE}/send`, {
+                        method: 'POST',
+                        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            phone: activeCustomer.phone,
+                            message: qr.message
+                        })
+                    });
                 }
-            } else {
-                messageInputEl.value = qr.message;
-                quickRepliesPopover.style.display = 'none';
-                messageInputEl.focus();
+
+                loadChatHistory(activeCustomer.phone);
+            } catch (err) {
+                console.error('Send QR error:', err);
+                window.showAlert('Error', 'Failed to send quick reply', 'error');
             }
         };
         qrPopoverList.appendChild(item);
@@ -2733,25 +2932,13 @@ if (qrEditMedia) {
                 if (fileSizeMB > maxLimit) {
                     window.showAlert('Error', `"${file.name}" (${typeLabel}) is too large. Max limit is ${maxLimit}MB.`, 'error');
                     qrEditMedia.value = '';
-                    qrSelectedFiles = [];
-                    qrEditMediaName.innerText = '';
-                    qrEditMediaRemove.classList.add('hidden');
                     return;
                 }
             }
-            qrSelectedFiles = files;
-            qrEditMediaName.innerText = files.map(f => f.name).join(', ');
-            qrEditMediaRemove.classList.remove('hidden');
+            qrSelectedFiles = qrSelectedFiles.concat(files);
+            qrEditMedia.value = '';
+            renderQrMediaChips();
         }
-    };
-}
-if (qrEditMediaRemove) {
-    qrEditMediaRemove.onclick = (e) => {
-        e.preventDefault();
-        qrSelectedFiles = [];
-        qrEditMedia.value = '';
-        qrEditMediaName.innerText = '';
-        qrEditMediaRemove.classList.add('hidden');
     };
 }
 

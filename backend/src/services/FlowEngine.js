@@ -156,15 +156,18 @@ class FlowEngine {
                                 [keywordStr, cleanedText]
                             );
 
+                            let isCampaignFlow = false;
                             if (campaignRows.length > 0) {
                                 const activeCampaign = campaignRows.find(c => (c.status || '').toLowerCase() === 'active');
                                 if (!activeCampaign) {
                                     console.log(`[FlowEngine] Tagline exact-matched Campaign "${campaignRows[0].campaign_id}", but Campaign status is "${campaignRows[0].status}". Both Campaign AND Flow MUST be active! Skipping flow execution.`);
                                     continue; // Skip flow because campaign is inactive
                                 }
+                                isCampaignFlow = true;
                             }
 
                             matchedFlow = f;
+                            matchedFlow.is_campaign = isCampaignFlow;
                             break;
                         }
                     }
@@ -217,9 +220,12 @@ class FlowEngine {
 
             if (matchedFlow) {
                 console.log(`[FlowEngine] Starting Flow ID ${matchedFlow.flow_id} for ${phone}...`);
+                const initialVars = { first_message: messageText };
+                if (matchedFlow.is_campaign) initialVars.is_campaign = true;
+
                 const [sessionResult] = await pool.query(
                     'INSERT INTO chatbot_sessions (flow_id, version_id, phone, current_node_key, status, variables) VALUES (?, ?, ?, ?, ?, ?)',
-                    [matchedFlow.flow_id, matchedFlow.active_version_id, phone, 'node-start', 'active', JSON.stringify({ first_message: messageText })]
+                    [matchedFlow.flow_id, matchedFlow.active_version_id, phone, 'node-start', 'active', JSON.stringify(initialVars)]
                 );
 
                 // Load newly created session
@@ -504,6 +510,7 @@ class FlowEngine {
 
             const node = nodeRows[0];
             const config = typeof node.config === 'string' ? JSON.parse(node.config) : node.config;
+            const botSenderId = (session && session.variables && (session.variables.is_campaign || session.variables.sender_id === -2)) ? -2 : -1;
 
             console.log(`[FlowEngine] Executing Node [${node.node_type}] -> "${node.name}" (${node.node_key})`);
             await this.logExecution(session.session_id, node.node_key, 'enter', null, `Executing ${node.name}`);
@@ -514,7 +521,7 @@ class FlowEngine {
             else if (node.node_type === 'message' && !config.inputType) {
                 const msgText = this.formatTextVariables(config.message || '', session.variables);
                 if (msgText) {
-                    await whatsappService.sendMessage(session.phone, msgText);
+                    await whatsappService.sendMessage(session.phone, msgText, null, botSenderId);
                 }
                 currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
             } 
@@ -523,10 +530,10 @@ class FlowEngine {
                     const imgUrl = config.mediaUrl || config.image_url || config.file_url || '';
                     const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
                     if (imgUrl) {
-                        const sendRes = await whatsappService.sendMediaMessage(session.phone, imgUrl, 'image', caption);
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, imgUrl, 'image', caption, null, botSenderId);
                         await this.waitForMediaDelivery(sendRes);
                     } else if (caption) {
-                        await whatsappService.sendMessage(session.phone, caption);
+                        await whatsappService.sendMessage(session.phone, caption, null, botSenderId);
                     }
                 } catch (err) {
                     console.error(`[FlowEngine] Error executing Image node ${currentKey}:`, err.message);
@@ -538,10 +545,10 @@ class FlowEngine {
                     const videoUrl = config.mediaUrl || config.video_url || config.file_url || '';
                     const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
                     if (videoUrl) {
-                        const sendRes = await whatsappService.sendMediaMessage(session.phone, videoUrl, 'video', caption);
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, videoUrl, 'video', caption, null, botSenderId);
                         await this.waitForMediaDelivery(sendRes);
                     } else if (caption) {
-                        await whatsappService.sendMessage(session.phone, caption);
+                        await whatsappService.sendMessage(session.phone, caption, null, botSenderId);
                     }
                 } catch (err) {
                     console.error(`[FlowEngine] Error executing Video node ${currentKey}:`, err.message);
@@ -554,7 +561,7 @@ class FlowEngine {
                     const type = node.node_type === 'audio' ? 'audio' : 'document';
                     const caption = this.formatTextVariables(config.caption || config.filename || '', session.variables);
                     if (mediaUrl) {
-                        const sendRes = await whatsappService.sendMediaMessage(session.phone, mediaUrl, type, caption);
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, mediaUrl, type, caption, null, botSenderId);
                         await this.waitForMediaDelivery(sendRes);
                     }
                 } catch (err) {
@@ -569,7 +576,7 @@ class FlowEngine {
                     for (let i = 0; i < items.length; i++) {
                         const itemUrl = items[i];
                         if (itemUrl) {
-                            const sendRes = await whatsappService.sendMediaMessage(session.phone, itemUrl, 'image', i === 0 ? caption : '');
+                            const sendRes = await whatsappService.sendMediaMessage(session.phone, itemUrl, 'image', i === 0 ? caption : '', null, botSenderId);
                             await this.waitForMediaDelivery(sendRes);
                         }
                     }
@@ -615,14 +622,14 @@ class FlowEngine {
 
                     if (imageUrl && imageUrl.startsWith('http')) {
                         try {
-                            const sendRes = await whatsappService.sendMediaMessage(session.phone, imageUrl, 'image', cardText);
+                            const sendRes = await whatsappService.sendMediaMessage(session.phone, imageUrl, 'image', cardText, null, botSenderId);
                             await this.waitForMediaDelivery(sendRes);
                         } catch (mediaErr) {
                             console.warn(`[FlowEngine] Image send failed for Product node ${currentKey}, falling back to text:`, mediaErr.message);
-                            await whatsappService.sendMessage(session.phone, cardText);
+                            await whatsappService.sendMessage(session.phone, cardText, null, botSenderId);
                         }
                     } else {
-                        await whatsappService.sendMessage(session.phone, cardText);
+                        await whatsappService.sendMessage(session.phone, cardText, null, botSenderId);
                     }
                 } catch (err) {
                     console.error(`[FlowEngine] Error executing Product node ${currentKey}:`, err.message);
@@ -769,14 +776,14 @@ class FlowEngine {
             } 
             else if (node.node_type === 'question' || node.node_type === 'buttons' || node.node_type === 'list' || node.node_type === 'contact_time' || node.node_type === 'text_input' || node.node_type === 'number_input' || (node.node_type === 'message' && config.inputType === 'image')) {
                 // Interactive Node: Send prompt question / options and stop execution loop, pausing at this node waiting for user response
-                await this.sendNodePrompt(session.phone, node, config);
+                await this.sendNodePrompt(session.phone, node, config, session);
                 await pool.query('UPDATE chatbot_sessions SET current_node_key = ?, variables = ? WHERE session_id = ?', [currentKey, JSON.stringify(session.variables), session.session_id]);
                 await this.syncLeadFromChatbotSession(session);
                 return;
             } 
             else if (node.node_type === 'end') {
                 const finalMsg = this.formatTextVariables(config.message || 'Thank you! Our sales team will contact you soon.', session.variables);
-                await whatsappService.sendMessage(session.phone, finalMsg);
+                await whatsappService.sendMessage(session.phone, finalMsg, null, botSenderId);
                 await pool.query('UPDATE chatbot_sessions SET status = "completed", current_node_key = ?, variables = ?, completed_at = NOW() WHERE session_id = ?', 
                     [currentKey, JSON.stringify(session.variables), session.session_id]);
                 await this.syncLeadFromChatbotSession(session);
@@ -797,7 +804,8 @@ class FlowEngine {
     /**
      * Helper to send corresponding interactive menu prompts
      */
-    static async sendNodePrompt(phone, node, config) {
+    static async sendNodePrompt(phone, node, config, session = null) {
+        const botSenderId = (session && session.variables && (session.variables.is_campaign || session.variables.sender_id === -2)) ? -2 : -1;
         if (['question', 'buttons', 'list', 'contact_time'].includes(node.node_type)) {
             const rawChoices = config.choices || config.slots || (config.options ? config.options.map(o => o.label || o.value) : []);
             const choices = rawChoices.map((item, idx) => typeof item === 'string' ? item : (item.label || item.title || `Option ${idx + 1}`));
@@ -805,23 +813,23 @@ class FlowEngine {
             
             if ((node.node_type === 'buttons' || config.responseType === 'buttons') && choices.length > 0 && choices.length <= 3) {
                 const buttons = choices.map((choice, idx) => ({ id: `opt-${idx}`, title: choice }));
-                await whatsappService.sendButtons(phone, promptText, buttons);
+                await whatsappService.sendButtons(phone, promptText, buttons, botSenderId);
             } else if ((node.node_type === 'list' || config.responseType === 'list') && choices.length > 0) {
                 const listItems = choices.map((choice, idx) => ({ id: `opt-${idx}`, title: choice }));
-                await whatsappService.sendList(phone, promptText, config.buttonText || 'Select Option', listItems);
+                await whatsappService.sendList(phone, promptText, config.buttonText || 'Select Option', listItems, botSenderId);
             } else if (choices.length > 0) {
                 let menuText = `${promptText}\n\n`;
                 choices.forEach((c, idx) => {
                     menuText += `${idx + 1}. ${c}\n`;
                 });
-                await whatsappService.sendMessage(phone, menuText);
+                await whatsappService.sendMessage(phone, menuText, null, botSenderId);
             } else {
-                await whatsappService.sendMessage(phone, promptText);
+                await whatsappService.sendMessage(phone, promptText, null, botSenderId);
             }
         } else if (node.node_type === 'text_input' || node.node_type === 'number_input') {
-            await whatsappService.sendMessage(phone, config.question || 'Please enter details:');
+            await whatsappService.sendMessage(phone, config.question || 'Please enter details:', null, botSenderId);
         } else if (node.node_type === 'message' && config.inputType === 'image') {
-            await whatsappService.sendMessage(phone, config.message);
+            await whatsappService.sendMessage(phone, config.message, null, botSenderId);
         }
     }
 

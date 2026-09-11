@@ -22,7 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (profileElem) profileElem.textContent = user.name || user.email || 'admin';
 
     const role = (user.role || '').toLowerCase();
-    isManageAllowed = (role === 'admin' || role === 'super-admin' || role === 'sales');
+    isManageAllowed = (role === 'admin' || role === 'super-admin' || role === 'sales' || role.includes('dealer') || user.is_manager);
+    if (role.includes('viewer')) {
+        isManageAllowed = false;
+    }
 
     const addBtn = document.getElementById('addDealerBtn');
     if (addBtn && !isManageAllowed) {

@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Admins and Super Admins always get the admin sidebar or dealer sidebar
             if (role === 'admin' || role === 'super-admin') {
                 sidebarFileName = isDealerMode ? 'sidebar-dealer.html' : 'sidebar-admin.html';
+            } else if (role.includes('dealer') || userPermissions.includes('dealer_dashboard')) {
+                sidebarFileName = 'sidebar-dealer.html';
             } else if (role === 'whatsapp_management_executive') {
                 sidebarFileName = 'sidebar-whatsapp_management_executive.html';
             } else if (role === 'billing_manager' || (role === 'manager' && userPermissions.includes('billing_billing'))) {
@@ -105,6 +107,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (role === 'super-admin') {
                     const sidebarLabel = document.getElementById('sidebar-role-label');
                     if (sidebarLabel) sidebarLabel.textContent = 'SUPER ADMIN PORTAL';
+                } else if (role.includes('dealer')) {
+                    const sidebarLabel = document.getElementById('sidebar-role-label');
+                    if (sidebarLabel) {
+                        if (role === 'dealer_manager') sidebarLabel.textContent = 'DEALER MANAGER PANEL';
+                        else if (role === 'dealer_executive') sidebarLabel.textContent = 'DEALER EXECUTIVE PANEL';
+                        else if (role === 'dealer_viewer') sidebarLabel.textContent = 'DEALER VIEWER PANEL';
+                        else sidebarLabel.textContent = 'DEALER PANEL';
+                    }
                 } else if (role === 'manager' && userPermissions.includes('sales_dashboard')) {
                     const sidebarLabel = document.getElementById('sidebar-role-label');
                     if (sidebarLabel) sidebarLabel.textContent = 'SALES MANAGER PANEL';
@@ -127,15 +137,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
                 }
 
-                // Initialize B2B Dealer Mode Toggle
-                const dealerModeToggle = document.getElementById('dealerModeToggle');
-                if (dealerModeToggle) {
-                    const isDealerMode = localStorage.getItem('dealerMode') === 'true';
-                    dealerModeToggle.checked = isDealerMode;
-                    dealerModeToggle.addEventListener('change', (e) => {
-                        localStorage.setItem('dealerMode', e.target.checked ? 'true' : 'false');
-                        window.location.reload();
-                    });
+                // Initialize B2B Dealer Mode Toggle (Only for Admin & Super Admin)
+                const toggleContainer = sidebarContainer.querySelector('.sidebar-toggle-container');
+                if (toggleContainer) {
+                    if (role === 'admin' || role === 'super-admin') {
+                        toggleContainer.style.display = 'block';
+                        const dealerModeToggle = document.getElementById('dealerModeToggle');
+                        if (dealerModeToggle) {
+                            const isDealerMode = localStorage.getItem('dealerMode') === 'true';
+                            dealerModeToggle.checked = isDealerMode;
+                            dealerModeToggle.addEventListener('change', (e) => {
+                                localStorage.setItem('dealerMode', e.target.checked ? 'true' : 'false');
+                                window.location.reload();
+                            });
+                        }
+                    } else {
+                        toggleContainer.remove();
+                    }
                 }
             } else {
                 console.error(`Sidebar file not found: sidebar-dynamic.html`);
@@ -183,7 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ── Viewer Read-Only UI Adjustments ──
-    if (role === 'viewer') {
+    if (role === 'viewer' || role.includes('viewer')) {
         const bannerText = 'VIEWER MODE: You have read-only access to the system. Modifications are disabled.';
         const banner = document.createElement('div');
         banner.innerHTML = `<div style="background: #fef3c7; border-bottom: 1px solid #fde68a; color: #92400e; text-align: center; padding: 0.5rem; font-weight: 700; font-size: 0.85rem; position: sticky; top: 0; z-index: 10000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">

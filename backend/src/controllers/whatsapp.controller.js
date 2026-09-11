@@ -97,16 +97,19 @@ const receiveMessage = async (req, res) => {
             const interactive = msg.interactive;
             inputText = interactive.button_reply?.title || interactive.list_reply?.title || 'Interactive response';
           } else if (['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type)) {
-            const mediaId = msg[msg.type].id;
-            const caption = msg[msg.type].caption || '';
+            const mediaId = msg[msg.type]?.id;
+            const caption = msg[msg.type]?.caption || '';
             inputText = caption || `Sent a ${msg.type}`;
+            mimeType = msg[msg.type]?.mime_type || null;
 
-            try {
-              const media = await whatsappService.downloadMedia(mediaId);
-              mediaBuffer = media.buffer;
-              mimeType = media.mimeType;
-            } catch (mediaErr) {
-              logger.error(`Failed to download incoming media ${mediaId}:`, mediaErr.message);
+            if (mediaId) {
+              try {
+                const media = await whatsappService.downloadMedia(mediaId);
+                mediaBuffer = media.buffer;
+                if (media.mimeType) mimeType = media.mimeType;
+              } catch (mediaErr) {
+                logger.error(`Failed to download incoming media ${mediaId}:`, mediaErr.message);
+              }
             }
           } else {
             inputText = `Media/Other type: ${msg.type}`;
@@ -173,10 +176,10 @@ const receiveMessage = async (req, res) => {
                 for (const reply of autoReplies) {
                   try {
                     if (reply.type === 'text') {
-                      await whatsappService.sendMessage(formatForWhatsApp(fromNumber), reply.content);
+                      await whatsappService.sendMessage(formatForWhatsApp(fromNumber), reply.content, null, -2);
                     } else if (reply.type === 'image' || reply.type === 'video') {
                       if (reply.url) {
-                        await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption);
+                        await whatsappService.sendMediaMessage(formatForWhatsApp(fromNumber), reply.url, reply.type, reply.caption, null, -2);
                       }
                     }
 
@@ -254,17 +257,23 @@ const sendReply = async (req, res) => {
     // 1. Handle Media Sending
     if (mediaData && category) {
       let mediaId;
+      let mediaBuffer = null;
       if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
         mediaId = mediaData;
-      } else {
-        // Convert Base64 to Buffer
+      } else if (typeof mediaData === 'string' && mediaData.includes(',')) {
         const base64Data = mediaData.split(',')[1];
-        const buffer = Buffer.from(base64Data, 'base64');
-        mediaId = await whatsappService.uploadMedia(buffer, mimeType, category, message || 'file');
+        mediaBuffer = Buffer.from(base64Data, 'base64');
+        mediaId = await whatsappService.uploadMedia(mediaBuffer, mimeType, category, message || 'file');
+      } else if (typeof mediaData === 'string') {
+        mediaBuffer = Buffer.from(mediaData, 'base64');
+        mediaId = await whatsappService.uploadMedia(mediaBuffer, mimeType, category, message || 'file');
+      } else if (Buffer.isBuffer(mediaData)) {
+        mediaBuffer = mediaData;
+        mediaId = await whatsappService.uploadMedia(mediaBuffer, mimeType, category, message || 'file');
       }
 
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId);
+      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId, mediaBuffer, mimeType);
     }
     // 2. Handle Text Sending
     else if (message) {
@@ -300,6 +309,9 @@ const getMedia = async (req, res) => {
     }
 
     const { media_data, media_url, mime_type } = rows[0];
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
     // Priority 1: Supabase URL
     if (media_url) {

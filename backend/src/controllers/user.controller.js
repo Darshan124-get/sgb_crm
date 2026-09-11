@@ -348,7 +348,17 @@ exports.createUser = async (req, res) => {
             'INSERT INTO users (name, email, phone, employee_id, password_hash, role_id, department_id, language, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [name, email, phone || null, employee_id || null, hashedPassword, role_id, department_id || null, language || 'EN', permissions ? JSON.stringify(permissions) : null]
         );
-        res.status(201).json({ message: 'User created successfully', user_id: result.insertId });
+        const newUserId = result.insertId;
+
+        // Auto-assign department manager if user's role is Manager and a department is specified
+        if (role_id && department_id) {
+            const [[roleRow]] = await db.execute('SELECT name FROM roles WHERE role_id = ?', [role_id]);
+            if (roleRow && (roleRow.name.toLowerCase().includes('manager') || role_id === 'manager')) {
+                await db.execute('UPDATE departments SET manager_id = ? WHERE id = ?', [newUserId, department_id]);
+            }
+        }
+
+        res.status(201).json({ message: 'User created successfully', user_id: newUserId });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             let field = 'A unique field';
@@ -367,7 +377,7 @@ exports.updateUser = async (req, res) => {
     try {
         // Fetch current row
         const [[current]] = await db.execute(
-            'SELECT language, status, department_id FROM users WHERE user_id = ?', [id]
+            'SELECT language, status, department_id, role_id FROM users WHERE user_id = ?', [id]
         );
 
         if (!current) return res.status(404).json({ message: 'User not found' });
@@ -396,6 +406,21 @@ exports.updateUser = async (req, res) => {
                 [name, email, phone || null, employee_id || null, role_id, department_id || null, safeLang, safeStatus, permissions ? JSON.stringify(permissions) : null, id]
             );
         }
+
+        // Auto-assign department manager if user's role is Manager and department is specified
+        const finalRoleId = role_id || current.role_id;
+        const finalDeptId = (department_id !== undefined && department_id !== '') ? department_id : current.department_id;
+
+        if (finalRoleId) {
+            const [[roleRow]] = await db.execute('SELECT name FROM roles WHERE role_id = ?', [finalRoleId]);
+            const isManager = roleRow && (roleRow.name.toLowerCase().includes('manager') || finalRoleId === 'manager');
+            if (isManager && finalDeptId) {
+                await db.execute('UPDATE departments SET manager_id = ? WHERE id = ?', [id, finalDeptId]);
+            } else if (!isManager) {
+                await db.execute('UPDATE departments SET manager_id = NULL WHERE manager_id = ?', [id]);
+            }
+        }
+
         res.json({ message: 'User updated successfully' });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -412,7 +437,20 @@ exports.updateUser = async (req, res) => {
 exports.resetPassword = async (req, res) => {
     const { id } = req.params;
     const { newPassword } = req.body;
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 6) {
+        return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    }
+
     try {
+        // PBAC constraint for managers
+        if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            const [[targetUser]] = await db.execute('SELECT department_id FROM users WHERE user_id = ?', [id]);
+            if (targetUser && targetUser.department_id !== req.user.department_id) {
+                return res.status(403).json({ message: 'Unauthorized to reset password for user in another department' });
+            }
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         await db.execute('UPDATE users SET password_hash = ? WHERE user_id = ?', [hashedPassword, id]);
         res.json({ message: 'Password reset successfully' });

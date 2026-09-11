@@ -4,7 +4,10 @@ const pool = require('../config/db');
 const { logActivity } = require('../utils/logger');
 require('dotenv').config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable must be set.');
+}
 
 exports.login = async (req, res) => {
     const { identifier, password } = req.body;
@@ -58,17 +61,20 @@ exports.login = async (req, res) => {
             if (!perms.includes('manager_team')) perms.push('manager_team');
         }
 
-        // Inject default permissions based on Department (for Manager, Executive, Viewer)
-        if (roleName !== 'super-admin' && roleName !== 'admin' && deptName) {
-            if (deptName.includes('sales')) {
+        // Inject default permissions based on Department/Role (for Manager, Executive, Viewer)
+        if (roleName !== 'super-admin' && roleName !== 'admin') {
+            if (roleName.includes('dealer') || (deptName && (deptName.includes('delar') || deptName.includes('dealer')))) {
+                const dealerPerms = ['dealer_dashboard', 'dealer_dealers', 'dealer_orders', 'dealer_visits', 'dealer_reports', 'dealer_settings'];
+                dealerPerms.forEach(p => { if (!perms.includes(p)) perms.push(p); });
+            } else if (roleName.includes('sales') || (deptName && deptName.includes('sales'))) {
                 const salesPerms = ['sales_dashboard', 'sales_lead_management', 'sales_sales_pipeline', 'sales_schedules', 'sales_orders', 'sales_dealers', 'sales_reports', 'sales_activity', 'sales_settings', 'sales_campaigns', 'whatsapp_whatsapp_chats'];
                 salesPerms.forEach(p => { if (!perms.includes(p)) perms.push(p); });
-            } else if (deptName.includes('billing')) {
+            } else if (roleName.includes('billing') || (deptName && deptName.includes('billing'))) {
                 if (!perms.includes('billing_billing')) perms.push('billing_billing');
-            } else if (deptName.includes('packing')) {
+            } else if (roleName.includes('packing') || (deptName && deptName.includes('packing'))) {
                 if (!perms.includes('packing_dashboard')) perms.push('packing_dashboard');
                 if (!perms.includes('packing_packing')) perms.push('packing_packing');
-            } else if (deptName.includes('ship')) {
+            } else if (roleName.includes('ship') || (deptName && deptName.includes('ship'))) {
                 if (!perms.includes('shipping_dashboard')) perms.push('shipping_dashboard');
                 if (!perms.includes('shipping_shipping')) perms.push('shipping_shipping');
             }

@@ -1638,7 +1638,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="file" id="node-p-file-input" accept="image/*" style="display: none;" onchange="handleProductFileUpload(event)">
 
                         <div id="product-img-preview-container" style="display: ${node.config.image ? 'block' : 'none'}; position: relative; margin-bottom: 6px;">
-                            <img id="product-img-preview" src="${node.config.image || 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3C/svg%3E'}" crossorigin="anonymous" onerror="this.style.display='none';" style="max-width: 100%; max-height: 140px; border-radius: 6px; object-fit: contain; border: 1px solid #e2e8f0; background: #ffffff; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <img id="product-img-preview" src="${node.config.image || 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3C/svg%3E'}" onerror="this.style.display='none';" style="max-width: 100%; max-height: 140px; border-radius: 6px; object-fit: contain; border: 1px solid #e2e8f0; background: #ffffff; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <button type="button" id="btn-remove-p-image" style="position: absolute; top: 4px; right: 4px; background: rgba(239, 68, 68, 0.95); color: #ffffff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;" title="Remove Image" onclick="removeProductImage(event)">&times;</button>
                         </div>
 
@@ -2003,21 +2003,48 @@ document.addEventListener('DOMContentLoaded', () => {
     function runLiveValidation() {
         const issues = [];
 
+        // Determine reachable nodes from Start node ('node-start')
+        const reachable = new Set(['node-start']);
+        const queue = ['node-start'];
+
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+
+            // Find all outgoing connections from currentId
+            const outgoingConns = connections.filter(c => {
+                if (currentId === 'node-start') return c.from === 'port-node-start-out';
+                return c.from === `port-${currentId}-out` || c.from.startsWith(`port-${currentId}-out-`);
+            });
+
+            outgoingConns.forEach(c => {
+                const targetNode = nodes.find(n => c.to === `port-${n.id}-in` || c.to === `port-${n.id}`);
+                if (targetNode && !reachable.has(targetNode.id)) {
+                    reachable.add(targetNode.id);
+                    queue.push(targetNode.id);
+                }
+            });
+
+            // Check Goto node targets
+            const currNodeObj = nodes.find(n => n.id === currentId);
+            if (currNodeObj && currNodeObj.type === 'goto' && currNodeObj.config && currNodeObj.config.targetNodeId) {
+                const gotoTarget = currNodeObj.config.targetNodeId;
+                if (gotoTarget !== 'unconnected' && !reachable.has(gotoTarget)) {
+                    reachable.add(gotoTarget);
+                    queue.push(gotoTarget);
+                }
+            }
+        }
+
         // Check Start node output
         const hasStartOut = connections.some(c => c.from === 'port-node-start-out');
         if (!hasStartOut) {
             issues.push({ nodeId: 'node-start', text: 'Flow entry point (Start node) has no output connection.' });
         }
 
-        // Loop nodes
+        // Loop reachable nodes ONLY (ignore disconnected/unused nodes on canvas)
         nodes.forEach(node => {
             if (node.type === 'start') return;
-
-            // Check incoming
-            const hasIn = connections.some(c => c.to === `port-${node.id}-in`);
-            if (!hasIn) {
-                issues.push({ nodeId: node.id, text: `Node "${node.name}" is completely disconnected.` });
-            }
+            if (!reachable.has(node.id)) return; // Skip disconnected/unreachable nodes
 
             // Check Question unconnected options
             if (node.type === 'question') {
@@ -2030,7 +2057,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } else if (node.type !== 'end') {
                 // Check simple node output
-                const hasOut = connections.some(c => c.from === `port-${node.id}-out`);
+                const hasOut = connections.some(c => c.from === `port-${node.id}-out` || c.from.startsWith(`port-${node.id}-out-`));
                 if (!hasOut) {
                     issues.push({ nodeId: node.id, text: `Node "${node.name}" has no next step connected.` });
                 }
@@ -3556,7 +3583,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const formData = new FormData();
                     formData.append('file', file);
                     const token = localStorage.getItem('token');
-                    const resp = await fetch('/api/chatbot/media/upload', {
+                    const apiBase = window.API_URL || 'http://127.0.0.1:5000/api';
+                    const resp = await fetch(`${apiBase}/chatbot/media/upload`, {
                         method: 'POST',
                         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
                         body: formData
@@ -3974,7 +4002,8 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('type', 'image');
 
             const token = localStorage.getItem('token');
-            const res = await fetch(`${window.API_URL}/chatbot/media/upload`, {
+            const apiBase = window.API_URL || 'http://127.0.0.1:5000/api';
+            const res = await fetch(`${apiBase}/chatbot/media/upload`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -4032,7 +4061,8 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('type', type || 'image');
 
             const token = localStorage.getItem('token');
-            const res = await fetch(`${window.API_URL}/chatbot/media/upload`, {
+            const apiBase = window.API_URL || 'http://127.0.0.1:5000/api';
+            const res = await fetch(`${apiBase}/chatbot/media/upload`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData

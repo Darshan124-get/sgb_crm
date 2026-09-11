@@ -188,22 +188,41 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     if (mediaData) {
       if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
         mediaUrl = mediaData;
-      } else if (typeof mediaData === 'string' && mediaData.startsWith('data:')) {
+      } else if (typeof mediaData === 'string' && mediaData.includes(',')) {
         buffer = Buffer.from(mediaData.split(',')[1], 'base64');
+      } else if (typeof mediaData === 'string') {
+        buffer = Buffer.from(mediaData, 'base64');
       } else if (Buffer.isBuffer(mediaData)) {
         buffer = mediaData;
       }
 
       if (buffer && Buffer.isBuffer(buffer)) {
         const timestamp = Date.now();
-        const extension = mimeType ? mimeType.split('/')[1] : 'bin';
+        const cleanMime = (mimeType || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+        const mimeMap = {
+          'image/jpeg': 'jpg',
+          'image/jpg': 'jpg',
+          'image/png': 'png',
+          'image/gif': 'gif',
+          'image/webp': 'webp',
+          'video/mp4': 'mp4',
+          'video/3gpp': '3gp',
+          'audio/aac': 'aac',
+          'audio/mp4': 'm4a',
+          'audio/amr': 'amr',
+          'audio/mpeg': 'mp3',
+          'audio/ogg': 'ogg',
+          'application/pdf': 'pdf'
+        };
+        let extension = mimeMap[cleanMime] || (cleanMime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+        if (extension === 'jpeg') extension = 'jpg';
         const fileName = `${timestamp}-${phone}.${extension}`;
         const filePath = `chats/${phone}/${fileName}`;
 
         const { data, error } = await supabase.storage
           .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
           .upload(filePath, buffer, {
-            contentType: mimeType || 'application/octet-stream',
+            contentType: cleanMime,
             upsert: true
           });
 
@@ -259,7 +278,7 @@ const getChatHistory = async (phoneInput, user = null) => {
       SELECT cm.*, 
       CASE WHEN cm.sender_type = 'user' THEN 'incoming' ELSE 'outgoing' END as direction, 
       cm.message as body,
-      COALESCE(u.name, CASE WHEN cm.sender_type = 'admin' AND cm.sender_id IS NULL THEN 'Chatbot' ELSE NULL END) as sender_name
+      COALESCE(u.name, CASE WHEN cm.sender_type = 'admin' AND cm.sender_id = -2 THEN 'Campaign' WHEN cm.sender_type = 'admin' AND (cm.sender_id IS NULL OR cm.sender_id = -1) THEN 'Chatbot' ELSE NULL END) as sender_name
       FROM chat_messages cm
       JOIN chat_sessions cs ON cm.session_id = cs.session_id
       JOIN leads l ON cs.lead_id = l.lead_id

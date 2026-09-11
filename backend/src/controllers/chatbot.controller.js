@@ -126,8 +126,8 @@ exports.createFlowFromTemplate = async (req, res) => {
             nodes = [
                 { key: 'node-start', type: 'start', name: 'Start', x: 80, y: 300, config: { triggerType: 'Keyword', keywords: keywords ? (Array.isArray(keywords) ? keywords.join(', ') : keywords) : 'Dumper, dumper, just dumper' } },
                 { key: 'node-1', type: 'text_input', name: 'Step 1: Place & Pin Code', x: 280, y: 300, config: { question: 'Q: Sir please share your Place and Pincode\n(ಸರ್ ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸ್ಥಳ ಮತ್ತು ಪಿನ್‌ಕೋಡ್ ಹಂಚಿಕೊಳ್ಳಿ)', saveTo: 'place_pincode', saveResponseTo: 'place_pincode', nextNode: 'node-v1' } },
-                { key: 'node-v1', type: 'video', name: 'Dumper Video', x: 540, y: 300, config: { mediaUrl: 'https://poxjjdfjxidwvrtfjyxx.supabase.co/storage/v1/object/public/SGB/chatbot-media/1788260574245_WhatsApp_Video_2026-09-01_at_4.30.07_PM.mp4', caption: 'Dumper Heavy Duty Video Demonstration', nextNode: 'node-img1' } },
-                { key: 'node-img1', type: 'image', name: 'Dumper Photo & Specs', x: 780, y: 300, config: { mediaUrl: 'https://poxjjdfjxidwvrtfjyxx.supabase.co/storage/v1/object/public/SGB/chatbot-media/1788261401335_SIDE_PACK_BRUSHCUTTER.png', caption: 'Dumper Model Photo & Specifications', nextNode: 'node-delay1' } },
+                { key: 'node-v1', type: 'video', name: 'Dumper Video', x: 540, y: 300, config: { mediaUrl: 'https://yvcmjkquuafcgszlkkfu.supabase.co/storage/v1/object/public/SGB/chatbot-media/1788260574245_WhatsApp_Video_2026-09-01_at_4.30.07_PM.mp4', caption: 'Dumper Heavy Duty Video Demonstration', nextNode: 'node-img1' } },
+                { key: 'node-img1', type: 'image', name: 'Dumper Photo & Specs', x: 780, y: 300, config: { mediaUrl: 'https://yvcmjkquuafcgszlkkfu.supabase.co/storage/v1/object/public/SGB/chatbot-media/1788261401335_SIDE_PACK_BRUSHCUTTER.png', caption: 'Dumper Model Photo & Specifications', nextNode: 'node-delay1' } },
                 { key: 'node-delay1', type: 'time_trigger', name: '10s Delay', x: 1020, y: 300, config: { delayValue: 10, delayUnit: 'seconds', duration: 10, unit: 'seconds', nextNode: 'node-2' } },
                 { key: 'node-2', type: 'question', name: 'Step 2: Model Purpose', x: 1260, y: 300, config: { question: 'Q: We have 2 models. What purpose do you need sir?\n(ನಮ್ಮ ಬಳಿ 2 ಮಾದರಿಗಳಿವೆ. ನಿಮಗೆ ಯಾವ ಉದ್ದೇಶಕ್ಕಾಗಿ ಬೇಕು ಸರ್?)', responseType: 'buttons', choices: ['1. Commercial / Heavy Duty', '2. Agricultural / Personal'], options: [{ label: '1. Commercial / Heavy Duty', value: 'commercial', nextNode: 'node-3' }, { label: '2. Agricultural / Personal', value: 'agricultural', nextNode: 'node-3' }], saveResponseTo: 'dumper_purpose' } },
                 { key: 'node-3', type: 'question', name: 'Step 3: Call Time', x: 1540, y: 300, config: { question: 'Q: Right time to contact you ?\n(ನಿಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಲು ಇದು ಸರಿಯಾದ ಸಮಯವೇ?)', responseType: 'buttons', choices: ['1. 9:30 AM - 1:00 PM', '2. 2:30 PM - 6:00 PM'], options: [{ label: '1. 9:30 AM - 1:00 PM', value: 'morning', nextNode: 'node-lead' }, { label: '2. 2:30 PM - 6:00 PM', value: 'evening', nextNode: 'node-lead' }], saveResponseTo: 'preferred_contact_time' } },
@@ -1144,8 +1144,9 @@ exports.deleteMedia = async (req, res) => {
         // 2. Hard Delete from Local Disk if stored locally
         if (media.file_url && media.file_url.startsWith('/uploads/')) {
             try {
-                const localPath = path.join(__dirname, '../..', media.file_url);
-                if (fs.existsSync(localPath)) {
+                const uploadsDir = path.resolve(__dirname, '../../uploads');
+                const localPath = path.resolve(__dirname, '../..', media.file_url.replace(/^\//, ''));
+                if (localPath.startsWith(uploadsDir) && fs.existsSync(localPath)) {
                     fs.unlinkSync(localPath);
                 }
             } catch (e) {

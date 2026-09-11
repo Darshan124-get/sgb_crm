@@ -345,6 +345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         tbody.innerHTML = '';
+        allRoles.forEach(role => {
             let permsObj = role.default_permissions || role.permissions || {};
             if (typeof permsObj === 'string') {
                 try { permsObj = JSON.parse(permsObj); } catch(e) { permsObj = {}; }
@@ -565,6 +566,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 closeAdminModal();
                 fetchAdmins();
                 fetchUsers(); // refresh manager list
+                fetchDepartments(); // refresh department table with manager updates
             } else {
                 window.showAlert('Error', data.message || 'Failed to save user', 'error');
             }
@@ -641,7 +643,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         'Billing': ['Billing'],
         'Shipping': ['Shipping'],
         'Packing': ['Packing'],
-        'WhatsApp': ['WhatsApp Chats']
+        'WhatsApp': ['WhatsApp Chats'],
+        'Dealer': ['Dealer Management', 'Dealer Orders', 'Dealer Inventory', 'Dealer Reports']
     };
 
     let selectedPermissions = [];
@@ -910,6 +913,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('wizardPassword').removeAttribute('required');
             document.getElementById('wizardConfirmPassword').removeAttribute('required');
             document.getElementById('wizardDept').value = user.department_id || '';
+            populateFilteredWizardRoles();
             document.getElementById('wizardRole').value = user.role_id || '';
             
             const langGroup = document.getElementById('languageSelectionGroup');
@@ -973,6 +977,105 @@ document.addEventListener('DOMContentLoaded', async () => {
         userWizardModal.style.display = 'none';
     }
 
+    function populateFilteredWizardRoles() {
+        const currentUser = window.getCurrentUser();
+        const currentRole = (currentUser.role || '').toLowerCase();
+        
+        const deptSelect = document.getElementById('wizardDept');
+        const roleSelect = document.getElementById('wizardRole');
+        if (!deptSelect || !roleSelect) return;
+        
+        const selectedDeptId = deptSelect.value;
+        const selectedDeptObj = allDepartments.find(d => d.id == selectedDeptId || d.department_id == selectedDeptId);
+        let deptName = selectedDeptObj ? (selectedDeptObj.name || '').toLowerCase() : '';
+
+        // Fallback: If selectedDeptObj wasn't found by ID, get text directly from selected option
+        if (!deptName && deptSelect.selectedIndex >= 0) {
+            const selectedOptText = deptSelect.options[deptSelect.selectedIndex]?.text || '';
+            if (!selectedOptText.includes('-- Select')) {
+                deptName = selectedOptText.toLowerCase();
+            }
+        }
+
+        const currentSelectedRoleId = roleSelect.value;
+        roleSelect.innerHTML = '<option value="">-- Select Role --</option>';
+
+        // Explicit Department Role Mapping (lowercase role names)
+        const DEPARTMENT_ROLE_MAP = {
+            'sales': ['telecaller_executive', 'whatsapp_management_executive', 'sales_manager', 'whatsapp_manager', 'sales_executive'],
+            'dealer': ['dealer_executive', 'dealer_manager', 'dealer_viewer'],
+            'billing': ['billing_executive', 'billing_manager', 'billing_viewer'],
+            'shipping': ['shipping_executive', 'shipping_manager', 'shipping_viewer', 'shipping'],
+            'packing': ['packing_executive', 'packing_manager', 'packing_viewer', 'packaging', 'packing'],
+            'whatsapp': ['whatsapp_management_executive', 'whatsapp_manager']
+        };
+
+        // Determine which department key matches (supporting spelling variations like DELAR B2B and SHIPING in DB)
+        let activeDeptKey = '';
+        if (deptName) {
+            if (deptName.includes('dealer') || deptName.includes('delar') || deptName.includes('b2b')) {
+                activeDeptKey = 'dealer';
+            } else if (deptName.includes('sales') || deptName.includes('telecaller')) {
+                activeDeptKey = 'sales';
+            } else if (deptName.includes('billing') || deptName.includes('finance')) {
+                activeDeptKey = 'billing';
+            } else if (deptName.includes('shipping') || deptName.includes('shiping') || deptName.includes('shp') || deptName.includes('logistics')) {
+                activeDeptKey = 'shipping';
+            } else if (deptName.includes('pack') || deptName.includes('pak') || deptName.includes('warehouse')) {
+                activeDeptKey = 'packing';
+            } else if (deptName.includes('whatsapp')) {
+                activeDeptKey = 'whatsapp';
+            }
+        }
+
+        allRoles.forEach(r => {
+            const rName = (r.name || '').toLowerCase().trim();
+
+            // Always exclude system admin / super-admin roles, generic 'manager', and generic 'viewer'
+            if (rName === 'admin' || rName === 'super-admin' || rName === 'super_admin' || rName === 'manager' || rName === 'viewer') {
+                return;
+            }
+
+            // Managers cannot assign manager roles to users unless super-admin or admin
+            if (currentUser.is_manager && currentRole !== 'super-admin' && currentRole !== 'admin') {
+                if (rName.includes('manager')) return;
+            }
+
+            // If a department is selected, strictly filter by that department's allowed role list
+            if (activeDeptKey) {
+                const allowedRoles = DEPARTMENT_ROLE_MAP[activeDeptKey] || [];
+                if (!allowedRoles.includes(rName)) return;
+            } else if (deptName) {
+                // For custom department names
+                if (!rName.includes(deptName)) return;
+            } else {
+                return;
+            }
+
+            // Format name nicely (e.g., 'dealer_executive' -> 'Dealer Executive', 'whatsapp_management_executive' -> 'WhatsApp Management Executive')
+            let formattedName = r.name.replace(/[-_]/g, ' ').split(' ').map(word => {
+                if (word.toLowerCase() === 'whatsapp') return 'WhatsApp';
+                return word.charAt(0).toUpperCase() + word.slice(1);
+            }).join(' ');
+
+            if (rName === 'shipping') formattedName = 'Shipping Executive';
+
+            // Avoid adding duplicate label options if both 'shipping' and 'shipping_executive' exist
+            if (Array.from(roleSelect.options).some(o => o.textContent === formattedName)) {
+                return;
+            }
+
+            const opt = document.createElement('option');
+            opt.value = r.role_id;
+            opt.textContent = formattedName;
+            roleSelect.appendChild(opt);
+        });
+
+        if (currentSelectedRoleId && Array.from(roleSelect.options).some(o => o.value == currentSelectedRoleId)) {
+            roleSelect.value = currentSelectedRoleId;
+        }
+    }
+
     function populateWizardDropdowns() {
         const currentUser = window.getCurrentUser();
         const currentRole = (currentUser.role || '').toLowerCase();
@@ -984,6 +1087,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             opt.value = d.id;
             opt.textContent = d.name;
             deptSelect.appendChild(opt);
+        });
+
+        // Add change event listeners to trigger dynamic filtering when department changes
+        deptSelect.onchange = () => {
+            populateFilteredWizardRoles();
+        };
+        deptSelect.addEventListener('change', () => {
+            populateFilteredWizardRoles();
         });
 
         // PBAC: Lock department for Managers
@@ -1000,25 +1111,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(createDeptBox) createDeptBox.style.display = 'block';
         }
 
-        const roleSelect = document.getElementById('wizardRole');
-        roleSelect.innerHTML = '<option value="">-- Select Role --</option>';
-        allRoles.forEach(r => {
-            // Managers cannot assign admin, super-admin, or other manager roles
-            if (currentUser.is_manager && currentRole !== 'super-admin' && currentRole !== 'admin') {
-                if (r.name === 'admin' || r.name === 'super-admin' || r.name.toLowerCase().includes('manager')) return;
-            }
-            
-            const opt = document.createElement('option');
-            opt.value = r.role_id;
-            
-            // Format name nicely (e.g., 'telecaller_executive' -> 'Telecaller Executive')
-            const formattedName = r.name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-            opt.textContent = formattedName;
-            
-            roleSelect.appendChild(opt);
-        });
+        populateFilteredWizardRoles();
 
-        roleSelect.addEventListener('change', (e) => {
+        const roleSelect = document.getElementById('wizardRole');
+        roleSelect.onchange = (e) => {
             const selectedRoleId = e.target.value;
             const role = allRoles.find(r => r.role_id == selectedRoleId);
             if (role && role.default_permissions) {
@@ -1031,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 selectedPermissions = [];
             }
             updatePermissionsSummary();
-        });
+        };
     }
 
     function showWizardStep(step) {
@@ -1068,6 +1164,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Show/Hide Buttons
         btnWizardBack.style.visibility = (step === 1) ? 'hidden' : 'visible';
         
+        if (step === 3) {
+            populateFilteredWizardRoles();
+        }
+
         if(step === 4) {
             btnWizardNext.style.display = 'none';
             btnWizardCancel.style.display = 'block';
@@ -1229,6 +1329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.showAlert('Success', `User successfully ${userId ? 'updated' : 'created'}!`, 'success');
                 closeUserWizard();
                 fetchAllPbacUsers();
+                fetchDepartments();
                 if (activeProfileUserId && activeProfileUserId == userId) {
                     openUserProfile(userId);
                 }

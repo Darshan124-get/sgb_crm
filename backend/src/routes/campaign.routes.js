@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const campaignController = require('../controllers/campaign.controller');
-const { authenticateToken } = require('../middleware/auth.middleware');
+const { authenticateToken, isAdminOrSales } = require('../middleware/auth.middleware');
 
-router.post('/', campaignController.createCampaign);
 router.get('/', authenticateToken, campaignController.getCampaigns);
-router.put('/:id', campaignController.updateCampaign);
-router.delete('/:id', campaignController.deleteCampaign);
+router.post('/', authenticateToken, isAdminOrSales, campaignController.createCampaign);
+router.put('/:id', authenticateToken, isAdminOrSales, campaignController.updateCampaign);
+router.delete('/:id', authenticateToken, isAdminOrSales, campaignController.deleteCampaign);
 
 module.exports = router;

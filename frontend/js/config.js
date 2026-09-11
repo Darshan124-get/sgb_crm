@@ -42,9 +42,23 @@ window.ROLE_REDIRECTS = {
     admin: 'modules/admin/dashboard.html',
     'super-admin': 'modules/admin/dashboard.html',
     sales: 'modules/sales/dashboard.html',
+    sales_manager: 'modules/sales/dashboard.html',
+    dealer: 'modules/dealer/dashboard.html',
+    dealer_manager: 'modules/dealer/dashboard.html',
+    dealer_executive: 'modules/dealer/dashboard.html',
+    dealer_viewer: 'modules/dealer/dashboard.html',
     billing: 'modules/billing/billing.html',
+    billing_manager: 'modules/billing/billing.html',
+    billing_executive: 'modules/billing/billing.html',
+    billing_viewer: 'modules/billing/billing.html',
     packing: 'modules/packing/dashboard.html',
+    packing_manager: 'modules/packing/dashboard.html',
+    packing_executive: 'modules/packing/dashboard.html',
+    packing_viewer: 'modules/packing/dashboard.html',
     shipping: 'modules/shipping/dashboard.html',
+    shipping_manager: 'modules/shipping/dashboard.html',
+    shipping_executive: 'modules/shipping/dashboard.html',
+    shipping_viewer: 'modules/shipping/dashboard.html',
     shipment: 'modules/shipping/dashboard.html',
     whatsapp_manager: 'modules/whatsapp/whatsapp.html'
 };
@@ -57,6 +71,11 @@ window.getHomeUrl = function (user) {
         return window.ROLE_REDIRECTS[role];
     }
 
+    // Direct role match in ROLE_REDIRECTS for department-specific roles
+    if (window.ROLE_REDIRECTS[role]) {
+        return window.ROLE_REDIRECTS[role];
+    }
+
     // Check if they have custom PBAC permissions
     let userPermissions = [];
     try {
@@ -64,10 +83,14 @@ window.getHomeUrl = function (user) {
     } catch (e) { }
 
     // Route based on department permissions injected by auth controller
+    if (userPermissions.includes('dealer_dashboard')) return 'modules/dealer/dashboard.html';
     if (userPermissions.includes('sales_dashboard')) return 'modules/sales/dashboard.html';
     if (userPermissions.includes('packing_dashboard')) return 'modules/packing/dashboard.html';
     if (userPermissions.includes('shipping_dashboard')) return 'modules/shipping/dashboard.html';
     if (userPermissions.includes('billing_billing')) return 'modules/billing/billing.html';
+
+    // Dealer role fallback
+    if (role.includes('dealer')) return 'modules/dealer/dashboard.html';
 
     // If they have PBAC permissions but don't match the above, or are a manager, route them to the unified dashboard as fallback
     if ((userPermissions.length > 0 || user.is_manager) && role !== 'admin' && role !== 'super-admin') {

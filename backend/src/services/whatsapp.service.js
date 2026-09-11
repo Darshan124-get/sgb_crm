@@ -7,8 +7,8 @@ const { formatForWhatsApp } = require('../utils/phoneUtils');
 const API_VERSION = 'v21.0';
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
 
-const whatsappToken = process.env.WHATSAPP_TOKEN;
-const phoneNumberId = process.env.PHONE_NUMBER_ID;
+const getToken = () => process.env.WHATSAPP_TOKEN;
+const getPhoneId = () => process.env.PHONE_NUMBER_ID;
 
 /**
  * Sends a text message to a WhatsApp recipient
@@ -28,9 +28,9 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null) =
       data.context = { message_id: replyToMessageId };
     }
 
-    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
       headers: {
-        Authorization: `Bearer ${whatsappToken}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': 'application/json',
       },
     });
@@ -68,9 +68,9 @@ const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
     
     const payload = Buffer.concat(parts);
     
-    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/media`, payload, {
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/media`, payload, {
       headers: {
-        Authorization: `Bearer ${whatsappToken}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'Content-Length': payload.length
       },
@@ -111,7 +111,7 @@ const getOrCreateMetaMediaId = async (url, type) => {
 /**
  * Sends a media message using a media_id or pre-uploaded URL
  */
-const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null, senderId = null) => {
+const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null, senderId = null, mediaBuffer = null, customMimeType = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     let resolvedMediaId = mediaId;
@@ -140,16 +140,16 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
       data.context = { message_id: replyToMessageId };
     }
 
-    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
       headers: {
-        Authorization: `Bearer ${whatsappToken}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': 'application/json',
       },
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
-    const mimeType = type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf'));
-    await messageService.logChatMessage(to, 'outgoing', type, caption || '', isUrl ? mediaId : null, mimeType, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot media message:', err.message));
+    const mimeType = customMimeType || (type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf')));
+    await messageService.logChatMessage(to, 'outgoing', type, caption || '', mediaBuffer || (isUrl ? mediaId : null), mimeType, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot media message:', err.message));
 
     return response.data;
   } catch (err) {
@@ -162,27 +162,50 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
  * Downloads media from Meta's servers
  */
 const downloadMedia = async (mediaId) => {
+  const token = getToken();
   try {
-    // 1. Get media URL
+    // 1. Get media URL from Meta Graph API
     const infoRes = await axios.get(`${BASE_URL}/${mediaId}`, {
-      headers: { Authorization: `Bearer ${whatsappToken}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'curl/7.64.1'
+      },
+      timeout: 15000
     });
     const { url, mime_type } = infoRes.data;
 
-    // 2. Download binary data
-    const mediaRes = await axios.get(url, {
-      headers: { Authorization: `Bearer ${whatsappToken}` },
-      responseType: 'arraybuffer',
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
-    });
+    // 2. Download binary data from Meta CDN (try with Auth header, fallback without Auth if CDN redirects)
+    let mediaRes;
+    try {
+      mediaRes = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'curl/7.64.1'
+        },
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      });
+    } catch (cdnErr) {
+      logger.warn(`Meta CDN download retry without auth header for mediaId ${mediaId}:`, cdnErr.message);
+      mediaRes = await axios.get(url, {
+        headers: {
+          'User-Agent': 'curl/7.64.1'
+        },
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      });
+    }
 
     return {
       buffer: Buffer.from(mediaRes.data),
       mimeType: mime_type,
     };
   } catch (err) {
-    logger.error('Error downloading media from Meta:', err.response ? err.response.data : err.message);
+    logger.error('Error downloading media from Meta:', err.response ? JSON.stringify(err.response.data) : err.message);
     throw err;
   }
 };
@@ -190,7 +213,7 @@ const downloadMedia = async (mediaId) => {
 /**
  * Sends a Button Message (Max 3 buttons)
  */
-const sendButtons = async (to, text, buttons) => {
+const sendButtons = async (to, text, buttons, senderId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     const data = {
@@ -210,16 +233,16 @@ const sendButtons = async (to, text, buttons) => {
       },
     };
 
-    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
       headers: {
-        Authorization: `Bearer ${whatsappToken}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': 'application/json',
       },
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
     const formattedBtnText = `${text}\n\n` + buttons.map((b, i) => `${i + 1}. ${b.title}`).join('\n');
-    await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedBtnText, null, null, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot buttons:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedBtnText, null, null, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot buttons:', err.message));
 
     return response.data;
   } catch (err) {
@@ -231,7 +254,7 @@ const sendButtons = async (to, text, buttons) => {
 /**
  * Sends a List Message (Max 10 rows)
  */
-const sendList = async (to, text, buttonLabel, rows) => {
+const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     const data = {
@@ -258,16 +281,16 @@ const sendList = async (to, text, buttonLabel, rows) => {
       },
     };
 
-    const response = await axios.post(`${BASE_URL}/${phoneNumberId}/messages`, data, {
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
       headers: {
-        Authorization: `Bearer ${whatsappToken}`,
+        Authorization: `Bearer ${getToken()}`,
         'Content-Type': 'application/json',
       },
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
     const formattedListText = `${text}\n\n${buttonLabel || 'Select Option'}:\n` + rows.map((r, i) => `${i + 1}. ${r.title}`).join('\n');
-    await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedListText, null, null, null, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot list:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedListText, null, null, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot list:', err.message));
 
     return response.data;
   } catch (err) {

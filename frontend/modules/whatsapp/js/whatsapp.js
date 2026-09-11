@@ -2146,14 +2146,14 @@ function renderMessages(history) {
 
         let senderTagHtml = '';
         if (msg.direction === 'outgoing') {
-            const isCampaign = msg.sender_name === 'Campaign' || msg.sender_id === -2;
-            const isBot = (msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1) && !isCampaign;
+            const isCampaign = msg.sender_name === 'Campaign' || msg.sender_id == -2 || (msg.media_url && msg.media_url.includes('/campaigns/'));
+            const isBot = (msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1 || msg.sender_id == -1) && !isCampaign;
             if (isCampaign) {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #8b5cf6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-bullhorn" style="font-size: 0.75rem;"></i> Campaign</div>`;
             } else if (isBot) {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
             } else if (msg.sender_name && msg.sender_name !== 'Staff') {
-                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px;">${msg.sender_name}</div>`;
+                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-user-tie" style="font-size: 0.75rem;"></i> ${msg.sender_name}</div>`;
             }
         }
 

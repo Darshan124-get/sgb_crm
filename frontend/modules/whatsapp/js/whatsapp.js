@@ -773,13 +773,16 @@ async function loadCustomers() {
     }
 }
 
-/**
- * Render Customer List
- */
-function renderCustomerList() {
+let customerDisplayLimit = 30;
+
+function renderCustomerList(shouldResetLimit = true) {
     if (!Array.isArray(allCustomers) || allCustomers.length === 0) {
         customerListEl.innerHTML = '<div class="loading-spinner" style="font-size: 0.9rem; color: #8696a0;">No conversations yet.</div>';
         return;
+    }
+
+    if (shouldResetLimit) {
+        customerDisplayLimit = 30;
     }
 
     const searchTerm = searchInputEl ? searchInputEl.value.toLowerCase().trim() : '';
@@ -876,13 +879,17 @@ function renderCustomerList() {
         return bTime - aTime;
     });
 
+    window._currentFilteredCustomers = filtered;
+
     if (filtered.length === 0) {
         customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">No conversations in this tab.</div>`;
         return;
     }
 
-    customerListEl.innerHTML = '';
-    filtered.forEach(customer => {
+    const visibleCustomers = filtered.slice(0, customerDisplayLimit);
+
+    const fragment = document.createDocumentFragment();
+    visibleCustomers.forEach(customer => {
         const displayName = customer.customer_name || customer.phone;
         const initials = getInitials(customer.customer_name);
         const color = getAvatarStyle(customer.phone);
@@ -984,8 +991,61 @@ function renderCustomerList() {
             window.showCustomerContextMenu(e, customer.phone);
         };
         item.onclick = () => selectCustomer(customer);
-        customerListEl.appendChild(item);
+        fragment.appendChild(item);
     });
+
+    customerListEl.innerHTML = '';
+    customerListEl.appendChild(fragment);
+
+    // Infinite scroll listener on sidebar customer list
+    if (customerListEl && !customerListEl._hasLazyScroll) {
+        customerListEl._hasLazyScroll = true;
+        customerListEl.addEventListener('scroll', () => {
+            if (customerListEl.scrollHeight - customerListEl.scrollTop - customerListEl.clientHeight < 150) {
+                if (window._currentFilteredCustomers && customerDisplayLimit < window._currentFilteredCustomers.length) {
+                    customerDisplayLimit += 30;
+                    renderCustomerList(false);
+                }
+            }
+        });
+    }
+}
+
+window._isSelectingCustomer = false;
+let _chatResizeObserver = null;
+
+function initChatResizeObserver() {
+    if (!messageContainerEl || _chatResizeObserver) return;
+    try {
+        _chatResizeObserver = new ResizeObserver(() => {
+            if (!messageContainerEl) return;
+            const distanceToBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight;
+            if (window._isSelectingCustomer || distanceToBottom < 400) {
+                messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+            }
+        });
+        _chatResizeObserver.observe(messageContainerEl);
+    } catch (e) {
+        console.error('ResizeObserver error:', e);
+    }
+}
+
+function scrollToBottomInstant() {
+    if (!messageContainerEl) return;
+    initChatResizeObserver();
+    messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    requestAnimationFrame(() => {
+        if (messageContainerEl) messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    });
+    setTimeout(() => {
+        if (messageContainerEl) messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    }, 50);
+    setTimeout(() => {
+        if (messageContainerEl) messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    }, 200);
+    setTimeout(() => {
+        if (messageContainerEl) messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    }, 600);
 }
 
 /**
@@ -998,6 +1058,8 @@ async function selectCustomer(customer) {
         quickRepliesPopover.style.display = 'none';
     }
     activeCustomer = customer;
+    isScrollLoadingHistory = true;
+    window._isSelectingCustomer = true;
 
     // Reset scroll button state when changing chats
     scrollUnreadCount = 0;
@@ -1009,23 +1071,7 @@ async function selectCustomer(customer) {
         scrollUnreadBadge.classList.add('hidden');
     }
 
-    // Use cached history for instant display if available
-    const cached = chatHistoryCache.get(customer.phone);
-    if (cached) {
-        currentHistory = cached;
-        renderMessages(cached);
-    } else {
-        currentHistory = [];
-        if (messageContainerEl) {
-            messageContainerEl.innerHTML = '<div class="loading-spinner" style="padding: 20px; text-align: center; color: var(--whatsapp-secondary);">Loading messages...</div>';
-        }
-    }
-
-    // Update URL query parameters without reloading
-    const newUrl = `${window.location.pathname}?phone=${customer.phone}`;
-    window.history.replaceState(null, '', newUrl);
-
-    // UI Transitions
+    // UI Transitions MUST occur BEFORE rendering messages so container layout height is non-zero
     chatWelcomeEl.classList.add('hidden');
     chatWindowEl.classList.remove('hidden');
     
@@ -1038,6 +1084,26 @@ async function selectCustomer(customer) {
         if (resizerRight) resizerRight.classList.remove('hidden');
     }
     appContainerEl.classList.add('show-chat');
+
+    initChatResizeObserver();
+
+    // Use cached history for instant display if available
+    const cached = chatHistoryCache.get(customer.phone);
+    if (cached) {
+        currentHistory = cached;
+        renderMessages(cached, true, true);
+    } else {
+        currentHistory = [];
+        if (messageContainerEl) {
+            messageContainerEl.innerHTML = '<div class="loading-spinner" style="padding: 20px; text-align: center; color: var(--whatsapp-secondary);">Loading messages...</div>';
+        }
+    }
+
+    scrollToBottomInstant();
+
+    // Update URL query parameters without reloading
+    const newUrl = `${window.location.pathname}?phone=${customer.phone}`;
+    window.history.replaceState(null, '', newUrl);
 
     // Reset edit state
     contactEditEl.classList.add('hidden');
@@ -1102,7 +1168,17 @@ async function selectCustomer(customer) {
     }
     renderCustomerList();
 
-    await loadChatHistory(customer.phone);
+    await loadChatHistory(customer.phone, false, true);
+    scrollToBottomInstant();
+
+    setTimeout(() => {
+        isScrollLoadingHistory = false;
+    }, 400);
+
+    setTimeout(() => {
+        window._isSelectingCustomer = false;
+        scrollToBottomInstant();
+    }, 1000);
 }
 
 // ── 24h Window Timer ──────────────────────────────────────────────────────────
@@ -1327,7 +1403,7 @@ async function handleTransfer() {
 /**
  * Load Chat History
  */
-async function loadChatHistory(phone, isPolling = false) {
+async function loadChatHistory(phone, isPolling = false, forceScrollToBottom = false) {
     if (activeHistoryFetches.has(phone)) return;
     activeHistoryFetches.add(phone);
     try {
@@ -1341,10 +1417,33 @@ async function loadChatHistory(phone, isPolling = false) {
 
         // Update UI only if this is still the active customer chat
         if (activeCustomer && activeCustomer.phone === phone) {
-            // Avoid re-rendering if history hasn't changed (for both polling and manual switching)
-            if (JSON.stringify(history) === JSON.stringify(currentHistory)) return;
             currentHistory = history;
-            renderMessages(history);
+
+            if (!isPolling || forceScrollToBottom) {
+                // Initial load, chat switch, reload, or send reply: always render the latest messages
+                renderMessages(history, true, forceScrollToBottom || !isPolling);
+            } else {
+                // Background polling update: check if new messages arrived
+                const lastMsg = history.length > 0 ? history[history.length - 1] : null;
+                if (lastMsg) {
+                    const lastEl = document.getElementById(`msg-${lastMsg.chat_id}`);
+                    if (!lastEl) {
+                        // New message arrived while polling! Render history
+                        const isAtBottom = messageContainerEl ? (messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight < 300) : true;
+                        renderMessages(history, false, isAtBottom);
+                    } else if (lastMsg.direction === 'outgoing') {
+                        // Update tick icon for status changes (delivered/read)
+                        const tickContainer = lastEl.querySelector('.message-time');
+                        if (tickContainer) {
+                            let tickIcon = '<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>';
+                            if (lastMsg.status === 'delivered') tickIcon = '<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>';
+                            else if (lastMsg.status === 'read') tickIcon = '<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #53bdeb;"></i>';
+                            const date = new Date(lastMsg.timestamp);
+                            tickContainer.innerHTML = `${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${tickIcon}`;
+                        }
+                    }
+                }
+            }
         }
     } catch (err) {
         console.error('Failed to load history:', err);
@@ -1972,6 +2071,94 @@ window.initForwardAndReplyEvents = function () {
     }
 };
 
+window.deleteMessage = function (chatId) {
+    closeAllContextMenus();
+    const numChatId = Number(chatId);
+
+    let modal = document.getElementById('delete-message-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'delete-message-modal';
+        modal.innerHTML = `
+            <div style="background: #1f2c34; color: #e9edef; border-radius: 14px; padding: 24px; max-width: 380px; width: 90%; box-shadow: 0 16px 48px rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.12); font-family: system-ui, -apple-system, sans-serif;">
+                <h3 style="margin: 0 0 10px 0; font-size: 1.15rem; color: #f1f5f9; display: flex; align-items: center; gap: 10px; font-weight: 600;">
+                    <i class="fas fa-trash-alt" style="color: #ef4444; font-size: 1.15rem;"></i> Delete message?
+                </h3>
+                <p style="font-size: 0.9rem; color: #94a3b8; margin: 0 0 20px 0; line-height: 1.5;">
+                    Select an option below to delete this message:
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button id="btn-delete-everyone" style="background: #dc2626; color: white; border: none; padding: 12px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;">
+                        <i class="fas fa-users"></i> Delete for Everyone
+                    </button>
+                    <button id="btn-delete-me" style="background: #334155; color: #f1f5f9; border: none; padding: 12px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;">
+                        <i class="fas fa-user-slash"></i> Delete for Me
+                    </button>
+                    <button id="btn-delete-cancel" style="background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 10px 16px; border-radius: 8px; font-weight: 500; font-size: 0.88rem; cursor: pointer; margin-top: 4px;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    modal.style.cssText = 'position: fixed !important; inset: 0 !important; background: rgba(0,0,0,0.65) !important; display: flex !important; align-items: center !important; justify-content: center !important; z-index: 999999 !important; backdrop-filter: blur(4px) !important; opacity: 1 !important; pointer-events: auto !important;';
+
+    const btnEveryone = modal.querySelector('#btn-delete-everyone');
+    const btnMe = modal.querySelector('#btn-delete-me');
+    const btnCancel = modal.querySelector('#btn-delete-cancel');
+
+    const closeModal = () => {
+        modal.style.display = 'none';
+        modal.style.opacity = '0';
+        modal.style.pointerEvents = 'none';
+        document.body.classList.remove('modal-open');
+    };
+
+    btnCancel.onclick = closeModal;
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
+
+    const executeDelete = async (deleteType) => {
+        closeModal();
+        try {
+            const response = await fetch(`${API_BASE}/message/${chatId}?deleteType=${deleteType}`, {
+                method: 'DELETE',
+                headers: getAuthHeader()
+            });
+
+            if (!response.ok) throw new Error('Delete request failed');
+
+            const msgEl = document.getElementById(`msg-${chatId}`);
+            if (msgEl) {
+                msgEl.style.transition = 'all 0.25s ease';
+                msgEl.style.opacity = '0';
+                msgEl.style.transform = 'scale(0.9)';
+                setTimeout(() => msgEl.remove(), 250);
+            }
+
+            currentHistory = currentHistory.filter(m => Number(m.chat_id) !== numChatId);
+            if (activeCustomer) {
+                chatHistoryCache.set(activeCustomer.phone, currentHistory);
+                saveCacheToSession();
+            }
+
+            const alertText = deleteType === 'for_everyone' ? 'Message deleted for everyone' : 'Message deleted for me';
+            window.showAlert('Success', alertText, 'success');
+        } catch (err) {
+            console.error('Delete message error:', err);
+            window.showAlert('Error', 'Failed to delete message', 'error');
+        }
+    };
+
+    btnEveryone.onclick = () => executeDelete('for_everyone');
+    btnMe.onclick = () => executeDelete('for_me');
+
+    document.body.classList.add('modal-open');
+};
+
 function isRawFileName(str) {
     if (!str || typeof str !== 'string') return true;
     const trimmed = str.trim();
@@ -1981,17 +2168,235 @@ function isRawFileName(str) {
     return false;
 }
 
-function renderMessages(history) {
+let displayedHistoryLimit = 40;
+let isScrollLoadingHistory = false;
+
+function updateCustomerItemSnippet(phone, messageText, senderType = 'admin', status = 'sent') {
+    const item = customerListEl ? customerListEl.querySelector(`.customer-item[data-phone="${phone}"]`) : null;
+    if (item) {
+        const snippetEl = item.querySelector('.last-message-snippet');
+        const timeEl = item.querySelector('.customer-time');
+        if (snippetEl) {
+            let tickHtml = '';
+            if (senderType === 'admin') {
+                if (status === 'read') {
+                    tickHtml = `<i class="fa-solid fa-check-double" style="color: #53bdeb; font-size: 0.85rem; margin-right: 4px;" title="Read"></i>`;
+                } else if (status === 'delivered') {
+                    tickHtml = `<i class="fa-solid fa-check-double" style="color: #94a3b8; font-size: 0.85rem; margin-right: 4px;" title="Delivered"></i>`;
+                } else {
+                    tickHtml = `<i class="fa-solid fa-check" style="color: #94a3b8; font-size: 0.85rem; margin-right: 4px;" title="Sent"></i>`;
+                }
+            }
+            snippetEl.innerHTML = `${tickHtml}${messageText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
+        }
+        if (timeEl) {
+            timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+    }
+}
+
+window.playVideoMessage = function(containerEl, mediaUrl, mimeType) {
+    if (!containerEl) return;
+    const typeAttr = mimeType === 'video' ? 'video/mp4' : mimeType;
+    containerEl.outerHTML = `
+        <div class="message-media" style="border-radius: 8px; overflow: hidden; min-width: 280px; width: 300px; max-width: 100%;">
+            <video controls autoplay style="max-width: 100%; width: 100%; border-radius: 8px; display: block;">
+                <source src="${mediaUrl}" type="${typeAttr}">
+                Your browser does not support video.
+            </video>
+        </div>
+    `;
+};
+
+function createSingleMessageElement(msg, history = []) {
+    const msgDate = new Date(msg.timestamp);
+    const msgEl = document.createElement('div');
+    msgEl.className = `message message-${msg.direction}`;
+    msgEl.id = `msg-${msg.chat_id}`;
+
+    let replyHtml = '';
+    if (msg.reply_to_chat_id) {
+        const repliedMsg = (history || []).find(m => m.chat_id === msg.reply_to_chat_id);
+        if (repliedMsg) {
+            const senderName = repliedMsg.direction === 'incoming' ? 'Customer' : (repliedMsg.sender_name || 'Agent');
+            let textPreview = repliedMsg.body;
+            if (!textPreview) {
+                if (repliedMsg.mime_type && repliedMsg.mime_type.startsWith('image')) textPreview = '📷 Photo';
+                else if (repliedMsg.mime_type && repliedMsg.mime_type.startsWith('video')) textPreview = '🎥 Video';
+                else if (repliedMsg.mime_type && repliedMsg.mime_type.startsWith('audio')) textPreview = '🎵 Audio';
+                else if (repliedMsg.mime_type) textPreview = '📎 Document';
+                else textPreview = 'Attachment';
+            }
+            replyHtml = `
+                <div class="message-reply-preview" onclick="scrollToMessage(${msg.reply_to_chat_id})">
+                    <div class="reply-sender">${senderName}</div>
+                    <div class="reply-body">${textPreview}</div>
+                </div>
+            `;
+        }
+    }
+
+    let forwardedHtml = '';
+    if (msg.is_forwarded) {
+        forwardedHtml = `
+            <div class="message-forwarded">
+                <i class="fas fa-share"></i> Forwarded
+            </div>
+        `;
+    }
+
+    let contentHtml = '';
+
+    // Add Down-Arrow Context Menu Action
+    const actionsHtml = `<div class="message-actions" onclick="showContextMenu(event, ${msg.chat_id})" title="Message Options">
+        <i class="fas fa-chevron-down"></i>
+    </div>`;
+
+    const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : ((msg.message_type === 'audio' || msg.message_type === 'voice') ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
+
+    const hasMedia = !!(msg.media_url || msg.media_data);
+
+    if (effectiveMimeType && hasMedia) {
+        let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
+        let mediaUrl = msg.media_url || proxyUrl;
+
+        if (effectiveMimeType.startsWith('image')) {
+            msgEl.classList.add('has-media');
+            contentHtml = `
+                <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
+                    <img src="${mediaUrl}" alt="Attachment" 
+                         onerror="if(this.src !== '${proxyUrl}') { console.log('Supabase load failed, falling back to proxy'); this.src='${proxyUrl}'; } else { this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22 viewBox=%220 0 200 150%22%3E%3Crect width=%22200%22 height=%22150%22 fill=%22%23202c33%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%238696a0%22 font-family=%22sans-serif%22 font-size=%2214%22%3EImage Unavailable%3C/text%3E%3C/svg%3E'; }">
+                    ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content">${msg.body}</div>` : ''}
+                </div>`;
+        } else if (effectiveMimeType.startsWith('video')) {
+            msgEl.classList.add('has-media');
+            const typeAttr = effectiveMimeType === 'video' ? 'video/mp4' : effectiveMimeType;
+            contentHtml = `
+                <div class="message-media video-preview-card" 
+                     onclick="window.playVideoMessage(this, '${mediaUrl}', '${typeAttr}')"
+                     style="position: relative; min-width: 280px; width: 300px; max-width: 100%; aspect-ratio: 16/9; background: #111b21; border-radius: 8px; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                    <video preload="metadata" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.75; pointer-events: none;">
+                        <source src="${mediaUrl}#t=0.1" type="${typeAttr}">
+                    </video>
+                    <div class="video-play-overlay" style="position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: flex; flex-direction: column; align-items: center; justify-content: center; transition: background 0.2s;">
+                        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(18, 140, 126, 0.95); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: transform 0.2s;">
+                            <i class="fas fa-play" style="color: white; font-size: 1.3rem; margin-left: 3px;"></i>
+                        </div>
+                        <span style="margin-top: 8px; color: white; font-size: 0.78rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(0,0,0,0.5); padding: 3px 10px; border-radius: 12px;"><i class="fas fa-video" style="margin-right: 4px;"></i> Click to Play Video</span>
+                    </div>
+                    ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content" style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: white; padding: 14px 10px 6px 10px; font-size: 0.85rem; z-index: 2;">${msg.body}</div>` : ''}
+                </div>`;
+        } else if (effectiveMimeType.startsWith('audio')) {
+            contentHtml = `
+                <div class="message-media" style="padding: 10px; background: #202c33; border-radius: 8px; min-width: 280px; width: 100%;">
+                    <audio controls style="width: 100%; display: block; outline: none;">
+                        <source src="${mediaUrl}" type="${effectiveMimeType === 'audio' || effectiveMimeType === 'voice' ? 'audio/mpeg' : effectiveMimeType}">
+                    </audio>
+                </div>`;
+        } else {
+            contentHtml = `
+                <div class="message-media">
+                    <a href="${mediaUrl}" target="_blank" class="file-attachment">
+                        <i class="fas fa-file"></i>
+                        <span>${msg.body || 'Attachment'}</span>
+                    </a>
+                </div>`;
+        }
+    } else {
+        let displayText = msg.body || '';
+        if (!displayText || displayText === 'Sent a image' || displayText === 'Sent a video' || displayText === 'Sent a audio' || displayText === 'Sent a document') {
+            if (effectiveMimeType) {
+                const typeLabel = effectiveMimeType.startsWith('image') ? '📷 Photo' : (effectiveMimeType.startsWith('video') ? '🎥 Video' : (effectiveMimeType.startsWith('audio') ? '🎵 Audio' : '📎 Document'));
+                displayText = `<span style="font-style: italic; opacity: 0.7;">${typeLabel} (Media Unavailable)</span>`;
+            } else {
+                displayText = '(Empty message)';
+            }
+        } else {
+            displayText = displayText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        }
+        contentHtml = `<div class="message-content" style="white-space: pre-wrap; word-break: break-word; line-height: 1.45;">${displayText}</div>`;
+    }
+
+    let tickHtml = '';
+    if (msg.direction === 'outgoing') {
+        if (msg.status === 'sent') {
+            tickHtml = `<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+        } else if (msg.status === 'delivered') {
+            tickHtml = `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+        } else if (msg.status === 'read') {
+            tickHtml = `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #53bdeb;"></i>`;
+        } else if (msg.status === 'failed') {
+            tickHtml = `<i class="fas fa-exclamation-circle" style="margin-left: 5px; font-size: 0.75rem; color: #ef4444;"></i>`;
+        } else if (msg.status === 'sending') {
+            tickHtml = `<i class="fas fa-clock" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+        } else {
+            tickHtml = `<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+        }
+    }
+
+    let senderTagHtml = '';
+    if (msg.direction === 'outgoing') {
+        const isBot = msg.sender_id == -1 || msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1;
+        const isCampaign = (msg.sender_id == -2 || msg.sender_name === 'Campaign') && !isBot;
+        if (isBot) {
+            senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
+        } else if (isCampaign) {
+            senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #8b5cf6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-bullhorn" style="font-size: 0.75rem;"></i> Campaign</div>`;
+        } else {
+            const agentName = (msg.sender_name && msg.sender_name !== 'Staff') ? msg.sender_name : 'Agent';
+            const qrSuffix = msg.quick_reply_name ? ` • <i class="fas fa-bolt" style="color: #eab308; font-size: 0.7rem;"></i> Quick Reply: /${msg.quick_reply_name}` : '';
+            senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-user-tie" style="font-size: 0.75rem;"></i> ${agentName}${qrSuffix}</div>`;
+        }
+    }
+
+    msgEl.innerHTML = `
+        ${actionsHtml}
+        ${senderTagHtml}
+        ${forwardedHtml}
+        ${replyHtml}
+        ${contentHtml}
+        <div class="message-time">
+            ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            ${tickHtml}
+        </div>
+    `;
+
+    // Auto-scroll when images finish loading if view is near bottom or chat is being selected
+    const imgs = msgEl.querySelectorAll('img');
+    imgs.forEach(img => {
+        const handleSnap = () => {
+            if (!messageContainerEl) return;
+            const distanceToBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight;
+            if (window._isSelectingCustomer || distanceToBottom < 500) {
+                scrollToBottomInstant();
+            }
+        };
+        if (img.complete) {
+            requestAnimationFrame(handleSnap);
+        } else {
+            img.addEventListener('load', handleSnap);
+            img.addEventListener('error', handleSnap);
+        }
+    });
+
+    return msgEl;
+}
+
+function renderMessages(history, shouldResetLimit = true, forceScrollToBottom = false) {
     if (!messageContainerEl) return;
+
+    if (shouldResetLimit) {
+        displayedHistoryLimit = 40;
+    }
 
     const existingMessageCount = messageContainerEl.querySelectorAll('.message').length;
 
     // Determine if we should scroll to bottom after rendering
-    const isAtBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight < 150;
+    const isAtBottom = messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight < 250;
     const isFirstLoad = messageContainerEl.querySelector('.loading-spinner') !== null || messageContainerEl.innerHTML === '';
 
     // If new messages arrived while user was scrolled up, increment unread badge
-    if (history.length > existingMessageCount && !isAtBottom && !isFirstLoad) {
+    if (history.length > existingMessageCount && !isAtBottom && !isFirstLoad && shouldResetLimit) {
         const diff = history.length - existingMessageCount;
         scrollUnreadCount += diff;
         const scrollUnreadBadge = document.getElementById('scroll-unread-badge');
@@ -2001,11 +2406,26 @@ function renderMessages(history) {
         }
     }
 
-    messageContainerEl.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    const totalCount = history.length;
+    const startIndex = Math.max(0, totalCount - displayedHistoryLimit);
+    const visibleHistory = history.slice(startIndex);
+
+    // Show subtle top loading status if earlier messages are being fetched via scroll up
+    if (startIndex > 0) {
+        const topIndicator = document.createElement('div');
+        topIndicator.id = 'history-top-indicator';
+        topIndicator.style.cssText = 'text-align: center; margin: 8px 0; user-select: none; opacity: 0.8;';
+        topIndicator.innerHTML = isScrollLoadingHistory 
+            ? `<span style="font-size: 0.75rem; color: #8696a0; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-circle-notch fa-spin"></i> Loading earlier messages...</span>`
+            : `<span style="font-size: 0.72rem; color: #8696a0; opacity: 0.65;">Scroll up for earlier messages</span>`;
+        fragment.appendChild(topIndicator);
+    }
 
     let lastDateStr = null;
 
-    history.forEach(msg => {
+    visibleHistory.forEach(msg => {
         const msgDate = new Date(msg.timestamp);
 
         // --- Date Divider Logic ---
@@ -2028,166 +2448,29 @@ function renderMessages(history) {
             dateDivider.style.justifyContent = 'center';
             dateDivider.style.margin = '15px 0';
             dateDivider.innerHTML = `<span style="background: var(--whatsapp-bg); color: var(--whatsapp-secondary); padding: 5px 12px; border-radius: 8px; font-size: 0.8rem; text-transform: uppercase;">${dateLabel}</span>`;
-            messageContainerEl.appendChild(dateDivider);
+            fragment.appendChild(dateDivider);
             lastDateStr = dateLabel;
         }
-        // ------------------------
 
-        const msgEl = document.createElement('div');
-        msgEl.className = `message message-${msg.direction}`;
-        msgEl.id = `msg-${msg.chat_id}`;
-
-        let replyHtml = '';
-        if (msg.reply_to_chat_id) {
-            const repliedMsg = history.find(m => m.chat_id === msg.reply_to_chat_id);
-            if (repliedMsg) {
-                const senderName = repliedMsg.direction === 'incoming' ? 'Customer' : (repliedMsg.sender_name || 'Agent');
-                let textPreview = repliedMsg.body;
-                if (!textPreview) {
-                    if (repliedMsg.mime_type && repliedMsg.mime_type.startsWith('image')) textPreview = '📷 Photo';
-                    else if (repliedMsg.mime_type && repliedMsg.mime_type.startsWith('video')) textPreview = '🎥 Video';
-                    else if (repliedMsg.mime_type && repliedMsg.mime_type.startsWith('audio')) textPreview = '🎵 Audio';
-                    else if (repliedMsg.mime_type) textPreview = '📎 Document';
-                    else textPreview = 'Attachment';
-                }
-                replyHtml = `
-                    <div class="message-reply-preview" onclick="scrollToMessage(${msg.reply_to_chat_id})">
-                        <div class="reply-sender">${senderName}</div>
-                        <div class="reply-body">${textPreview}</div>
-                    </div>
-                `;
-            }
-        }
-
-        let forwardedHtml = '';
-        if (msg.is_forwarded) {
-            forwardedHtml = `
-                <div class="message-forwarded">
-                    <i class="fas fa-share"></i> Forwarded
-                </div>
-            `;
-        }
-
-        let contentHtml = '';
-
-        // Add Down-Arrow Context Menu Action
-        const actionsHtml = `<div class="message-actions" onclick="showContextMenu(event, ${msg.chat_id})" title="Message Options">
-            <i class="fas fa-chevron-down"></i>
-        </div>`;
-
-        const effectiveMimeType = msg.mime_type || (msg.message_type === 'image' ? 'image/jpeg' : (msg.message_type === 'video' ? 'video/mp4' : ((msg.message_type === 'audio' || msg.message_type === 'voice') ? 'audio/mpeg' : (msg.message_type === 'document' ? 'application/octet-stream' : null))));
-
-        const hasMedia = !!(msg.media_url || msg.media_data);
-
-        if (effectiveMimeType && hasMedia) {
-            let proxyUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
-            let mediaUrl = msg.media_url || proxyUrl;
-
-            if (effectiveMimeType.startsWith('image')) {
-                msgEl.classList.add('has-media');
-                contentHtml = `
-                    <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
-                        <img src="${mediaUrl}" alt="Attachment" 
-                             onerror="if(this.src !== '${proxyUrl}') { console.log('Supabase load failed, falling back to proxy'); this.src='${proxyUrl}'; } else { this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22 viewBox=%220 0 200 150%22%3E%3Crect width=%22200%22 height=%22150%22 fill=%22%23202c33%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%238696a0%22 font-family=%22sans-serif%22 font-size=%2214%22%3EImage Unavailable%3C/text%3E%3C/svg%3E'; }">
-                        ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content">${msg.body}</div>` : ''}
-                    </div>`;
-            } else if (effectiveMimeType.startsWith('video')) {
-                msgEl.classList.add('has-media');
-                contentHtml = `
-                    <div class="message-media">
-                        <video controls style="max-width: 100%; border-radius: 8px;">
-                            <source src="${mediaUrl}" type="${effectiveMimeType === 'video' ? 'video/mp4' : effectiveMimeType}">
-                            Your browser does not support the video tag.
-                        </video>
-                        ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content">${msg.body}</div>` : ''}
-                    </div>`;
-            } else if (effectiveMimeType.startsWith('audio')) {
-                contentHtml = `
-                    <div class="message-media" style="padding: 10px; background: #202c33; border-radius: 8px; min-width: 280px; width: 100%;">
-                        <audio controls style="width: 100%; display: block; outline: none;">
-                            <source src="${mediaUrl}" type="${effectiveMimeType === 'audio' || effectiveMimeType === 'voice' ? 'audio/mpeg' : effectiveMimeType}">
-                        </audio>
-                    </div>`;
-            } else {
-                contentHtml = `
-                    <div class="message-media">
-                        <a href="${mediaUrl}" target="_blank" class="file-attachment">
-                            <i class="fas fa-file"></i>
-                            <span>${msg.body || 'Attachment'}</span>
-                        </a>
-                    </div>`;
-            }
-        } else {
-            let displayText = msg.body || '';
-            if (!displayText || displayText === 'Sent a image' || displayText === 'Sent a video' || displayText === 'Sent a audio' || displayText === 'Sent a document') {
-                if (effectiveMimeType) {
-                    const typeLabel = effectiveMimeType.startsWith('image') ? '📷 Photo' : (effectiveMimeType.startsWith('video') ? '🎥 Video' : (effectiveMimeType.startsWith('audio') ? '🎵 Audio' : '📎 Document'));
-                    displayText = `<span style="font-style: italic; opacity: 0.7;">${typeLabel} (Media Unavailable)</span>`;
-                } else {
-                    displayText = '(Empty message)';
-                }
-            } else {
-                displayText = displayText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-            }
-            contentHtml = `<div class="message-content" style="white-space: pre-wrap; word-break: break-word; line-height: 1.45;">${displayText}</div>`;
-        }
-
-        let tickHtml = '';
-        if (msg.direction === 'outgoing') {
-            if (msg.status === 'sent') {
-                tickHtml = `<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
-            } else if (msg.status === 'delivered') {
-                tickHtml = `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
-            } else if (msg.status === 'read') {
-                tickHtml = `<i class="fas fa-check-double" style="margin-left: 5px; font-size: 0.75rem; color: #53bdeb;"></i>`;
-            } else if (msg.status === 'failed') {
-                tickHtml = `<i class="fas fa-exclamation-circle" style="margin-left: 5px; font-size: 0.75rem; color: #ef4444;"></i>`;
-            } else {
-                tickHtml = `<i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
-            }
-        }
-
-        let senderTagHtml = '';
-        if (msg.direction === 'outgoing') {
-            const isBot = msg.sender_id == -1 || msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1;
-            const isCampaign = (msg.sender_id == -2 || msg.sender_name === 'Campaign') && !isBot;
-            if (isBot) {
-                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
-            } else if (isCampaign) {
-                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #8b5cf6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-bullhorn" style="font-size: 0.75rem;"></i> Campaign</div>`;
-            } else {
-                const agentName = (msg.sender_name && msg.sender_name !== 'Staff') ? msg.sender_name : 'Agent';
-                const qrSuffix = msg.quick_reply_name ? ` • <i class="fas fa-bolt" style="color: #eab308; font-size: 0.7rem;"></i> Quick Reply: /${msg.quick_reply_name}` : '';
-                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-user-tie" style="font-size: 0.75rem;"></i> ${agentName}${qrSuffix}</div>`;
-            }
-        }
-
-        msgEl.innerHTML = `
-            ${actionsHtml}
-            ${senderTagHtml}
-            ${forwardedHtml}
-            ${replyHtml}
-            ${contentHtml}
-            <div class="message-time">
-                ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                ${tickHtml}
-            </div>
-        `;
-
-        messageContainerEl.appendChild(msgEl);
+        const msgEl = createSingleMessageElement(msg, history);
+        fragment.appendChild(msgEl);
     });
 
     // Re-append active uploads for this phone
     if (activeCustomer) {
         activeUploads.forEach((upload, msgId) => {
             if (upload.phone === activeCustomer.phone) {
-                messageContainerEl.appendChild(upload.element);
+                fragment.appendChild(upload.element);
             }
         });
     }
 
-    if (isFirstLoad || isAtBottom) {
-        messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+    // Single DOM mutation update
+    messageContainerEl.innerHTML = '';
+    messageContainerEl.appendChild(fragment);
+
+    if (forceScrollToBottom || shouldResetLimit || isFirstLoad || isAtBottom) {
+        scrollToBottomInstant();
     }
 }
 
@@ -2197,59 +2480,86 @@ async function handleSend() {
     messageInputEl.value = '';
     messageInputEl.style.height = 'auto';
 
-    const originalIcon = sendBtnEl.innerHTML;
-    sendBtnEl.disabled = true;
-    sendBtnEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+    const payload = { phone: activeCustomer.phone, message: text };
+    if (replyingToMessage) {
+        payload.reply_to_chat_id = replyingToMessage.chat_id;
+    }
+    clearReplyPreview();
+
+    // Clear handoff state locally if customer was in handoff
+    if (activeCustomer) {
+        const wasHandoff = activeCustomer.status === 'human_needed' || activeCustomer.lead_status === 'human_needed' || activeCustomer.session_status === 'paused_for_human' || activeCustomer.needs_human;
+        if (wasHandoff) {
+            activeCustomer.status = activeCustomer.status === 'human_needed' ? 'assigned' : activeCustomer.status;
+            activeCustomer.lead_status = activeCustomer.lead_status === 'human_needed' ? 'assigned' : activeCustomer.lead_status;
+            activeCustomer.session_status = null;
+            activeCustomer.needs_human = false;
+
+            const matchingInList = allCustomers.find(c => c.phone === activeCustomer.phone);
+            if (matchingInList) {
+                matchingInList.status = activeCustomer.status;
+                matchingInList.lead_status = activeCustomer.lead_status;
+                matchingInList.session_status = null;
+                matchingInList.needs_human = false;
+            }
+
+            const bannerEl = document.getElementById('handoff-action-banner');
+            if (bannerEl) bannerEl.classList.add('hidden');
+
+            updateHandoffCounts();
+        }
+    }
+
+    // Instantly append temporary outgoing message to UI (0ms latency, zero DOM wipe!)
+    const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+    const tempChatId = 'temp-' + Date.now();
+    const tempMsg = {
+        chat_id: tempChatId,
+        direction: 'outgoing',
+        sender_id: currentUser.id || currentUser.user_id || 1,
+        sender_name: currentUser.name || 'Agent',
+        message_type: 'text',
+        body: text,
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+        reply_to_chat_id: payload.reply_to_chat_id || null,
+        quick_reply_name: window.lastUsedQuickReplyName || null
+    };
+    window.lastUsedQuickReplyName = null;
+
+    const msgEl = createSingleMessageElement(tempMsg, currentHistory || []);
+    messageContainerEl.appendChild(msgEl);
+    if (Array.isArray(currentHistory)) currentHistory.push(tempMsg);
+
+    // Instant scroll to bottom (zero screen movement, no animation jitter)
+    messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+
+    // Update customer list snippet in-place
+    updateCustomerItemSnippet(activeCustomer.phone, text, 'admin', 'sending');
 
     try {
-        const payload = { phone: activeCustomer.phone, message: text };
-        if (replyingToMessage) {
-            payload.reply_to_chat_id = replyingToMessage.chat_id;
-        }
-
         const response = await fetch(`${API_BASE}/send`, {
             method: 'POST',
             headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+
         if (response.ok) {
-            clearReplyPreview();
-
-            // Clear handoff state locally if customer was in handoff
-            if (activeCustomer) {
-                const wasHandoff = activeCustomer.status === 'human_needed' || activeCustomer.lead_status === 'human_needed' || activeCustomer.session_status === 'paused_for_human' || activeCustomer.needs_human;
-                if (wasHandoff) {
-                    activeCustomer.status = activeCustomer.status === 'human_needed' ? 'assigned' : activeCustomer.status;
-                    activeCustomer.lead_status = activeCustomer.lead_status === 'human_needed' ? 'assigned' : activeCustomer.lead_status;
-                    activeCustomer.session_status = null;
-                    activeCustomer.needs_human = false;
-
-                    const matchingInList = allCustomers.find(c => c.phone === activeCustomer.phone);
-                    if (matchingInList) {
-                        matchingInList.status = activeCustomer.status;
-                        matchingInList.lead_status = activeCustomer.lead_status;
-                        matchingInList.session_status = null;
-                        matchingInList.needs_human = false;
-                    }
-
-                    const bannerEl = document.getElementById('handoff-action-banner');
-                    if (bannerEl) bannerEl.classList.add('hidden');
-
-                    updateHandoffCounts();
+            tempMsg.status = 'sent';
+            const renderedMsgEl = document.getElementById(`msg-${tempChatId}`);
+            if (renderedMsgEl) {
+                const tickContainer = renderedMsgEl.querySelector('.message-time');
+                if (tickContainer) {
+                    const date = new Date(tempMsg.timestamp);
+                    tickContainer.innerHTML = `${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} <i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
                 }
             }
-
-            loadChatHistory(activeCustomer.phone);
-            currentCustomersJson = '';
-            loadCustomers();
+            updateCustomerItemSnippet(activeCustomer.phone, text, 'admin', 'sent');
         } else {
             window.showAlert('Error', 'Failed to send message', 'error');
         }
     } catch (err) {
         console.error('Send error:', err);
-    } finally {
-        sendBtnEl.disabled = false;
-        sendBtnEl.innerHTML = originalIcon;
     }
 }
 
@@ -3231,14 +3541,25 @@ if (messageContainerEl) {
                 }
             }
         }
+
+        // Automatic Native WhatsApp-style Scroll-Up Lazy Loading
+        if (messageContainerEl.scrollTop < 150 && !isScrollLoadingHistory) {
+            if (distanceToBottom > 250 && currentHistory && Array.isArray(currentHistory) && currentHistory.length > displayedHistoryLimit) {
+                isScrollLoadingHistory = true;
+                const oldScrollHeight = messageContainerEl.scrollHeight;
+                displayedHistoryLimit += 50;
+                renderMessages(currentHistory, false);
+                requestAnimationFrame(() => {
+                    messageContainerEl.scrollTop = messageContainerEl.scrollHeight - oldScrollHeight;
+                    setTimeout(() => { isScrollLoadingHistory = false; }, 200);
+                });
+            }
+        }
     });
 
     if (scrollToBottomBtn) {
         scrollToBottomBtn.addEventListener('click', () => {
-            messageContainerEl.scrollTo({
-                top: messageContainerEl.scrollHeight,
-                behavior: 'smooth'
-            });
+            scrollToBottomInstant();
             scrollUnreadCount = 0;
             if (scrollUnreadBadge) {
                 scrollUnreadBadge.textContent = '0';

@@ -372,6 +372,41 @@ const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
   }
 };
 
+/**
+ * Revokes/Deletes a sent WhatsApp message for everyone via Meta Cloud API
+ */
+const deleteMessageForEveryone = async (messageId) => {
+  if (!messageId) return false;
+  try {
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, {
+      messaging_product: 'whatsapp',
+      status: 'deleted',
+      message_id: messageId
+    }, {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    logger.info(`WhatsApp message ${messageId} deleted for everyone: ${response.status}`);
+    return true;
+  } catch (err) {
+    logger.warn('Primary delete endpoint failed, trying direct message ID DELETE endpoint:', err.response ? err.response.data : err.message);
+    try {
+      const response2 = await axios.delete(`${BASE_URL}/${messageId}`, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+      logger.info(`WhatsApp message ${messageId} deleted for everyone (fallback): ${response2.status}`);
+      return true;
+    } catch (err2) {
+      logger.error('Failed to revoke message on WhatsApp Cloud API:', err2.response ? err2.response.data : err2.message);
+      return false;
+    }
+  }
+};
+
 module.exports = {
   sendMessage,
   sendButtons,
@@ -380,4 +415,5 @@ module.exports = {
   getOrCreateMetaMediaId,
   sendMediaMessage,
   downloadMedia,
+  deleteMessageForEveryone,
 };

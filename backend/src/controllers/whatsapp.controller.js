@@ -335,8 +335,25 @@ const getMedia = async (req, res) => {
 const deleteMessage = async (req, res) => {
   try {
     const { chatId } = req.params;
+    const deleteType = req.query.deleteType || req.body?.deleteType || 'for_me';
+
+    if (deleteType === 'for_everyone') {
+      const db = require('../config/db');
+      const [rows] = await db.execute('SELECT chat_id, message_id, sender_type FROM chat_messages WHERE chat_id = ?', [chatId]);
+      if (rows.length > 0) {
+        const msg = rows[0];
+        if (msg.message_id) {
+          try {
+            await whatsappService.deleteMessageForEveryone(msg.message_id);
+          } catch (waErr) {
+            logger.warn(`Could not delete message on WhatsApp API: ${waErr.message}`);
+          }
+        }
+      }
+    }
+
     await messageService.deleteChatMessage(chatId);
-    res.json({ success: true, message: 'Message deleted' });
+    res.json({ success: true, message: deleteType === 'for_everyone' ? 'Message deleted for everyone' : 'Message deleted for me' });
   } catch (err) {
     logger.error(`Error deleting message ${req.params.chatId}:`, err.message);
     res.status(500).json({ error: 'Failed to delete message' });

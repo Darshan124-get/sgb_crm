@@ -53,15 +53,21 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null) =
  * @param {string} category The Meta category ('image', 'document', 'video', 'audio')
  * @param {string} fileName Optional filename
  */
-const uploadMedia = async (buffer, mimeType, category, fileName = 'file') => {
+const uploadMedia = async (buffer, mimeType, category, fileName = 'file.jpg') => {
   try {
+    let finalFileName = fileName || 'file.jpg';
+    if (!finalFileName.includes('.')) {
+      const ext = category === 'image' ? (mimeType && mimeType.includes('png') ? 'png' : 'jpg') : (category === 'video' ? 'mp4' : (category === 'audio' ? 'mp3' : 'pdf'));
+      finalFileName = `${finalFileName}.${ext}`;
+    }
+
     const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
     
     // Build the payload manually using Buffer to bypass missing FormData/Blob in older Node.js versions
     const parts = [
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="messaging_product"\r\n\r\nwhatsapp\r\n`),
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\n${category}\r\n`),
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${finalFileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
       buffer,
       Buffer.from(`\r\n--${boundary}--\r\n`)
     ];
@@ -95,11 +101,38 @@ const getOrCreateMetaMediaId = async (url, type) => {
   try {
     const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
     const buffer = Buffer.from(res.data);
-    const mimeType = type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf'));
-    const metaMediaId = await uploadMedia(buffer, mimeType, type, `file-${Date.now()}`);
+    const headerContentType = res.headers['content-type'] || '';
+
+    let ext = 'jpg';
+    let mimeType = 'image/jpeg';
+
+    if (type === 'image') {
+      if (headerContentType.includes('png') || url.toLowerCase().includes('.png')) {
+        ext = 'png';
+        mimeType = 'image/png';
+      } else if (headerContentType.includes('webp') || url.toLowerCase().includes('.webp')) {
+        ext = 'webp';
+        mimeType = 'image/webp';
+      } else {
+        ext = 'jpg';
+        mimeType = 'image/jpeg';
+      }
+    } else if (type === 'video') {
+      ext = 'mp4';
+      mimeType = 'video/mp4';
+    } else if (type === 'audio') {
+      ext = 'mp3';
+      mimeType = 'audio/mpeg';
+    } else {
+      ext = 'pdf';
+      mimeType = 'application/pdf';
+    }
+
+    const fileName = `media-${Date.now()}.${ext}`;
+    const metaMediaId = await uploadMedia(buffer, mimeType, type, fileName);
     if (metaMediaId) {
       mediaIdCache.set(url, metaMediaId);
-      logger.info(`[META MEDIA] Pre-uploaded URL to Meta Media ID: ${metaMediaId}`);
+      logger.info(`[META MEDIA] Pre-uploaded URL to Meta Media ID: ${metaMediaId} (${fileName})`);
       return metaMediaId;
     }
   } catch (err) {
@@ -140,12 +173,30 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
       data.context = { message_id: replyToMessageId };
     }
 
-    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    let response;
+    try {
+      response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (apiErr) {
+      if (isUrl && isMetaId) {
+        logger.warn(`Failed to send via Meta Media ID (${resolvedMediaId}), retrying via direct HTTP link...`);
+        const fallbackObj = { link: mediaId };
+        if (caption) fallbackObj.caption = caption;
+        data[type] = fallbackObj;
+        response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } else {
+        throw apiErr;
+      }
+    }
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
     const mimeType = customMimeType || (type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf')));
@@ -216,6 +267,18 @@ const downloadMedia = async (mediaId) => {
 const sendButtons = async (to, text, buttons, senderId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
+    const sanitizedButtons = (buttons || []).slice(0, 3).map((btn, idx) => {
+      let title = (btn.title || '').trim();
+      if (title.length > 20) {
+        title = title.substring(0, 20).trim();
+      }
+      if (!title) title = `Option ${idx + 1}`;
+      return {
+        type: 'reply',
+        reply: { id: String(btn.id || `opt-${idx}`), title },
+      };
+    });
+
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -223,12 +286,9 @@ const sendButtons = async (to, text, buttons, senderId = null) => {
       type: 'interactive',
       interactive: {
         type: 'button',
-        body: { text },
+        body: { text: text || 'Please select an option:' },
         action: {
-          buttons: buttons.map((btn) => ({
-            type: 'reply',
-            reply: { id: btn.id, title: btn.title },
-          })),
+          buttons: sanitizedButtons,
         },
       },
     };
@@ -241,7 +301,7 @@ const sendButtons = async (to, text, buttons, senderId = null) => {
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
-    const formattedBtnText = `${text}\n\n` + buttons.map((b, i) => `${i + 1}. ${b.title}`).join('\n');
+    const formattedBtnText = `${text}\n\n` + sanitizedButtons.map((b, i) => `${i + 1}. ${b.reply.title}`).join('\n');
     await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedBtnText, null, null, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot buttons:', err.message));
 
     return response.data;
@@ -257,6 +317,23 @@ const sendButtons = async (to, text, buttons, senderId = null) => {
 const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
+    let label = (buttonLabel || 'Select Option').trim();
+    if (label.length > 20) label = label.substring(0, 20).trim();
+    if (!label) label = 'Select Option';
+
+    const sanitizedRows = (rows || []).slice(0, 10).map((row, idx) => {
+      let title = (row.title || '').trim();
+      if (title.length > 24) title = title.substring(0, 24).trim();
+      if (!title) title = `Option ${idx + 1}`;
+
+      let description = (row.description || '').trim();
+      if (description.length > 72) description = description.substring(0, 72).trim();
+
+      const item = { id: String(row.id || `opt-${idx}`), title };
+      if (description) item.description = description;
+      return item;
+    });
+
     const data = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -264,17 +341,13 @@ const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
       type: 'interactive',
       interactive: {
         type: 'list',
-        body: { text },
+        body: { text: text || 'Please select an option:' },
         action: {
-          button: buttonLabel,
+          button: label,
           sections: [
             {
               title: 'Options',
-              rows: rows.map((row) => ({
-                id: row.id,
-                title: row.title,
-                description: row.description || '',
-              })),
+              rows: sanitizedRows,
             },
           ],
         },
@@ -289,7 +362,7 @@ const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
-    const formattedListText = `${text}\n\n${buttonLabel || 'Select Option'}:\n` + rows.map((r, i) => `${i + 1}. ${r.title}`).join('\n');
+    const formattedListText = `${text}\n\n${label}:\n` + sanitizedRows.map((r, i) => `${i + 1}. ${r.title}`).join('\n');
     await messageService.logChatMessage(to, 'outgoing', 'interactive', formattedListText, null, null, senderId, metaMsgId, 'sent').catch(err => logger.error('Error logging outgoing bot list:', err.message));
 
     return response.data;

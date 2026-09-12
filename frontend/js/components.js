@@ -737,6 +737,41 @@ async function initLeadList(filters = {}, page = 1) {
                 outline: none;
                 border-color: #10b981;
             }
+            .leads-pagination-custom-box {
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+            }
+            .leads-pagination-custom-input {
+                width: 60px;
+                padding: 0.35rem 0.5rem;
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #1e293b;
+                background: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 0.375rem;
+                text-align: center;
+            }
+            .leads-pagination-custom-input:focus {
+                outline: none;
+                border-color: #10b981;
+                box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+            }
+            .leads-pagination-custom-btn {
+                padding: 0.35rem 0.65rem;
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: white;
+                background: #10b981;
+                border: none;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .leads-pagination-custom-btn:hover {
+                background: #059669;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -1141,17 +1176,24 @@ window.renderPaginationControls = function ({ totalLeads, totalPages, currentPag
     `;
 
     // Build limit selector
-    const limitOptions = [10, 20, 30, 100, 200, 500];
+    const limitOptions = [10, 20, 30, 40, 50, 100, 200, 500];
+    const isCustom = !limitOptions.includes(Number(limit));
+
     let limitSelectHtml = `
         <div class="leads-pagination-limit">
             <span>Rows per page:</span>
-            <select class="leads-pagination-select" onchange="changeLeadsLimit(this.value)">
+            <select class="leads-pagination-select" onchange="handleLeadsLimitSelectChange(this)">
     `;
     limitOptions.forEach(opt => {
-        limitSelectHtml += `<option value="${opt}" ${opt === limit ? 'selected' : ''}>${opt}</option>`;
+        limitSelectHtml += `<option value="${opt}" ${!isCustom && opt === limit ? 'selected' : ''}>${opt}</option>`;
     });
     limitSelectHtml += `
+                <option value="custom" ${isCustom ? 'selected' : ''}>Custom${isCustom ? ` (${limit})` : '...'}</option>
             </select>
+            <div id="leadsCustomLimitBox" class="leads-pagination-custom-box" style="display: ${isCustom ? 'flex' : 'none'};">
+                <input type="number" id="leadsCustomLimitInput" class="leads-pagination-custom-input" min="1" max="100" value="${isCustom ? limit : ''}" placeholder="1-100" title="Custom rows per page (max 100)" onkeydown="if(event.key==='Enter') applyLeadsCustomLimit();" />
+                <button type="button" class="leads-pagination-custom-btn" onclick="applyLeadsCustomLimit()" title="Apply custom limit">Set</button>
+            </div>
         </div>
     `;
 
@@ -1166,12 +1208,54 @@ window.renderPaginationControls = function ({ totalLeads, totalPages, currentPag
     `;
 };
 
+window.handleLeadsLimitSelectChange = function (selectEl) {
+    const val = selectEl.value;
+    const box = document.getElementById('leadsCustomLimitBox');
+    const input = document.getElementById('leadsCustomLimitInput');
+    if (val === 'custom') {
+        if (box) box.style.display = 'flex';
+        if (input) {
+            input.focus();
+            if (input.value) input.select();
+        }
+    } else {
+        if (box) box.style.display = 'none';
+        changeLeadsLimit(val);
+    }
+};
+
+window.applyLeadsCustomLimit = function () {
+    const input = document.getElementById('leadsCustomLimitInput');
+    if (!input) return;
+    let val = parseInt(input.value, 10);
+    if (isNaN(val) || val < 1) {
+        if (typeof showToast === 'function') {
+            showToast('Please enter a valid number of rows (1-100)', 'error');
+        } else {
+            alert('Please enter a valid number of rows (1-100)');
+        }
+        return;
+    }
+    if (val > 100) {
+        val = 100;
+        input.value = 100;
+        if (typeof showToast === 'function') {
+            showToast('Custom rows per page is capped at 100', 'warning');
+        } else {
+            alert('Custom rows per page maximum limit is 100.');
+        }
+    }
+    changeLeadsLimit(val);
+};
+
 window.changeLeadsPage = function (page) {
     initLeadList(window.currentBaseFilters, page);
 };
 
 window.changeLeadsLimit = function (limit) {
-    localStorage.setItem('leadsPageSize', limit);
+    let parsed = parseInt(limit, 10);
+    if (isNaN(parsed) || parsed < 1) parsed = 10;
+    localStorage.setItem('leadsPageSize', parsed);
     initLeadList(window.currentBaseFilters, 1);
 };
 

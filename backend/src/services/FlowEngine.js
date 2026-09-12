@@ -292,19 +292,28 @@ class FlowEngine {
                 return { label: labelStr, value: valStr, index: idx };
             });
 
-            // 1. Exact match / 1-based index match
-            let matchedOption = options.find((opt, idx) => 
-                opt.label.trim().toLowerCase() === cleanedText || 
-                opt.value.trim().toLowerCase() === cleanedText ||
-                cleanedText === String(idx + 1)
-            );
+            // 1. Exact match / 1-based index match / option id / truncated title match
+            let matchedOption = options.find((opt, idx) => {
+                const l = opt.label.trim().toLowerCase();
+                const v = opt.value.trim().toLowerCase();
+                const truncatedL = l.substring(0, 20).trim();
+                return l === cleanedText || 
+                       v === cleanedText ||
+                       truncatedL === cleanedText ||
+                       cleanedText === String(idx + 1) ||
+                       cleanedText === `opt-${idx}`;
+            });
 
             // 2. Intelligent Fuzzy / Substring match if exact match fails
             if (!matchedOption) {
                 matchedOption = options.find(opt => {
                     const l = opt.label.toLowerCase();
                     const v = opt.value.toLowerCase();
-                    return l.includes(cleanedText) || cleanedText.includes(l.replace(/^\d+[\.\s]*/, '')) || v.includes(cleanedText);
+                    const truncatedL = l.substring(0, 20).trim();
+                    return l.includes(cleanedText) || 
+                           cleanedText.includes(l.replace(/^\d+[\.\s]*/, '')) || 
+                           v.includes(cleanedText) ||
+                           (truncatedL && (cleanedText.includes(truncatedL) || truncatedL.includes(cleanedText)));
                 });
             }
             
@@ -811,20 +820,33 @@ class FlowEngine {
             const choices = rawChoices.map((item, idx) => typeof item === 'string' ? item : (item.label || item.title || `Option ${idx + 1}`));
             const promptText = config.question || 'Please select an option:';
             
-            if ((node.node_type === 'buttons' || config.responseType === 'buttons') && choices.length > 0 && choices.length <= 3) {
-                const buttons = choices.map((choice, idx) => ({ id: `opt-${idx}`, title: choice }));
-                await whatsappService.sendButtons(phone, promptText, buttons, botSenderId);
-            } else if ((node.node_type === 'list' || config.responseType === 'list') && choices.length > 0) {
-                const listItems = choices.map((choice, idx) => ({ id: `opt-${idx}`, title: choice }));
-                await whatsappService.sendList(phone, promptText, config.buttonText || 'Select Option', listItems, botSenderId);
-            } else if (choices.length > 0) {
-                let menuText = `${promptText}\n\n`;
-                choices.forEach((c, idx) => {
-                    menuText += `${idx + 1}. ${c}\n`;
-                });
-                await whatsappService.sendMessage(phone, menuText, null, botSenderId);
-            } else {
-                await whatsappService.sendMessage(phone, promptText, null, botSenderId);
+            try {
+                if ((node.node_type === 'buttons' || config.responseType === 'buttons' || (choices.length > 0 && choices.length <= 3)) && choices.length > 0 && choices.length <= 3) {
+                    const buttons = choices.map((choice, idx) => ({ id: `opt-${idx}`, title: choice }));
+                    await whatsappService.sendButtons(phone, promptText, buttons, botSenderId);
+                } else if ((node.node_type === 'list' || config.responseType === 'list' || choices.length > 3) && choices.length > 0 && choices.length <= 10) {
+                    const listItems = choices.map((choice, idx) => ({ id: `opt-${idx}`, title: choice }));
+                    await whatsappService.sendList(phone, promptText, config.buttonText || 'Select Option', listItems, botSenderId);
+                } else if (choices.length > 0) {
+                    let menuText = `${promptText}\n\n`;
+                    choices.forEach((c, idx) => {
+                        menuText += `${idx + 1}. ${c}\n`;
+                    });
+                    await whatsappService.sendMessage(phone, menuText, null, botSenderId);
+                } else {
+                    await whatsappService.sendMessage(phone, promptText, null, botSenderId);
+                }
+            } catch (err) {
+                console.error(`[FlowEngine] Failed to send interactive buttons/list for node ${node.node_key}, falling back to plain text menu:`, err.message);
+                if (choices && choices.length > 0) {
+                    let menuText = `${promptText}\n\n`;
+                    choices.forEach((c, idx) => {
+                        menuText += `${idx + 1}. ${c}\n`;
+                    });
+                    await whatsappService.sendMessage(phone, menuText, null, botSenderId);
+                } else {
+                    await whatsappService.sendMessage(phone, promptText, null, botSenderId);
+                }
             }
         } else if (node.node_type === 'text_input' || node.node_type === 'number_input') {
             await whatsappService.sendMessage(phone, config.question || 'Please enter details:', null, botSenderId);

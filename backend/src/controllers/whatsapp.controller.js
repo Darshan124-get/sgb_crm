@@ -234,8 +234,9 @@ const getHistory = async (req, res) => {
  * Internal API: Send a manual reply from the agent (supports text and media)
  */
 const sendReply = async (req, res) => {
-  const { phone, message, mediaData, mimeType, reply_to_chat_id, is_forwarded } = req.body;
+  const { phone, message, mediaData, mimeType, reply_to_chat_id, is_forwarded, quick_reply_shortcut, quick_reply_name } = req.body;
   const staffUserId = req.user ? (req.user.id || req.user.user_id) : null;
+  const qrName = quick_reply_shortcut || quick_reply_name || null;
 
   if (!phone || (!message && !mediaData)) {
     return res.status(400).json({ error: 'Phone and either message or media are required' });
@@ -273,12 +274,12 @@ const sendReply = async (req, res) => {
       }
 
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId, mediaBuffer, mimeType);
+      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId, mediaBuffer, mimeType, qrName);
     }
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMessage(waPhone, message, replyToMessageId, staffUserId);
+      await whatsappService.sendMessage(waPhone, message, replyToMessageId, staffUserId, qrName);
     }
 
     // Auto-resolve handoff if active for this customer

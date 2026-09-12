@@ -994,6 +994,9 @@ function renderCustomerList() {
 async function selectCustomer(customer) {
     closeAllContextMenus();
     clearReplyPreview();
+    if (typeof quickRepliesPopover !== 'undefined' && quickRepliesPopover) {
+        quickRepliesPopover.style.display = 'none';
+    }
     activeCustomer = customer;
 
     // Reset scroll button state when changing chats
@@ -2146,14 +2149,16 @@ function renderMessages(history) {
 
         let senderTagHtml = '';
         if (msg.direction === 'outgoing') {
-            const isCampaign = msg.sender_name === 'Campaign' || msg.sender_id == -2 || (msg.media_url && msg.media_url.includes('/campaigns/'));
-            const isBot = (msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1 || msg.sender_id == -1) && !isCampaign;
-            if (isCampaign) {
-                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #8b5cf6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-bullhorn" style="font-size: 0.75rem;"></i> Campaign</div>`;
-            } else if (isBot) {
+            const isBot = msg.sender_id == -1 || msg.sender_name === 'Chatbot' || msg.is_bot === true || msg.is_bot === 1;
+            const isCampaign = (msg.sender_id == -2 || msg.sender_name === 'Campaign') && !isBot;
+            if (isBot) {
                 senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #3b82f6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-robot" style="font-size: 0.75rem;"></i> Chatbot</div>`;
-            } else if (msg.sender_name && msg.sender_name !== 'Staff') {
-                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-user-tie" style="font-size: 0.75rem;"></i> ${msg.sender_name}</div>`;
+            } else if (isCampaign) {
+                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #8b5cf6; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-bullhorn" style="font-size: 0.75rem;"></i> Campaign</div>`;
+            } else {
+                const agentName = (msg.sender_name && msg.sender_name !== 'Staff') ? msg.sender_name : 'Agent';
+                const qrSuffix = msg.quick_reply_name ? ` • <i class="fas fa-bolt" style="color: #eab308; font-size: 0.7rem;"></i> Quick Reply: /${msg.quick_reply_name}` : '';
+                senderTagHtml = `<div class="message-sender" style="font-size: 0.72rem; font-weight: 700; color: #008069; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;"><i class="fas fa-user-tie" style="font-size: 0.75rem;"></i> ${agentName}${qrSuffix}</div>`;
             }
         }
 
@@ -2813,14 +2818,15 @@ function filterAndShowPopover(searchTerm) {
         `;
         item.onclick = async () => {
             quickRepliesPopover.style.display = 'none';
-            if (messageInputEl) {
-                messageInputEl.value = '';
-                messageInputEl.style.height = 'auto';
-            }
             if (!activeCustomer) return;
 
-            try {
-                if (qr.media_url && qr.media_url !== '[]') {
+            // If Quick Reply has media attached, send media upon explicit click
+            if (qr.media_url && qr.media_url !== '[]') {
+                if (messageInputEl) {
+                    messageInputEl.value = '';
+                    messageInputEl.style.height = 'auto';
+                }
+                try {
                     let urls = [];
                     let types = [];
                     try {
@@ -2842,7 +2848,8 @@ function filterAndShowPopover(searchTerm) {
                             headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 phone: activeCustomer.phone,
-                                message: qr.message
+                                message: qr.message,
+                                quick_reply_shortcut: qr.shortcut
                             })
                         });
                     }
@@ -2856,26 +2863,25 @@ function filterAndShowPopover(searchTerm) {
                                 phone: activeCustomer.phone,
                                 message: '', // Caption
                                 mediaData: urls[i],
-                                mimeType: types[i]
+                                mimeType: types[i],
+                                quick_reply_shortcut: qr.shortcut
                             })
                         });
                     }
-                } else if (qr.message) {
-                    // Send text-only quick reply immediately
-                    await fetch(`${API_BASE}/send`, {
-                        method: 'POST',
-                        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            phone: activeCustomer.phone,
-                            message: qr.message
-                        })
-                    });
-                }
 
-                loadChatHistory(activeCustomer.phone);
-            } catch (err) {
-                console.error('Send QR error:', err);
-                window.showAlert('Error', 'Failed to send quick reply', 'error');
+                    loadChatHistory(activeCustomer.phone);
+                } catch (err) {
+                    console.error('Send QR error:', err);
+                    window.showAlert('Error', 'Failed to send quick reply', 'error');
+                }
+            } else if (qr.message) {
+                // For text-only quick replies: populate input box for agent to review/edit before sending
+                if (messageInputEl) {
+                    messageInputEl.value = qr.message;
+                    messageInputEl.style.height = 'auto';
+                    messageInputEl.style.height = (messageInputEl.scrollHeight < 100 ? messageInputEl.scrollHeight : 100) + 'px';
+                    messageInputEl.focus();
+                }
             }
         };
         qrPopoverList.appendChild(item);
@@ -2976,15 +2982,20 @@ if (messageInputEl) {
     messageInputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
-        } else if (e.key === 'Enter' && !e.shiftKey && quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
-            const firstItem = qrPopoverList ? qrPopoverList.firstElementChild : null;
-            if (firstItem && firstItem.onclick) {
-                e.preventDefault();
-                e.stopPropagation();
-                firstItem.click();
+        } else if (e.key === 'Enter' && !e.shiftKey) {
+            if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
+        }
+    });
+
+    // Close quick reply popover when clicking outside
+    document.addEventListener('click', (e) => {
+        if (quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
+            const btn = document.getElementById('quick-reply-btn');
+            if (!quickRepliesPopover.contains(e.target) && (!btn || !btn.contains(e.target)) && e.target !== messageInputEl) {
+                quickRepliesPopover.style.display = 'none';
             }
         }
-    }, true);
+    });
 }
 
 function initResizers() {

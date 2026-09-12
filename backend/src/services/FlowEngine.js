@@ -99,7 +99,7 @@ class FlowEngine {
             await notificationService.sendToRole('whatsapp_manager', '🚨 Human Assistance Needed', `Lead ${customerName} (${phone}) needs human takeover: ${reason}`, { phone, type: 'human_takeover' }).catch(() => {});
 
             // Send WhatsApp handoff notice to customer
-            await whatsappService.sendMessage(phone, 'Connecting you to a representative. Please wait, a salesperson will contact you shortly.');
+            await whatsappService.sendMessage(phone, 'Connecting you to a representative. Please wait, a salesperson will contact you shortly.', null, -1);
             console.log(`[FlowEngine] Triggered Human Handoff for ${phone} (Reason: ${reason}) - Lead Status updated to 'human_needed'`);
         } catch (err) {
             console.error('[FlowEngine] Error in triggerHumanTakeover:', err);
@@ -363,7 +363,7 @@ class FlowEngine {
                     return;
                 } else {
                     // 1st Fallback: Prompt again with guidance text and re-trigger prompt
-                    await whatsappService.sendMessage(phone, '⚠️ I didn\'t quite get that response. Please select from the options below to continue:');
+                    await whatsappService.sendMessage(phone, '⚠️ I didn\'t quite get that response. Please select from the options below to continue:', null, -1);
                     await this.sendNodePrompt(phone, currentNode, config);
                     return;
                 }
@@ -380,26 +380,26 @@ class FlowEngine {
                 const isPhoneNumber = rawVal.replace(/\D/g, '').length >= 7 && !/[a-zA-Z\u0900-\u097F\u0C80-\u0CFF]/.test(rawVal);
 
                 if (isPureNumbers || isPhoneNumber) {
-                    await whatsappService.sendMessage(phone, "⚠️ Please enter a valid name (e.g. Ramesh, Bangalore). Pure numbers/phone numbers are not allowed as a customer name.");
+                    await whatsappService.sendMessage(phone, "⚠️ Please enter a valid name (e.g. Ramesh, Bangalore). Pure numbers/phone numbers are not allowed as a customer name.", null, -1);
                     return;
                 }
             } else if (valType === 'email') {
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(rawVal)) {
-                    await whatsappService.sendMessage(phone, "Please enter a valid email address.");
+                    await whatsappService.sendMessage(phone, "Please enter a valid email address.", null, -1);
                     return;
                 }
             } else if (valType === 'phone') {
                 const phoneDigits = rawVal.replace(/\D/g, '');
                 if (phoneDigits.length < 7) {
-                    await whatsappService.sendMessage(phone, "Please enter a valid phone number.");
+                    await whatsappService.sendMessage(phone, "Please enter a valid phone number.", null, -1);
                     return;
                 }
             }
             // For 'text' or default: numbers, digits, letters, spaces and symbols are all fully allowed
 
             if (config.minLength && rawVal.length < parseInt(config.minLength)) {
-                await whatsappService.sendMessage(phone, `Input must be at least ${config.minLength} characters.`);
+                await whatsappService.sendMessage(phone, `Input must be at least ${config.minLength} characters.`, null, -1);
                 return;
             }
 
@@ -425,7 +425,7 @@ class FlowEngine {
 
                 nextNodeKey = await this.getNextTargetNodeKey(session.version_id, session.current_node_key, config);
             } else {
-                await whatsappService.sendMessage(phone, "Please enter a valid numeric value.");
+                await whatsappService.sendMessage(phone, "Please enter a valid numeric value.", null, -1);
                 return;
             }
         } else if (currentNode.node_type === 'message' && config.inputType === 'image') {
@@ -437,7 +437,7 @@ class FlowEngine {
 
                 nextNodeKey = await this.getNextTargetNodeKey(session.version_id, session.current_node_key, config);
             } else {
-                await whatsappService.sendMessage(phone, "Please attach a photo/image file to continue.");
+                await whatsappService.sendMessage(phone, "Please attach a photo/image file to continue.", null, -1);
                 return;
             }
         }
@@ -519,7 +519,7 @@ class FlowEngine {
 
             const node = nodeRows[0];
             const config = typeof node.config === 'string' ? JSON.parse(node.config) : node.config;
-            const botSenderId = (session && session.variables && (session.variables.is_campaign || session.variables.sender_id === -2)) ? -2 : -1;
+            const botSenderId = -1; // Chatbot flow messages belong to Chatbot (-1)
 
             console.log(`[FlowEngine] Executing Node [${node.node_type}] -> "${node.name}" (${node.node_key})`);
             await this.logExecution(session.session_id, node.node_key, 'enter', null, `Executing ${node.name}`);
@@ -814,7 +814,7 @@ class FlowEngine {
      * Helper to send corresponding interactive menu prompts
      */
     static async sendNodePrompt(phone, node, config, session = null) {
-        const botSenderId = (session && session.variables && (session.variables.is_campaign || session.variables.sender_id === -2)) ? -2 : -1;
+        const botSenderId = -1; // Chatbot flow prompts belong to Chatbot (-1)
         if (['question', 'buttons', 'list', 'contact_time'].includes(node.node_type)) {
             const rawChoices = config.choices || config.slots || (config.options ? config.options.map(o => o.label || o.value) : []);
             const choices = rawChoices.map((item, idx) => typeof item === 'string' ? item : (item.label || item.title || `Option ${idx + 1}`));
@@ -952,7 +952,7 @@ class FlowEngine {
         if (nodeRows.length > 0) {
             const node = nodeRows[0];
             const config = typeof node.config === 'string' ? JSON.parse(node.config) : node.config;
-            await whatsappService.sendMessage(session.phone, '🔄 Chatbot flow resumed. Please continue:');
+            await whatsappService.sendMessage(session.phone, '🔄 Chatbot flow resumed. Please continue:', null, -1);
             await this.sendNodePrompt(session.phone, node, config);
         }
         return { success: true, sessionId: session.session_id, current_node_key: session.current_node_key };

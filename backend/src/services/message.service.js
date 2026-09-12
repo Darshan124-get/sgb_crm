@@ -138,7 +138,7 @@ const logInteraction = async (phoneInput, action, data = {}) => {
 /**
  * Logs a message to the chat history (linked to CRM chat_sessions)
  */
-const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent', replyToChatId = null, isForwarded = 0) => {
+const logChatMessage = async (phoneInput, direction, messageType, body, mediaData = null, mimeType = null, senderId = null, messageId = null, status = 'sent', replyToChatId = null, isForwarded = 0, quickReplyName = null) => {
   const phone = normalizePhone(phoneInput);
   const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
   try {
@@ -241,8 +241,8 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     }
 
     await db.execute(
-      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message_type, message, media_data, media_url, mime_type, message_id, status, reply_to_chat_id, is_forwarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      mapParams([session_id, sender_type, senderId, messageType, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status, replyToChatId, isForwarded])
+      'INSERT INTO chat_messages (session_id, sender_type, sender_id, message_type, message, media_data, media_url, mime_type, message_id, status, reply_to_chat_id, is_forwarded, quick_reply_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      mapParams([session_id, sender_type, senderId, messageType, body, (mediaUrl ? null : buffer), mediaUrl, mimeType, messageId, status, replyToChatId, isForwarded, quickReplyName])
     );
 
     // 4. Send push notification to assigned executive if message is incoming

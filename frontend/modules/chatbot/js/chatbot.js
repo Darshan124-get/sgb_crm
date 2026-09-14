@@ -3992,7 +3992,7 @@ document.addEventListener('DOMContentLoaded', () => {
             badge.textContent = flowSettings.status.charAt(0).toUpperCase() + flowSettings.status.slice(1);
         }
 
-        await saveFlowDraft();
+        await saveDraft();
     };
 
     // ─── Canvas Startup Positioning

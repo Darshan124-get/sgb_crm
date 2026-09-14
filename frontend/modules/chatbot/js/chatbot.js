@@ -115,15 +115,20 @@ document.addEventListener('DOMContentLoaded', () => {
             flowSettings.description = data.flow.description;
             flowSettings.status = data.flow.status;
 
-            // Extract keywords, triggerType, and language from start node's config
+            // Extract keywords, triggerType, campaign info, and language from start node's config
             const rawStartNode = data.nodes.find(n => n.type === 'start');
             if (rawStartNode && rawStartNode.config) {
-                flowSettings.triggerType = rawStartNode.config.triggerType || 'Keyword';
-                flowSettings.keywords = rawStartNode.config.keywords || '';
-                flowSettings.language = rawStartNode.config.language || 'English';
+                const cfg = typeof rawStartNode.config === 'string' ? JSON.parse(rawStartNode.config) : rawStartNode.config;
+                flowSettings.triggerType = cfg.triggerType || 'Keyword';
+                flowSettings.keywords = cfg.keywords || '';
+                flowSettings.campaignId = cfg.campaignId || '';
+                flowSettings.campaignTagline = cfg.campaignTagline || '';
+                flowSettings.language = cfg.language || 'English';
             } else {
                 flowSettings.triggerType = 'Keyword';
                 flowSettings.keywords = '';
+                flowSettings.campaignId = '';
+                flowSettings.campaignTagline = '';
                 flowSettings.language = 'English';
             }
             flowSettings.startNodeId = 'node-start';
@@ -916,6 +921,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             node.config.choices = choices;
+            if (choices.length > 3 && (node.config.responseType === 'buttons' || !node.config.responseType)) {
+                node.config.responseType = 'list';
+                const qTypeSelect = document.getElementById('node-q-type');
+                if (qTypeSelect) qTypeSelect.value = 'list';
+            }
         } else if (node.type === 'product') {
             const pSel = document.getElementById('node-p-select');
             if (pSel) node.config.product = pSel.value;
@@ -2731,6 +2741,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (startNode) {
             startNode.config.triggerType = flowSettings.triggerType || 'Keyword';
             startNode.config.keywords = flowSettings.keywords || '';
+            startNode.config.campaignId = flowSettings.campaignId || '';
+            startNode.config.campaignTagline = flowSettings.campaignTagline || '';
             startNode.config.language = flowSettings.language || 'English';
         }
 
@@ -2773,6 +2785,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Let's populate config.options automatically for backend FlowEngine compatibility
         mappedNodes.forEach(n => {
             if (n.type === 'question' && n.config.choices) {
+                if (n.config.choices.length > 3 && (n.config.responseType === 'buttons' || !n.config.responseType)) {
+                    n.config.responseType = 'list';
+                }
                 n.config.options = n.config.choices.map((choice, idx) => {
                     const matchedEdge = mappedEdges.find(e => e.source === n.id && e.sourceHandle === choice);
                     return {
@@ -3435,7 +3450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const rawPrice = parseFloat(prod.price || prod.selling_price || 0);
         const formattedPrice = !isNaN(rawPrice) && rawPrice > 0 ? `₹${rawPrice.toLocaleString('en-IN')}` : (prod.price || '');
-        
+
         let imgUrl = prod.image_url || '';
         if (!imgUrl && Array.isArray(prod.gallery_urls) && prod.gallery_urls.length > 0) {
             imgUrl = prod.gallery_urls[0];
@@ -3805,12 +3820,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 inspectorContent.innerHTML = `<div class="inspector-placeholder"><i class="fa-solid fa-mouse-pointer"></i><p>Select a node to configure it</p></div>`;
             }
         } else if (tabName === 'flow') {
+            const isCampaignMatched = (c) => {
+                if (flowSettings.campaignId && (flowSettings.campaignId === c.campaign_id || flowSettings.campaignId === String(c.id))) return true;
+                if (flowSettings.campaignTagline && flowSettings.campaignTagline === c.tag_line) return true;
+                if (flowSettings.keywords && (flowSettings.keywords === c.tag_line || flowSettings.keywords === c.campaign_id)) return true;
+                return false;
+            };
+
             loadCrmCampaignsForFlowSettings().then(campaigns => {
                 const campaignSelectEl = document.getElementById('flow-campaign-select');
                 if (campaignSelectEl && Array.isArray(campaigns) && campaigns.length > 0) {
                     campaignSelectEl.innerHTML = campaigns.map(c => {
                         const tagLineDisplay = c.tag_line ? (c.tag_line.length > 40 ? c.tag_line.substring(0, 40) + '...' : c.tag_line) : 'No Tagline';
-                        const isSelected = (flowSettings.campaignId === c.campaign_id || flowSettings.campaignId === String(c.id) || flowSettings.campaignTagline === c.tag_line) ? 'selected' : '';
+                        const isSelected = isCampaignMatched(c) ? 'selected' : '';
                         return `<option value="${c.campaign_id}" data-tagline="${encodeURIComponent(c.tag_line || '')}" ${isSelected}>${c.campaign_id} — "${tagLineDisplay}"</option>`;
                     }).join('');
                 }
@@ -3819,7 +3841,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const campaignOptionsHtml = (cachedCrmCampaigns.length > 0)
                 ? cachedCrmCampaigns.map(c => {
                     const tagLineDisplay = c.tag_line ? (c.tag_line.length > 40 ? c.tag_line.substring(0, 40) + '...' : c.tag_line) : 'No Tagline';
-                    const isSelected = (flowSettings.campaignId === c.campaign_id || flowSettings.campaignId === String(c.id) || flowSettings.campaignTagline === c.tag_line) ? 'selected' : '';
+                    const isSelected = isCampaignMatched(c) ? 'selected' : '';
                     return `<option value="${c.campaign_id}" data-tagline="${encodeURIComponent(c.tag_line || '')}" ${isSelected}>${c.campaign_id} — "${tagLineDisplay}"</option>`;
                 }).join('')
                 : `<option value="">Loading Campaigns...</option>`;
@@ -3907,13 +3929,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const rawTagLine = decodeURIComponent(selectedOpt.getAttribute('data-tagline') || '');
             flowSettings.campaignId = select.value;
             flowSettings.campaignTagline = rawTagLine;
-            if (rawTagLine) {
-                flowSettings.keywords = rawTagLine;
-            }
+            flowSettings.keywords = rawTagLine || select.value;
             const previewEl = document.getElementById('flow-campaign-tagline-preview');
             if (previewEl) {
                 previewEl.textContent = rawTagLine ? `Trigger Tag Line: "${rawTagLine}"` : '';
             }
+            const startNode = nodes.find(n => n.type === 'start');
+            if (startNode) {
+                startNode.config.campaignId = flowSettings.campaignId;
+                startNode.config.campaignTagline = flowSettings.campaignTagline;
+                startNode.config.keywords = flowSettings.keywords;
+                startNode.config.triggerType = 'Campaign';
+            }
+            showSaveIndicator("Unsaved changes");
         }
     };
 
@@ -3945,6 +3973,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         flowSettings.language = document.getElementById('flow-language-select').value;
 
+        const startNode = nodes.find(n => n.type === 'start');
+        if (startNode) {
+            startNode.config.triggerType = flowSettings.triggerType;
+            startNode.config.keywords = flowSettings.keywords;
+            startNode.config.campaignId = flowSettings.campaignId;
+            startNode.config.campaignTagline = flowSettings.campaignTagline;
+            startNode.config.language = flowSettings.language;
+        }
+
         // Reflect name in header breadcrumbs
         document.getElementById('headerFlowName').textContent = flowSettings.name;
 
@@ -3965,17 +4002,17 @@ document.addEventListener('DOMContentLoaded', () => {
         runLiveValidation();
     }, 200);
     // ─── Direct Media File Upload & Picker Handlers for Video / Image / Media Nodes
-    window.openNodeFilePicker = function(type) {
+    window.openNodeFilePicker = function (type) {
         const input = document.getElementById('node-media-file-input');
         if (input) input.click();
     };
 
-    window.openProductFilePicker = function() {
+    window.openProductFilePicker = function () {
         const input = document.getElementById('node-p-file-input');
         if (input) input.click();
     };
 
-    window.removeProductImage = function(e) {
+    window.removeProductImage = function (e) {
         if (e) e.stopPropagation();
         const hiddenInp = document.getElementById('node-p-image');
         const previewContainer = document.getElementById('product-img-preview-container');
@@ -3989,7 +4026,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.saveSelectedNodeSettingsSilently();
     };
 
-    window.handleProductFileUpload = async function(event) {
+    window.handleProductFileUpload = async function (event) {
         const file = event.target.files[0];
         if (!file) return;
 
@@ -4035,7 +4072,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.removeNodeMediaFile = function(e) {
+    window.removeNodeMediaFile = function (e) {
         if (e) e.stopPropagation();
         const urlInput = document.getElementById('node-media-url');
         const previewBox = document.getElementById('media-preview-container');
@@ -4048,9 +4085,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (browseText) browseText.textContent = 'Upload / Pick File';
     };
 
-    window.handleNodeMediaFileUpload = async function(event, type) {
+    window.handleNodeMediaFileUpload = async function (event, type) {
         const file = event.target.files[0];
         if (!file) return;
+
+        const isVid = type === 'video' || (file.type && file.type.startsWith('video/')) || (file.name && file.name.toLowerCase().endsWith('.mp4'));
+        if (isVid && file.size > 16 * 1024 * 1024) {
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+            window.showAlert("Upload Blocked", `Video file "${file.name}" is ${sizeMb}MB, which exceeds WhatsApp's 16MB limit. Please compress the video file under 16MB and try again.`, "danger");
+            event.target.value = ''; // Reset input selection
+            return;
+        }
 
         const browseText = document.getElementById('btn-browse-media-text');
         if (browseText) browseText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';

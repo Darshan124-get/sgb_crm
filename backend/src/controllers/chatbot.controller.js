@@ -470,9 +470,16 @@ exports.saveDraft = async (req, res) => {
             for (const node of nodes) {
                 const posX = node.position ? node.position.x : 0;
                 const posY = node.position ? node.position.y : 0;
+                const cfg = node.config || {};
+                if (node.type === 'question') {
+                    const optCount = cfg.options ? cfg.options.length : (cfg.choices ? cfg.choices.length : 0);
+                    if (optCount > 3 && (cfg.responseType === 'buttons' || !cfg.responseType)) {
+                        cfg.responseType = 'list';
+                    }
+                }
                 await connection.query(
                     'INSERT INTO chatbot_nodes (version_id, node_key, node_type, name, position_x, position_y, config) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [versionId, node.id, node.type, node.name, posX, posY, JSON.stringify(node.config || {})]
+                    [versionId, node.id, node.type, node.name, posX, posY, JSON.stringify(cfg)]
                 );
             }
         }
@@ -503,11 +510,11 @@ exports.saveDraft = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Draft saved successfully' });
     } catch (err) {
-        try { await connection.rollback(); } catch (rbErr) {}
+        try { await connection.rollback(); } catch (rbErr) { }
         console.error('[SAVE DRAFT ERROR]', err.message);
         res.status(500).json({ message: 'Error saving draft' });
     } finally {
-        try { connection.release(); } catch (relErr) {}
+        try { connection.release(); } catch (relErr) { }
     }
 };
 
@@ -526,7 +533,7 @@ exports.publishFlow = async (req, res) => {
         );
 
         if (verRows.length === 0) {
-            try { await connection.rollback(); } catch (e) {}
+            try { await connection.rollback(); } catch (e) { }
             return res.status(404).json({ message: 'No draft version found to publish' });
         }
 
@@ -545,22 +552,27 @@ exports.publishFlow = async (req, res) => {
         if (startNodes.length === 0) errors.push('Flow has no Start node.');
         if (startNodes.length > 1) errors.push('Flow contains multiple Start nodes.');
 
-        // Check 2: All interactive nodes check WhatsApp limits
-        nodes.forEach(n => {
-            const config = JSON.parse(n.config);
-            if (n.node_type === 'question' && config.responseType === 'buttons') {
-                const optCount = config.options ? config.options.length : 0;
-                if (optCount > 3) {
-                    errors.push(`Question node "${n.name}" has ${optCount} buttons. WhatsApp Cloud API supports a maximum of 3 buttons.`);
-                }
-            }
-            if (n.node_type === 'question' && config.responseType === 'list') {
-                const optCount = config.options ? config.options.length : 0;
-                if (optCount > 10) {
+        // Check 2: All interactive nodes check WhatsApp limits & auto-convert >3 buttons to List type
+        for (const n of nodes) {
+            let config = {};
+            try { config = typeof n.config === 'string' ? JSON.parse(n.config) : (n.config || {}); } catch (e) { }
+            if (n.node_type === 'question') {
+                const optCount = config.options ? config.options.length : (config.choices ? config.choices.length : 0);
+                const respType = config.responseType || 'buttons';
+                if (respType === 'buttons' && optCount > 3) {
+                    if (optCount <= 10) {
+                        // Auto-promote to list menu for WhatsApp compatibility
+                        config.responseType = 'list';
+                        n.config = JSON.stringify(config);
+                        await connection.query('UPDATE chatbot_nodes SET config = ? WHERE version_id = ? AND node_key = ?', [n.config, draftVersionId, n.node_key]);
+                    } else {
+                        errors.push(`Question node "${n.name}" has ${optCount} options. WhatsApp Cloud API List menus support a maximum of 10 items.`);
+                    }
+                } else if (respType === 'list' && optCount > 10) {
                     errors.push(`List option node "${n.name}" has ${optCount} items. WhatsApp List menus support a maximum of 10 items.`);
                 }
             }
-        });
+        }
 
         // Check 3: Missing destinations
         edges.forEach(e => {
@@ -570,7 +582,7 @@ exports.publishFlow = async (req, res) => {
         });
 
         if (errors.length > 0) {
-            try { await connection.rollback(); } catch (e) {}
+            try { await connection.rollback(); } catch (e) { }
             return res.status(400).json({ message: 'Validation failed before publish', errors, warnings });
         }
 
@@ -617,11 +629,11 @@ exports.publishFlow = async (req, res) => {
         await connection.commit();
         res.json({ message: 'Flow published successfully', active_version: currentVerNum, next_draft_version: nextVerNum });
     } catch (err) {
-        try { await connection.rollback(); } catch (rbErr) {}
+        try { await connection.rollback(); } catch (rbErr) { }
         console.error('[PUBLISH FLOW ERROR]', err.message);
         res.status(500).json({ message: 'Error publishing flow' });
     } finally {
-        try { connection.release(); } catch (relErr) {}
+        try { connection.release(); } catch (relErr) { }
     }
 };
 
@@ -636,7 +648,7 @@ exports.duplicateFlow = async (req, res) => {
         // Get original flow metadata
         const [flowRows] = await connection.query('SELECT * FROM chatbot_flows WHERE flow_id = ?', [flowId]);
         if (flowRows.length === 0) {
-            try { await connection.rollback(); } catch (e) {}
+            try { await connection.rollback(); } catch (e) { }
             return res.status(404).json({ message: 'Original flow not found' });
         }
         const orig = flowRows[0];
@@ -687,11 +699,11 @@ exports.duplicateFlow = async (req, res) => {
         await connection.commit();
         res.json({ duplicated_flow_id: newFlowId, message: 'Flow duplicated successfully' });
     } catch (err) {
-        try { await connection.rollback(); } catch (rbErr) {}
+        try { await connection.rollback(); } catch (rbErr) { }
         console.error('[DUPLICATE FLOW ERROR]', err.message);
         res.status(500).json({ message: 'Error duplicating flow' });
     } finally {
-        try { connection.release(); } catch (relErr) {}
+        try { connection.release(); } catch (relErr) { }
     }
 };
 
@@ -1091,6 +1103,16 @@ exports.uploadMedia = async (req, res) => {
 
         const filesToProcess = req.files || [req.file];
         const insertedMedia = [];
+
+        for (const file of filesToProcess) {
+            const isVideo = (file.mimetype && file.mimetype.startsWith('video/')) || (file.originalname && file.originalname.toLowerCase().endsWith('.mp4'));
+            if (isVideo && file.size > 16 * 1024 * 1024) {
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                return res.status(400).json({
+                    message: `Video file "${file.originalname}" is ${sizeMb}MB, which exceeds WhatsApp's 16MB limit. Please compress the video file under 16MB and try again.`
+                });
+            }
+        }
 
         for (const file of filesToProcess) {
             const mediaInfo = await saveMediaFile(file);

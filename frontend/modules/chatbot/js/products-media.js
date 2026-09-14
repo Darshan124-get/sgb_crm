@@ -513,6 +513,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const files = Array.from(e.target.files);
             if (files.length === 0 || !selectedProductId) return;
 
+            for (const f of files) {
+                const isVid = (f.type && f.type.startsWith('video/')) || (f.name && f.name.toLowerCase().endsWith('.mp4'));
+                if (isVid && f.size > 16 * 1024 * 1024) {
+                    const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+                    showToast(`Upload Blocked: Video "${f.name}" is ${sizeMb}MB (WhatsApp limit is 16MB). Please compress the file.`, 'error');
+                    e.target.value = '';
+                    return;
+                }
+            }
+
             const p = productsList.find(item => item.id === selectedProductId);
             if (!p) return;
 
@@ -1399,6 +1409,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleWizardMediaUpload(filesList) {
         if (!wizardProductData.uploadedFiles) wizardProductData.uploadedFiles = [];
         if (!wizardMediaPreviewsList) return;
+
+        for (let i = 0; i < filesList.length; i++) {
+            const f = filesList[i];
+            const isVid = (f.type && f.type.startsWith('video/')) || (f.name && f.name.toLowerCase().endsWith('.mp4'));
+            if (isVid && f.size > 16 * 1024 * 1024) {
+                const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+                showToast(`Upload Blocked: Video "${f.name}" is ${sizeMb}MB (WhatsApp limit is 16MB). Please compress the file.`, 'error');
+                return;
+            }
+        }
 
         const formData = new FormData();
         for (let i = 0; i < filesList.length; i++) {

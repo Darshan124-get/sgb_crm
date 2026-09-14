@@ -554,8 +554,14 @@ class FlowEngine {
                     const videoUrl = config.mediaUrl || config.video_url || config.file_url || '';
                     const caption = this.formatTextVariables(config.caption || config.message || '', session.variables);
                     if (videoUrl) {
-                        const sendRes = await whatsappService.sendMediaMessage(session.phone, videoUrl, 'video', caption, null, botSenderId);
-                        await this.waitForMediaDelivery(sendRes);
+                        try {
+                            const sendRes = await whatsappService.sendMediaMessage(session.phone, videoUrl, 'video', caption, null, botSenderId);
+                            await this.waitForMediaDelivery(sendRes);
+                        } catch (videoErr) {
+                            console.warn(`[FlowEngine] Native video send failed for node ${currentKey} (${videoErr.message}). Falling back to sending video link text message...`);
+                            const fallbackMsg = caption ? `${caption}\n\n🎥 *Watch Video:* ${videoUrl}` : `🎥 *Watch Video:* ${videoUrl}`;
+                            await whatsappService.sendMessage(session.phone, fallbackMsg, null, botSenderId);
+                        }
                     } else if (caption) {
                         await whatsappService.sendMessage(session.phone, caption, null, botSenderId);
                     }

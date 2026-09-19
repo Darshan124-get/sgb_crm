@@ -67,7 +67,7 @@ exports.login = async (req, res) => {
                 const dealerPerms = ['dealer_dashboard', 'dealer_dealers', 'dealer_orders', 'dealer_visits', 'dealer_reports', 'dealer_settings'];
                 dealerPerms.forEach(p => { if (!perms.includes(p)) perms.push(p); });
             } else if (roleName.includes('sales') || (deptName && deptName.includes('sales'))) {
-                const salesPerms = ['sales_dashboard', 'sales_lead_management', 'sales_sales_pipeline', 'sales_schedules', 'sales_orders', 'sales_dealers', 'sales_reports', 'sales_activity', 'sales_settings', 'sales_campaigns', 'whatsapp_whatsapp_chats'];
+                const salesPerms = ['sales_dashboard', 'sales_lead_management', 'sales_sales_pipeline', 'sales_schedules', 'sales_orders', 'sales_reports', 'sales_activity', 'sales_settings', 'whatsapp_whatsapp_chats'];
                 salesPerms.forEach(p => { if (!perms.includes(p)) perms.push(p); });
             } else if (roleName.includes('billing') || (deptName && deptName.includes('billing'))) {
                 if (!perms.includes('billing_billing')) perms.push('billing_billing');

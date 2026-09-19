@@ -5,7 +5,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Auth & Sidebar Check
     if (typeof window.requireAuth === 'function') {
-        if (!window.requireAuth(['admin', 'super-admin'])) return;
+        if (!window.requireAuth(['admin', 'super-admin'], 'chatbot_management')) return;
     }
 
     // Load current user profile name

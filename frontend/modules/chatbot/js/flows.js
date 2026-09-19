@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin'], 'chatbot_management')) return;
     // 1. Load sidebar using existing components helper
     if (typeof window.loadSidebar === 'function') {
         window.loadSidebar('chatbot');

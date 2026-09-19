@@ -5,7 +5,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Auth Guard & User Check
     if (window.requireAuth && typeof window.requireAuth === 'function') {
-        window.requireAuth(['admin', 'super-admin', 'whatsapp_management_executive']);
+        if (!window.requireAuth(['admin', 'super-admin'], 'chatbot_management')) return;
     }
 
     const flowService = new FlowService();

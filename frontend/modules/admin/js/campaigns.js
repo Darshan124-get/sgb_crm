@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Check Auth
-    if (!window.requireAuth(['admin', 'whatsapp_manager'])) return;
+    if (!window.requireAuth(['admin', 'super-admin'], 'sales_campaigns')) return;
 
     const token = localStorage.getItem('token');
     const user = window.getCurrentUser();

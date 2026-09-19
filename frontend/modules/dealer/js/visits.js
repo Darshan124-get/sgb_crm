@@ -8,6 +8,7 @@ let dealerPurchasedProductsMap = new Map();
 let selectedVisitIds = new Set();
 
 document.addEventListener('DOMContentLoaded', async () => {
+    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'sales_dealers')) return;
     // Set default date in New Visit form
     const dateInput = document.getElementById('nvVisitedDate');
     if (dateInput) {

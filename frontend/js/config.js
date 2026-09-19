@@ -131,7 +131,7 @@ window.getCurrentUser = function () {
 };
 
 // ─── Auth Guard ──────────────────────────────────────────────
-window.requireAuth = function (allowedRoles = []) {
+window.requireAuth = function (allowedRoles = [], requiredPermission = null) {
     const token = localStorage.getItem('token');
     if (!token) {
         window.location.href = `${window.ROOT_PATH}index.html`;
@@ -146,15 +146,33 @@ window.requireAuth = function (allowedRoles = []) {
         allowedRoles.push('super-admin');
     }
 
-    // PBAC Bypass: If the user has custom permissions or is a manager, allow them into unified folders 
-    // Security is handled by the backend APIs and sidebar filtering.
     let userPermissions = [];
     try { userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []); } catch (e) { }
+
+    // Admins and Super Admins or ALL permission holders always pass
+    if (role === 'admin' || role === 'super-admin' || userPermissions.includes('ALL')) {
+        return true;
+    }
+
+    // Check specific required permission if provided
+    if (requiredPermission) {
+        if (!userPermissions.includes(requiredPermission)) {
+            const home = window.getHomeUrl(user);
+            const targetPath = new URL(home, window.location.origin + window.location.pathname).pathname;
+            if (!window.location.pathname.includes(targetPath)) {
+                window.location.href = `${window.ROOT_PATH}${home}`;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    // PBAC Bypass: Allow users with permissions or managers into standard pages
     if (userPermissions.length > 0 || user.is_manager) {
         return true;
     }
 
-    // Standard folder-based role restriction
+    // Standard role-based restriction
     if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
         const home = window.getHomeUrl(user);
 

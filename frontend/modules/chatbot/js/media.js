@@ -4,7 +4,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Auth check
-    if (!window.requireAuth(['admin', 'super-admin'])) return;
+    if (!window.requireAuth(['admin', 'super-admin'], 'chatbot_management')) return;
 
     // Load current user profile name
     const currentUser = window.getCurrentUser();

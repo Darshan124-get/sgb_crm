@@ -39,4 +39,12 @@ function startServer() {
     });
 }
 
+process.on('unhandledRejection', (reason) => {
+    console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ Uncaught Exception:', err?.message || err);
+});
+
 startServer();

@@ -444,11 +444,39 @@ function renderPaginationButtons(totalPages) {
         return;
     }
 
+    let startPage = Math.max(1, currentPage - 1);
+    let endPage = startPage + 2;
+
+    if (endPage > totalPages) {
+        endPage = totalPages;
+        startPage = Math.max(1, endPage - 2);
+    }
+
     let html = '';
-    for (let i = 1; i <= totalPages; i++) {
+
+    // Previous Button
+    const prevDisabled = currentPage === 1;
+    html += `<button onclick="goToOrdersPage(${currentPage - 1})" ${prevDisabled ? 'disabled' : ''} style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid #cbd5e1;background:${prevDisabled ? '#f8fafc' : '#ffffff'};color:${prevDisabled ? '#cbd5e1' : '#475569'};font-weight:700;font-size:0.8rem;cursor:${prevDisabled ? 'default' : 'pointer'};" title="Previous Page"><i class="fa-solid fa-chevron-left"></i></button>`;
+
+    // Display max 3 page buttons
+    for (let i = startPage; i <= endPage; i++) {
         const isActive = i === currentPage;
         html += `<button onclick="goToOrdersPage(${i})" style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid ${isActive ? '#FF6B00' : '#cbd5e1'};background:${isActive ? '#FF6B00' : '#ffffff'};color:${isActive ? '#ffffff' : '#475569'};font-weight:700;font-size:0.8rem;cursor:pointer;">${i}</button>`;
     }
+
+    // Ellipsis & Last Page if totalPages > endPage
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<span style="color:#94a3b8;padding:0.35rem 0.25rem;font-size:0.8rem;font-weight:700;">...</span>`;
+        }
+        const isLastActive = totalPages === currentPage;
+        html += `<button onclick="goToOrdersPage(${totalPages})" style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid ${isLastActive ? '#FF6B00' : '#cbd5e1'};background:${isLastActive ? '#FF6B00' : '#ffffff'};color:${isLastActive ? '#ffffff' : '#475569'};font-weight:700;font-size:0.8rem;cursor:pointer;">${totalPages}</button>`;
+    }
+
+    // Next Button
+    const nextDisabled = currentPage === totalPages;
+    html += `<button onclick="goToOrdersPage(${currentPage + 1})" ${nextDisabled ? 'disabled' : ''} style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid #cbd5e1;background:${nextDisabled ? '#f8fafc' : '#ffffff'};color:${nextDisabled ? '#cbd5e1' : '#475569'};font-weight:700;font-size:0.8rem;cursor:${nextDisabled ? 'default' : 'pointer'};" title="Next Page"><i class="fa-solid fa-chevron-right"></i></button>`;
+
     container.innerHTML = html;
 }
 

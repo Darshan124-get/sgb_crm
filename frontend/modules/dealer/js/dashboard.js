@@ -374,7 +374,6 @@ function processAndRenderDashboard() {
     // 3. Render Top Stat Cards
     document.getElementById('kpiTotalDealers').textContent = totalDealersCount;
     document.getElementById('kpiActiveDealers').textContent = activeDealersCount;
-    document.getElementById('kpiNewDealers').textContent = newDealersCount;
     document.getElementById('kpiOrdersMonth').textContent = ordersPeriodCount;
     document.getElementById('kpiOverdueDealers').textContent = overdueDealersCount;
     document.getElementById('kpiTotalSales').textContent = `₹${totalSalesVal.toLocaleString('en-IN')}`;
@@ -382,7 +381,6 @@ function processAndRenderDashboard() {
 
     document.getElementById('kpiTotalDealersSub').innerHTML = `<i class="fa-solid fa-arrow-up"></i> <span>▲ 4.9%</span>`;
     document.getElementById('kpiActiveDealersSub').innerHTML = `<i class="fa-solid fa-arrow-up"></i> <span>▲ 4.2%</span>`;
-    document.getElementById('kpiNewDealersSub').innerHTML = `<i class="fa-solid fa-arrow-up"></i> <span>▲ 27%</span>`;
     document.getElementById('kpiOrdersMonthSub').innerHTML = `<i class="fa-solid fa-arrow-up"></i> <span>▲ 2.9%</span>`;
     document.getElementById('kpiOverdueDealersSub').innerHTML = `<i class="fa-solid fa-arrow-down"></i> <span>▼ 15%</span>`;
     document.getElementById('kpiTotalSalesSub').innerHTML = `<i class="fa-solid fa-arrow-up"></i> <span>▲ 14%</span>`;

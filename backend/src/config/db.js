@@ -12,7 +12,7 @@ const pool = mysql.createPool({
     queueLimit: 0,
     connectTimeout: 20000, 
     enableKeepAlive: true,
-    keepAliveInitialDelay: 10000,
+    keepAliveInitialDelay: 5000,
     maxIdle: 10,
     idleTimeout: 10000, // Proactively close idle connections after 10s (below Hostinger server timeouts)
     timezone: '+00:00'

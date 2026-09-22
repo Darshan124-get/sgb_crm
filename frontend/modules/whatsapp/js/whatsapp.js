@@ -20,6 +20,10 @@ function getAuthHeader() {
 let activeCustomer = null;
 let currentHistory = [];
 let allCustomers = [];
+let totalLeadsCount = 0;
+let totalUnreadCount = 0;
+let totalHandoffCount = 0;
+let isLoadingMoreConversations = false;
 let currentTab = 'all';
 let salesUsers = [];
 let activeCampaigns = [];
@@ -288,21 +292,21 @@ function renderSidebarTabs() {
     const isAdminOrManager = role.includes('admin') || role.includes('whatsapp_manager') || role.includes('manager');
 
     // Total active customers count
-    const totalCount = (allCustomers || []).length;
+    const totalCount = totalLeadsCount || (allCustomers || []).length;
 
-    // Calculate unread count
-    const unreadCount = (allCustomers || []).filter(c => {
-        return parseInt(c.unread_msg_count || 0) > 0;
-    }).length;
+    // Calculate unread count (from DB if available)
+    const unreadCount = totalUnreadCount !== undefined && totalUnreadCount > 0 
+        ? totalUnreadCount 
+        : (allCustomers || []).filter(c => parseInt(c.unread_msg_count || 0) > 0).length;
 
-    // Calculate handoff count
+    // Calculate handoff count (from DB if available)
     const handoffCustomers = (allCustomers || []).filter(c => 
         c.status === 'human_needed' || 
         c.lead_status === 'human_needed' || 
         c.session_status === 'paused_for_human'
     );
     const myHandoffs = handoffCustomers.filter(c => String(c.assigned_to) === String(currentUserId));
-    const handoffCount = isAdminOrManager ? handoffCustomers.length : myHandoffs.length;
+    const handoffCount = totalHandoffCount !== undefined ? totalHandoffCount : (isAdminOrManager ? handoffCustomers.length : myHandoffs.length);
 
     const isCampaignActive = activeCampaigns.some(camp => camp.tag_line === currentTab);
     const customLists = loadCustomLists();
@@ -543,6 +547,7 @@ function renderSidebarTabs() {
             }
             tab.classList.add('active');
             currentTab = tab.dataset.tab;
+            loadCustomers(currentTab);
             renderCustomerList();
         });
     });
@@ -614,13 +619,14 @@ function updateHandoffCounts() {
     const myHandoffs = handoffCustomers.filter(c => String(c.assigned_to) === String(currentUserId));
 
     const topHandoffEl = document.getElementById('top-handoff-count');
-    if (topHandoffEl) topHandoffEl.textContent = handoffCustomers.length;
+    const handoffDisplay = totalHandoffCount !== undefined ? totalHandoffCount : handoffCustomers.length;
+    if (topHandoffEl) topHandoffEl.textContent = handoffDisplay;
 
     const topMyHandoffEl = document.getElementById('top-my-handoff-count');
     if (topMyHandoffEl) topMyHandoffEl.textContent = myHandoffs.length;
 
     const handoffPillEl = document.getElementById('handoff-pill-count');
-    if (handoffPillEl) handoffPillEl.textContent = handoffCustomers.length;
+    if (handoffPillEl) handoffPillEl.textContent = handoffDisplay;
 }
 
 window.switchToHandoffTab = function(tabType) {
@@ -629,6 +635,7 @@ window.switchToHandoffTab = function(tabType) {
     const isAdminOrManager = role.includes('admin') || role === 'whatsapp_manager';
 
     currentTab = tabType || (isAdminOrManager ? 'handoff' : 'my_handoff');
+    loadCustomers(currentTab);
     
     // Style active top buttons
     const btnTopHandoff = document.getElementById('btn-top-handoff');
@@ -725,31 +732,28 @@ window.retriggerBotFromBanner = async function() {
  */
 let currentCustomersJson = '';
 
-async function loadCustomers() {
+async function loadCustomers(tabParam = null) {
     try {
-        const response = await fetch(`${API_BASE}/customers`, { headers: getAuthHeader() });
+        const tabToFetch = tabParam || currentTab || 'all';
+        const response = await fetch(`${API_BASE}/customers?limit=50&page=1&tab=${encodeURIComponent(tabToFetch)}`, { headers: getAuthHeader() });
         if (response.status === 401) return window.doLogout();
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
-        const data = await response.json();
-        const dataJson = JSON.stringify(data);
-        if (dataJson === currentCustomersJson) {
-            // Even if data is unchanged, still check for pending phone selection on initial load
-            if (window._pendingPhone) {
-                const customer = data.find(c => c.phone === window._pendingPhone);
-                if (customer) {
-                    selectCustomer(customer);
-                }
-                delete window._pendingPhone;
-            }
-            updateHandoffCounts();
-            return;
+        const rawData = await response.json();
+        const data = Array.isArray(rawData) ? rawData : (rawData.customers || []);
+        if (rawData) {
+            if (rawData.totalCount !== undefined && (tabToFetch === 'all' || !totalLeadsCount)) totalLeadsCount = parseInt(rawData.totalCount);
+            if (rawData.unreadCount !== undefined) totalUnreadCount = parseInt(rawData.unreadCount);
+            if (rawData.handoffCount !== undefined) totalHandoffCount = parseInt(rawData.handoffCount);
         }
-        currentCustomersJson = dataJson;
 
-        allCustomers = data;
+        // Merge incoming customer records with existing in-memory allCustomers array
+        const existingMap = new Map(allCustomers.map(c => [c.phone, c]));
+        data.forEach(c => existingMap.set(c.phone, c));
+        allCustomers = Array.from(existingMap.values());
+
         updateHandoffCounts();
-        renderSidebarTabs(); // update unread count
+        renderSidebarTabs(); // update unread and total count
         renderCustomerList();
 
         // Trigger background preloading of chat histories ONLY ONCE on initial load
@@ -1001,13 +1005,62 @@ function renderCustomerList(shouldResetLimit = true) {
     if (customerListEl && !customerListEl._hasLazyScroll) {
         customerListEl._hasLazyScroll = true;
         customerListEl.addEventListener('scroll', () => {
-            if (customerListEl.scrollHeight - customerListEl.scrollTop - customerListEl.clientHeight < 150) {
+            const remaining = customerListEl.scrollHeight - customerListEl.scrollTop - customerListEl.clientHeight;
+            if (remaining < 150) {
                 if (window._currentFilteredCustomers && customerDisplayLimit < window._currentFilteredCustomers.length) {
                     customerDisplayLimit += 30;
                     renderCustomerList(false);
+                } else if (!isLoadingMoreConversations && (totalLeadsCount === 0 || allCustomers.length < totalLeadsCount)) {
+                    loadMoreConversationsFromBackend();
                 }
             }
         });
+    }
+}
+
+async function loadMoreConversationsFromBackend() {
+    if (isLoadingMoreConversations) return;
+    if (totalLeadsCount > 0 && allCustomers.length >= totalLeadsCount) return;
+
+    isLoadingMoreConversations = true;
+    const nextPage = Math.floor(allCustomers.length / 50) + 1;
+    const scrollPos = customerListEl ? customerListEl.scrollTop : 0;
+
+    let loaderEl = document.getElementById('sidebar-infinite-loader');
+    if (!loaderEl && customerListEl) {
+        loaderEl = document.createElement('div');
+        loaderEl.id = 'sidebar-infinite-loader';
+        loaderEl.style.cssText = 'padding: 12px; text-align: center; color: var(--whatsapp-secondary); font-size: 0.8rem; border-top: 1px solid var(--whatsapp-border);';
+        loaderEl.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="margin-right: 6px; color: var(--whatsapp-green);"></i> Loading more conversations...';
+        customerListEl.appendChild(loaderEl);
+    }
+
+    try {
+        const tabToFetch = currentTab || 'all';
+        const response = await fetch(`${API_BASE}/customers?limit=50&page=${nextPage}&tab=${encodeURIComponent(tabToFetch)}`, { headers: getAuthHeader() });
+        if (response.ok) {
+            const rawData = await response.json();
+            const newCustomers = Array.isArray(rawData) ? rawData : (rawData.customers || []);
+            if (rawData && rawData.totalCount && (tabToFetch === 'all' || !totalLeadsCount)) totalLeadsCount = parseInt(rawData.totalCount);
+
+            if (newCustomers.length > 0) {
+                const existingPhones = new Set(allCustomers.map(c => c.phone));
+                newCustomers.forEach(c => {
+                    if (!existingPhones.has(c.phone)) {
+                        allCustomers.push(c);
+                    }
+                });
+                customerDisplayLimit = allCustomers.length;
+                renderCustomerList(false);
+                if (customerListEl) customerListEl.scrollTop = scrollPos;
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load more conversations:', err);
+    } finally {
+        isLoadingMoreConversations = false;
+        const loader = document.getElementById('sidebar-infinite-loader');
+        if (loader) loader.remove();
     }
 }
 

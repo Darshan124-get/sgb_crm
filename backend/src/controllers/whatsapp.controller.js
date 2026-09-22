@@ -208,7 +208,13 @@ const receiveMessage = async (req, res) => {
  */
 const getCustomers = async (req, res) => {
   try {
-    const customers = await messageService.getAllChatCustomers(req.user);
+    const options = {
+      limit: req.query.limit,
+      page: req.query.page,
+      search: req.query.search,
+      tab: req.query.tab
+    };
+    const customers = await messageService.getAllChatCustomers(req.user, options);
     res.json(customers);
   } catch (err) {
     logger.error('API Error (getCustomers):', err.message);

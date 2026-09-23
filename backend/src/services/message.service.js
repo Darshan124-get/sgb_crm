@@ -364,9 +364,18 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     }
 
     if (options.search) {
-      const searchPattern = `%${options.search.trim().toLowerCase()}%`;
-      query += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
-      params.push(searchPattern, searchPattern);
+      const trimmedSearch = options.search.trim().toLowerCase();
+      const searchDigits = trimmedSearch.replace(/\D/g, '');
+      const searchPattern = `%${trimmedSearch}%`;
+
+      if (searchDigits && searchDigits.length >= 3) {
+        const digitsPattern = `%${searchDigits}%`;
+        query += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ? OR REPLACE(REPLACE(l.phone_number, '+', ''), ' ', '') LIKE ?)";
+        params.push(searchPattern, searchPattern, digitsPattern);
+      } else {
+        query += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
+        params.push(searchPattern, searchPattern);
+      }
     }
 
     if (options.tab === 'handoff' || options.tab === 'my_handoff') {
@@ -399,9 +408,18 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     }
 
     if (options.search) {
-      const searchPattern = `%${options.search.trim().toLowerCase()}%`;
-      countQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
-      countParams.push(searchPattern, searchPattern);
+      const trimmedSearch = options.search.trim().toLowerCase();
+      const searchDigits = trimmedSearch.replace(/\D/g, '');
+      const searchPattern = `%${trimmedSearch}%`;
+
+      if (searchDigits && searchDigits.length >= 3) {
+        const digitsPattern = `%${searchDigits}%`;
+        countQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ? OR REPLACE(REPLACE(l.phone_number, '+', ''), ' ', '') LIKE ?)";
+        countParams.push(searchPattern, searchPattern, digitsPattern);
+      } else {
+        countQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
+        countParams.push(searchPattern, searchPattern);
+      }
     }
 
     const [countRows] = await db.execute(countQuery, countParams);

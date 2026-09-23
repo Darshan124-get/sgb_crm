@@ -217,8 +217,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Search Filtering
     if (searchInputEl) {
+        let searchDebounceTimeout = null;
         searchInputEl.addEventListener('input', () => {
             renderCustomerList();
+            clearTimeout(searchDebounceTimeout);
+            searchDebounceTimeout = setTimeout(() => {
+                const term = searchInputEl.value.trim();
+                loadCustomers(currentTab, term);
+            }, 300);
         });
     }
 
@@ -732,10 +738,15 @@ window.retriggerBotFromBanner = async function() {
  */
 let currentCustomersJson = '';
 
-async function loadCustomers(tabParam = null) {
+async function loadCustomers(tabParam = null, searchParam = null) {
     try {
         const tabToFetch = tabParam || currentTab || 'all';
-        const response = await fetch(`${API_BASE}/customers?limit=50&page=1&tab=${encodeURIComponent(tabToFetch)}`, { headers: getAuthHeader() });
+        const searchTerm = searchParam !== null ? searchParam : (searchInputEl ? searchInputEl.value.trim() : '');
+        let fetchUrl = `${API_BASE}/customers?limit=50&page=1&tab=${encodeURIComponent(tabToFetch)}`;
+        if (searchTerm) {
+            fetchUrl += `&search=${encodeURIComponent(searchTerm)}`;
+        }
+        const response = await fetch(fetchUrl, { headers: getAuthHeader() });
         if (response.status === 401) return window.doLogout();
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
@@ -845,9 +856,15 @@ function renderCustomerList(shouldResetLimit = true) {
         // Apply search filter if search term is provided
         if (searchTerm) {
             const name = (customer.customer_name || '').toLowerCase();
-            const phone = (customer.phone || '').toLowerCase();
+            const rawPhone = String(customer.phone || '').toLowerCase();
+            const phoneDigits = rawPhone.replace(/\D/g, '');
+            const searchDigits = searchTerm.replace(/\D/g, '');
             const lastMsg = (customer.last_message || '').toLowerCase();
-            return name.includes(searchTerm) || phone.includes(searchTerm) || lastMsg.includes(searchTerm);
+
+            const matchPhone = rawPhone.includes(searchTerm) ||
+                               (searchDigits && searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+
+            return name.includes(searchTerm) || matchPhone || lastMsg.includes(searchTerm);
         }
 
         return true;

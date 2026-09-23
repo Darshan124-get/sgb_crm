@@ -1007,6 +1007,28 @@ class FlowEngine {
 
         return { success: true, message: 'Handoff resolved successfully' };
     }
+
+    /**
+     * Silently completes any active chatbot session when an agent sends a manual message
+     * (Stops bot execution without triggering Human Handoff / NEEDS HUMAN flags)
+     */
+    static async pauseSessionForAgent(sessionIdOrPhone) {
+        const phoneTen = String(sessionIdOrPhone).replace(/\D/g, '').slice(-10);
+
+        try {
+            const [result] = await pool.query(
+                'UPDATE chatbot_sessions SET status = "completed", completed_at = NOW() WHERE status = "active" AND (session_id = ? OR phone = ? OR phone LIKE ?)',
+                [sessionIdOrPhone, sessionIdOrPhone, `%${phoneTen}`]
+            );
+            if (result.affectedRows > 0) {
+                console.log(`[FlowEngine] Chatbot session for ${sessionIdOrPhone} silently completed due to manual agent reply.`);
+            }
+            return { success: true, completedCount: result.affectedRows };
+        } catch (err) {
+            console.error('[FlowEngine] Error in pauseSessionForAgent:', err.message);
+            return { success: false, error: err.message };
+        }
+    }
 }
 
 module.exports = FlowEngine;

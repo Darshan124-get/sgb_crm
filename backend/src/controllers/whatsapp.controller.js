@@ -288,12 +288,12 @@ const sendReply = async (req, res) => {
       await whatsappService.sendMessage(waPhone, message, replyToMessageId, staffUserId, qrName);
     }
 
-    // Auto-resolve handoff if active for this customer
+    // Auto-pause active chatbot session when human agent sends a manual reply
     try {
       const FlowEngine = require('../services/FlowEngine');
-      await FlowEngine.resolveHandoff(phone);
-    } catch (resolveErr) {
-      console.warn('Auto handoff resolve error:', resolveErr.message);
+      await FlowEngine.pauseSessionForAgent(phone);
+    } catch (pauseErr) {
+      console.warn('Auto bot pause error:', pauseErr.message);
     }
 
     res.json({ success: true });

@@ -257,6 +257,31 @@ function formatVisitedBy(visitedByStr) {
     return user.name || user.email || 'SGB Sales';
 }
 
+function formatDealerPhone(phoneStr) {
+    if (!phoneStr || phoneStr === '—' || String(phoneStr).trim() === '') {
+        return '<span style="color:#94a3b8;font-size:0.825rem;">—</span>';
+    }
+
+    let parts = [];
+    if (Array.isArray(phoneStr)) {
+        parts = phoneStr;
+    } else {
+        parts = String(phoneStr).split(/[\/\,\n]/).map(p => p.trim()).filter(Boolean);
+    }
+
+    if (parts.length === 0) return '<span style="color:#94a3b8;font-size:0.825rem;">—</span>';
+
+    return parts.map((num, idx) => {
+        const cleanNum = num.replace(/\D/g, '');
+        return `
+            <div style="display:flex;align-items:center;gap:6px;${idx > 0 ? 'margin-top:4px;' : ''}" title="Click to copy phone number" onclick="event.stopPropagation(); if(window.copyToClipboard) window.copyToClipboard('${cleanNum || num}')">
+                <i class="fa-solid fa-phone" style="color:#94a3b8;font-size:0.75rem;flex-shrink:0;"></i>
+                <span style="color:#334155;font-weight:600;font-size:0.825rem;cursor:pointer;white-space:nowrap;" onmouseover="this.style.color='#FF6B00'" onmouseout="this.style.color='#334155'">${num}</span>
+            </div>
+        `;
+    }).join('');
+}
+
 function formatGstNo(gstStr) {
     if (gstStr && gstStr.trim()) {
         return gstStr.trim();
@@ -461,8 +486,8 @@ function renderDealersTable() {
                         </div>
                     ` : ''}
                 </td>
-                <td style="padding:1rem 1.25rem;color:#334155;white-space:nowrap;">
-                    <i class="fa-solid fa-phone" style="color:#94a3b8;font-size:0.75rem;margin-right:6px;"></i>${phone}
+                <td style="padding:1rem 1.25rem;white-space:nowrap;vertical-align:middle;">
+                    ${formatDealerPhone(phone)}
                 </td>
                 <td style="padding:1rem 1.25rem;color:#475569;font-size:0.825rem;line-height:1.4;">${address}</td>
                 <td style="padding:1rem 1.25rem;text-align:center;white-space:nowrap;">

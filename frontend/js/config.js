@@ -154,16 +154,13 @@ window.requireAuth = function (allowedRoles = [], requiredPermission = null) {
         return true;
     }
 
+    // Role-based check: if user's role is in allowedRoles, grant access
+    if (allowedRoles.length > 0 && (allowedRoles.includes(role) || (role.includes('dealer') && allowedRoles.some(r => r.includes('dealer'))))) {
+        return true;
+    }
+
     // Check specific required permission if provided
-    if (requiredPermission) {
-        if (!userPermissions.includes(requiredPermission)) {
-            const home = window.getHomeUrl(user);
-            const targetPath = new URL(home, window.location.origin + window.location.pathname).pathname;
-            if (!window.location.pathname.includes(targetPath)) {
-                window.location.href = `${window.ROOT_PATH}${home}`;
-            }
-            return false;
-        }
+    if (requiredPermission && userPermissions.includes(requiredPermission)) {
         return true;
     }
 
@@ -172,21 +169,14 @@ window.requireAuth = function (allowedRoles = [], requiredPermission = null) {
         return true;
     }
 
-    // Standard role-based restriction
-    if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-        const home = window.getHomeUrl(user);
-
-        // Loop Breaker
-        const targetPath = new URL(home, window.location.origin + window.location.pathname).pathname;
-        if (window.location.pathname.includes(targetPath)) {
-            console.error("Infinite redirect detected. Staying on current page or redirecting to safe state.");
-            return false;
-        }
-
+    // Redirect to home if unauthorized
+    const home = window.getHomeUrl(user);
+    const targetPath = new URL(home, window.location.origin + window.location.pathname).pathname;
+    if (!window.location.pathname.includes(targetPath)) {
+        console.warn(`Unauthorized access to ${window.location.pathname}. Redirecting to ${home}`);
         window.location.href = `${window.ROOT_PATH}${home}`;
-        return false;
     }
-    return true;
+    return false;
 };
 
 // ─── Logout ──────────────────────────────────────────────────

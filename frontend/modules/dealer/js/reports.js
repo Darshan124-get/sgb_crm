@@ -14,7 +14,7 @@ let currentMetricView = 'sales'; // 'sales' or 'orders'
 let currentChartRange = 'month';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (window.requireAuth && !window.requireAuth([])) return;
+    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'dealer_reports')) return;
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const profileElem = document.getElementById('profileName');

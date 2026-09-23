@@ -16,6 +16,7 @@ let chartDealerStatusObj = null;
 let chartSalesTrendObj = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'dealer_dashboard')) return;
     const user = window.getCurrentUser ? window.getCurrentUser() : {};
     const uName = user.name || user.username || 'Admin';
     const profileElem = document.getElementById('profileName');

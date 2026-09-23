@@ -342,16 +342,20 @@ function initSidebar(links) {
         }
 
         // Highlight active link
-        // Use full URL comparison for reliability
+        // Use full URL comparison & filename fallback for reliability
         try {
             const linkUrl = new URL(link.href);
-            if (currentPath === linkUrl.pathname) {
+            const currentFilename = currentPath.split('/').pop() || 'dashboard.html';
+            const linkFilename = linkUrl.pathname.split('/').pop();
+
+            if (currentPath === linkUrl.pathname || (linkFilename && currentFilename === linkFilename)) {
                 // Hash-aware matching
                 const currentHash = window.location.hash || '#dashboard';
                 const linkHash = linkUrl.hash || '#dashboard';
                 if (linkUrl.hash && currentHash !== linkHash) {
                     return;
                 }
+                document.querySelectorAll('.sidebar .nav-link, .sidebar .nav-item').forEach(el => el.classList.remove('active'));
                 link.classList.add('active');
                 const navItem = link.closest('.nav-item');
                 if (navItem) navItem.classList.add('active');

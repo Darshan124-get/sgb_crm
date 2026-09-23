@@ -13,6 +13,7 @@ let currentPage = 1;
 let pageSize = 10;
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'dealer_orders')) return;
     fetchDealerOrders();
 });
 

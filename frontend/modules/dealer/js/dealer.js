@@ -15,7 +15,7 @@ let customVisitQuestionCounter = 0;
 let pendingImportDealersList = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'sales_dealers')) return;
+    if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'dealer_dealers')) return;
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const profileElem = document.getElementById('profileName');

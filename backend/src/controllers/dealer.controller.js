@@ -891,7 +891,7 @@ exports.bulkUpdateDealerOrdersStatus = async (req, res) => {
 };
 
 exports.bulkImportDealers = async (req, res) => {
-    const { dealers } = req.body;
+    const { dealers, duplicateAction = 'skip' } = req.body;
 
     if (!Array.isArray(dealers) || dealers.length === 0) {
         return res.status(400).json({ message: 'No dealer records provided for import' });
@@ -960,11 +960,18 @@ exports.bulkImportDealers = async (req, res) => {
         return '';
     };
 
+    const normStr = (s) => s ? String(s).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
+        // Fetch existing dealers for backend duplicate verification
+        const [existingDealers] = await connection.query(`SELECT dealer_id, dealer_name, contact_person, phone, gst_no FROM dealers`);
+
         let insertedCount = 0;
+        let updatedCount = 0;
+        let skippedCount = 0;
 
         for (const item of dealers) {
             const firmName = getVal(item, ['FIRM / SHOP NAME', 'FIRM NAME', 'Firm Name', 'Shop Name', 'dealer_name', 'firm_name', 'Customer Name', 'Party Name', 'Store Name', 'Shop']);
@@ -999,7 +1006,7 @@ exports.bulkImportDealers = async (req, res) => {
             const vrlCode = getVal(item, ['VRL CODE', 'VRL Code', 'vrl_code', 'Dealer Code', 'Dealer ID']);
             let status = getVal(item, ['CURRENT STATUS', 'STATUS', 'Current Status', 'Status', 'status']);
 
-            // Auto-calculate status dynamically based on LAST PURCHASED DATE (Active if within 45 days, Inactive if older than 45 days)
+            // Auto-calculate status dynamically based on LAST PURCHASED DATE
             if (visitedDate) {
                 const parsedDate = new Date(visitedDate);
                 if (!isNaN(parsedDate.getTime())) {
@@ -1021,6 +1028,65 @@ exports.bulkImportDealers = async (req, res) => {
             if (!firmName && !dealerName && !phone) continue;
 
             const finalFirmName = firmName || 'Agri Dealer Store';
+            const rowFirmNorm = normStr(finalFirmName);
+            const rowGstNorm = normStr(gstNo);
+
+            // Duplicate match check
+            let existingMatch = null;
+            for (const ed of existingDealers) {
+                const edFirmNorm = normStr(ed.dealer_name);
+                const edGstNorm = normStr(ed.gst_no);
+                const edPhones = extractPhoneNumbers({ phone: ed.phone, contact: ed.contact_person });
+
+                if (extractedPhones.length > 0 && edPhones.length > 0) {
+                    if (extractedPhones.some(p => edPhones.includes(p))) {
+                        existingMatch = ed;
+                        break;
+                    }
+                }
+                if (rowFirmNorm && edFirmNorm && (rowFirmNorm === edFirmNorm)) {
+                    existingMatch = ed;
+                    break;
+                }
+                if (rowGstNorm && edGstNorm && rowGstNorm === edGstNorm) {
+                    existingMatch = ed;
+                    break;
+                }
+            }
+
+            if (existingMatch) {
+                if (duplicateAction === 'skip') {
+                    skippedCount++;
+                    continue;
+                } else if (duplicateAction === 'update') {
+                    await connection.query(
+                        `UPDATE dealers SET
+                            contact_person = COALESCE(NULLIF(?, ''), contact_person),
+                            phone = COALESCE(NULLIF(?, ''), phone),
+                            email = COALESCE(NULLIF(?, ''), email),
+                            address = COALESCE(NULLIF(?, ''), address),
+                            town_village = COALESCE(NULLIF(?, ''), town_village),
+                            city = COALESCE(NULLIF(?, ''), city),
+                            taluk = COALESCE(NULLIF(?, ''), taluk),
+                            district = COALESCE(NULLIF(?, ''), district),
+                            state = COALESCE(NULLIF(?, ''), state),
+                            pincode = COALESCE(NULLIF(?, ''), pincode),
+                            visited_date = COALESCE(NULLIF(?, ''), visited_date),
+                            visited_by = COALESCE(NULLIF(?, ''), visited_by),
+                            gst_no = COALESCE(NULLIF(?, ''), gst_no),
+                            nearest_vrl = COALESCE(NULLIF(?, ''), nearest_vrl),
+                            vrl_code = COALESCE(NULLIF(?, ''), vrl_code),
+                            status = COALESCE(NULLIF(?, ''), status)
+                        WHERE dealer_id = ?`,
+                        [
+                            dealerName, phone, email, address, townVillage, city, taluk, district, state, pincode || null,
+                            visitedDate, visitedBy, gstNo, nearestVrl, vrlCode, status, existingMatch.dealer_id
+                        ]
+                    );
+                    updatedCount++;
+                    continue;
+                }
+            }
 
             await connection.query(
                 `INSERT INTO dealers (
@@ -1037,7 +1103,19 @@ exports.bulkImportDealers = async (req, res) => {
         }
 
         await connection.commit();
-        res.status(201).json({ success: true, count: insertedCount, message: `Successfully imported ${insertedCount} dealer(s)` });
+
+        let message = `Bulk import completed! ${insertedCount} new dealer(s) imported.`;
+        if (updatedCount > 0) message += ` ${updatedCount} existing dealer(s) updated.`;
+        if (skippedCount > 0) message += ` ${skippedCount} duplicate dealer(s) skipped.`;
+
+        res.status(201).json({
+            success: true,
+            count: insertedCount + updatedCount,
+            insertedCount,
+            updatedCount,
+            skippedCount,
+            message: message
+        });
     } catch (err) {
         await connection.rollback();
         console.error('bulkImportDealers Error:', err);

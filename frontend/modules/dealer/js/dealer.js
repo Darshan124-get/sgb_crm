@@ -513,22 +513,33 @@ function updatePaginationControls(start, end, total) {
     if (!pagesElem) return;
 
     const totalPages = Math.ceil(total / pageSize) || 1;
-    let pageHtml = `<button class="page-btn" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="changePage(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>`;
+    if (totalPages <= 1) {
+        pagesElem.innerHTML = '';
+        return;
+    }
 
-    for (let i = 1; i <= Math.min(3, totalPages); i++) {
+    let startPage = Math.max(1, currentPage - 1);
+    let endPage = startPage + 2;
+
+    if (endPage > totalPages) {
+        endPage = totalPages;
+        startPage = Math.max(1, endPage - 2);
+    }
+
+    let pageHtml = `<button class="page-btn" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="changePage(${currentPage - 1})" title="Previous Page"><i class="fa-solid fa-chevron-left"></i></button>`;
+
+    for (let i = startPage; i <= endPage; i++) {
         pageHtml += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
     }
 
-    if (totalPages > 5) {
-        pageHtml += `<span style="color:#94a3b8;padding:0 2px;">...</span>`;
-        pageHtml += `<button class="page-btn ${totalPages === currentPage ? 'active' : ''}" onclick="changePage(${totalPages})">${totalPages}</button>`;
-    } else {
-        for (let i = 4; i <= totalPages; i++) {
-            pageHtml += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pageHtml += `<span style="color:#94a3b8;padding:0 4px;font-size:0.8rem;font-weight:700;">...</span>`;
         }
+        pageHtml += `<button class="page-btn ${totalPages === currentPage ? 'active' : ''}" onclick="changePage(${totalPages})">${totalPages}</button>`;
     }
 
-    pageHtml += `<button class="page-btn" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="changePage(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>`;
+    pageHtml += `<button class="page-btn" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="changePage(${currentPage + 1})" title="Next Page"><i class="fa-solid fa-chevron-right"></i></button>`;
 
     pagesElem.innerHTML = pageHtml;
 }
@@ -1322,13 +1333,41 @@ function renderDpOrdersTable(tbodyId, orders) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
     if (!orders || orders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#94a3b8;">No orders recorded yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="padding:2rem;text-align:center;color:#94a3b8;">No orders recorded yet.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = orders.map(o => {
+    // Sort orders descending by created_at date to calculate gap to preceding order accurately
+    const sortedOrders = [...orders].sort((a, b) => {
+        const dA = new Date(a.created_at || a.order_date || 0);
+        const dB = new Date(b.created_at || b.order_date || 0);
+        return dB - dA;
+    });
+
+    tbody.innerHTML = sortedOrders.map((o, idx) => {
         const oId = window.formatOrderId ? window.formatOrderId(o.order_id, o.created_at) : `#ORD-${o.order_id}`;
         const date = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB') : '—';
+
+        // Order Gap calculation (difference in days from the previous chronological order)
+        let gapHtml = `<span style="background:#f8fafc;color:#64748b;font-weight:600;padding:3px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #e2e8f0;display:inline-block;white-space:nowrap;">1st Order</span>`;
+        if (idx < sortedOrders.length - 1) {
+            const nextOrder = sortedOrders[idx + 1];
+            const currentDate = new Date(o.created_at || o.order_date);
+            const prevDate = new Date(nextOrder.created_at || nextOrder.order_date);
+
+            if (!isNaN(currentDate.getTime()) && !isNaN(prevDate.getTime())) {
+                const d1 = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+                const d2 = new Date(prevDate.getFullYear(), prevDate.getMonth(), prevDate.getDate());
+                const diffTime = d1 - d2;
+                const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+                if (diffDays === 0) {
+                    gapHtml = `<span style="background:#f1f5f9;color:#475569;font-weight:600;padding:3px 8px;border-radius:6px;font-size:0.75rem;display:inline-block;white-space:nowrap;">Same Day</span>`;
+                } else {
+                    gapHtml = `<span style="background:#eff6ff;color:#1d4ed8;font-weight:700;padding:3px 8px;border-radius:6px;font-size:0.75rem;display:inline-block;white-space:nowrap;border:1px solid #bfdbfe;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:4px;color:#3b82f6;"></i>${diffDays} Day${diffDays > 1 ? 's' : ''}</span>`;
+                }
+            }
+        }
 
         let items = 'Agri Products';
         if (o.items_summary) {
@@ -1350,6 +1389,7 @@ function renderDpOrdersTable(tbodyId, orders) {
             <tr style="border-bottom:1px solid #f1f5f9;">
                 <td style="padding:0.75rem 0.85rem;font-weight:700;color:#ff6b00;">${oId}</td>
                 <td style="padding:0.75rem 0.85rem;color:#475569;white-space:nowrap;">${date}</td>
+                <td style="padding:0.75rem 0.85rem;text-align:center;white-space:nowrap;">${gapHtml}</td>
                 <td style="padding:0.75rem 0.85rem;color:#334155;line-height:1.4;">${items}</td>
                 <td style="padding:0.75rem 0.85rem;color:#0f172a;font-weight:700;white-space:nowrap;">
                     <span style="background:#f1f5f9;color:#334155;font-weight:700;padding:3px 8px;border-radius:6px;font-size:0.775rem;border:1px solid #cbd5e1;display:inline-block;">${delType}</span>
@@ -2250,7 +2290,7 @@ function renderDealerProductGrid() {
                     </div>
                     <div class="quantity-controls" onclick="event.stopPropagation();">
                         <button type="button" class="qty-btn" onclick="updateDealerProductQuantity(event, this, -1)">-</button>
-                        <input type="number" min="1" value="1" class="qty-val" oninput="updateDealerProductQuantityInput(event, this)" onwheel="this.blur()" style="width:45px;text-align:center;font-weight:700;border:1px solid #cbd5e1;border-radius:4px;padding:2px 4px;font-size:0.85rem;outline:none;background:#ffffff;margin:0 2px;">
+                        <input type="number" min="1" value="1" class="qty-val" oninput="updateDealerProductQuantityInput(event, this)" onblur="handleDealerProductQuantityBlur(this)" onwheel="this.blur()" style="width:45px;text-align:center;font-weight:700;border:1px solid #cbd5e1;border-radius:4px;padding:2px 4px;font-size:0.85rem;outline:none;background:#ffffff;margin:0 2px;">
                         <button type="button" class="qty-btn" onclick="updateDealerProductQuantity(event, this, 1)">+</button>
                     </div>
                     <div class="check-indicator"><i class="fa-solid fa-circle-check"></i></div>
@@ -2271,7 +2311,7 @@ function renderDealerProductGrid() {
                     </div>
                     <div class="quantity-controls" onclick="event.stopPropagation();">
                         <button type="button" class="qty-btn" onclick="updateDealerProductQuantity(event, this, -1)">-</button>
-                        <input type="number" min="1" value="1" class="qty-val" oninput="updateDealerProductQuantityInput(event, this)" onwheel="this.blur()" style="width:45px;text-align:center;font-weight:700;border:1px solid #cbd5e1;border-radius:4px;padding:2px 4px;font-size:0.85rem;outline:none;background:#ffffff;margin:0 2px;">
+                        <input type="number" min="1" value="1" class="qty-val" oninput="updateDealerProductQuantityInput(event, this)" onblur="handleDealerProductQuantityBlur(this)" onwheel="this.blur()" style="width:45px;text-align:center;font-weight:700;border:1px solid #cbd5e1;border-radius:4px;padding:2px 4px;font-size:0.85rem;outline:none;background:#ffffff;margin:0 2px;">
                         <button type="button" class="qty-btn" onclick="updateDealerProductQuantity(event, this, 1)">+</button>
                     </div>
                     <div class="check-indicator"><i class="fa-solid fa-circle-check"></i></div>
@@ -2333,15 +2373,19 @@ function updateDealerProductQuantityInput(event, inputEl) {
     const card = inputEl.closest('.product-select-card');
     if (!card) return;
 
-    let val = parseInt(inputEl.value) || 0;
-    if (val <= 0) {
-        card.classList.remove('selected');
-    } else {
-        if (!card.classList.contains('selected')) {
-            card.classList.add('selected');
-        }
+    if (!card.classList.contains('selected')) {
+        card.classList.add('selected');
     }
     recalcDealerOrderAmounts();
+}
+
+function handleDealerProductQuantityBlur(inputEl) {
+    const rawVal = (inputEl.value || '').trim();
+    const val = parseInt(rawVal);
+    if (isNaN(val) || val < 1) {
+        inputEl.value = '1';
+        recalcDealerOrderAmounts();
+    }
 }
 
 function getDealerSelectedProducts() {
@@ -2488,13 +2532,13 @@ function renderStage2OrderItemsTable() {
                     ${item.quantity > 1 ? `<span style="font-size:0.75rem;color:#f59e0b;font-weight:700;">Qty: ${item.quantity}</span>` : ''}
                 </td>
                 <td style="padding:0.75rem 0.75rem;">
-                    <input type="number" min="0" step="1" value="${item.unitPrice}" oninput="updateStage2ItemUnitPrice(${idx}, this.value)" onwheel="this.blur()" style="width:105px;padding:0.4rem 0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;font-weight:700;color:#0f172a;outline:none;background:#ffffff;">
+                    <input type="number" id="stage2UnitPrice_${idx}" min="0" step="1" value="${item.unitPrice}" oninput="updateStage2ItemUnitPrice(${idx}, this.value)" onwheel="this.blur()" style="width:105px;padding:0.4rem 0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;font-weight:700;color:#0f172a;outline:none;background:#ffffff;">
                 </td>
                 <td style="padding:0.75rem 0.75rem;">
-                    <input type="number" min="0" step="1" value="${item.discount}" oninput="updateStage2ItemDiscount(${idx}, this.value)" onwheel="this.blur()" style="width:95px;padding:0.4rem 0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;font-weight:600;color:#0f172a;outline:none;background:#ffffff;">
+                    <input type="number" id="stage2Discount_${idx}" min="0" step="1" value="${item.discount}" oninput="updateStage2ItemDiscount(${idx}, this.value)" onwheel="this.blur()" style="width:95px;padding:0.4rem 0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;font-weight:600;color:#0f172a;outline:none;background:#ffffff;">
                 </td>
                 <td style="padding:0.75rem 0.75rem;">
-                    <span style="font-weight:800;color:#16a34a;font-size:0.95rem;">₹${itemFinalTotal.toLocaleString('en-IN')}.00</span>
+                    <span id="stage2RowTotal_${idx}" style="font-weight:800;color:#16a34a;font-size:0.95rem;">₹${itemFinalTotal.toLocaleString('en-IN')}.00</span>
                 </td>
                 <td style="padding:0.75rem 0.5rem;text-align:center;">
                     <button type="button" onclick="removeStage2OrderItem(${idx})" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:4px 8px;font-size:0.95rem;" title="Remove Item">
@@ -2514,21 +2558,67 @@ function renderStage2OrderItemsTable() {
 function updateStage2ItemUnitPrice(idx, val) {
     if (stage2OrderItems[idx]) {
         stage2OrderItems[idx].unitPrice = parseFloat(val) || 0;
-        renderStage2OrderItemsTable();
+        
+        // Update row total without re-rendering tbody (preserves focus & cursor)
+        const item = stage2OrderItems[idx];
+        const itemSubTotal = item.unitPrice * item.quantity;
+        const itemDiscountTotal = item.discount * item.quantity;
+        const itemFinalTotal = Math.max(0, itemSubTotal - itemDiscountTotal);
+        const rowTotalEl = document.getElementById(`stage2RowTotal_${idx}`);
+        if (rowTotalEl) {
+            rowTotalEl.textContent = `₹${itemFinalTotal.toLocaleString('en-IN')}.00`;
+        }
+
+        // Update footer totals
+        let totalItems = 0;
+        let subTotalSum = 0;
+        stage2OrderItems.forEach(it => {
+            totalItems += it.quantity;
+            subTotalSum += (it.unitPrice * it.quantity);
+        });
+        const itemsCountEl = document.getElementById('stage2TotalItemsCount');
+        const subTotalDisplayEl = document.getElementById('stage2SubTotalDisplay');
+        if (itemsCountEl) itemsCountEl.textContent = totalItems;
+        if (subTotalDisplayEl) subTotalDisplayEl.textContent = `₹${subTotalSum.toLocaleString('en-IN')}.00`;
+
+        recalcStage3Amounts();
     }
 }
 
 function updateStage2ItemDiscount(idx, val) {
     if (stage2OrderItems[idx]) {
         stage2OrderItems[idx].discount = parseFloat(val) || 0;
-        renderStage2OrderItemsTable();
+        
+        // Update row total without re-rendering tbody (preserves focus & cursor)
+        const item = stage2OrderItems[idx];
+        const itemSubTotal = item.unitPrice * item.quantity;
+        const itemDiscountTotal = item.discount * item.quantity;
+        const itemFinalTotal = Math.max(0, itemSubTotal - itemDiscountTotal);
+        const rowTotalEl = document.getElementById(`stage2RowTotal_${idx}`);
+        if (rowTotalEl) {
+            rowTotalEl.textContent = `₹${itemFinalTotal.toLocaleString('en-IN')}.00`;
+        }
+
+        // Update footer totals
+        let totalItems = 0;
+        let subTotalSum = 0;
+        stage2OrderItems.forEach(it => {
+            totalItems += it.quantity;
+            subTotalSum += (it.unitPrice * it.quantity);
+        });
+        const itemsCountEl = document.getElementById('stage2TotalItemsCount');
+        const subTotalDisplayEl = document.getElementById('stage2SubTotalDisplay');
+        if (itemsCountEl) itemsCountEl.textContent = totalItems;
+        if (subTotalDisplayEl) subTotalDisplayEl.textContent = `₹${subTotalSum.toLocaleString('en-IN')}.00`;
+
+        recalcStage3Amounts();
     }
 }
 
 function updateStage2ItemTax(idx, val) {
     if (stage2OrderItems[idx]) {
         stage2OrderItems[idx].tax = parseFloat(val) || 0;
-        renderStage2OrderItemsTable();
+        recalcStage3Amounts();
     }
 }
 
@@ -3021,6 +3111,7 @@ function clearImportFileSelection() {
     if (btnSubmit) {
         btnSubmit.disabled = true;
         btnSubmit.style.opacity = '0.5';
+        btnSubmit.innerHTML = '<i class="fa-solid fa-file-import"></i> Import Dealers Now';
     }
 }
 
@@ -3164,36 +3255,107 @@ function extractPhoneNumbersFromObject(item) {
 function renderImportPreview(rows) {
     const previewContainer = document.getElementById('importPreviewContainer');
     const tbody = document.getElementById('importPreviewTableBody');
-    const badge = document.getElementById('importRecordCountBadge');
     const btnSubmit = document.getElementById('btnSubmitBulkImport');
+
+    const totalEl = document.getElementById('importSummaryTotal');
+    const newEl = document.getElementById('importSummaryNew');
+    const oldEl = document.getElementById('importSummaryOld');
 
     if (!tbody || !previewContainer) return;
 
-    badge.textContent = `Parsed ${rows.length} Dealer Record${rows.length === 1 ? '' : 's'} Ready to Import`;
     previewContainer.style.display = 'block';
 
-    const previewRows = rows;
-    tbody.innerHTML = previewRows.map((r, idx) => {
+    const normalizeStr = (str) => str ? String(str).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+    let newCount = 0;
+    let oldCount = 0;
+
+    tbody.innerHTML = rows.map((r, idx) => {
         const firmName = r.firm_name || r.dealer_name || r['FIRM / SHOP NAME'] || r['FIRM NAME'] || r['Firm Name'] || r['Shop Name'] || '—';
         const dealerName = r.owner_name || r.contact_person || r['DEALER NAME'] || r['Dealer Name'] || '—';
         const extracted = extractPhoneNumbersFromObject(r);
         const phone = extracted.length > 0 ? extracted.join(' / ') : (r.phone_number || r.phone || r.contact || r['CONTACT'] || r['Phone'] || '—');
         const city = r.city || r['CITY'] || r.address || r['ADDRESS'] || r['City'] || '—';
+        const gstNo = r.gst_no || r['GST NO.'] || r['GST NO'] || r['GST No'] || r['GSTIN'] || '';
+
+        const rowFirmNorm = normalizeStr(firmName !== '—' ? firmName : '');
+        const rowGstNorm = normalizeStr(gstNo);
+
+        let isDuplicate = false;
+        let matchReason = '';
+
+        for (const d of allDealers) {
+            const existingFirmNorm = normalizeStr(d.dealer_name);
+            const existingGstNorm = normalizeStr(d.gst_no);
+            const existingPhones = extractPhoneNumbersFromObject({ phone: d.phone, contact: d.contact_person });
+
+            // 1. Phone match check
+            if (extracted.length > 0 && existingPhones.length > 0) {
+                const matchedPhone = extracted.find(p => existingPhones.includes(p));
+                if (matchedPhone) {
+                    isDuplicate = true;
+                    matchReason = `Phone ${matchedPhone} matches "${d.dealer_name}"`;
+                    break;
+                }
+            }
+
+            // 2. Firm Name match check
+            if (rowFirmNorm && existingFirmNorm && (rowFirmNorm === existingFirmNorm)) {
+                isDuplicate = true;
+                matchReason = `Firm Name matches "${d.dealer_name}"`;
+                break;
+            }
+
+            // 3. GST match check
+            if (rowGstNorm && existingGstNorm && rowGstNorm === existingGstNorm) {
+                isDuplicate = true;
+                matchReason = `GST No. matches "${d.dealer_name}"`;
+                break;
+            }
+        }
+
+        if (isDuplicate) {
+            oldCount++;
+        } else {
+            newCount++;
+        }
+
+        const statusBadge = isDuplicate
+            ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#FFEDD5;color:#C2410C;border:1px solid #FED7AA;padding:0.25rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:700;"><i class="fa-solid fa-user-check"></i> EXISTING (OLD)</span>`
+            : `<span style="display:inline-flex;align-items:center;gap:4px;background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0;padding:0.25rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:700;"><i class="fa-solid fa-user-plus"></i> NEW</span>`;
+
+        const matchText = isDuplicate
+            ? `<span style="color:#C2410C;font-weight:600;font-size:0.7rem;" title="${matchReason}">${matchReason}</span>`
+            : `<span style="color:#16A34A;font-weight:600;font-size:0.7rem;">Ready to Import</span>`;
+
+        const rowBg = isDuplicate ? 'background:#FFFBF5;' : '';
 
         return `
-            <tr style="border-bottom:1px solid #f1f5f9;">
-                <td style="padding:0.4rem 0.75rem;color:#64748b;">${idx + 1}</td>
-                <td style="padding:0.4rem 0.75rem;font-weight:700;color:#0f172a;">${firmName}</td>
-                <td style="padding:0.4rem 0.75rem;color:#334155;">${dealerName}</td>
-                <td style="padding:0.4rem 0.75rem;color:#334155;">${phone}</td>
-                <td style="padding:0.4rem 0.75rem;color:#475569;">${city}</td>
+            <tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
+                <td style="padding:0.45rem 0.75rem;color:#64748b;">${idx + 1}</td>
+                <td style="padding:0.45rem 0.75rem;">${statusBadge}</td>
+                <td style="padding:0.45rem 0.75rem;font-weight:700;color:#0f172a;">${firmName}</td>
+                <td style="padding:0.45rem 0.75rem;color:#334155;">${dealerName}</td>
+                <td style="padding:0.45rem 0.75rem;color:#334155;">${phone}</td>
+                <td style="padding:0.45rem 0.75rem;color:#475569;">${city}</td>
+                <td style="padding:0.45rem 0.75rem;">${matchText}</td>
             </tr>
         `;
     }).join('');
 
+    if (totalEl) totalEl.innerHTML = `Total: <strong>${rows.length}</strong>`;
+    if (newEl) newEl.innerHTML = `<i class="fa-solid fa-user-plus"></i> New Dealers: <strong>${newCount}</strong>`;
+    if (oldEl) oldEl.innerHTML = `<i class="fa-solid fa-user-check"></i> Existing (Old): <strong>${oldCount}</strong>`;
+
+    const dupOptionsEl = document.getElementById('duplicateHandlingOptions');
+    if (dupOptionsEl) {
+        dupOptionsEl.style.display = oldCount > 0 ? 'flex' : 'none';
+    }
+
     if (btnSubmit) {
         btnSubmit.disabled = false;
         btnSubmit.style.opacity = '1';
+        btnSubmit.innerHTML = '<i class="fa-solid fa-file-import"></i> Import Dealers Now';
     }
 }
 
@@ -3205,8 +3367,10 @@ async function executeDealerBulkImport() {
         return;
     }
 
+    const dupActionEl = document.querySelector('input[name="duplicateAction"]:checked');
+    const duplicateAction = dupActionEl ? dupActionEl.value : 'skip';
+
     const btnSubmit = document.getElementById('btnSubmitBulkImport');
-    const originalText = btnSubmit ? btnSubmit.innerHTML : 'Import Dealers Now';
 
     if (btnSubmit) {
         btnSubmit.disabled = true;
@@ -3220,14 +3384,17 @@ async function executeDealerBulkImport() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token()}`
             },
-            body: JSON.stringify({ dealers: pendingImportDealersList })
+            body: JSON.stringify({
+                dealers: pendingImportDealersList,
+                duplicateAction: duplicateAction
+            })
         });
 
         const data = await res.json();
 
         if (res.ok && data.success) {
             if (window.showAlert) {
-                window.showAlert("Import Success", data.message || `Successfully imported ${data.count} dealers!`, "success");
+                window.showAlert("Import Success", data.message || `Successfully processed dealers!`, "success");
             } else {
                 alert(data.message || "Import completed successfully!");
             }
@@ -3243,9 +3410,11 @@ async function executeDealerBulkImport() {
         } else {
             alert(err.message || "Import failed");
         }
+    } finally {
         if (btnSubmit) {
             btnSubmit.disabled = false;
-            btnSubmit.innerHTML = originalText;
+            btnSubmit.style.opacity = '1';
+            btnSubmit.innerHTML = '<i class="fa-solid fa-file-import"></i> Import Dealers Now';
         }
     }
 }

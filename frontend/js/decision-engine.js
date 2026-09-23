@@ -71,9 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('click', (e) => {
         if (e.target.classList.contains('status-pill')) {
             const wrapper = e.target.closest('.selection-row') || e.target.closest('.status-pill-grid');
-            if (wrapper) {
-                wrapper.querySelectorAll('.status-pill').forEach(btn => btn.classList.remove('active'));
-            }
+            if (!wrapper) return;
+
+            wrapper.querySelectorAll('.status-pill').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
             const val = e.target.getAttribute('data-value');
 

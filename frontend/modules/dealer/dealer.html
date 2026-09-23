@@ -234,9 +234,23 @@
                             <p style="color:#64748b;font-size:0.875rem;">Manage all dealer accounts and their orders.
                             </p>
                         </div>
-                        <button class="btn-orange" id="addDealerBtn" onclick="openAddDealerView()">
-                            <i class="fa-solid fa-plus"></i> Add Dealer
-                        </button>
+                        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                            <button class="btn-outline-card" id="btnExportDealers" onclick="exportDealersData()">
+                                <i class="fa-solid fa-download"></i> <span id="btnExportDealersLabel">Export</span>
+                            </button>
+                            <button class="btn-outline-card" id="btnImportDealers"
+                                onclick="openImportDealersModal(event)"
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;font-weight:600;padding:0.4rem 0.85rem;border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <i class="fa-solid fa-file-import" style="color:#10b981;"></i> Import Dealers
+                            </button>
+                            <button class="btn-outline-card" id="btnImportOrders" onclick="openImportOrdersModal(event)"
+                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;font-weight:600;padding:0.4rem 0.85rem;border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                <i class="fa-solid fa-boxes-packing" style="color:#FF6B00;"></i> Import Bulk Orders
+                            </button>
+                            <button class="btn-orange" id="addDealerBtn" onclick="openAddDealerView()">
+                                <i class="fa-solid fa-plus"></i> Add Dealer
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Filter & Stat Cards Row -->
@@ -301,24 +315,12 @@
                                 <i class="fa-solid fa-check-double"></i> <span id="selectedDealersCount">0</span>
                                 Selected
                             </div>
-                            <button class="btn-outline-card" id="btnExportDealers" onclick="exportDealersData()">
-                                <i class="fa-solid fa-download"></i> <span id="btnExportDealersLabel">Export</span>
-                            </button>
                             <button class="btn-outline-card" id="btnDeleteSelectedDealers"
                                 onclick="deleteSelectedDealers()"
                                 style="display:none;padding:0.4rem 0.85rem;background:#FEE2E2;color:#DC2626;border-color:#FCA5A5;font-weight:700;transition:all 0.15s ease;"
                                 onmouseover="this.style.background='#FCA5A5';"
                                 onmouseout="this.style.background='#FEE2E2';" title="Delete Selected Dealers">
                                 <i class="fa-solid fa-trash-can"></i> Delete Selected
-                            </button>
-                            <button class="btn-outline-card" id="btnImportDealers"
-                                onclick="openImportDealersModal(event)"
-                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;font-weight:600;padding:0.4rem 0.85rem;border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                                <i class="fa-solid fa-file-import" style="color:#10b981;"></i> Import Dealers
-                            </button>
-                            <button class="btn-outline-card" id="btnImportOrders" onclick="openImportOrdersModal(event)"
-                                style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;font-weight:600;padding:0.4rem 0.85rem;border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                                <i class="fa-solid fa-boxes-packing" style="color:#FF6B00;"></i> Import Bulk Orders
                             </button>
                         </div>
 
@@ -1213,6 +1215,9 @@
                                                 style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
                                                 Order Date</th>
                                             <th
+                                                style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:center;">
+                                                Order Gap</th>
+                                            <th
                                                 style="padding:0.75rem 0.85rem;font-weight:700;color:#64748b;text-align:left;">
                                                 Products & Quantity</th>
                                             <th
@@ -1234,7 +1239,7 @@
                                     </thead>
                                     <tbody id="dpAllOrdersTbody">
                                         <tr>
-                                            <td colspan="8" style="padding:2rem;text-align:center;color:#94a3b8;">No
+                                            <td colspan="9" style="padding:2rem;text-align:center;color:#94a3b8;">No
                                                 orders recorded yet.</td>
                                         </tr>
                                     </tbody>
@@ -1840,7 +1845,7 @@
     <div id="importDealersModal"
         style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
         <div
-            style="background:#ffffff;border-radius:16px;width:100%;max-width:650px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;animation:entrance 0.25s ease-out;">
+            style="background:#ffffff;border-radius:16px;width:100%;max-width:850px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;animation:entrance 0.25s ease-out;">
             <!-- Header -->
             <div
                 style="padding:1.25rem 1.5rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
@@ -1891,23 +1896,52 @@
 
                 <!-- Preview & Status Area -->
                 <div id="importPreviewContainer" style="display:none;margin-top:1.25rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                        <div style="font-size:0.825rem;font-weight:700;color:#0F172A;" id="importRecordCountBadge">
-                            Parsed 0 Records</div>
-                        <button type="button" onclick="clearImportFileSelection()"
-                            style="background:transparent;border:none;color:#EF4444;font-size:0.75rem;font-weight:600;cursor:pointer;">Clear
-                            Selection</button>
+                    <!-- Summary Badges Bar -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;background:#F8FAFC;padding:0.75rem 1rem;border-radius:10px;border:1px solid #E2E8F0;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                            <span id="importSummaryTotal" style="font-size:0.775rem;font-weight:700;color:#0F172A;background:#E2E8F0;padding:0.3rem 0.65rem;border-radius:6px;">
+                                Total: <strong>0</strong>
+                            </span>
+                            <span id="importSummaryNew" style="font-size:0.775rem;font-weight:700;color:#15803D;background:#DCFCE7;padding:0.3rem 0.65rem;border-radius:6px;border:1px solid #BBF7D0;">
+                                <i class="fa-solid fa-user-plus"></i> New Dealers: <strong>0</strong>
+                            </span>
+                            <span id="importSummaryOld" style="font-size:0.775rem;font-weight:700;color:#C2410C;background:#FFEDD5;padding:0.3rem 0.65rem;border-radius:6px;border:1px solid #FED7AA;">
+                                <i class="fa-solid fa-user-check"></i> Existing (Old): <strong>0</strong>
+                            </span>
+                        </div>
+                        <button type="button" onclick="clearImportFileSelection()" style="background:transparent;border:none;color:#EF4444;font-size:0.75rem;font-weight:700;cursor:pointer;">
+                            <i class="fa-solid fa-rotate-left"></i> Clear Selection
+                        </button>
                     </div>
-                    <div
-                        style="max-height:260px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#ffffff;">
+
+                    <!-- Duplicate Action Options (Only shown when existing/old dealers are detected) -->
+                    <div id="duplicateHandlingOptions" style="display:none;margin-bottom:0.75rem;padding:0.6rem 0.85rem;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;align-items:center;gap:1.25rem;flex-wrap:wrap;font-size:0.775rem;font-weight:600;color:#92400E;">
+                        <span style="font-weight:700;color:#78350F;"><i class="fa-solid fa-filter"></i> Import Action:</span>
+                        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="radio" name="duplicateAction" value="skip" checked style="accent-color:#16A34A;">
+                            <span>Skip Existing (Import New Only)</span>
+                        </label>
+                        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="radio" name="duplicateAction" value="update" style="accent-color:#16A34A;">
+                            <span>Update Existing & Insert New</span>
+                        </label>
+                        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="radio" name="duplicateAction" value="all" style="accent-color:#16A34A;">
+                            <span>Import All (Allow Duplicates)</span>
+                        </label>
+                    </div>
+
+                    <div style="max-height:280px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#ffffff;">
                         <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
-                            <thead style="background:#F8FAFC;position:sticky;top:0;border-bottom:1px solid #E2E8F0;">
+                            <thead style="background:#F8FAFC;position:sticky;top:0;border-bottom:1px solid #E2E8F0;z-index:2;">
                                 <tr>
-                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">#</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;width:35px;">#</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;width:130px;">Status</th>
                                     <th style="padding:0.5rem 0.75rem;color:#64748B;">Firm / Shop Name</th>
                                     <th style="padding:0.5rem 0.75rem;color:#64748B;">Dealer Name</th>
                                     <th style="padding:0.5rem 0.75rem;color:#64748B;">Contact</th>
                                     <th style="padding:0.5rem 0.75rem;color:#64748B;">City / Address</th>
+                                    <th style="padding:0.5rem 0.75rem;color:#64748B;">Match Details</th>
                                 </tr>
                             </thead>
                             <tbody id="importPreviewTableBody"></tbody>

@@ -312,9 +312,87 @@ const getChatHistory = async (phoneInput, user = null) => {
  */
 const getAllChatCustomers = async (user = null, options = {}) => {
   try {
-    const limit = parseInt(options.limit) > 0 ? parseInt(options.limit) : null;
+    const limit = parseInt(options.limit) > 0 ? parseInt(options.limit) : 30;
     const page = parseInt(options.page) > 0 ? parseInt(options.page) : 1;
-    const offset = limit ? (page - 1) * limit : 0;
+    const offset = (page - 1) * limit;
+
+    if (options.search) {
+      const trimmedSearch = options.search.trim().toLowerCase();
+      const searchDigits = trimmedSearch.replace(/\D/g, '');
+      const searchPattern = `%${trimmedSearch}%`;
+
+      let leadQuery = `SELECT l.lead_id FROM leads l WHERE 1=1`;
+      let leadParams = [];
+
+      if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
+        leadQuery += " AND l.assigned_to = ?";
+        leadParams.push(user.id);
+      }
+
+      if (searchDigits && searchDigits.length >= 3) {
+        const digitsPattern = `%${searchDigits}%`;
+        leadQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ? OR REPLACE(REPLACE(l.phone_number, '+', ''), ' ', '') LIKE ?)";
+        leadParams.push(searchPattern, searchPattern, digitsPattern);
+      } else {
+        leadQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
+        leadParams.push(searchPattern, searchPattern);
+      }
+
+      leadQuery += " LIMIT 100";
+
+      const [matchingLeads] = await db.execute(leadQuery, leadParams);
+      const leadIds = matchingLeads.map(l => l.lead_id);
+
+      if (leadIds.length === 0) {
+        return { customers: [], totalCount: 0, unreadCount: 0, handoffCount: 0 };
+      }
+
+      const inClause = leadIds.map(() => '?').join(',');
+      let searchQuery = `
+        SELECT 
+          l.*, 
+          l.phone_number AS phone, 
+          u.name AS assigned_name,
+          cs_paused.status AS session_status,
+          cs_paused.paused_at AS paused_at,
+          agg.last_message_at,
+          agg.last_inbound_at,
+          COALESCE(agg.unread_msg_count, 0) AS unread_msg_count,
+          cm_last.message AS last_message,
+          cm_last.sender_type AS last_message_sender_type,
+          cm_last.status AS last_message_status
+        FROM leads l
+        LEFT JOIN users u ON l.assigned_to = u.user_id
+        LEFT JOIN (
+          SELECT 
+            cs.lead_id,
+            MAX(cm.chat_id) AS max_chat_id,
+            MAX(cm.timestamp) AS last_message_at,
+            MAX(CASE WHEN cm.sender_type = 'user' THEN cm.timestamp ELSE NULL END) AS last_inbound_at,
+            SUM(CASE WHEN cm.sender_type = 'user' AND cm.status = 'sent' THEN 1 ELSE 0 END) AS unread_msg_count
+          FROM chat_sessions cs
+          JOIN chat_messages cm ON cs.session_id = cm.session_id
+          WHERE cs.lead_id IN (${inClause})
+          GROUP BY cs.lead_id
+        ) agg ON l.lead_id = agg.lead_id
+        LEFT JOIN chat_messages cm_last ON cm_last.chat_id = agg.max_chat_id
+        LEFT JOIN (
+          SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
+          FROM chatbot_sessions cs1
+          JOIN (
+            SELECT MAX(session_id) as max_session_id
+            FROM chatbot_sessions
+            WHERE status = 'paused_for_human' AND lead_id IN (${inClause})
+            GROUP BY session_id
+          ) cs2 ON cs1.session_id = cs2.max_session_id
+        ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
+        WHERE l.lead_id IN (${inClause})
+        ORDER BY agg.last_message_at DESC, l.created_at DESC
+      `;
+
+      const [rows] = await db.execute(searchQuery, [...leadIds, ...leadIds, ...leadIds]);
+      return { customers: rows, totalCount: rows.length, unreadCount: 0, handoffCount: 0 };
+    }
 
     let query = `
       SELECT 
@@ -344,16 +422,12 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       ) agg ON l.lead_id = agg.lead_id
       LEFT JOIN chat_messages cm_last ON cm_last.chat_id = agg.max_chat_id
       LEFT JOIN (
-        SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
-        FROM chatbot_sessions cs1
-        JOIN (
-          SELECT MAX(session_id) as max_session_id
-          FROM chatbot_sessions
-          WHERE status = 'paused_for_human'
-          GROUP BY session_id
-        ) cs2 ON cs1.session_id = cs2.max_session_id
-      ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
-                  OR (cs_paused.phone IS NOT NULL AND RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_unicode_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_unicode_ci)
+        SELECT lead_id, status, paused_at
+        FROM chatbot_sessions
+        WHERE status = 'paused_for_human'
+        ORDER BY session_id DESC
+        LIMIT 100
+      ) cs_paused ON l.lead_id = cs_paused.lead_id
       WHERE 1=1
     `;
     let params = [];
@@ -361,21 +435,6 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
       query += " AND l.assigned_to = ?";
       params.push(user.id);
-    }
-
-    if (options.search) {
-      const trimmedSearch = options.search.trim().toLowerCase();
-      const searchDigits = trimmedSearch.replace(/\D/g, '');
-      const searchPattern = `%${trimmedSearch}%`;
-
-      if (searchDigits && searchDigits.length >= 3) {
-        const digitsPattern = `%${searchDigits}%`;
-        query += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ? OR REPLACE(REPLACE(l.phone_number, '+', ''), ' ', '') LIKE ?)";
-        params.push(searchPattern, searchPattern, digitsPattern);
-      } else {
-        query += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
-        params.push(searchPattern, searchPattern);
-      }
     }
 
     if (options.tab === 'handoff' || options.tab === 'my_handoff') {
@@ -390,69 +449,41 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       query += " AND l.status IN ('converted', 'closed', 'lost')";
     }
 
-    query += ` ORDER BY agg.last_message_at DESC, l.created_at DESC`;
-
-    if (limit) {
-      query += ` LIMIT ${limit} OFFSET ${offset}`;
-    }
-
-    const [rows] = await db.execute(query, params);
+    query += ` ORDER BY agg.last_message_at DESC, l.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
     // Compute total count of leads matching user filter
     let countQuery = `SELECT COUNT(*) AS total FROM leads l WHERE 1=1`;
     let countParams = [];
-
     if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
       countQuery += " AND l.assigned_to = ?";
       countParams.push(user.id);
     }
 
-    if (options.search) {
-      const trimmedSearch = options.search.trim().toLowerCase();
-      const searchDigits = trimmedSearch.replace(/\D/g, '');
-      const searchPattern = `%${trimmedSearch}%`;
-
-      if (searchDigits && searchDigits.length >= 3) {
-        const digitsPattern = `%${searchDigits}%`;
-        countQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ? OR REPLACE(REPLACE(l.phone_number, '+', ''), ' ', '') LIKE ?)";
-        countParams.push(searchPattern, searchPattern, digitsPattern);
-      } else {
-        countQuery += " AND (LOWER(l.customer_name) LIKE ? OR l.phone_number LIKE ?)";
-        countParams.push(searchPattern, searchPattern);
-      }
-    }
-
-    const [countRows] = await db.execute(countQuery, countParams);
-    const totalCount = countRows[0] ? parseInt(countRows[0].total) : rows.length;
-
     // Compute total unread count across DB
     let unreadQuery = `
-      SELECT COUNT(DISTINCT cs.lead_id) AS total_unread 
-      FROM chat_sessions cs 
-      JOIN chat_messages cm ON cs.session_id = cm.session_id 
-      WHERE cm.sender_type = 'user' AND cm.status = 'sent'
+      SELECT COUNT(DISTINCT session_id) AS total_unread 
+      FROM chat_messages 
+      WHERE sender_type = 'user' AND status = 'sent'
     `;
     let unreadParams = [];
-    if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
-      unreadQuery += " AND cs.lead_id IN (SELECT lead_id FROM leads WHERE assigned_to = ?)";
-      unreadParams.push(user.id);
-    }
-    const [unreadRows] = await db.execute(unreadQuery, unreadParams);
-    const unreadCount = unreadRows[0] ? parseInt(unreadRows[0].total_unread) : 0;
 
-    // Compute total handoff count across DB (joining chatbot_sessions by lead_id or phone with explicit collation)
+    // Compute total handoff count across DB
     let handoffQuery = `
-      SELECT COUNT(DISTINCT cs.session_id) AS total_handoff 
-      FROM chatbot_sessions cs 
-      LEFT JOIN leads l ON (cs.lead_id IS NOT NULL AND cs.lead_id = l.lead_id) OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_unicode_ci = RIGHT(REPLACE(cs.phone, '+', ''), 10) COLLATE utf8mb4_unicode_ci)
-      WHERE (cs.status = 'paused_for_human' OR l.status = 'human_needed')
+      SELECT COUNT(*) AS total_handoff 
+      FROM chatbot_sessions 
+      WHERE status = 'paused_for_human'
     `;
     let handoffParams = [];
-    if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
-      handoffQuery += " AND l.assigned_to = ?";
-      handoffParams.push(user.id);
-    }
-    const [handoffRows] = await db.execute(handoffQuery, handoffParams);
+
+    const [[rows], [countRows], [unreadRows], [handoffRows]] = await Promise.all([
+      db.execute(query, params),
+      db.execute(countQuery, countParams),
+      db.execute(unreadQuery, unreadParams),
+      db.execute(handoffQuery, handoffParams)
+    ]);
+
+    const totalCount = countRows[0] ? parseInt(countRows[0].total) : rows.length;
+    const unreadCount = unreadRows[0] ? parseInt(unreadRows[0].total_unread) : 0;
     const handoffCount = handoffRows[0] ? parseInt(handoffRows[0].total_handoff) : 0;
 
     return {
@@ -461,7 +492,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       unreadCount: unreadCount,
       handoffCount: handoffCount,
       page: page,
-      limit: limit || rows.length
+      limit: limit
     };
   } catch (err) {
     logger.error('Fetch all chat customers error:', err.message);

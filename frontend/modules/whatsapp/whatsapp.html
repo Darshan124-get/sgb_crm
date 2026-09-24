@@ -137,7 +137,18 @@
                 <div class="search-box" style="margin-top: 15px; position: relative;">
                     <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--whatsapp-secondary);"></i>
                     <input type="text" id="customer-search" name="customer-search" aria-label="Search conversations" placeholder="Search conversations..." 
-                           style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 10px 10px 10px 40px; border-radius: 8px; color: var(--whatsapp-text); outline: none; transition: border-color 0.2s;">
+                           style="width: 100%; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); padding: 10px 36px 10px 40px; border-radius: 8px; color: var(--whatsapp-text); outline: none; transition: border-color 0.2s;">
+                    <i class="fas fa-times-circle" id="clear-customer-search" title="Clear search" style="
+                        position: absolute; 
+                        right: 12px; 
+                        top: 50%; 
+                        transform: translateY(-50%); 
+                        color: var(--whatsapp-secondary); 
+                        cursor: pointer; 
+                        display: none; 
+                        font-size: 1rem;
+                        transition: color 0.2s;
+                    " onmouseover="this.style.color='var(--whatsapp-text)'" onmouseout="this.style.color='var(--whatsapp-secondary)'"></i>
                 </div>
             </header>
 

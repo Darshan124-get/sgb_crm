@@ -146,7 +146,16 @@ const receiveMessage = async (req, res) => {
             // 4. Campaign Auto-Replies Check (ONLY for ACTIVE campaigns)
             logger.info(`Message received from ${fromNumber}: ${inputText}`);
 
-            const [campaigns] = await pool.query('SELECT * FROM campaigns WHERE status = "active" AND auto_replies IS NOT NULL AND auto_replies != \'[]\' ORDER BY id DESC');
+            if (!global._activeCampaignsCache || (Date.now() - (global._activeCampaignsCacheTime || 0) > 60000)) {
+              try {
+                const [campaignRows] = await pool.query('SELECT * FROM campaigns WHERE status = "active" AND auto_replies IS NOT NULL AND auto_replies != \'[]\' ORDER BY id DESC');
+                global._activeCampaignsCache = campaignRows;
+                global._activeCampaignsCacheTime = Date.now();
+              } catch (cErr) {
+                logger.error('Error fetching active campaigns cache:', cErr.message);
+              }
+            }
+            const campaigns = global._activeCampaignsCache || [];
             let matchedCampaign = null;
 
             if (inputText) {

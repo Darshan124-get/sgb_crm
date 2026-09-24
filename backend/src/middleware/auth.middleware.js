@@ -14,7 +14,7 @@ function authenticateToken(req, res, next) {
     if (!token) return res.status(401).json({ message: 'No token provided' });
 
     jwt.verify(token, JWT_SECRET, async (err, user) => {
-        if (err) return res.status(403).json({ message: 'Invalid token' });
+        if (err) return res.status(401).json({ message: 'Invalid or expired token' });
         
         // Backward compatibility: If old token lacks role, fetch from database.
         if (!user.role && user.id) {

@@ -215,17 +215,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 10000);
 
-    // Search Filtering
+    // Refresh customer list every 10 seconds if page is visible
+
+    // Search Filtering & Clear Icon Logic
+    const clearSearchBtnEl = document.getElementById('clear-customer-search');
+
     if (searchInputEl) {
         let searchDebounceTimeout = null;
+
+        const updateClearBtnVisibility = () => {
+            if (clearSearchBtnEl) {
+                clearSearchBtnEl.style.display = searchInputEl.value.trim() ? 'block' : 'none';
+            }
+        };
+
+        const triggerSearch = () => {
+            clearTimeout(searchDebounceTimeout);
+            updateClearBtnVisibility();
+            renderCustomerList();
+            const term = searchInputEl.value.trim();
+            loadCustomers(currentTab, term);
+        };
+
         searchInputEl.addEventListener('input', () => {
+            updateClearBtnVisibility();
             renderCustomerList();
             clearTimeout(searchDebounceTimeout);
-            searchDebounceTimeout = setTimeout(() => {
-                const term = searchInputEl.value.trim();
-                loadCustomers(currentTab, term);
-            }, 300);
+            searchDebounceTimeout = setTimeout(triggerSearch, 120);
         });
+
+        searchInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                triggerSearch();
+            }
+        });
+
+        if (clearSearchBtnEl) {
+            clearSearchBtnEl.addEventListener('click', () => {
+                searchInputEl.value = '';
+                updateClearBtnVisibility();
+                renderCustomerList();
+                triggerSearch();
+                searchInputEl.focus();
+            });
+        }
     }
 
     // Tab Switching Logic (initial setup if container is not dynamically loaded yet, but loadCampaignsAndTabs handles it)
@@ -742,12 +776,18 @@ async function loadCustomers(tabParam = null, searchParam = null) {
     try {
         const tabToFetch = tabParam || currentTab || 'all';
         const searchTerm = searchParam !== null ? searchParam : (searchInputEl ? searchInputEl.value.trim() : '');
-        let fetchUrl = `${API_BASE}/customers?limit=50&page=1&tab=${encodeURIComponent(tabToFetch)}`;
+        let fetchUrl = `${API_BASE}/customers?limit=${searchTerm ? 100 : 50}&page=1&tab=${encodeURIComponent(tabToFetch)}`;
         if (searchTerm) {
             fetchUrl += `&search=${encodeURIComponent(searchTerm)}`;
         }
         const response = await fetch(fetchUrl, { headers: getAuthHeader() });
-        if (response.status === 401) return window.doLogout();
+        if (response.status === 401 || response.status === 403) {
+            console.warn('Session expired or unauthorized. Logging out...');
+            if (typeof window.doLogout === 'function') return window.doLogout();
+            localStorage.removeItem('token');
+            window.location.href = `${window.ROOT_PATH}index.html`;
+            return;
+        }
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
         const rawData = await response.json();
@@ -851,7 +891,7 @@ function renderCustomerList(shouldResetLimit = true) {
             }
         }
 
-        if (!matchesTab) return false;
+        if (!searchTerm && !matchesTab) return false;
 
         // Apply search filter if search term is provided
         if (searchTerm) {
@@ -903,7 +943,11 @@ function renderCustomerList(shouldResetLimit = true) {
     window._currentFilteredCustomers = filtered;
 
     if (filtered.length === 0) {
-        customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">No conversations in this tab.</div>`;
+        if (searchTerm) {
+            customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;"><i class="fas fa-spinner fa-spin" style="margin-right: 8px; color: #00a884;"></i> Searching database for "${searchTerm}"...</div>`;
+        } else {
+            customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">No conversations in this tab.</div>`;
+        }
         return;
     }
 

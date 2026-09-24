@@ -1,6 +1,8 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config({ path: __dirname + '/../../.env' });
 
+const connectionLimit = process.env.DB_CONNECTION_LIMIT ? parseInt(process.env.DB_CONNECTION_LIMIT) : 1;
+
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -8,12 +10,12 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME,
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
-    connectionLimit: 15, 
+    connectionLimit: connectionLimit, 
     queueLimit: 0,
     connectTimeout: 20000, 
     enableKeepAlive: true,
     keepAliveInitialDelay: 5000,
-    maxIdle: 10,
+    maxIdle: connectionLimit,
     idleTimeout: 10000, // Proactively close idle connections after 10s (below Hostinger server timeouts)
     timezone: '+00:00'
 });
@@ -28,9 +30,14 @@ function isRetryableDbError(err) {
         code === 'PROTOCOL_CONNECTION_LOST' ||
         code === 'ETIMEDOUT' ||
         code === 'EPIPE' ||
+        code === 'ER_USER_LIMIT_REACHED' ||
+        code === 'ER_TOO_MANY_USER_CONNECTIONS' ||
         msg.includes('ETIMEDOUT') ||
         msg.includes('PROTOCOL_CONNECTION_LOST') ||
-        msg.includes('ECONNRESET')
+        msg.includes('ECONNRESET') ||
+        msg.includes('max_user_connections') ||
+        msg.includes('user_connections') ||
+        msg.includes('too many connections')
     );
 }
 
@@ -44,45 +51,74 @@ pool.on('connection', (connection) => {
     });
 });
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Wrap execute, query, and getConnection to auto-retry once on connection resets/timeouts
 const originalQuery = pool.query.bind(pool);
 const originalExecute = pool.execute.bind(pool);
 const originalGetConnection = pool.getConnection.bind(pool);
 
 pool.query = async function (...args) {
-    try {
-        return await originalQuery(...args);
-    } catch (err) {
-        if (isRetryableDbError(err)) {
-            console.warn(`[DB] Query failed due to connection error (${err.code || err.message}). Retrying query...`);
+    let lastErr;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
             return await originalQuery(...args);
+        } catch (err) {
+            lastErr = err;
+            if (isRetryableDbError(err) && attempt < 3) {
+                console.warn(`[DB] Query failed (attempt ${attempt}/3) due to connection error (${err.code || err.message}). Retrying in ${300 * attempt}ms...`);
+                await delay(300 * attempt);
+            } else {
+                throw err;
+            }
         }
-        throw err;
     }
+    throw lastErr;
 };
 
 pool.execute = async function (...args) {
-    try {
-        return await originalExecute(...args);
-    } catch (err) {
-        if (isRetryableDbError(err)) {
-            console.warn(`[DB] Execute failed due to connection error (${err.code || err.message}). Retrying execute...`);
+    let lastErr;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
             return await originalExecute(...args);
+        } catch (err) {
+            lastErr = err;
+            if (isRetryableDbError(err) && attempt < 3) {
+                console.warn(`[DB] Execute failed (attempt ${attempt}/3) due to connection error (${err.code || err.message}). Retrying in ${300 * attempt}ms...`);
+                await delay(300 * attempt);
+            } else {
+                throw err;
+            }
         }
-        throw err;
     }
+    throw lastErr;
 };
 
 pool.getConnection = async function (...args) {
-    try {
-        return await originalGetConnection(...args);
-    } catch (err) {
-        if (isRetryableDbError(err)) {
-            console.warn(`[DB] getConnection failed due to connection error (${err.code || err.message}). Retrying...`);
+    let lastErr;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
             return await originalGetConnection(...args);
+        } catch (err) {
+            lastErr = err;
+            if (isRetryableDbError(err) && attempt < 3) {
+                console.warn(`[DB] getConnection failed (attempt ${attempt}/3) due to connection error (${err.code || err.message}). Retrying in ${300 * attempt}ms...`);
+                await delay(300 * attempt);
+            } else {
+                throw err;
+            }
         }
-        throw err;
     }
+    throw lastErr;
 };
+
+// Periodic Database Heartbeat (ping every 15s) to prevent Hostinger idle socket drops (wait_timeout)
+setInterval(async () => {
+    try {
+        await originalQuery('SELECT 1');
+    } catch (err) {
+        // Silent catch for heartbeat
+    }
+}, 15000);
 
 module.exports = pool;

@@ -47,6 +47,23 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null, q
 };
 
 /**
+const formatMetaError = (err) => {
+  if (!err) return 'Unknown error';
+  if (err.response) {
+    const status = err.response.status;
+    const data = err.response.data;
+    if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html'))) {
+      return `Meta API returned HTML Error Page (HTTP status ${status})`;
+    }
+    if (data?.error?.message) {
+      return `Meta API Error (${status}): ${data.error.message}`;
+    }
+    return `Meta API Error (${status}): ${typeof data === 'object' ? JSON.stringify(data) : data}`;
+  }
+  return err.message || String(err);
+};
+
+/**
  * Uploads media to Meta's servers to get a media_id
  * @param {Buffer} buffer The file buffer
  * @param {string} mimeType The exact MIME type (e.g. 'image/jpeg')
@@ -54,39 +71,53 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null, q
  * @param {string} fileName Optional filename
  */
 const uploadMedia = async (buffer, mimeType, category, fileName = 'file.jpg') => {
-  try {
-    let finalFileName = fileName || 'file.jpg';
-    if (!finalFileName.includes('.')) {
-      const ext = category === 'image' ? (mimeType && mimeType.includes('png') ? 'png' : 'jpg') : (category === 'video' ? 'mp4' : (category === 'audio' ? 'mp3' : 'pdf'));
-      finalFileName = `${finalFileName}.${ext}`;
-    }
-
-    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
-    
-    // Build the payload manually using Buffer to bypass missing FormData/Blob in older Node.js versions
-    const parts = [
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="messaging_product"\r\n\r\nwhatsapp\r\n`),
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\n${category}\r\n`),
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${finalFileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
-      buffer,
-      Buffer.from(`\r\n--${boundary}--\r\n`)
-    ];
-    
-    const payload = Buffer.concat(parts);
-    
-    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/media`, payload, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': payload.length
-      },
-    });
-
-    return response.data.id;
-  } catch (err) {
-    logger.error('Error uploading media to Meta:', err.response ? err.response.data : err.message);
-    throw err;
+  let finalFileName = fileName || 'file.jpg';
+  if (!finalFileName.includes('.')) {
+    const ext = category === 'image' ? (mimeType && mimeType.includes('png') ? 'png' : 'jpg') : (category === 'video' ? 'mp4' : (category === 'audio' ? 'mp3' : 'pdf'));
+    finalFileName = `${finalFileName}.${ext}`;
   }
+
+  const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+  
+  // Build the payload manually using Buffer to bypass missing FormData/Blob in older Node.js versions
+  const parts = [
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="messaging_product"\r\n\r\nwhatsapp\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\n${category}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${finalFileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--\r\n`)
+  ];
+  
+  const payload = Buffer.concat(parts);
+
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await axios.post(`${BASE_URL}/${getPhoneId()}/media`, payload, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': payload.length
+        },
+        timeout: 45000,
+      });
+
+      return response.data.id;
+    } catch (err) {
+      lastError = err;
+      const status = err.response?.status;
+      const isRetryable = !status || status >= 500 || status === 429 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT';
+      if (isRetryable && attempt < 3) {
+        logger.warn(`Meta media upload attempt ${attempt}/3 failed (${formatMetaError(err)}). Retrying in ${attempt * 1500}ms...`);
+        await new Promise((res) => setTimeout(res, attempt * 1500));
+      } else {
+        break;
+      }
+    }
+  }
+
+  logger.error('Error uploading media to Meta:', formatMetaError(lastError));
+  throw lastError;
 };
 
 const mediaIdCache = new Map();
@@ -99,7 +130,7 @@ const getOrCreateMetaMediaId = async (url, type) => {
     return mediaIdCache.get(url);
   }
   try {
-    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
     const buffer = Buffer.from(res.data);
     const headerContentType = res.headers['content-type'] || '';
 
@@ -136,7 +167,7 @@ const getOrCreateMetaMediaId = async (url, type) => {
       return metaMediaId;
     }
   } catch (err) {
-    logger.error(`Error pre-uploading media URL to Meta (${url}):`, err.message);
+    logger.error(`Error pre-uploading media URL to Meta (${url}):`, formatMetaError(err));
   }
   return null;
 };
@@ -380,7 +411,7 @@ const deleteMessageForEveryone = async (messageId) => {
   try {
     const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, {
       messaging_product: 'whatsapp',
-      status: 'deleted',
+      status: 'read',
       message_id: messageId
     }, {
       headers: {
@@ -388,22 +419,11 @@ const deleteMessageForEveryone = async (messageId) => {
         'Content-Type': 'application/json',
       },
     });
-    logger.info(`WhatsApp message ${messageId} deleted for everyone: ${response.status}`);
+    logger.info(`WhatsApp message ${messageId} marked as read/revoked: ${response.status}`);
     return true;
   } catch (err) {
-    logger.warn('Primary delete endpoint failed, trying direct message ID DELETE endpoint:', err.response ? err.response.data : err.message);
-    try {
-      const response2 = await axios.delete(`${BASE_URL}/${messageId}`, {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      });
-      logger.info(`WhatsApp message ${messageId} deleted for everyone (fallback): ${response2.status}`);
-      return true;
-    } catch (err2) {
-      logger.error('Failed to revoke message on WhatsApp Cloud API:', err2.response ? err2.response.data : err2.message);
-      return false;
-    }
+    logger.debug(`WhatsApp Cloud API message delete endpoint not supported or failed for ${messageId}:`, err.response?.data?.error?.message || err.message);
+    return false;
   }
 };
 

@@ -620,7 +620,8 @@ function renderSidebarTabs() {
 
 async function loadCampaignsAndTabs() {
     try {
-        const response = await fetch(`${window.API_URL}/campaigns`, { headers: getAuthHeader() });
+        const fetchFunc = window.fetchWithRetry || fetch;
+        const response = await fetchFunc(`${window.API_URL}/campaigns`, { headers: getAuthHeader() });
         if (response.ok) {
             const allCampaigns = await response.json();
             activeCampaigns = allCampaigns.filter(c => c.status === 'active');
@@ -780,7 +781,8 @@ async function loadCustomers(tabParam = null, searchParam = null) {
         if (searchTerm) {
             fetchUrl += `&search=${encodeURIComponent(searchTerm)}`;
         }
-        const response = await fetch(fetchUrl, { headers: getAuthHeader() });
+        const fetchFunc = window.fetchWithRetry || fetch;
+        const response = await fetchFunc(fetchUrl, { headers: getAuthHeader() });
         if (response.status === 401 || response.status === 403) {
             console.warn('Session expired or unauthorized. Logging out...');
             if (typeof window.doLogout === 'function') return window.doLogout();
@@ -1425,7 +1427,8 @@ async function handleSaveDetails() {
 
 async function loadSalesUsers() {
     try {
-        const response = await fetch(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
+        const fetchFunc = window.fetchWithRetry || fetch;
+        const response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
         if (response.ok) {
             salesUsers = await response.json();
             renderSalesList();
@@ -2986,7 +2989,8 @@ let quickReplies = [];
 
 async function loadQuickReplies() {
     try {
-        const response = await fetch(`${API_BASE}/quick-replies`, {
+        const fetchFunc = window.fetchWithRetry || fetch;
+        const response = await fetchFunc(`${API_BASE}/quick-replies`, {
             headers: getAuthHeader()
         });
         if (response.ok) {

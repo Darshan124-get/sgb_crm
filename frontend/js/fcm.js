@@ -348,7 +348,8 @@ async function saveTokenToBackend(fcmToken) {
   if (!token) return;
 
   try {
-    const response = await fetch(`${window.API_URL}/users/fcm-token`, {
+    const fetchFunc = window.fetchWithRetry || fetch;
+    const response = await fetchFunc(`${window.API_URL}/users/fcm-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

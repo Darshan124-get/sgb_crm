@@ -8,10 +8,43 @@ const isLocal = window.location.origin.includes('localhost') ||
                 window.location.origin.includes('127.0.0.1') || 
                 window.location.protocol === 'file:';
 
-// Automatically use local backend for local development, and production cloud backend for HTTPS/Hostinger
-window.BASE_URL = isLocal ? `http://127.0.0.1:${BACKEND_PORT}` : 'https://paleturquoise-elk-361855.hostingersite.com';
+// Automatically use local backend for local development, and current location origin for HTTPS/Hostinger production
+if (isLocal) {
+    window.BASE_URL = `http://127.0.0.1:${BACKEND_PORT}`;
+} else {
+    window.BASE_URL = window.location.origin.replace(/\/$/, '');
+}
 window.API_URL = `${window.BASE_URL}/api`;
 window.FCM_VAPID_KEY = 'BCt9SBycqLOQToZjMnZ9sRedn1Etk7-HtrCeCnPxAQEmgqCnMA87QtqPflx6Wi1PAOU2to8Rd6F_AeY1OEhTRE4';
+
+// ─── Resilient Fetch Wrapper ─────────────────────────────────
+window.fetchWithRetry = async function (url, options = {}, retries = 3, delayMs = 500) {
+    let lastError = null;
+    let targetUrl = url;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(targetUrl, options);
+            return response;
+        } catch (err) {
+            lastError = err;
+            console.warn(`[Network Retry] Fetch attempt ${attempt}/${retries} failed for ${targetUrl}:`, err.message);
+
+            if (attempt === 2 && targetUrl.startsWith('http')) {
+                try {
+                    const parsed = new URL(targetUrl);
+                    targetUrl = `${window.location.origin}${parsed.pathname}${parsed.search}`;
+                    console.warn(`[Network Fallback] Retrying with same-origin URL: ${targetUrl}`);
+                } catch (e) {}
+            }
+
+            if (attempt < retries) {
+                await new Promise(r => setTimeout(r, delayMs * attempt));
+            }
+        }
+    }
+    throw lastError;
+};
 
 // ─── Root Path Computation ───────────────────────────────────
 // Computes how many levels deep we are from the frontend root.

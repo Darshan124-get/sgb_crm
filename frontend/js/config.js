@@ -53,8 +53,6 @@ window.fetchWithRetry = async function (url, options = {}, retries = 3, delayMs 
     }
     throw lastError;
 };
-    throw lastError;
-};
 
 // ─── Root Path Computation ───────────────────────────────────
 // Computes how many levels deep we are from the frontend root.

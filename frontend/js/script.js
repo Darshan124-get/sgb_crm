@@ -31,7 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('password').value;
 
             try {
-                const response = await fetch(`${API_URL}/auth/login`, {
+                const fetchFunc = window.fetchWithRetry || fetch;
+                const response = await fetchFunc(`${window.API_URL || API_URL}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ identifier, password })

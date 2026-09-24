@@ -8,11 +8,17 @@ const isLocal = window.location.origin.includes('localhost') ||
                 window.location.origin.includes('127.0.0.1') || 
                 window.location.protocol === 'file:';
 
-// Automatically use local backend for local development, and current location origin for HTTPS/Hostinger production
+const PROD_BACKEND_URL = 'https://paleturquoise-elk-361855.hostingersite.com';
+
 if (isLocal) {
     window.BASE_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 } else {
-    window.BASE_URL = window.location.origin.replace(/\/$/, '');
+    // If hosted directly on hostingersite.com backend domain, use origin; otherwise use production backend cloud URL
+    if (window.location.hostname.includes('hostingersite.com')) {
+        window.BASE_URL = window.location.origin.replace(/\/$/, '');
+    } else {
+        window.BASE_URL = PROD_BACKEND_URL;
+    }
 }
 window.API_URL = `${window.BASE_URL}/api`;
 window.FCM_VAPID_KEY = 'BCt9SBycqLOQToZjMnZ9sRedn1Etk7-HtrCeCnPxAQEmgqCnMA87QtqPflx6Wi1PAOU2to8Rd6F_AeY1OEhTRE4';
@@ -30,12 +36,14 @@ window.fetchWithRetry = async function (url, options = {}, retries = 3, delayMs 
             lastError = err;
             console.warn(`[Network Retry] Fetch attempt ${attempt}/${retries} failed for ${targetUrl}:`, err.message);
 
-            if (attempt === 2 && targetUrl.startsWith('http')) {
-                try {
-                    const parsed = new URL(targetUrl);
-                    targetUrl = `${window.location.origin}${parsed.pathname}${parsed.search}`;
-                    console.warn(`[Network Fallback] Retrying with same-origin URL: ${targetUrl}`);
-                } catch (e) {}
+            if (attempt === 2 && !isLocal) {
+                if (targetUrl.includes('crafzio.in')) {
+                    targetUrl = targetUrl.replace(window.location.origin, PROD_BACKEND_URL);
+                    console.warn(`[Network Fallback] Switched target URL to production backend: ${targetUrl}`);
+                } else if (targetUrl.includes('paleturquoise-elk')) {
+                    targetUrl = targetUrl.replace('https://paleturquoise-elk-361855.hostingersite.com', 'https://darksalmon-ibex-936777.hostingersite.com');
+                    console.warn(`[Network Fallback] Switched target URL to backup backend: ${targetUrl}`);
+                }
             }
 
             if (attempt < retries) {
@@ -43,6 +51,8 @@ window.fetchWithRetry = async function (url, options = {}, retries = 3, delayMs 
             }
         }
     }
+    throw lastError;
+};
     throw lastError;
 };
 

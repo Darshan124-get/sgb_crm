@@ -22,6 +22,6 @@ router.get('/', authenticateToken, dealerController.getDealers);
 router.post('/', authenticateToken, isAdminOrSales, dealerController.createDealer);
 router.post('/:id/orders', authenticateToken, isAdminOrSales, dealerController.createDealerOrder);
 router.put('/:id', authenticateToken, isAdminOrSales, dealerController.updateDealer);
-router.delete('/:id', authenticateToken, isAdmin, dealerController.deleteDealer);
+router.delete('/:id', authenticateToken, isAdminOrSales, dealerController.deleteDealer);
 
 module.exports = router;

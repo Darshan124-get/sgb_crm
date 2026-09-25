@@ -274,7 +274,7 @@ const sendReply = async (req, res) => {
     if (mediaData && category) {
       let mediaId;
       let mediaBuffer = null;
-      if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
+      if (typeof mediaData === 'string' && (mediaData.startsWith('http') || mediaData.startsWith('/api/media/') || mediaData.includes('quick-replies/') || mediaData.includes('chats/'))) {
         mediaId = mediaData;
       } else if (typeof mediaData === 'string' && mediaData.includes(',')) {
         const base64Data = mediaData.split(',')[1];
@@ -329,9 +329,22 @@ const getMedia = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    // Priority 1: Supabase URL
+    // Priority 1: Cloudflare R2 / Storage Service
     if (media_url) {
-      return res.redirect(media_url);
+      const storageService = require('../services/storage.service');
+      const key = storageService.extractKeyFromUrl(media_url);
+      try {
+        const r2Data = await storageService.downloadObject({ key });
+        res.setHeader('Content-Type', r2Data.contentType || mime_type || 'application/octet-stream');
+        res.setHeader('Content-Length', r2Data.contentLength);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(r2Data.buffer);
+      } catch (r2Err) {
+        logger.warn(`R2 fetch failed for key '${key}', attempting fallback redirect: ${r2Err.message}`);
+        if (media_url.startsWith('http') && !media_url.includes('.r2.cloudflarestorage.com')) {
+          return res.redirect(media_url);
+        }
+      }
     }
 
     // Priority 2: Database BLOB (Legacy)
@@ -378,7 +391,25 @@ const deleteMessage = async (req, res) => {
 const getQuickReplies = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM whatsapp_quick_replies ORDER BY shortcut ASC');
-    res.json(rows);
+    const storageService = require('../services/storage.service');
+    const processedRows = rows.map(row => {
+      if (row.media_url) {
+        try {
+          const parsed = JSON.parse(row.media_url);
+          if (Array.isArray(parsed)) {
+            const formatted = parsed.map(url => {
+              if (!url) return url;
+              if (url.startsWith('/api/media/')) return url;
+              const key = storageService.extractKeyFromUrl(url);
+              return `/api/media/${key}`;
+            });
+            return { ...row, media_url: JSON.stringify(formatted) };
+          }
+        } catch (e) {}
+      }
+      return row;
+    });
+    res.json(processedRows);
   } catch (err) {
     logger.error('Error fetching quick replies:', err.message);
     res.status(500).json({ error: 'Failed to fetch quick replies' });
@@ -419,23 +450,14 @@ const saveQuickReply = async (req, res) => {
         const extension = mType ? mType.split('/')[1] : 'bin';
         const fileName = `quick-replies/${Date.now()}-${shortcut}-${i}.${extension}`;
 
-        const { error } = await supabase.storage
-          .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-          .upload(fileName, buffer, {
-            contentType: mType,
-            upsert: true
-          });
+        const storageService = require('../services/storage.service');
+        const uploadResult = await storageService.uploadObject({
+          key: fileName,
+          body: buffer,
+          contentType: mType
+        });
 
-        if (error) {
-          logger.error('Supabase upload error in quick replies:', error.message);
-          throw error;
-        }
-
-        const { data: urlData } = supabase.storage
-          .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-          .getPublicUrl(fileName);
-
-        uploadedUrls.push(urlData.publicUrl);
+        uploadedUrls.push(uploadResult.publicUrl);
         mappedTypes.push(mType.startsWith('image') ? 'image' :
           mType.startsWith('video') ? 'video' :
             mType.startsWith('audio') ? 'audio' : 'document');

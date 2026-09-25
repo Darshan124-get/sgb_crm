@@ -186,12 +186,15 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
     let buffer = null;
 
     if (mediaData) {
-      if (typeof mediaData === 'string' && mediaData.startsWith('http')) {
-        mediaUrl = mediaData;
+      const storageService = require('./storage.service');
+      if (typeof mediaData === 'string' && (mediaData.startsWith('http') || mediaData.startsWith('/api/media/') || mediaData.includes('/') || mediaData.includes('.')) && !mediaData.includes(',')) {
+        mediaUrl = storageService.getPublicUrl(mediaData);
       } else if (typeof mediaData === 'string' && mediaData.includes(',')) {
         buffer = Buffer.from(mediaData.split(',')[1], 'base64');
-      } else if (typeof mediaData === 'string') {
+      } else if (typeof mediaData === 'string' && mediaData.length > 500) {
         buffer = Buffer.from(mediaData, 'base64');
+      } else if (typeof mediaData === 'string') {
+        mediaUrl = storageService.getPublicUrl(mediaData);
       } else if (Buffer.isBuffer(mediaData)) {
         buffer = mediaData;
       }
@@ -219,23 +222,28 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
         const fileName = `${timestamp}-${phone}.${extension}`;
         const filePath = `chats/${phone}/${fileName}`;
 
-        const { data, error } = await supabase.storage
-          .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-          .upload(filePath, buffer, {
-            contentType: cleanMime,
-            upsert: true
+        const storageService = require('./storage.service');
+        try {
+          const uploadResult = await storageService.uploadObject({
+            key: filePath,
+            body: buffer,
+            contentType: cleanMime
           });
-
-        if (error) {
-          logger.error('Supabase upload error:', error.message);
-        } else {
-          // Get Public URL
-          const { data: urlData } = supabase.storage
-            .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-            .getPublicUrl(filePath);
-
-          mediaUrl = urlData.publicUrl;
-          logger.info(`[SUPABASE] File uploaded: ${mediaUrl}`);
+          mediaUrl = uploadResult.publicUrl;
+          logger.info(`[R2 STORAGE] File uploaded: ${mediaUrl}`);
+        } catch (uploadErr) {
+          logger.error('R2 upload error, attempting Supabase fallback:', uploadErr.message);
+          try {
+            const { data, error } = await supabase.storage
+              .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
+              .upload(filePath, buffer, { contentType: cleanMime, upsert: true });
+            if (!error) {
+              const { data: urlData } = supabase.storage.from(process.env.SUPABASE_BUCKET_NAME || 'SGB').getPublicUrl(filePath);
+              mediaUrl = urlData.publicUrl;
+            }
+          } catch (supErr) {
+            logger.error('Supabase upload fallback error:', supErr.message);
+          }
         }
       }
     }

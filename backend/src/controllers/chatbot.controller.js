@@ -1044,30 +1044,22 @@ async function saveMediaFile(file) {
     const storagePath = `${folderPath}/${filename}`;
 
     let publicUrl = '';
-    let isSupabaseSuccess = false;
+    let isStorageSuccess = false;
 
-    if (supabase && process.env.SUPABASE_URL) {
-        try {
-            const { data, error } = await supabase.storage
-                .from(bucketName)
-                .upload(storagePath, file.buffer, {
-                    contentType: file.mimetype,
-                    upsert: true
-                });
-
-            if (!error) {
-                const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(storagePath);
-                publicUrl = urlData.publicUrl;
-                isSupabaseSuccess = true;
-            } else {
-                console.warn('[SUPABASE UPLOAD WARN] Falling back to local disk:', error.message);
-            }
-        } catch (sErr) {
-            console.warn('[SUPABASE UPLOAD CATCH WARN] Falling back to local disk:', sErr.message);
-        }
+    const storageService = require('../services/storage.service');
+    try {
+        const uploadResult = await storageService.uploadObject({
+            key: storagePath,
+            body: file.buffer,
+            contentType: file.mimetype
+        });
+        publicUrl = uploadResult.publicUrl;
+        isStorageSuccess = true;
+    } catch (r2Err) {
+        console.warn('[R2 UPLOAD WARN] Falling back to local disk:', r2Err.message);
     }
 
-    if (!isSupabaseSuccess) {
+    if (!isStorageSuccess) {
         const uploadDir = path.join(__dirname, '../../uploads/chatbot-media');
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
@@ -1153,13 +1145,13 @@ exports.deleteMedia = async (req, res) => {
         if (rows.length === 0) return res.status(404).json({ message: 'Media not found' });
 
         const media = rows[0];
-        // 1. Hard Delete from Supabase Storage
-        if (supabase && media.storage_path && process.env.SUPABASE_URL) {
+        // 1. Hard Delete from Cloudflare R2 Storage
+        if (media.storage_path) {
             try {
-                const bucketName = process.env.SUPABASE_BUCKET_NAME || 'chatbot-media';
-                await supabase.storage.from(bucketName).remove([media.storage_path]);
+                const storageService = require('../services/storage.service');
+                await storageService.deleteObject({ key: media.storage_path });
             } catch (e) {
-                console.warn('[SUPABASE HARD DELETE WARN]', e.message);
+                console.warn('[R2 HARD DELETE WARN]', e.message);
             }
         }
 

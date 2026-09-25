@@ -61,10 +61,19 @@ function isAdminOrSales(req, res, next) {
     if (!req.user || !req.user.role) return res.status(403).json({ message: 'Access denied' });
     
     const role = req.user.role.toLowerCase();
-    if (role === 'admin' || role === 'super-admin' || role === 'sales' || role.includes('executive') || role === 'manager' || role.includes('telecaller')) {
+    if (
+        role === 'admin' || 
+        role === 'super-admin' || 
+        role.includes('sales') || 
+        role.includes('executive') || 
+        role.includes('manager') || 
+        role.includes('dealer') || 
+        role.includes('telecaller') ||
+        req.user.is_manager
+    ) {
         next();
     } else {
-        res.status(403).json({ message: 'Access denied: Requires Admin, Manager, Sales/Executive, or Telecaller role' });
+        res.status(403).json({ message: 'Access denied: Requires Admin, Manager, Sales/Executive, Dealer, or Telecaller role' });
     }
 }
 
@@ -72,7 +81,7 @@ function isManagerOrAdmin(req, res, next) {
     if (!req.user) return res.status(403).json({ message: 'Access denied' });
     
     const role = (req.user.role || '').toLowerCase();
-    if (role === 'admin' || role === 'super-admin' || req.user.is_manager) {
+    if (role === 'admin' || role === 'super-admin' || req.user.is_manager || role.includes('manager') || role.includes('dealer')) {
         next();
     } else {
         res.status(403).json({ message: 'Admin or Manager access required' });
@@ -100,8 +109,9 @@ function hasPermission(permissionName) {
         }
 
         // Fallbacks for backward compatibility
-        if (permissionName === 'sales_access' && role === 'sales') return next();
-        if (permissionName === 'billing_access' && role === 'billing') return next();
+        if (permissionName === 'sales_access' && role.includes('sales')) return next();
+        if (permissionName === 'billing_access' && role.includes('billing')) return next();
+        if (permissionName.includes('dealer') && (role.includes('dealer') || role.includes('manager'))) return next();
 
         res.status(403).json({ message: `Access denied: Requires ${permissionName} permission` });
     };

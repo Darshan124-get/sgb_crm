@@ -101,8 +101,25 @@ app.use('/uploads', express.static(uploadsDir));
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../../frontend')));
 
-// Webhook Route (Public - Must be BEFORE any auth or fallback)
-app.use('/webhook', webhookRoutes);
+// Cloudflare R2 Public Media Streamer Route
+const storageService = require('./services/storage.service');
+app.get('/api/media/*', async (req, res) => {
+    const objectKey = req.params[0];
+    if (!objectKey) return res.status(400).send('Missing media key');
+
+    try {
+        const r2Data = await storageService.downloadObject({ key: objectKey });
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Content-Type', r2Data.contentType || 'application/octet-stream');
+        if (r2Data.contentLength) res.setHeader('Content-Length', r2Data.contentLength);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(r2Data.buffer);
+    } catch (err) {
+        console.warn(`[MEDIA STREAM WARN] Failed to serve object '${objectKey}': ${err.message}`);
+        return res.status(404).send('Media not found');
+    }
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);

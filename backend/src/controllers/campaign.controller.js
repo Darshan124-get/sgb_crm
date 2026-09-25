@@ -15,23 +15,14 @@ const processAutoReplies = async (campaign_id, auto_replies) => {
                 const extension = reply.mimeType.split('/')[1] || 'bin';
                 const fileName = `campaigns/${campaign_id}/auto-reply-${Date.now()}-${i}.${extension}`;
                 
-                const { error } = await supabase.storage
-                  .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-                  .upload(fileName, buffer, {
-                    contentType: reply.mimeType,
-                    upsert: true
-                  });
+                const storageService = require('../services/storage.service');
+                const uploadResult = await storageService.uploadObject({
+                  key: fileName,
+                  body: buffer,
+                  contentType: reply.mimeType
+                });
 
-                if (error) {
-                    logger.error('Supabase upload error for campaign auto_reply:', error.message);
-                    throw error;
-                }
-
-                const { data: urlData } = supabase.storage
-                  .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-                  .getPublicUrl(fileName);
-
-                reply.url = urlData.publicUrl;
+                reply.url = uploadResult.publicUrl;
                 delete reply.mediaData; // Remove large base64 payload before saving
                 delete reply.mimeType;
             } catch (err) {

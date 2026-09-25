@@ -47,6 +47,8 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null, q
 };
 
 /**
+ * Formats Meta API errors cleanly
+ */
 const formatMetaError = (err) => {
   if (!err) return 'Unknown error';
   if (err.response) {
@@ -123,65 +125,83 @@ const uploadMedia = async (buffer, mimeType, category, fileName = 'file.jpg') =>
 const mediaIdCache = new Map();
 
 /**
- * Downloads HTTP media URL and uploads to Meta to obtain a direct Meta Media ID for instant delivery
+ * Downloads media from Cloudflare R2 or HTTP URL and uploads to Meta to obtain a direct Meta Media ID for instant delivery
  */
-const getOrCreateMetaMediaId = async (url, type) => {
-  if (mediaIdCache.has(url)) {
-    return mediaIdCache.get(url);
+const getOrCreateMetaMediaId = async (urlOrKey, type) => {
+  if (!urlOrKey) return null;
+  if (mediaIdCache.has(urlOrKey)) {
+    return mediaIdCache.get(urlOrKey);
   }
-  try {
-    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
-    const buffer = Buffer.from(res.data);
-    const headerContentType = res.headers['content-type'] || '';
 
-    let ext = 'jpg';
+  const storageService = require('./storage.service');
+  const cleanKey = storageService.extractKeyFromUrl(urlOrKey);
+
+  try {
+    let buffer = null;
     let mimeType = 'image/jpeg';
 
-    if (type === 'image') {
-      if (headerContentType.includes('png') || url.toLowerCase().includes('.png')) {
-        ext = 'png';
-        mimeType = 'image/png';
-      } else if (headerContentType.includes('webp') || url.toLowerCase().includes('.webp')) {
-        ext = 'webp';
-        mimeType = 'image/webp';
-      } else {
-        ext = 'jpg';
-        mimeType = 'image/jpeg';
+    // 1. Try downloading directly from Cloudflare R2 using StorageService
+    if (cleanKey) {
+      try {
+        const r2Object = await storageService.downloadObject({ key: cleanKey });
+        buffer = r2Object.buffer;
+        mimeType = r2Object.contentType || mimeType;
+      } catch (r2Err) {
+        logger.warn(`StorageService R2 download for key '${cleanKey}' failed, attempting HTTP fetch: ${r2Err.message}`);
       }
+    }
+
+    // 2. Fallback to HTTP download if not in R2 or if external URL
+    if (!buffer && typeof urlOrKey === 'string' && urlOrKey.startsWith('http')) {
+      const res = await axios.get(urlOrKey, { responseType: 'arraybuffer', timeout: 15000 });
+      buffer = Buffer.from(res.data);
+      const headerContentType = res.headers['content-type'] || '';
+      if (headerContentType) mimeType = headerContentType;
+    }
+
+    if (!buffer) {
+      throw new Error(`Unable to retrieve media buffer for '${urlOrKey}'`);
+    }
+
+    let ext = 'jpg';
+    if (type === 'image') {
+      if (mimeType.includes('png') || urlOrKey.toLowerCase().includes('.png')) ext = 'png';
+      else if (mimeType.includes('webp') || urlOrKey.toLowerCase().includes('.webp')) ext = 'webp';
+      else ext = 'jpg';
     } else if (type === 'video') {
       ext = 'mp4';
-      mimeType = 'video/mp4';
+      mimeType = mimeType || 'video/mp4';
     } else if (type === 'audio') {
       ext = 'mp3';
-      mimeType = 'audio/mpeg';
+      mimeType = mimeType || 'audio/mpeg';
     } else {
       ext = 'pdf';
-      mimeType = 'application/pdf';
+      mimeType = mimeType || 'application/pdf';
     }
 
     const fileName = `media-${Date.now()}.${ext}`;
     const metaMediaId = await uploadMedia(buffer, mimeType, type, fileName);
     if (metaMediaId) {
-      mediaIdCache.set(url, metaMediaId);
-      logger.info(`[META MEDIA] Pre-uploaded URL to Meta Media ID: ${metaMediaId} (${fileName})`);
+      mediaIdCache.set(urlOrKey, metaMediaId);
+      logger.info(`[META MEDIA] Pre-uploaded media to Meta Media ID: ${metaMediaId} (${fileName})`);
       return metaMediaId;
     }
   } catch (err) {
-    logger.error(`Error pre-uploading media URL to Meta (${url}):`, formatMetaError(err));
+    logger.error(`Error pre-uploading media URL to Meta (${urlOrKey}):`, formatMetaError(err));
   }
   return null;
 };
 
 /**
- * Sends a media message using a media_id or pre-uploaded URL
+ * Sends a media message using a media_id or pre-uploaded URL/key
  */
 const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null, senderId = null, mediaBuffer = null, customMimeType = null, quickReplyName = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     let resolvedMediaId = mediaId;
-    let isUrl = typeof mediaId === 'string' && mediaId.startsWith('http');
+    let isUrlOrKey = typeof mediaId === 'string' && (mediaId.startsWith('http') || mediaId.includes('/') || mediaId.includes('.'));
 
-    if (isUrl) {
+    if (isUrlOrKey) {
       const uploadedId = await getOrCreateMetaMediaId(mediaId, type);
       if (uploadedId) {
         resolvedMediaId = uploadedId;
@@ -213,7 +233,7 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
         },
       });
     } catch (apiErr) {
-      if (isUrl && isMetaId) {
+      if (isUrlOrKey && isMetaId) {
         logger.warn(`Failed to send via Meta Media ID (${resolvedMediaId}), retrying via direct HTTP link...`);
         const fallbackObj = { link: mediaId };
         if (caption) fallbackObj.caption = caption;
@@ -231,7 +251,7 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
     const mimeType = customMimeType || (type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf')));
-    await messageService.logChatMessage(to, 'outgoing', type, caption || '', mediaBuffer || (isUrl ? mediaId : null), mimeType, senderId, metaMsgId, 'sent', null, 0, quickReplyName).catch(err => logger.error('Error logging outgoing bot media message:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', type, caption || '', mediaBuffer || (isUrlOrKey ? mediaId : null), mimeType, senderId, metaMsgId, 'sent', null, 0, quickReplyName).catch(err => logger.error('Error logging outgoing bot media message:', err.message));
 
     return response.data;
   } catch (err) {

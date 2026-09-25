@@ -1,5 +1,4 @@
 const pool = require('../config/db');
-const supabase = require('../config/supabase');
 const fs = require('fs');
 const path = require('path');
 
@@ -1036,7 +1035,7 @@ exports.getMedia = async (req, res) => {
     }
 };
 
-// Helper: Upload file to Supabase Storage or Local Disk fallback
+// Helper: Upload file to Cloudflare R2 Storage or Local Disk fallback
 async function saveMediaFile(file) {
     const bucketName = process.env.SUPABASE_BUCKET_NAME || 'chatbot-media';
     const folderPath = 'chatbot-media';

@@ -1,5 +1,4 @@
 const db = require('../config/db');
-const supabase = require('../config/supabase');
 const logger = require('../utils/whatsappLogger');
 
 const processAutoReplies = async (campaign_id, auto_replies) => {

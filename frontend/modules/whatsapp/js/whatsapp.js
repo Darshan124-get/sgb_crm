@@ -2831,7 +2831,7 @@ function renderQrMediaChips() {
     if (!container) return;
     container.innerHTML = '';
 
-    // 1. Render Existing Stored Supabase URLs
+    // 1. Render Stored Media URLs
     qrExistingMediaUrls.forEach((item, index) => {
         const chip = document.createElement('div');
         chip.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; background: var(--whatsapp-header); border: 1px solid var(--whatsapp-border); border-radius: 20px; padding: 5px 12px; font-size: 0.82rem; color: var(--whatsapp-text); box-shadow: 0 1px 3px rgba(0,0,0,0.1);';

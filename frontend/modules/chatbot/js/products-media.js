@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;">
                     <i class="fa-regular fa-images" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i>
                     <p style="font-weight: 700; margin: 0;">No media items found for "${currentMediaTypeFilter}"</p>
-                    <p style="font-size: 0.8rem; margin-top: 4px;">Click "Upload Media" to upload files to Supabase Storage.</p>
+                    <p style="font-size: 0.8rem; margin-top: 4px;">Click "Upload Media" to upload files to Cloudflare R2 Storage.</p>
                 </div>
             `;
             return;
@@ -1427,7 +1427,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const loadingEl = document.createElement('div');
         loadingEl.style.cssText = 'padding: 10px; background: #eef2ff; border: 1px dashed #6366f1; border-radius: 6px; font-size: 0.8rem; color: #4338ca; display: flex; align-items: center; gap: 8px;';
-        loadingEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading ${filesList.length} file(s) to Supabase Storage...`;
+        loadingEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading ${filesList.length} file(s) to Cloudflare R2...`;
         wizardMediaPreviewsList.appendChild(loadingEl);
 
         try {
@@ -1483,7 +1483,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${iconHtml}
                         <div style="min-width: 0;">
                             <div style="font-weight: 700; font-size: 0.8rem; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.original_name || file.filename}</div>
-                            <div style="font-size: 0.725rem; color: #10b981; margin-top: 1px;">✓ Uploaded to Supabase • ${formattedSize}</div>
+                            <div style="font-size: 0.725rem; color: #10b981; margin-top: 1px;">✓ Uploaded to Cloudflare R2 • ${formattedSize}</div>
                         </div>
                     </div>
                     <button type="button" class="btn-remove-wizard-file" data-idx="${idx}" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px;">

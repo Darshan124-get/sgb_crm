@@ -427,7 +427,6 @@ const saveQuickReply = async (req, res) => {
     let mediaType = null;
 
     if (mediaData) {
-      const supabase = require('../config/supabase');
       const dataArray = Array.isArray(mediaData) ? mediaData : [mediaData];
       const typeArray = Array.isArray(mimeType) ? mimeType : [mimeType];
 

@@ -1,7 +1,6 @@
 const db = require('../config/db');
 const logger = require('../utils/whatsappLogger');
 const { normalizePhone } = require('../utils/phoneUtils');
-const supabase = require('../config/supabase');
 
 /**
  * Helper to ensure no parameters are 'undefined' (MySQL driver requirement)
@@ -232,18 +231,7 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
           mediaUrl = uploadResult.publicUrl;
           logger.info(`[R2 STORAGE] File uploaded: ${mediaUrl}`);
         } catch (uploadErr) {
-          logger.error('R2 upload error, attempting Supabase fallback:', uploadErr.message);
-          try {
-            const { data, error } = await supabase.storage
-              .from(process.env.SUPABASE_BUCKET_NAME || 'SGB')
-              .upload(filePath, buffer, { contentType: cleanMime, upsert: true });
-            if (!error) {
-              const { data: urlData } = supabase.storage.from(process.env.SUPABASE_BUCKET_NAME || 'SGB').getPublicUrl(filePath);
-              mediaUrl = urlData.publicUrl;
-            }
-          } catch (supErr) {
-            logger.error('Supabase upload fallback error:', supErr.message);
-          }
+          logger.error('R2 upload error:', uploadErr.message);
         }
       }
     }

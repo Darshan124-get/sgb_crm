@@ -981,3 +981,40 @@ exports.updateDecisionEngineState = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
+exports.getLeadNotes = async (req, res) => {
+    try {
+        const leadId = req.params.id;
+        const [rows] = await pool.query(
+            `SELECT n.*, u.name as author_name 
+             FROM lead_notes n 
+             LEFT JOIN users u ON n.user_id = u.user_id 
+             WHERE n.lead_id = ? 
+             ORDER BY n.created_at DESC`,
+            [leadId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('getLeadNotes Error:', err);
+        res.status(500).json({ message: 'Error fetching lead notes: ' + err.message });
+    }
+};
+
+exports.addLeadNote = async (req, res) => {
+    try {
+        const leadId = req.params.id;
+        const { note } = req.body;
+        if (!note || !String(note).trim()) {
+            return res.status(400).json({ message: 'Note text is required' });
+        }
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+        const [result] = await pool.query(
+            'INSERT INTO lead_notes (lead_id, user_id, note, created_at) VALUES (?, ?, ?, NOW())',
+            [leadId, actingUserId, String(note).trim()]
+        );
+        res.status(201).json({ message: 'Note added successfully', note_id: result.insertId });
+    } catch (err) {
+        console.error('addLeadNote Error:', err);
+        res.status(500).json({ message: 'Error adding note: ' + err.message });
+    }
+};

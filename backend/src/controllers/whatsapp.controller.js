@@ -427,6 +427,7 @@ const saveQuickReply = async (req, res) => {
     let mediaType = null;
 
     if (mediaData) {
+      const storageService = require('../services/storage.service');
       const dataArray = Array.isArray(mediaData) ? mediaData : [mediaData];
       const typeArray = Array.isArray(mimeType) ? mimeType : [mimeType];
 
@@ -449,7 +450,6 @@ const saveQuickReply = async (req, res) => {
         const extension = mType ? mType.split('/')[1] : 'bin';
         const fileName = `quick-replies/${Date.now()}-${shortcut}-${i}.${extension}`;
 
-        const storageService = require('../services/storage.service');
         const uploadResult = await storageService.uploadObject({
           key: fileName,
           body: buffer,

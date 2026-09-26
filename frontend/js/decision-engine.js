@@ -584,18 +584,59 @@ function handleCallStatusChange(status) {
 }
 
 function hideAllSubforms() {
-    const ids = ['de-form-order', 'de-form-followup', 'de-form-reason', 'de-form-feedback', 'de-form-notconnected'];
+    const ids = ['de-form-order', 'de-form-followup', 'de-form-reason', 'de-form-feedback', 'de-form-notconnected', 'de-form-dealer'];
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
 
     // Remove required attributes from all
-    const reqIds = ['de-order-screenshot', 'de-followup-date', 'de-lost-reason', 'de-feedback-satisfaction', 'de-nc-date'];
+    const reqIds = ['de-order-screenshot', 'de-followup-date', 'de-lost-reason', 'de-feedback-satisfaction', 'de-nc-date', 'de-dealer-manager-select'];
     reqIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.removeAttribute('required');
     });
+}
+
+async function loadDealerManagersList() {
+    const select = document.getElementById('de-dealer-manager-select');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Loading Dealer Managers...</option>';
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${window.API_URL}/users`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const users = await response.json();
+            // Strictly filter for Dealer Managers only
+            const dealerManagers = users.filter(u => {
+                const role = (u.role_name || u.role || '').toLowerCase().trim();
+                return role === 'dealer_manager' || role === 'dealer manager' || role.includes('dealer_manager') || (role.includes('dealer') && role.includes('manager'));
+            });
+
+            if (dealerManagers.length > 0) {
+                let options = '<option value="">-- Select Dealer Manager --</option>';
+                dealerManagers.forEach(u => {
+                    options += `<option value="${u.user_id || u.id}" data-name="${u.name}">${u.name}</option>`;
+                });
+                select.innerHTML = options;
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('Dealer manager fetch error, using fallback list:', e);
+    }
+
+    select.innerHTML = `
+        <option value="">-- Select Dealer Manager --</option>
+        <option value="77" data-name="D TEST3">D TEST3</option>
+        <option value="83" data-name="ABHIJITH">ABHIJITH</option>
+        <option value="84" data-name="venkat">venkat</option>
+    `;
 }
 
 function handleSalesStatusChange(status) {
@@ -613,11 +654,21 @@ function handleSalesStatusChange(status) {
         document.getElementById('de-form-order').style.display = 'block';
         document.getElementById('de-order-screenshot').setAttribute('required', 'true');
         calculateOrderAmounts(); // Fresh calculation
-    } else if (status === 'interested' || status === 'followup' || status === 'dealer' || status === 'Hot/Very Interested' || status === 'Mild/Later' || status === 'Dealer') {
-        // For interest/followup, we can go to step 4 to pick products OR just save
-        // Let's allow going to step 4 to pick what they are interested in
+    } else if (status === 'dealer' || status === 'Dealer') {
+        // Dealer selected: REMOVE follow-up, show Dealer Manager Selection form
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
+
+        const dealerForm = document.getElementById('de-form-dealer');
+        if (dealerForm) dealerForm.style.display = 'block';
+        const mgrSelect = document.getElementById('de-dealer-manager-select');
+        if (mgrSelect) mgrSelect.setAttribute('required', 'true');
+
+        loadDealerManagersList();
+    } else if (status === 'interested' || status === 'followup' || status === 'Hot/Very Interested' || status === 'Mild/Later') {
+        // For interest/followup, show Follow-up Details
         if (nextBtn) nextBtn.style.display = 'block';
-        if (saveBtn) saveBtn.style.display = 'block'; // Allow direct save too
+        if (saveBtn) saveBtn.style.display = 'block';
 
         document.getElementById('de-form-followup').style.display = 'block';
         document.getElementById('de-followup-date').setAttribute('required', 'true');
@@ -920,16 +971,25 @@ async function submitDecisionEngine() {
             if (adv > 0 && !file) {
                 return window.showAlert("Payment Record", "Payment screenshot is required when advance is recorded.", "error");
             }
-        } else if (['Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
+        } else if (['Hot/Very Interested', 'Mild/Later'].includes(salesStatus)) {
             if (!document.getElementById('de-followup-date').value) {
+                if (submitBtn) { submitBtn.innerHTML = 'Save Changes <i class="fas fa-check ml-2"></i>'; submitBtn.disabled = false; }
                 return window.showAlert("Required", "Please provide a Next Follow-up Date.", "error");
+            }
+        } else if (salesStatus === 'dealer' || salesStatus === 'Dealer') {
+            const mgrId = document.getElementById('de-dealer-manager-select')?.value;
+            if (!mgrId) {
+                if (submitBtn) { submitBtn.innerHTML = 'Save Changes <i class="fas fa-check ml-2"></i>'; submitBtn.disabled = false; }
+                return window.showAlert("Dealer Manager Required", "Please select a Dealer Manager from the list.", "error");
             }
         } else if (salesStatus === 'Cold/Not Interested') {
             if (!document.getElementById('de-lost-reason').value) {
+                if (submitBtn) { submitBtn.innerHTML = 'Save Changes <i class="fas fa-check ml-2"></i>'; submitBtn.disabled = false; }
                 return window.showAlert("Required", "Please provide a Reason.", "error");
             }
         } else if (salesStatus === 'Old Purchased') {
             if (!document.getElementById('de-feedback-satisfaction').value) {
+                if (submitBtn) { submitBtn.innerHTML = 'Save Changes <i class="fas fa-check ml-2"></i>'; submitBtn.disabled = false; }
                 return window.showAlert("Required", "Please provide Satisfaction level.", "error");
             }
         }
@@ -1000,7 +1060,10 @@ async function submitDecisionEngine() {
                 summaryNote += `Satisfaction: ${document.getElementById('de-feedback-satisfaction').value}. Feedback: ${document.getElementById('de-feedback-notes').value}`;
             } else if (salesStatus === 'dealer' || salesStatus === 'Dealer') {
                 finalStatus = 'dealer';
-                summaryNote += `Mapped to Dealer inquiry. Next Followup: ${document.getElementById('de-followup-date').value}`;
+                const mgrSelect = document.getElementById('de-dealer-manager-select');
+                const mgrName = mgrSelect && mgrSelect.options[mgrSelect.selectedIndex] ? mgrSelect.options[mgrSelect.selectedIndex].text : 'Dealer Manager';
+                const dealerNotes = document.getElementById('de-dealer-notes')?.value || '';
+                summaryNote += `Assigned to Dealer Manager: ${mgrName}. Notes: ${dealerNotes}`;
             }
         }
 
@@ -1013,7 +1076,6 @@ async function submitDecisionEngine() {
         if (!noteRes.ok) throw new Error('Failed to save interaction note');
 
         // Update Lead Details (Name, city, state, status, language)
-        // Auto-assign score based on finalStatus
         let finalScore = 'cold';
         if (finalStatus === 'converted' || finalStatus === 'interested') finalScore = 'hot';
         else if (finalStatus === 'followup' || finalStatus === 'callback' || finalStatus === 'dealer') finalScore = 'warm';
@@ -1030,13 +1092,19 @@ async function submitDecisionEngine() {
             phone_number: phone,
             language: document.getElementById('de-language').value,
             assigned_to: document.getElementById('leadDetailAssignedId')?.value,
-            first_message: document.getElementById('leadDetailAmount')?.textContent || '', // preserve
+            first_message: document.getElementById('leadDetailAmount')?.textContent || '',
             call_count: currentCallCount
         };
 
+        if (salesStatus === 'dealer' || salesStatus === 'Dealer') {
+            const selectedMgrId = document.getElementById('de-dealer-manager-select')?.value;
+            if (selectedMgrId) updatePayload.assigned_to = selectedMgrId;
+            updatePayload.status = 'dealer';
+        }
+
         if (leadPath === 'not_connected') {
             updatePayload.next_followup_date = document.getElementById('de-nc-date').value;
-        } else if (['interested', 'followup', 'dealer', 'Hot/Very Interested', 'Mild/Later', 'Dealer'].includes(salesStatus)) {
+        } else if (['interested', 'followup', 'Hot/Very Interested', 'Mild/Later'].includes(salesStatus)) {
             updatePayload.next_followup_date = document.getElementById('de-followup-date').value;
         }
         const updateRes = await fetch(`${window.API_URL}/leads/${leadId}`, {

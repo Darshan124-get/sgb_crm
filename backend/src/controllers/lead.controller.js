@@ -1,13 +1,13 @@
 const pool = require('../config/db');
 
 exports.getLeads = async (req, res) => {
-    const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit } = req.query;
+    const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit, module: moduleName, dealer_only } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
     try {
         let query = `
-            SELECT l.*, u.name as assigned_to_name,
+            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
                     ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
@@ -17,9 +17,23 @@ exports.getLeads = async (req, res) => {
                    (SELECT cs.variables FROM chatbot_sessions cs WHERE cs.lead_id = l.lead_id OR cs.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci ORDER BY cs.session_id DESC LIMIT 1) as bot_variables
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
+            LEFT JOIN roles r ON u.role_id = r.role_id
             WHERE 1=1
         `;
         let params = [];
+
+        // 🎯 Dealer Module Filtering: Strictly display B2B Dealer Leads (WhatsApp transfer to Dealer Manager OR CRM Order Conversion Wizard)
+        if (moduleName === 'dealer' || dealer_only === 'true') {
+            query += ` AND (
+                LOWER(l.status) IN ('dealer', 'dealer_lead', 'dealer_converted')
+                OR l.lead_id IN (
+                    SELECT DISTINCT lead_id 
+                    FROM lead_notes 
+                    WHERE note LIKE '%Dealer Manager%' OR note LIKE '%transferred%Dealer%'
+                )
+                OR LOWER(COALESCE(r.name, '')) IN ('dealer_manager', 'dealer manager', 'dealer_executive', 'dealer_head')
+            )`;
+        }
 
         // 🛡️ SECURITY: Role-Based Data Isolation
         if ((userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp')) {
@@ -103,7 +117,7 @@ exports.getLeads = async (req, res) => {
         const totalLeads = countResult[0].total;
 
         // Apply Order
-        query += ' ORDER BY l.created_at DESC';
+        query += ' ORDER BY COALESCE(l.updated_at, l.created_at) DESC, l.lead_id DESC';
 
         const reqPriority = (req.query.priority || '').toLowerCase();
 
@@ -233,12 +247,17 @@ exports.getLeadById = async (req, res) => {
         lead.order = allOrders[0] || null; // Most recent for top summary
         lead.order_history = allOrders; // Full list for history section
 
-        // Fetch recent feedback (last note that isn't an 'attempt' or automated)
+        // Fetch recent feedback / notes (prefer real user notes over automated system status updates)
         const [feedbackRows] = await pool.query(
-            'SELECT note FROM lead_notes WHERE lead_id = ? AND note NOT LIKE "%attempt%" AND note NOT LIKE "Lead created%" ORDER BY created_at DESC LIMIT 1',
+            'SELECT note FROM lead_notes WHERE lead_id = ? AND note NOT LIKE "%attempt%" AND note NOT LIKE "Lead created%" AND note NOT LIKE "Lead details updated%" ORDER BY created_at DESC LIMIT 1',
             [req.params.id]
         );
-        lead.feedback = feedbackRows[0] ? feedbackRows[0].note : '-';
+        const [allNotesRows] = await pool.query(
+            'SELECT n.*, u.name as author_name FROM lead_notes n LEFT JOIN users u ON n.user_id = u.user_id WHERE n.lead_id = ? ORDER BY n.created_at DESC',
+            [req.params.id]
+        );
+        lead.notes_history = allNotesRows;
+        lead.feedback = feedbackRows[0] ? feedbackRows[0].note : (allNotesRows[0] ? allNotesRows[0].note : null);
 
         // Count call attempts
         const [attemptRows] = await pool.query(
@@ -480,7 +499,7 @@ exports.updateLead = async (req, res) => {
     const {
         phone_number, customer_name, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
-        current_crop, acreage, delivery_type, call_count
+        current_crop, acreage, delivery_type, call_count, notes, remarks
     } = req.body;
 
     let connection;
@@ -552,8 +571,10 @@ exports.updateLead = async (req, res) => {
             }
         }
 
-        await connection.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [req.params.id, req.user.id, `Lead details updated. Status: ${status}`]);
+        const userNote = notes || req.body.notes || req.body.remarks;
+        const noteToSave = userNote ? userNote : `Lead details updated. Status: ${finalStatus}`;
+        await connection.query('INSERT INTO lead_notes (lead_id, user_id, note, created_at) VALUES (?, ?, ?, NOW())',
+            [req.params.id, req.user ? req.user.id : 1, noteToSave]);
 
         await connection.commit();
         res.json({ message: 'Lead updated successfully' });
@@ -641,7 +662,10 @@ exports.transferLead = async (req, res) => {
         // 1. If direct userId is provided, use it
         if (userId) {
             const [userRows] = await connection.query(
-                'SELECT user_id, name, language FROM users WHERE user_id = ? AND status = "active"',
+                `SELECT u.user_id, u.name, u.language, r.name as role_name 
+                 FROM users u 
+                 LEFT JOIN roles r ON u.role_id = r.role_id 
+                 WHERE u.user_id = ? AND u.status = "active"`,
                 [userId]
             );
             if (userRows.length === 0) {
@@ -653,7 +677,7 @@ exports.transferLead = async (req, res) => {
         // 2. Otherwise, find the best target Sales staff for the new language (Round Robin)
         else if (target_language) {
             const [salesStaff] = await connection.query(
-                `SELECT u.user_id, u.name 
+                `SELECT u.user_id, u.name, r.name as role_name 
                  FROM users u 
                  JOIN roles r ON u.role_id = r.role_id 
                  JOIN departments d ON u.department_id = d.id
@@ -677,14 +701,16 @@ exports.transferLead = async (req, res) => {
         // 3. Perform the transfer
         const finalLanguage = target_language || targetUser.language || 'EN';
         await connection.query(
-            'UPDATE leads SET assigned_to = ?, language = ?, status = "assigned" WHERE lead_id = ?',
+            'UPDATE leads SET assigned_to = ?, language = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?',
             [targetUser.user_id, finalLanguage, leadId]
         );
 
         // 4. Log the transfer
+        const isDealerManager = (targetUser.role_name || '').toLowerCase().includes('dealer');
+        const roleLabel = isDealerManager ? 'Dealer Manager' : 'Telecaller';
         await connection.query(
             'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [leadId, req.user.id, `Lead transferred to ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
+            [leadId, req.user.id, `Lead transferred to ${roleLabel} ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
         );
 
         // 5. Update target user's rotation timestamp

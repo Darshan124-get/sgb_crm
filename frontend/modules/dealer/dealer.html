@@ -364,9 +364,9 @@
                     <!-- Table Card Container -->
                     <div class="premium-card"
                         style="overflow:hidden;border-radius:12px;box-shadow: 0 1px 3px rgba(0,0,0,0.05);background:#ffffff;">
-                        <div style="overflow-x:auto;">
-                            <table style="width:100%;border-collapse:collapse;text-align:left;">
-                                <thead style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                        <div class="table-scroll-container">
+                            <table class="sticky-table-header">
+                                <thead style="background:#f8fafc;">
                                     <tr>
                                         <th style="padding:1rem 0.75rem;width:40px;text-align:center;">
                                             <input type="checkbox" id="selectAllDealersCheckbox"
@@ -419,30 +419,28 @@
                         </div>
 
                         <!-- Pagination Footer -->
-                        <div class="pagination-container">
-                            <div id="paginationInfo">Showing 0 entries</div>
-                            <div style="display:flex;align-items:center;gap:1rem;">
-                                <div class="pagination-pages" id="paginationPages">
-                                    <button class="page-btn" onclick="changePage('prev')"><i
-                                            class="fa-solid fa-chevron-left"></i></button>
-                                    <button class="page-btn active">1</button>
-                                    <button class="page-btn" onclick="changePage(2)">2</button>
-                                    <button class="page-btn" onclick="changePage(3)">3</button>
-                                    <span style="color:#94a3b8;padding:0 2px;">...</span>
-                                    <button class="page-btn" onclick="changePage(13)">13</button>
-                                    <button class="page-btn" onclick="changePage('next')"><i
-                                            class="fa-solid fa-chevron-right"></i></button>
-                                </div>
+                        <div class="pagination-container" style="padding:1rem 1.5rem;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;background:#ffffff;">
+                            <div style="font-size:0.825rem;color:#64748b;" id="paginationInfo">Showing 0 entries</div>
+                            <div style="display:flex;align-items:center;gap:0.75rem;">
                                 <select id="pageSizeSelect" onchange="changePageSize(this.value)"
-                                    style="padding:0.35rem 0.6rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.8rem;color:#334155;background:#ffffff;outline:none;cursor:pointer;">
-                                    <option value="10" selected>10 / page</option>
-                                    <option value="25">25 / page</option>
+                                    style="padding:0.4rem 0.6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.8rem;color:#475569;background:#ffffff;outline:none;cursor:pointer;">
+                                    <option value="10">10 / page</option>
+                                    <option value="25" selected>25 / page</option>
                                     <option value="50">50 / page</option>
                                     <option value="100">100 / page</option>
                                     <option value="250">250 / page</option>
                                     <option value="500">500 / page</option>
                                     <option value="custom">Custom...</option>
                                 </select>
+                                <div class="pagination-pages" id="paginationPages" style="display:flex;gap:0.25rem;">
+                                    <button class="page-btn" onclick="changePage('prev')"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <button class="page-btn active">1</button>
+                                    <button class="page-btn" onclick="changePage(2)">2</button>
+                                    <button class="page-btn" onclick="changePage(3)">3</button>
+                                    <span style="color:#94a3b8;padding:0 2px;">...</span>
+                                    <button class="page-btn" onclick="changePage(13)">13</button>
+                                    <button class="page-btn" onclick="changePage('next')"><i class="fa-solid fa-chevron-right"></i></button>
+                                </div>
                             </div>
                         </div>
                     </div>

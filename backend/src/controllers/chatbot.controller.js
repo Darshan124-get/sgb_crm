@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const storageService = require('../services/storage.service');
 const fs = require('fs');
 const path = require('path');
 
@@ -1037,7 +1038,6 @@ exports.getMedia = async (req, res) => {
 
 // Helper: Upload file to Cloudflare R2 Storage or Local Disk fallback
 async function saveMediaFile(file) {
-    const bucketName = process.env.SUPABASE_BUCKET_NAME || 'chatbot-media';
     const folderPath = 'chatbot-media';
     const filename = `${Date.now()}_${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const storagePath = `${folderPath}/${filename}`;
@@ -1045,7 +1045,6 @@ async function saveMediaFile(file) {
     let publicUrl = '';
     let isStorageSuccess = false;
 
-    const storageService = require('../services/storage.service');
     try {
         const uploadResult = await storageService.uploadObject({
             key: storagePath,
@@ -1147,7 +1146,6 @@ exports.deleteMedia = async (req, res) => {
         // 1. Hard Delete from Cloudflare R2 Storage
         if (media.storage_path) {
             try {
-                const storageService = require('../services/storage.service');
                 await storageService.deleteObject({ key: media.storage_path });
             } catch (e) {
                 console.warn('[R2 HARD DELETE WARN]', e.message);

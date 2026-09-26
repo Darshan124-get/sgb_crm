@@ -1425,12 +1425,18 @@ async function handleSaveDetails() {
     }
 }
 
+let currentTransferTab = 'dealer'; // default active tab: 'dealer' or 'telecaller'
+
 async function loadSalesUsers() {
     try {
         const fetchFunc = window.fetchWithRetry || fetch;
-        const response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
+        let response = await fetchFunc(`${USER_API_BASE}`, { headers: getAuthHeader() });
+        if (!response.ok) {
+            response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
+        }
         if (response.ok) {
-            salesUsers = await response.json();
+            const data = await response.json();
+            salesUsers = Array.isArray(data) ? data : (data.users || []);
             renderSalesList();
         }
     } catch (err) {
@@ -1438,28 +1444,83 @@ async function loadSalesUsers() {
     }
 }
 
+function switchTransferTab(tab) {
+    currentTransferTab = tab;
+    
+    const tabDealer = document.getElementById('transfer-tab-dealer');
+    const tabTelecaller = document.getElementById('transfer-tab-telecaller');
+    
+    if (tabDealer && tabTelecaller) {
+        if (tab === 'dealer') {
+            tabDealer.style.color = '#FF6B00';
+            tabDealer.style.borderBottom = '2.5px solid #FF6B00';
+            tabTelecaller.style.color = '#64748b';
+            tabTelecaller.style.borderBottom = '2.5px solid transparent';
+        } else {
+            tabTelecaller.style.color = '#FF6B00';
+            tabTelecaller.style.borderBottom = '2.5px solid #FF6B00';
+            tabDealer.style.color = '#64748b';
+            tabDealer.style.borderBottom = '2.5px solid transparent';
+        }
+    }
+    
+    const searchVal = salesSearchEl ? salesSearchEl.value : '';
+    renderSalesList(searchVal);
+}
+window.switchTransferTab = switchTransferTab;
+
 function renderSalesList(filter = '') {
+    if (!salesPersonListEl) return;
     salesPersonListEl.innerHTML = '';
-    const filteredUsers = salesUsers.filter(u =>
-        u.name.toLowerCase().includes(filter.toLowerCase()) ||
+
+    // Filter users based on active tab category
+    const tabUsers = salesUsers.filter(user => {
+        const role = (user.role_name || user.role || '').toLowerCase();
+        if (currentTransferTab === 'dealer') {
+            // Display ONLY Dealer Managers / Dealer roles
+            return role.includes('dealer');
+        } else {
+            // Telecaller tab: Display Telecallers and other sales staff
+            return !role.includes('dealer');
+        }
+    });
+
+    const filteredUsers = tabUsers.filter(u =>
+        (u.name && u.name.toLowerCase().includes(filter.toLowerCase())) ||
         (u.phone && u.phone.includes(filter))
     );
+
+    if (filteredUsers.length === 0) {
+        salesPersonListEl.innerHTML = `
+            <div style="padding: 28px 16px; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+                <i class="fas fa-users-slash" style="font-size: 1.6rem; margin-bottom: 8px; display: block; color: #cbd5e1;"></i>
+                No ${currentTransferTab === 'dealer' ? 'Dealer Managers' : 'Telecallers'} found
+            </div>`;
+        return;
+    }
 
     filteredUsers.forEach(user => {
         const item = document.createElement('div');
         item.className = `sales-person-item ${selectedTransferUserId === user.user_id ? 'selected' : ''}`;
+        const userRoleStr = (user.role_name || user.role || 'Staff').toUpperCase();
+        const isDealerRole = userRoleStr.includes('DEALER');
         item.innerHTML = `
             <div class="radio-circle"></div>
             <div class="sales-avatar" style="background: ${getRandomColor(user.name)}">${getInitials(user.name)}</div>
             <div class="sales-info">
-                <div class="sales-name">${user.name}</div>
+                <div class="sales-name">
+                    ${user.name} 
+                    <span style="font-size:0.72rem; font-weight:600; background: ${isDealerRole ? '#fff7ed' : '#eff6ff'}; color: ${isDealerRole ? '#ea580c' : '#2563eb'}; padding:2px 7px; border-radius:4px; margin-left:6px;">
+                        ${userRoleStr}
+                    </span>
+                </div>
                 <div class="sales-phone">${user.phone || 'No phone'}</div>
             </div>
         `;
         item.onclick = () => {
             selectedTransferUserId = user.user_id;
             confirmTransferBtnEl.disabled = (activeCustomer && selectedTransferUserId === activeCustomer.assigned_to);
-            renderSalesList(filter); // Re-render to show selection
+            renderSalesList(filter); // Re-render to update selected radio state
         };
         salesPersonListEl.appendChild(item);
     });
@@ -1492,7 +1553,7 @@ async function handleTransfer() {
         });
 
         if (response.ok) {
-            window.showAlert('Success', 'Lead transferred successfully', 'success');
+            window.showAlert('Success', `Lead transferred successfully to ${currentTransferTab === 'dealer' ? 'Dealer Manager' : 'Telecaller'}`, 'success');
             transferModal.classList.remove('active');
             document.body.classList.remove('modal-open');
 

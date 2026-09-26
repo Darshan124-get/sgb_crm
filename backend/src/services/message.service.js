@@ -219,8 +219,6 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
         let extension = mimeMap[cleanMime] || (cleanMime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
         if (extension === 'jpeg') extension = 'jpg';
         const fileName = `${timestamp}-${phone}.${extension}`;
-        const filePath = `chats/${phone}/${fileName}`;
-
         const storageService = require('./storage.service');
         try {
           const uploadResult = await storageService.uploadObject({

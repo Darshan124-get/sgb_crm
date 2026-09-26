@@ -1081,17 +1081,20 @@ async function submitDecisionEngine() {
         else if (finalStatus === 'followup' || finalStatus === 'callback' || finalStatus === 'dealer') finalScore = 'warm';
         else if (finalStatus === 'not_interested' || finalStatus === 'lost') finalScore = 'cold';
 
+        const deLanguageEl = document.getElementById('de-language');
+        const langVal = deLanguageEl ? deLanguageEl.value : (window.currentLeadData ? window.currentLeadData.language : 'EN');
+
         const updatePayload = {
-            customer_name: customerName,
-            city: village,
-            district: district,
-            pincode: pincode,
-            state: state,
+            customer_name: customerName || (window.currentLeadData ? window.currentLeadData.customer_name : ''),
+            city: village || (window.currentLeadData ? window.currentLeadData.city : ''),
+            district: district || (window.currentLeadData ? window.currentLeadData.district : ''),
+            pincode: pincode || (window.currentLeadData ? window.currentLeadData.pincode : ''),
+            state: state || (window.currentLeadData ? window.currentLeadData.state : ''),
             status: finalStatus,
             score: finalScore,
-            phone_number: phone,
-            language: document.getElementById('de-language').value,
-            assigned_to: document.getElementById('leadDetailAssignedId')?.value,
+            phone_number: phone || (window.currentLeadData ? window.currentLeadData.phone_number : ''),
+            language: langVal,
+            assigned_to: document.getElementById('leadDetailAssignedId')?.value || (window.currentLeadData ? window.currentLeadData.assigned_to : null),
             first_message: document.getElementById('leadDetailAmount')?.textContent || '',
             call_count: currentCallCount
         };
@@ -1100,19 +1103,30 @@ async function submitDecisionEngine() {
             const selectedMgrId = document.getElementById('de-dealer-manager-select')?.value;
             if (selectedMgrId) updatePayload.assigned_to = selectedMgrId;
             updatePayload.status = 'dealer';
+            const dealerNotesVal = document.getElementById('de-dealer-notes')?.value;
+            if (dealerNotesVal) {
+                updatePayload.notes = `Notes for Dealer Manager: ${dealerNotesVal}`;
+            }
         }
 
         if (leadPath === 'not_connected') {
-            updatePayload.next_followup_date = document.getElementById('de-nc-date').value;
+            updatePayload.next_followup_date = document.getElementById('de-nc-date')?.value || null;
         } else if (['interested', 'followup', 'Hot/Very Interested', 'Mild/Later'].includes(salesStatus)) {
-            updatePayload.next_followup_date = document.getElementById('de-followup-date').value;
+            updatePayload.next_followup_date = document.getElementById('de-followup-date')?.value || null;
         }
         const updateRes = await fetch(`${window.API_URL}/leads/${leadId}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(updatePayload)
         });
-        if (!updateRes.ok) throw new Error('Failed to update lead status');
+        if (!updateRes.ok) {
+            let errText = 'Failed to update lead status';
+            try {
+                const errData = await updateRes.json();
+                errText = errData.message || errText;
+            } catch(e){}
+            throw new Error(errText);
+        }
 
         // 🔥 ACTUALLY CREATE THE ORDER 🔥
         if (finalStatus === 'converted') {

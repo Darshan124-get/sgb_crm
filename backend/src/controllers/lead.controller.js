@@ -526,6 +526,12 @@ exports.updateLead = async (req, res) => {
         const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
         const finalAddress = address !== undefined ? address : combinedAddress;
 
+        const cleanFollowupDate = (next_followup_date && String(next_followup_date).trim() !== '') 
+            ? next_followup_date 
+            : (currentLead.next_followup_date || null);
+
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+
         await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
@@ -536,37 +542,37 @@ exports.updateLead = async (req, res) => {
             [
                 phone_number || currentLead.phone_number,
                 customer_name || currentLead.customer_name,
-                first_message || currentLead.first_message,
-                language || currentLead.language,
-                finalAddress,
-                finalCity,
-                finalState,
-                finalDistrict,
-                finalPincode,
+                first_message || currentLead.first_message || null,
+                language || currentLead.language || 'EN',
+                finalAddress || null,
+                finalCity || null,
+                finalState || null,
+                finalDistrict || null,
+                finalPincode || null,
                 finalStatus,
-                finalAssignedTo,
+                finalAssignedTo || null,
                 score || currentLead.score || 'cold',
-                next_followup_date || currentLead.next_followup_date,
-                lost_reason || currentLead.lost_reason,
-                lost_notes || currentLead.lost_notes,
-                current_crop || currentLead.current_crop,
-                acreage || currentLead.acreage,
-                delivery_type || currentLead.delivery_type,
+                cleanFollowupDate,
+                lost_reason || currentLead.lost_reason || null,
+                lost_notes || currentLead.lost_notes || null,
+                current_crop || currentLead.current_crop || null,
+                acreage || currentLead.acreage || null,
+                delivery_type || currentLead.delivery_type || null,
                 call_count !== undefined ? call_count : currentLead.call_count,
                 req.params.id
             ]
         );
 
         // Sync lead_followups if date changed
-        if (next_followup_date && next_followup_date !== currentLead.next_followup_date) {
+        if (cleanFollowupDate && cleanFollowupDate !== currentLead.next_followup_date) {
             // Check if there's already a pending followup
             const [existing] = await connection.query('SELECT followup_id FROM lead_followups WHERE lead_id = ? AND status = "pending"', [req.params.id]);
             if (existing.length > 0) {
-                await connection.query('UPDATE lead_followups SET followup_date = ? WHERE followup_id = ?', [next_followup_date, existing[0].followup_id]);
+                await connection.query('UPDATE lead_followups SET followup_date = ? WHERE followup_id = ?', [cleanFollowupDate, existing[0].followup_id]);
             } else {
                 await connection.query(
                     'INSERT INTO lead_followups (lead_id, followup_date, status, remarks, created_by) VALUES (?, ?, "pending", ?, ?)',
-                    [req.params.id, next_followup_date, `Scheduled via Update (${status})`, req.user.id]
+                    [req.params.id, cleanFollowupDate, `Scheduled via Update (${finalStatus})`, actingUserId]
                 );
             }
         }
@@ -574,7 +580,7 @@ exports.updateLead = async (req, res) => {
         const userNote = notes || req.body.notes || req.body.remarks;
         const noteToSave = userNote ? userNote : `Lead details updated. Status: ${finalStatus}`;
         await connection.query('INSERT INTO lead_notes (lead_id, user_id, note, created_at) VALUES (?, ?, ?, NOW())',
-            [req.params.id, req.user ? req.user.id : 1, noteToSave]);
+            [req.params.id, actingUserId, noteToSave]);
 
         await connection.commit();
         res.json({ message: 'Lead updated successfully' });

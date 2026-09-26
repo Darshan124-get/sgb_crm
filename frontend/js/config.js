@@ -28,7 +28,7 @@ window.resolveMediaUrl = function (rawUrl) {
     const trimmed = rawUrl.trim();
     if (!trimmed) return window.SVG_PRODUCT_PLACEHOLDER || '';
 
-    if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
         return trimmed;
     }
 
@@ -36,14 +36,21 @@ window.resolveMediaUrl = function (rawUrl) {
         return trimmed;
     }
 
+    let cleanPath = trimmed;
+    if (cleanPath.startsWith('http://127.0.0.1:5000') || cleanPath.startsWith('http://localhost:5000')) {
+        cleanPath = cleanPath.replace(/^http:\/\/(127\.0\.0\.1|localhost):5000/, '');
+    } else if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+        return cleanPath;
+    }
+
     const baseUrl = window.BASE_URL || 
                     (window.API_URL ? window.API_URL.replace(/\/api$/, '') : '') || 
                     (window.location.origin && window.location.origin.includes(':5000') ? '' : 'http://127.0.0.1:5000');
 
     const cleanBase = baseUrl.replace(/\/$/, '');
-    const cleanPath = trimmed.startsWith('/') ? trimmed : '/' + trimmed;
+    const cleanPathFormatted = cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath;
 
-    return `${cleanBase}${cleanPath}`;
+    return `${cleanBase}${cleanPathFormatted}`;
 };
 
 window.FCM_VAPID_KEY = 'BCt9SBycqLOQToZjMnZ9sRedn1Etk7-HtrCeCnPxAQEmgqCnMA87QtqPflx6Wi1PAOU2to8Rd6F_AeY1OEhTRE4';

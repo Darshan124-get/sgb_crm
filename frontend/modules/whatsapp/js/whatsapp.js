@@ -36,12 +36,16 @@ let scrollUnreadCount = 0;
 function saveCacheToSession() {
     try {
         const cacheObj = {};
-        chatHistoryCache.forEach((value, key) => {
+        const entries = Array.from(chatHistoryCache.entries()).slice(-50);
+        entries.forEach(([key, value]) => {
             cacheObj[key] = value;
         });
         sessionStorage.setItem('wa_chat_history_cache', JSON.stringify(cacheObj));
     } catch (e) {
-        console.error('Failed to save chat cache to sessionStorage:', e);
+        console.warn('sessionStorage wa_chat_history_cache full, resetting cache:', e.message);
+        try {
+            sessionStorage.removeItem('wa_chat_history_cache');
+        } catch (_) {}
     }
 }
 
@@ -2377,13 +2381,7 @@ function createSingleMessageElement(msg, history = []) {
         let rawUrl = msg.media_url || '';
         let mediaUrl = '';
         if (rawUrl) {
-            if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-                mediaUrl = rawUrl;
-            } else if (rawUrl.startsWith('/')) {
-                mediaUrl = (window.BASE_URL || '') + rawUrl;
-            } else {
-                mediaUrl = (window.BASE_URL || '') + '/api/media/' + rawUrl.replace(/^\/+/, '');
-            }
+            mediaUrl = typeof window.resolveMediaUrl === 'function' ? window.resolveMediaUrl(rawUrl) : rawUrl;
         } else {
             mediaUrl = `${API_BASE}/media/${msg.chat_id}?token=${localStorage.getItem('token')}`;
         }

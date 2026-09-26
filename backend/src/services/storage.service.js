@@ -53,8 +53,8 @@ function getPublicUrl(key, bucketName = defaultBucket) {
   if (cleanKey.startsWith('http://') || cleanKey.startsWith('https://')) {
     return cleanKey;
   }
-  const baseUrl = (process.env.APP_BASE_URL || process.env.SERVER_URL || '').replace(/\/$/, '');
-  return baseUrl ? `${baseUrl}/api/media/${cleanKey}` : `/api/media/${cleanKey}`;
+  const baseUrl = (process.env.APP_BASE_URL || process.env.SERVER_URL || 'http://127.0.0.1:5000').replace(/\/$/, '');
+  return `${baseUrl}/api/media/${cleanKey}`;
 }
 
 /**

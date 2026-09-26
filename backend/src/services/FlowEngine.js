@@ -606,10 +606,6 @@ class FlowEngine {
                     let description = config.desc || config.description || '';
                     let imageUrl = config.image || config.image_url || '';
 
-                    if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-                        imageUrl = '';
-                    }
-
                     // Look up catalog details ONLY if fields are missing
                     let catRows = [];
                     if (config.productId) {
@@ -622,7 +618,7 @@ class FlowEngine {
                         productName = productName || catRows[0].name;
                         description = description || catRows[0].description;
                         // ONLY use catalog image_url if node config image is completely empty
-                        if (!imageUrl && catRows[0].image_url && catRows[0].image_url.startsWith('http')) {
+                        if (!imageUrl && catRows[0].image_url) {
                             imageUrl = catRows[0].image_url;
                         }
                     }
@@ -635,7 +631,7 @@ class FlowEngine {
                         cardText += `\n\n${description.trim()}`;
                     }
 
-                    if (imageUrl && imageUrl.startsWith('http')) {
+                    if (imageUrl) {
                         try {
                             const sendRes = await whatsappService.sendMediaMessage(session.phone, imageUrl, 'image', cardText, null, botSenderId);
                             await this.waitForMediaDelivery(sendRes);

@@ -151,9 +151,11 @@ const getOrCreateMetaMediaId = async (urlOrKey, type) => {
       }
     }
 
-    // 2. Fallback to HTTP download if not in R2 or if external URL
-    if (!buffer && typeof urlOrKey === 'string' && urlOrKey.startsWith('http')) {
-      const res = await axios.get(urlOrKey, { responseType: 'arraybuffer', timeout: 15000 });
+    // 2. Fallback to HTTP download if not in R2 or if external/relative URL
+    if (!buffer && typeof urlOrKey === 'string') {
+      const fullUrl = storageService.getPublicUrl(urlOrKey);
+      const httpUrl = fullUrl.startsWith('http') ? fullUrl : `http://127.0.0.1:5000${fullUrl.startsWith('/') ? '' : '/'}${fullUrl}`;
+      const res = await axios.get(httpUrl, { responseType: 'arraybuffer', timeout: 15000 });
       buffer = Buffer.from(res.data);
       const headerContentType = res.headers['content-type'] || '';
       if (headerContentType) mimeType = headerContentType;
@@ -208,8 +210,15 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
       }
     }
 
-    const isMetaId = !resolvedMediaId.startsWith('http');
-    const mediaObj = isMetaId ? { id: resolvedMediaId } : { link: resolvedMediaId };
+    const storageService = require('./storage.service');
+    const isMetaId = typeof resolvedMediaId === 'string' && /^\d+$/.test(resolvedMediaId);
+    let mediaObj;
+    if (isMetaId) {
+      mediaObj = { id: resolvedMediaId };
+    } else {
+      const fullUrl = storageService.getPublicUrl(resolvedMediaId);
+      mediaObj = { link: fullUrl };
+    }
     if (caption) mediaObj.caption = caption;
 
     const data = {
@@ -235,7 +244,8 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
     } catch (apiErr) {
       if (isUrlOrKey && isMetaId) {
         logger.warn(`Failed to send via Meta Media ID (${resolvedMediaId}), retrying via direct HTTP link...`);
-        const fallbackObj = { link: mediaId };
+        const fullUrl = storageService.getPublicUrl(mediaId);
+        const fallbackObj = { link: fullUrl };
         if (caption) fallbackObj.caption = caption;
         data[type] = fallbackObj;
         response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {

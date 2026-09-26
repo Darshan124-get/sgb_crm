@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (node.type === 'product') {
             bodyPreview = `
                 <div class="product-card-preview">
-                    <img src="${node.config.image || 'https://images.unsplash.com/photo-1599824434955-443a02302305?w=50'}" alt="Product">
+                    <img src="${window.resolveMediaUrl(node.config.image || 'https://images.unsplash.com/photo-1599824434955-443a02302305?w=50')}" alt="Product">
                     <div style="display:flex; flex-direction:column; gap:0.15rem; min-width:0; flex:1;">
                         <span style="font-weight:700; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${node.config.product || 'Select Product'}</span>
                         <span style="color:#f97316; font-weight:700; font-size:0.7rem;">${node.config.price || 'Price'}</span>
@@ -1496,14 +1496,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <div id="media-preview-container" style="display: ${node.config.mediaUrl ? 'block' : 'none'}; position: relative; margin-bottom: 6px;">
                             ${node.type === 'video' && node.config.mediaUrl ? `
-                                <video src="${node.config.mediaUrl}" controls style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#000;"></video>
+                                <video src="${window.resolveMediaUrl(node.config.mediaUrl)}" controls style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#000;"></video>
                             ` : (node.type === 'image' && node.config.mediaUrl ? `
-                                <img src="${node.config.mediaUrl}" style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; object-fit:contain;">
+                                <img src="${window.resolveMediaUrl(node.config.mediaUrl)}" style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; object-fit:contain;">
                             ` : `
                                 <div style="font-size:0.75rem; font-weight:700; color:#1e293b; word-break:break-all; background:#ffffff; padding:6px; border-radius:6px; border:1px solid #cbd5e1;">
                                     ${node.config.mediaUrl ? node.config.mediaUrl.split('/').pop() : ''}
                                 </div>
                             `)}
+
                             <button type="button" style="position: absolute; top: -6px; right: -6px; background: rgba(239, 68, 68, 0.95); color: #ffffff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;" title="Remove File" onclick="removeNodeMediaFile(event)">&times;</button>
                         </div>
 
@@ -1648,9 +1649,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="file" id="node-p-file-input" accept="image/*" style="display: none;" onchange="handleProductFileUpload(event)">
 
                         <div id="product-img-preview-container" style="display: ${node.config.image ? 'block' : 'none'}; position: relative; margin-bottom: 6px;">
-                            <img id="product-img-preview" src="${node.config.image || 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3C/svg%3E'}" onerror="this.style.display='none';" style="max-width: 100%; max-height: 140px; border-radius: 6px; object-fit: contain; border: 1px solid #e2e8f0; background: #ffffff; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <img id="product-img-preview" src="${window.resolveMediaUrl(node.config.image || 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3C/svg%3E')}" onerror="this.style.display='none';" style="max-width: 100%; max-height: 140px; border-radius: 6px; object-fit: contain; border: 1px solid #e2e8f0; background: #ffffff; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <button type="button" id="btn-remove-p-image" style="position: absolute; top: 4px; right: 4px; background: rgba(239, 68, 68, 0.95); color: #ffffff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;" title="Remove Image" onclick="removeProductImage(event)">&times;</button>
                         </div>
+
 
                         <div id="product-img-empty-box" style="display: ${node.config.image ? 'none' : 'block'}; padding: 10px 4px; cursor: pointer;" onclick="openProductFilePicker()">
                             <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.8rem; color: #94a3b8; margin-bottom: 4px;"></i>
@@ -2485,9 +2487,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble bot';
         bubble.style.padding = '0.45rem';
+        const prodImgUrl = typeof window.resolveMediaUrl === 'function' ? window.resolveMediaUrl(config.image || '') : (config.image || '');
         bubble.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:0.4rem; width:100%; max-width:200px;">
-                <img src="${config.image || 'https://images.unsplash.com/photo-1599824434955-443a02302305?w=150'}" style="width:100%; height:120px; object-fit:cover; border-radius:0.375rem;">
+                <img src="${prodImgUrl || 'https://images.unsplash.com/photo-1599824434955-443a02302305?w=150'}" style="width:100%; height:120px; object-fit:cover; border-radius:0.375rem;">
                 <div style="font-weight:700; font-size:0.8rem; color:var(--text-main);">${config.product || 'Product Name'}</div>
                 <div style="font-size:0.75rem; color:#f97316; font-weight:700;">${config.price || 'Price'}</div>
                 <div style="font-size:0.68rem; color:var(--text-muted);">${config.desc || ''}</div>
@@ -2503,8 +2506,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble bot';
         bubble.style.padding = '0.45rem';
-        const mediaUrl = config.mediaUrl || config.file_url || config.video_url || config.image_url || 'https://images.unsplash.com/photo-1599824434955-443a02302305?w=500';
+        const rawMediaUrl = config.mediaUrl || config.file_url || config.video_url || config.image_url || 'https://images.unsplash.com/photo-1599824434955-443a02302305?w=500';
+        const mediaUrl = typeof window.resolveMediaUrl === 'function' ? window.resolveMediaUrl(rawMediaUrl) : rawMediaUrl;
         const caption = config.caption || config.message || (type === 'video' ? 'Product Demonstration Video' : 'Media Attachment');
+
 
         if (type === 'video') {
             bubble.innerHTML = `
@@ -3461,11 +3466,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (imageInput) imageInput.value = imgUrl;
 
         if (imgUrl) {
-            if (previewImg) previewImg.src = imgUrl;
+            const resolvedImg = typeof window.resolveMediaUrl === 'function' ? window.resolveMediaUrl(imgUrl) : imgUrl;
+            if (previewImg) previewImg.src = resolvedImg;
             if (previewContainer) previewContainer.style.display = 'block';
             if (emptyBox) emptyBox.style.display = 'none';
             if (browseText) browseText.textContent = 'Change Image';
         } else {
+
             if (previewContainer) previewContainer.style.display = 'none';
             if (emptyBox) emptyBox.style.display = 'block';
             if (browseText) browseText.textContent = 'Choose Image File';
@@ -3568,7 +3575,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Local Base64 FileReader preview
+                // Local Base64 FileReader preview is
                 const reader = new FileReader();
                 reader.onload = function (evt) {
                     const dataUrl = evt.target.result;
@@ -3992,7 +3999,9 @@ document.addEventListener('DOMContentLoaded', () => {
             badge.textContent = flowSettings.status.charAt(0).toUpperCase() + flowSettings.status.slice(1);
         }
 
-        await saveDraft();
+        if (typeof window.saveFlowDraft === 'function') {
+            await window.saveFlowDraft();
+        }
     };
 
     // ─── Canvas Startup Positioning
@@ -4058,7 +4067,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (hiddenInp) hiddenInp.value = fileUrl;
             if (previewImg) {
-                previewImg.src = fileUrl;
+                previewImg.src = window.resolveMediaUrl(fileUrl);
                 previewImg.style.display = 'block';
             }
             if (previewContainer) previewContainer.style.display = 'block';
@@ -4129,13 +4138,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const isVid = mediaType === 'video' || (file && file.type && file.type.startsWith('video/'));
             const isAud = mediaType === 'audio' || (file && file.type && file.type.startsWith('audio/'));
 
+            const resolvedUrl = window.resolveMediaUrl(fileUrl);
             let previewHtml = '';
             if (isImg) {
-                previewHtml = `<img src="${fileUrl}" style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; object-fit:contain; background:#ffffff;">`;
+                previewHtml = `<img src="${resolvedUrl}" style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; object-fit:contain; background:#ffffff;">`;
             } else if (isVid) {
-                previewHtml = `<video src="${fileUrl}" controls style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#000;"></video>`;
+                previewHtml = `<video src="${resolvedUrl}" controls style="max-width:100%; max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#000;"></video>`;
             } else if (isAud) {
-                previewHtml = `<audio src="${fileUrl}" controls style="width:100%; margin-top:8px;"></audio>`;
+                previewHtml = `<audio src="${resolvedUrl}" controls style="width:100%; margin-top:8px;"></audio>`;
             } else {
                 previewHtml = `
                     <div style="font-size:0.75rem; font-weight:700; color:#1e293b; word-break:break-all; background:#ffffff; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
@@ -4143,6 +4153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             }
+
 
             if (previewBox) {
                 previewBox.innerHTML = `

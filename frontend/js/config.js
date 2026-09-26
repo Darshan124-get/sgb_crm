@@ -21,7 +21,33 @@ if (isLocal) {
     }
 }
 window.API_URL = `${window.BASE_URL}/api`;
+
+window.resolveMediaUrl = function (rawUrl) {
+    if (!rawUrl) return window.SVG_PRODUCT_PLACEHOLDER || '';
+    if (typeof rawUrl !== 'string') return '';
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return window.SVG_PRODUCT_PLACEHOLDER || '';
+
+    if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
+    }
+
+    if (trimmed.startsWith('../') || trimmed.includes('assets/images')) {
+        return trimmed;
+    }
+
+    const baseUrl = window.BASE_URL || 
+                    (window.API_URL ? window.API_URL.replace(/\/api$/, '') : '') || 
+                    (window.location.origin && window.location.origin.includes(':5000') ? '' : 'http://127.0.0.1:5000');
+
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    const cleanPath = trimmed.startsWith('/') ? trimmed : '/' + trimmed;
+
+    return `${cleanBase}${cleanPath}`;
+};
+
 window.FCM_VAPID_KEY = 'BCt9SBycqLOQToZjMnZ9sRedn1Etk7-HtrCeCnPxAQEmgqCnMA87QtqPflx6Wi1PAOU2to8Rd6F_AeY1OEhTRE4';
+
 
 // ─── Resilient Fetch Wrapper ─────────────────────────────────
 window.fetchWithRetry = async function (url, options = {}, retries = 3, delayMs = 500) {

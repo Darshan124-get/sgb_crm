@@ -13,6 +13,22 @@ window.handleImageError = function(img) {
     }
 };
 
+if (typeof window.resolveMediaUrl !== 'function') {
+    window.resolveMediaUrl = function(rawUrl) {
+        if (!rawUrl || rawUrl === SVG_PRODUCT_PLACEHOLDER) return SVG_PRODUCT_PLACEHOLDER;
+        if (typeof rawUrl !== 'string') return SVG_PRODUCT_PLACEHOLDER;
+        const trimmed = rawUrl.trim();
+        if (!trimmed) return SVG_PRODUCT_PLACEHOLDER;
+        if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+        if (trimmed.startsWith('../') || trimmed.includes('assets/images')) return trimmed;
+        const baseUrl = window.BASE_URL || (window.API_URL ? window.API_URL.replace(/\/api$/, '') : '') || 'http://127.0.0.1:5000';
+        const cleanBase = baseUrl.replace(/\/$/, '');
+        const cleanPath = trimmed.startsWith('/') ? trimmed : '/' + trimmed;
+        return `${cleanBase}${cleanPath}`;
+    };
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // ── Application State ──
@@ -467,10 +483,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const isDoc = m.file_type === 'document' || (m.mime_type && m.mime_type.includes('pdf'));
             const safeName = (m.original_name || m.filename || 'media').replace(/'/g, "\\'");
 
-            let previewMediaHtml = `<img src="${m.file_url}" style="width: 100%; height: 110px; object-fit: cover;" onerror="handleImageError(this)"/>`;
+            const fileUrl = window.resolveMediaUrl(m.file_url);
+            let previewMediaHtml = `<img src="${fileUrl}" style="width: 100%; height: 110px; object-fit: cover;" onerror="handleImageError(this)"/>`;
             if (isVideo) {
-                previewMediaHtml = `<video src="${m.file_url}" style="width: 100%; height: 110px; object-fit: cover; background: #000;" controls></video>`;
+                previewMediaHtml = `<video src="${fileUrl}" style="width: 100%; height: 110px; object-fit: cover; background: #000;" controls></video>`;
             } else if (isDoc) {
+
                 previewMediaHtml = `
                     <div style="width: 100%; height: 110px; background: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #6366f1;">
                         <i class="fa-regular fa-file-pdf" style="font-size: 2.5rem; margin-bottom: 4px;"></i>
@@ -635,8 +653,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isSelected = p.id === selectedProductId;
                 const formattedPrice = `₹${parseFloat(p.price || 0).toLocaleString('en-IN')}`;
                 const catBadgeClass = getCatBadgeClass(p.category);
-                const imgPath = p.image_url || SVG_PRODUCT_PLACEHOLDER;
+                const imgPath = window.resolveMediaUrl(p.image_url);
                 const updatedDate = p.updated_at ? new Date(p.updated_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently';
+
 
                 return `
                     <tr data-id="${p.id}" class="${isSelected ? 'selected-row' : ''}">
@@ -706,7 +725,8 @@ document.addEventListener('DOMContentLoaded', () => {
             productsGridContainer.innerHTML = productsList.map(p => {
                 const isSelected = p.id === selectedProductId;
                 const formattedPrice = `₹${parseFloat(p.price || 0).toLocaleString('en-IN')}`;
-                const imgPath = p.image_url || SVG_PRODUCT_PLACEHOLDER;
+                const imgPath = window.resolveMediaUrl(p.image_url);
+
 
                 return `
                     <div class="product-grid-card ${isSelected ? 'selected-grid-card' : ''}" data-id="${p.id}" style="border: 2px solid ${isSelected ? '#4f46e5' : '#e2e8f0'}; border-radius: 8px; overflow: hidden; background: #fff; cursor: pointer; transition: all 0.2s ease;">
@@ -856,17 +876,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const extraCount = galleryUrls.length > maxVisible ? galleryUrls.length - maxVisible : 0;
 
                 let stripHtml = visibleUrls.map((url, idx) => {
-                    const isVideo = url.endsWith('.mp4') || url.includes('video');
+                    const resolvedUrl = window.resolveMediaUrl(url);
+                    const isVideo = resolvedUrl.endsWith('.mp4') || resolvedUrl.includes('/video') || resolvedUrl.includes('.mov');
                     if (isVideo) {
                         return `
                             <div class="strip-thumb-box ${idx === 0 ? 'active' : ''}" data-url="${url}" style="position: relative; width: 44px; height: 44px; border-radius: 6px; overflow: hidden; border: 2px solid ${idx === 0 ? '#4f46e5' : '#e2e8f0'}; cursor: pointer; flex-shrink: 0; background: #000;">
-                                <video src="${url}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                <video src="${resolvedUrl}" style="width: 100%; height: 100%; object-fit: cover;"></video>
                                 <i class="fa-solid fa-play" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 0.75rem;"></i>
                             </div>
                         `;
                     }
                     return `
-                        <img src="${url}" class="strip-thumb ${idx === 0 ? 'active' : ''}" data-url="${url}" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover; border: 2px solid ${idx === 0 ? '#4f46e5' : '#e2e8f0'}; cursor: pointer; flex-shrink: 0;" onerror="handleImageError(this)" />
+                        <img src="${resolvedUrl}" class="strip-thumb ${idx === 0 ? 'active' : ''}" data-url="${url}" style="width: 44px; height: 44px; border-radius: 6px; overflow: hidden; border: 2px solid ${idx === 0 ? '#4f46e5' : '#e2e8f0'}; cursor: pointer; flex-shrink: 0;" onerror="handleImageError(this)" />
                     `;
                 }).join('');
 
@@ -915,13 +936,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setDrawerMainPreview(url) {
         if (!url) return;
-        const isVideo = url.endsWith('.mp4') || url.includes('/video');
+        const resolvedUrl = window.resolveMediaUrl(url);
+        const isVideo = resolvedUrl.endsWith('.mp4') || resolvedUrl.includes('/video') || resolvedUrl.includes('.mov');
 
         if (isVideo) {
             if (drawerMainImg) drawerMainImg.style.display = 'none';
             if (drawerMainVideo) {
                 drawerMainVideo.style.display = 'block';
-                drawerMainVideo.src = url;
+                drawerMainVideo.src = resolvedUrl;
             }
         } else {
             if (drawerMainVideo) {
@@ -930,10 +952,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (drawerMainImg) {
                 drawerMainImg.style.display = 'block';
-                drawerMainImg.src = url;
+                drawerMainImg.src = resolvedUrl;
             }
         }
     }
+
 
     // Switch Right Drawer Sub-Tabs
     function switchDrawerTab(tabName) {
@@ -1013,11 +1036,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         drawerMediaGrid.innerHTML = galleryUrls.map((url, idx) => {
-            const isVideo = url.endsWith('.mp4') || url.includes('/video');
+            const resolvedUrl = window.resolveMediaUrl(url);
+            const isVideo = resolvedUrl.endsWith('.mp4') || resolvedUrl.includes('/video') || resolvedUrl.includes('.mov');
             const safeUrl = url.replace(/'/g, "\\'");
             const mediaContent = isVideo
-                ? `<video src="${url}" controls style="width: 100%; height: 90px; object-fit: cover; background: #000;"></video>`
-                : `<img src="${url}" style="width: 100%; height: 90px; object-fit: cover;" onerror="handleImageError(this)"/>`;
+                ? `<video src="${resolvedUrl}" controls style="width: 100%; height: 90px; object-fit: cover; background: #000;"></video>`
+                : `<img src="${resolvedUrl}" style="width: 100%; height: 90px; object-fit: cover;" onerror="handleImageError(this)"/>`;
 
             return `
                 <div style="border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #fff; position: relative;">
@@ -1027,11 +1051,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                     <div style="padding: 6px; font-size: 0.7rem; color: #64748b; display: flex; justify-content: space-between; align-items: center;">
                         <span>Media #${idx + 1}</span>
-                        <a href="${url}" target="_blank" style="color: #4f46e5; text-decoration: none; font-weight: 700;">View</a>
+                        <a href="${resolvedUrl}" target="_blank" style="color: #4f46e5; text-decoration: none; font-weight: 700;">View</a>
                     </div>
                 </div>
             `;
         }).join('');
+
     }
 
     function renderDrawerFlowsPanel(p) {
@@ -1470,10 +1495,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         wizardMediaPreviewsList.innerHTML = list.map((file, idx) => {
+            const fileUrl = window.resolveMediaUrl(file.file_url);
             const isImg = file.file_type === 'image' || (file.mime_type && file.mime_type.startsWith('image/'));
             const iconHtml = isImg 
-                ? `<img src="${file.file_url}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 4px;" />` 
+                ? `<img src="${fileUrl}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 4px;" onerror="handleImageError(this)"/>` 
                 : `<i class="fa-regular fa-file-lines" style="font-size: 1.5rem; color: #6366f1;"></i>`;
+
             
             const formattedSize = file.size_bytes ? `${(file.size_bytes / (1024 * 1024)).toFixed(1)} MB` : 'Media File';
 

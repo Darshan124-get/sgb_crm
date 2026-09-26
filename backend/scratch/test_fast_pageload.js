@@ -6,7 +6,6 @@ async function testFastPageLoad(user, options = {}) {
   const page = parseInt(options.page) > 0 ? parseInt(options.page) : 1;
   const offset = (page - 1) * limit;
 
-  // Step 1: Run main customer query with optimized JOINs
   let query = `
     SELECT 
       l.*, 
@@ -35,12 +34,16 @@ async function testFastPageLoad(user, options = {}) {
     ) agg ON l.lead_id = agg.lead_id
     LEFT JOIN chat_messages cm_last ON cm_last.chat_id = agg.max_chat_id
     LEFT JOIN (
-      SELECT lead_id, status, paused_at
-      FROM chatbot_sessions
-      WHERE status = 'paused_for_human'
-      ORDER BY session_id DESC
-      LIMIT 100
-    ) cs_paused ON l.lead_id = cs_paused.lead_id
+      SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
+      FROM chatbot_sessions cs1
+      JOIN (
+        SELECT MAX(session_id) as max_session_id
+        FROM chatbot_sessions
+        WHERE status = 'paused_for_human'
+        GROUP BY COALESCE(lead_id, phone)
+      ) cs2 ON cs1.session_id = cs2.max_session_id
+    ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
+       OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
     WHERE 1=1
   `;
   let params = [];
@@ -59,10 +62,9 @@ async function testFastPageLoad(user, options = {}) {
 
   query += ` ORDER BY agg.last_message_at DESC, l.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
-  // Step 2: Run count queries concurrently or lightweight
   const countPromise = db.execute(`SELECT COUNT(*) AS total FROM leads l`);
   const unreadPromise = db.execute(`SELECT COUNT(DISTINCT session_id) AS total_unread FROM chat_messages WHERE sender_type = 'user' AND status = 'sent'`);
-  const handoffPromise = db.execute(`SELECT COUNT(*) AS total_handoff FROM chatbot_sessions WHERE status = 'paused_for_human'`);
+  const handoffPromise = db.execute(`SELECT COUNT(DISTINCT COALESCE(cs1.lead_id, cs1.phone)) AS total_handoff FROM chatbot_sessions cs1 WHERE cs1.status = 'paused_for_human'`);
 
   const [[rows], [countRows], [unreadRows], [handoffRows]] = await Promise.all([
     db.execute(query, params),
@@ -72,7 +74,6 @@ async function testFastPageLoad(user, options = {}) {
   ]);
 
   console.timeEnd('Fast Page Load');
-  console.log(`Loaded ${rows.length} customers in Fast Page Load`);
   return {
     customers: rows,
     totalCount: countRows[0] ? countRows[0].total : rows.length,
@@ -81,4 +82,8 @@ async function testFastPageLoad(user, options = {}) {
   };
 }
 
-testFastPageLoad({ role: 'admin', id: 1 }).then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
+module.exports = testFastPageLoad;
+
+
+
+

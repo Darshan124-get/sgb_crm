@@ -60,6 +60,7 @@ function isAdmin(req, res, next) {
 function isAdminOrSales(req, res, next) {
     if (!req.user || !req.user.role) return res.status(403).json({ message: 'Access denied' });
     
+    const role = req.user.role.toLowerCase();
     if (
         role === 'admin' || 
         role === 'super-admin' || 

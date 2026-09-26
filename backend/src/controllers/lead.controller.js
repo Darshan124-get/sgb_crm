@@ -586,6 +586,7 @@ exports.updateLead = async (req, res) => {
         res.json({ message: 'Lead updated successfully' });
     } catch (err) {
         if (connection) await connection.rollback();
+        console.error('updateLead Error:', err);
         res.status(500).json({ message: 'Error updating lead: ' + err.message });
     } finally {
         if (connection) connection.release();

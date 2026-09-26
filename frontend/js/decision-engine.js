@@ -1061,7 +1061,8 @@ async function submitDecisionEngine() {
             } else if (salesStatus === 'dealer' || salesStatus === 'Dealer') {
                 finalStatus = 'dealer';
                 const mgrSelect = document.getElementById('de-dealer-manager-select');
-                const mgrName = mgrSelect && mgrSelect.options[mgrSelect.selectedIndex] ? mgrSelect.options[mgrSelect.selectedIndex].text : 'Dealer Manager';
+                const selectedOpt = (mgrSelect && mgrSelect.selectedIndex >= 0) ? mgrSelect.options[mgrSelect.selectedIndex] : null;
+                const mgrName = selectedOpt ? selectedOpt.text : 'Dealer Manager';
                 const dealerNotes = document.getElementById('de-dealer-notes')?.value || '';
                 summaryNote += `Assigned to Dealer Manager: ${mgrName}. Notes: ${dealerNotes}`;
             }

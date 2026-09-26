@@ -681,12 +681,12 @@
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.25rem;">
                         <div>
                             <label style="display:block;font-size:0.75rem;font-weight:700;color:#334155;margin-bottom:0.3rem;">Delivery Method</label>
-                            <select id="wizDeliveryType" style="width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
+                            <select id="wizDeliveryType" onchange="toggleWizDeliveryTypeOther()" style="width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
                                 <option value="VRL Logistics">VRL Logistics</option>
-                                <option value="Self Pickup">Self Pickup</option>
-                                <option value="Direct Parcel">Direct Parcel</option>
-                                <option value="Local Transport">Local Transport</option>
+                                <option value="India Post">India Post</option>
+                                <option value="Others">Others</option>
                             </select>
+                            <input type="text" id="wizDeliveryTypeOther" placeholder="Enter Delivery Method..." style="display:none;margin-top:0.35rem;width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
                         </div>
                         <div>
                             <label style="display:block;font-size:0.75rem;font-weight:700;color:#334155;margin-bottom:0.3rem;">Payment Method</label>
@@ -760,7 +760,7 @@
     <!-- Scripts -->
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
-    <script src="js/leads.js?v=2"></script>
+    <script src="js/leads.js?v=3"></script>
 </body>
 
 </html>

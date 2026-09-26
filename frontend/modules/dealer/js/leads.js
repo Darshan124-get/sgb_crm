@@ -703,6 +703,11 @@ function openLeadConversionWizard(leadId) {
     if (document.getElementById('wizNotReceivedNotes')) document.getElementById('wizNotReceivedNotes').value = lead.notes || '';
 
     // Prefill Step 3 Order Form
+    if (document.getElementById('wizDeliveryType')) document.getElementById('wizDeliveryType').value = 'VRL Logistics';
+    if (document.getElementById('wizDeliveryTypeOther')) {
+        document.getElementById('wizDeliveryTypeOther').value = '';
+        document.getElementById('wizDeliveryTypeOther').style.display = 'none';
+    }
     if (document.getElementById('wizPaymentDate')) document.getElementById('wizPaymentDate').value = new Date().toISOString().slice(0, 10);
     if (document.getElementById('wizAdvanceAmount')) document.getElementById('wizAdvanceAmount').value = '0';
     if (document.getElementById('wizOrderNotes')) document.getElementById('wizOrderNotes').value = '';
@@ -717,6 +722,20 @@ function openLeadConversionWizard(leadId) {
     const modal = document.getElementById('wizardModal');
     if (modal) modal.style.display = 'flex';
 }
+
+function toggleWizDeliveryTypeOther() {
+    const sel = document.getElementById('wizDeliveryType');
+    const otherInput = document.getElementById('wizDeliveryTypeOther');
+    if (!sel || !otherInput) return;
+    if (sel.value === 'Others' || sel.value === 'Other') {
+        otherInput.style.display = 'block';
+        otherInput.focus();
+    } else {
+        otherInput.style.display = 'none';
+        otherInput.value = '';
+    }
+}
+window.toggleWizDeliveryTypeOther = toggleWizDeliveryTypeOther;
 
 function closeWizardModal() {
     const modal = document.getElementById('wizardModal');
@@ -1185,7 +1204,11 @@ async function submitWizPlaceOrderAndConvert() {
     const gstNo = (document.getElementById('wizOrderGstNo')?.value || '').trim();
     const nearestVrl = (document.getElementById('wizOrderNearestVrl')?.value || '').trim();
 
-    const deliveryType = document.getElementById('wizDeliveryType')?.value || 'VRL Logistics';
+    let deliveryType = document.getElementById('wizDeliveryType')?.value || 'VRL Logistics';
+    if (deliveryType === 'Others' || deliveryType === 'Other') {
+        const customOther = (document.getElementById('wizDeliveryTypeOther')?.value || '').trim();
+        deliveryType = customOther ? customOther : 'Others';
+    }
     const paymentMethod = document.getElementById('wizPaymentMethod')?.value || 'Bank Transfer';
     const paymentDate = document.getElementById('wizPaymentDate')?.value || new Date().toISOString().slice(0, 10);
     const advanceAmount = parseFloat(document.getElementById('wizAdvanceAmount')?.value || 0) || 0;

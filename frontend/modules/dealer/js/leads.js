@@ -116,14 +116,12 @@ function normalizeLead(item) {
 
     const rawStatus = String(item.status || 'NEW').toUpperCase().trim();
     let normStatus = 'NEW';
-    if (['CONVERTED', 'DEALER_CONVERTED', 'DEALER'].includes(rawStatus)) {
+    if (['CONVERTED', 'DEALER_CONVERTED'].includes(rawStatus)) {
         normStatus = 'CONVERTED';
-    } else if (['FOLLOWUP', 'CONTACTED', 'INTERESTED', 'DEALER_LEAD', 'CALLBACK'].includes(rawStatus)) {
+    } else if (['FOLLOWUP', 'CONTACTED', 'INTERESTED', 'CALLBACK'].includes(rawStatus)) {
         normStatus = 'FOLLOWUP';
-    } else if (rawStatus === 'NEW') {
-        normStatus = 'NEW';
     } else {
-        normStatus = 'FOLLOWUP';
+        normStatus = 'NEW';
     }
 
     return {

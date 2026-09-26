@@ -98,8 +98,11 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../../frontend')));
+// Serve static frontend files with maxAge browser caching
+app.use(express.static(path.join(__dirname, '../../frontend'), {
+    maxAge: '30d',
+    etag: true
+}));
 
 // Cloudflare R2 Public Media Streamer Route
 const storageService = require('./services/storage.service');
@@ -113,7 +116,7 @@ app.get('/api/media/*', async (req, res) => {
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         res.setHeader('Content-Type', r2Data.contentType || 'application/octet-stream');
         if (r2Data.contentLength) res.setHeader('Content-Length', r2Data.contentLength);
-        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         return res.send(r2Data.buffer);
     } catch (err) {
         console.warn(`[MEDIA STREAM WARN] Failed to serve object '${objectKey}': ${err.message}`);
@@ -138,13 +141,15 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/webhook', webhookRoutes);
+app.use('/api/whatsapp/webhook', webhookRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/product-sets', productSetRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 
 console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
-console.log('✅ WhatsApp Webhook: Mounted at /webhook');
+console.log('✅ WhatsApp Webhook: Mounted at /webhook & /api/whatsapp/webhook');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)
 app.all('/api/*', (req, res) => {

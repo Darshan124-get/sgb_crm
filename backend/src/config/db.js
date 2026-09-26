@@ -1,7 +1,7 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config({ path: __dirname + '/../../.env' });
 
-const connectionLimit = process.env.DB_CONNECTION_LIMIT ? parseInt(process.env.DB_CONNECTION_LIMIT) : 1;
+const connectionLimit = process.env.DB_CONNECTION_LIMIT ? parseInt(process.env.DB_CONNECTION_LIMIT) : 15;
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,

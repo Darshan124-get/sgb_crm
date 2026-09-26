@@ -2391,10 +2391,10 @@ function createSingleMessageElement(msg, history = []) {
         if (effectiveMimeType.startsWith('image')) {
             msgEl.classList.add('has-media');
             contentHtml = `
-                <div class="message-media" onclick="openFullscreen('${mediaUrl}')">
-                    <img src="${mediaUrl}" alt="Attachment" 
+                <div class="message-media" onclick="openFullscreen('${mediaUrl}')" style="min-height: 180px; width: 300px; max-width: 100%; aspect-ratio: 4/3; background: #111b21; border-radius: 8px; overflow: hidden; position: relative; cursor: pointer;">
+                    <img src="${mediaUrl}" alt="Attachment" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; display: block;"
                          onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22 viewBox=%220 0 200 150%22%3E%3Crect width=%22200%22 height=%22150%22 fill=%22%23202c33%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%238696a0%22 font-family=%22sans-serif%22 font-size=%2214%22%3EImage Unavailable%3C/text%3E%3C/svg%3E';">
-                    ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content">${msg.body}</div>` : ''}
+                    ${msg.body && !isRawFileName(msg.body) ? `<div class="message-content" style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: white; padding: 14px 10px 6px 10px; font-size: 0.85rem; z-index: 2;">${msg.body}</div>` : ''}
                 </div>`;
         } else if (effectiveMimeType.startsWith('video')) {
             msgEl.classList.add('has-media');

@@ -1567,8 +1567,15 @@ async function handleTransfer() {
 
             loadCustomers();
         } else {
-            const err = await response.json();
-            window.showAlert('Error', err.message || 'Transfer failed', 'error');
+            let errorMsg = 'Transfer failed';
+            try {
+                const err = await response.json();
+                errorMsg = err.message || errorMsg;
+            } catch (jsonErr) {
+                const text = await response.text().catch(() => '');
+                errorMsg = text || `Server error (${response.status})`;
+            }
+            window.showAlert('Error', errorMsg, 'error');
         }
     } catch (err) {
         console.error('Transfer error:', err);

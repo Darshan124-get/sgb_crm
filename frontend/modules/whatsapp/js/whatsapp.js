@@ -1553,7 +1553,8 @@ async function handleTransfer() {
         });
 
         if (response.ok) {
-            window.showAlert('Success', `Lead transferred successfully to ${currentTransferTab === 'dealer' ? 'Dealer Manager' : 'Telecaller'}`, 'success');
+            const recipientLabel = currentTransferTab === 'dealer' ? 'Dealer Manager' : 'Telecaller';
+            window.showAlert('Success', `Lead transferred successfully to ${recipientLabel} and added to panel!`, 'success');
             transferModal.classList.remove('active');
             document.body.classList.remove('modal-open');
 
@@ -1571,14 +1572,14 @@ async function handleTransfer() {
             try {
                 const err = await response.json();
                 errorMsg = err.message || errorMsg;
-            } catch (jsonErr) {
-                const text = await response.text().catch(() => '');
-                errorMsg = text || `Server error (${response.status})`;
+            } catch (e) {
+                errorMsg = `Server error (${response.status})`;
             }
             window.showAlert('Error', errorMsg, 'error');
         }
     } catch (err) {
         console.error('Transfer error:', err);
+        window.showAlert('Error', 'Network or connection error during transfer', 'error');
     } finally {
         confirmTransferBtnEl.disabled = false;
         confirmTransferBtnEl.innerText = 'Transfer';

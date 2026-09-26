@@ -652,108 +652,103 @@ exports.addLeadNote = async (req, res) => {
 exports.transferLead = async (req, res) => {
     const { target_language, userId } = req.body;
     const leadId = req.params.id;
-    const actingUserId = (req.user && (req.user.id || req.user.user_id)) ? (req.user.id || req.user.user_id) : null;
+    const connection = await pool.getConnection();
 
-    let lastError = null;
+    try {
+        await connection.beginTransaction();
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        let connection = null;
-        try {
-            connection = await pool.getConnection();
-            await connection.beginTransaction();
+        let targetUser = null;
 
-            let targetUser = null;
-
-            // 1. If direct userId is provided, use it
-            if (userId) {
-                const [userRows] = await connection.query(
-                    `SELECT u.user_id, u.name, u.language, r.name as role_name 
-                     FROM users u 
-                     LEFT JOIN roles r ON u.role_id = r.role_id 
-                     WHERE u.user_id = ? AND u.status = "active"`,
-                    [userId]
-                );
-                if (userRows.length === 0) {
-                    await connection.rollback();
-                    return res.status(404).json({ message: 'Target sales person not found or inactive' });
-                }
-                targetUser = userRows[0];
-            }
-            // 2. Otherwise, find target sales person for language
-            else if (target_language) {
-                const [salesStaff] = await connection.query(
-                    `SELECT u.user_id, u.name, r.name as role_name 
-                     FROM users u 
-                     JOIN roles r ON u.role_id = r.role_id 
-                     JOIN departments d ON u.department_id = d.id
-                     WHERE d.name LIKE '%sales%' 
-                       AND r.name IN ('executive', 'manager')
-                       AND u.language = ? AND u.status = 'active'
-                     ORDER BY u.updated_at ASC LIMIT 1`,
-                    [target_language]
-                );
-
-                if (salesStaff.length === 0) {
-                    await connection.rollback();
-                    return res.status(404).json({ message: `No active sales staff found for language: ${target_language}` });
-                }
-                targetUser = salesStaff[0];
-            } else {
+        // 1. If direct userId is provided, use it
+        if (userId) {
+            const [userRows] = await connection.query(
+                `SELECT u.user_id, u.name, u.language, r.name as role_name 
+                 FROM users u 
+                 LEFT JOIN roles r ON u.role_id = r.role_id 
+                 WHERE u.user_id = ? AND u.status = "active"`,
+                [userId]
+            );
+            if (userRows.length === 0) {
                 await connection.rollback();
-                return res.status(400).json({ message: 'Either userId or target_language is required for transfer' });
+                return res.status(404).json({ message: 'Target sales person not found or inactive' });
             }
-
-            // 3. Perform the transfer
-            const finalLanguage = target_language || targetUser.language || 'EN';
-            await connection.query(
-                'UPDATE leads SET assigned_to = ?, language = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?',
-                [targetUser.user_id, finalLanguage, leadId]
-            );
-
-            // 4. Log the transfer
-            const isDealerManager = (targetUser.role_name || '').toLowerCase().includes('dealer');
-            const roleLabel = isDealerManager ? 'Dealer Manager' : 'Telecaller';
-            await connection.query(
-                'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-                [leadId, actingUserId, `Lead transferred to ${roleLabel} ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
-            );
-
-            // 5. Update target user's rotation timestamp
-            await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [targetUser.user_id]);
-
-            await connection.commit();
-
-            // Send push notification asynchronously (non-blocking)
-            try {
-                const notificationService = require('../services/notification.service');
-                const [leadRows] = await pool.query('SELECT customer_name, phone_number FROM leads WHERE lead_id = ?', [leadId]);
-                const leadName = leadRows[0]?.customer_name || leadRows[0]?.phone_number || 'New Lead';
-
-                notificationService.sendToUser(
-                    targetUser.user_id,
-                    'Lead Transferred to You',
-                    `Lead "${leadName}" has been transferred to you.`,
-                    { leadId: String(leadId), type: 'lead_transferred' }
-                ).catch(notifErr => console.error('FCM Notification error:', notifErr.message));
-            } catch (notifErr) {
-                console.error('FCM Notification error (transferLead):', notifErr.message);
-            }
-
-            return res.json({ message: 'Lead transferred successfully', target_user: targetUser.name });
-        } catch (err) {
-            lastError = err;
-            if (connection) {
-                try { await connection.rollback(); } catch (re) {}
-            }
-            console.error(`Transfer attempt ${attempt} failed:`, err.message);
-        } finally {
-            if (connection) {
-                try { connection.release(); } catch (e) {}
-            }
+            targetUser = userRows[0];
         }
-    }
+        // 2. Otherwise, find the best target Sales staff for the new language (Round Robin)
+        else if (target_language) {
+            const [salesStaff] = await connection.query(
+                `SELECT u.user_id, u.name, r.name as role_name 
+                 FROM users u 
+                 JOIN roles r ON u.role_id = r.role_id 
+                 JOIN departments d ON u.department_id = d.id
+                 WHERE d.name LIKE '%sales%' 
+                   AND r.name IN ('executive', 'manager')
+                   AND u.language = ? AND u.status = 'active'
+                 ORDER BY u.updated_at ASC LIMIT 1`,
+                [target_language]
+            );
 
-    res.status(500).json({ message: 'Transfer failed: ' + (lastError ? lastError.message : 'Database error') });
+            if (salesStaff.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: `No active sales staff found for language: ${target_language}` });
+            }
+            targetUser = salesStaff[0];
+        } else {
+            await connection.rollback();
+            return res.status(400).json({ message: 'Either userId or target_language is required for transfer' });
+        }
+
+        // 3. Perform the transfer
+        const isDealerManager = (targetUser.role_name || '').toLowerCase().includes('dealer');
+        const roleLabel = isDealerManager ? 'Dealer Manager' : 'Telecaller';
+        const finalLanguage = target_language || targetUser.language || 'EN';
+
+        let targetStatus = 'assigned';
+        if (isDealerManager) {
+            targetStatus = 'dealer';
+        }
+
+        await connection.query(
+            'UPDATE leads SET assigned_to = ?, language = ?, status = CASE WHEN LOWER(status) IN ("dealer", "dealer_converted") THEN status ELSE ? END WHERE lead_id = ?',
+            [targetUser.user_id, finalLanguage, targetStatus, leadId]
+        );
+
+        // 4. Log the transfer
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+        await connection.query(
+            'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
+            [leadId, actingUserId, `Lead transferred to ${roleLabel} ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
+        );
+
+        // 5. Update target user's rotation timestamp
+        await connection.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [targetUser.user_id]);
+
+        await connection.commit();
+
+        // Send push notification to target user after successful transaction commit
+        try {
+            const notificationService = require('../services/notification.service');
+            const [leadRows] = await pool.query('SELECT customer_name, phone_number FROM leads WHERE lead_id = ?', [leadId]);
+            const leadName = leadRows[0]?.customer_name || leadRows[0]?.phone_number || 'New Lead';
+
+            await notificationService.sendToUser(
+                targetUser.user_id,
+                'Lead Transferred to You',
+                `Lead "${leadName}" has been transferred to you.`,
+                { leadId: String(leadId), type: 'lead_transferred' }
+            );
+        } catch (notifErr) {
+            console.error('FCM Notification error (transferLead):', notifErr.message);
+        }
+
+        res.json({ message: 'Lead transferred successfully', target_user: targetUser.name });
+    } catch (err) {
+        try { if (connection) await connection.rollback(); } catch (re) { }
+        console.error('Transfer error:', err);
+        res.status(500).json({ message: 'Transfer error: ' + err.message });
+    } finally {
+        if (connection) connection.release();
+    }
 };
 
 exports.getStats = async (req, res) => {

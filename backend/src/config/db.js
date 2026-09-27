@@ -14,9 +14,9 @@ const pool = mysql.createPool({
     queueLimit: 0,
     connectTimeout: 20000, 
     enableKeepAlive: true,
-    keepAliveInitialDelay: 5000,
-    maxIdle: connectionLimit,
-    idleTimeout: 10000, // Proactively close idle connections after 10s (below Hostinger server timeouts)
+    keepAliveInitialDelay: 2000,
+    maxIdle: Math.min(connectionLimit, 4), // Keep 2-4 warm idle connections to prevent Hostinger firewall socket kills
+    idleTimeout: 30000, // Gracefully close client-side idle connections after 30s
     timezone: '+00:00'
 });
 
@@ -41,12 +41,11 @@ function isRetryableDbError(err) {
     );
 }
 
-// Intercept connection errors to prevent ECONNRESET/PROTOCOL_CONNECTION_LOST in pool
+// Intercept connection errors to prevent unhandled socket errors in pool
 pool.on('connection', (connection) => {
     connection.on('error', (err) => {
         if (isRetryableDbError(err)) {
-            console.warn('[DB] Connection socket error in pool, destroying socket:', err.message);
-            connection.destroy();
+            try { connection.destroy(); } catch (e) {}
         }
     });
 });

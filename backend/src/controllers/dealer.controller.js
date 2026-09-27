@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const validationUtils = require('../utils/validation.utils');
 
 const ensureOrderPaymentsTable = async (db = pool) => {
     try {
@@ -190,23 +191,30 @@ exports.createDealer = async (req, res) => {
         nearest_vrl, vrl_code, status, image_url, image
     } = req.body;
 
-    const finalDealerName = firm_name || dealer_name || 'Agri Dealer Store';
-    const finalContactPerson = owner_name || dealer_owner_name || contact_person || '';
-    const finalPhone = phone_number || phone || contact || '';
-    const finalPincode = pincode || pin_code || '';
-    const finalGstNo = gst_no || gst_number || '';
+    const finalDealerName = validationUtils.sanitizeAlphanumeric(firm_name || dealer_name || 'Agri Dealer Store');
+    const finalContactPerson = validationUtils.sanitizeAlphabetOnly(owner_name || dealer_owner_name || contact_person || '');
+    const finalPhone = validationUtils.sanitizePhone(phone_number || phone || contact || '');
+    const finalPincode = validationUtils.sanitizePincode(pincode || pin_code || '');
+    const finalGstNo = validationUtils.sanitizeGSTIN(gst_no || gst_number || '');
+    const cleanCity = validationUtils.sanitizeAlphabetOnly(city || '');
+    const cleanTaluk = validationUtils.sanitizeAlphabetOnly(taluk || '');
+    const cleanDistrict = validationUtils.sanitizeAlphabetOnly(district || '');
+    const cleanState = validationUtils.sanitizeAlphabetOnly(state || '');
+    const cleanTown = validationUtils.sanitizeAlphabetOnly(town_village || '');
+    const cleanVrl = validationUtils.sanitizeAlphanumeric(nearest_vrl || '');
+    const cleanVrlCode = validationUtils.sanitizeAlphanumeric(vrl_code || '');
     const finalStatus = status || 'Active';
     const finalImageUrl = image_url || image || '';
 
     // Construct address summary if separate fields passed
-    let finalAddress = address;
+    let finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : '';
     if (!finalAddress) {
         const parts = [];
-        if (town_village) parts.push(town_village);
-        if (taluk) parts.push(`${taluk} Taluk`);
-        if (city) parts.push(city);
-        if (district && district !== city) parts.push(district);
-        if (state) parts.push(state);
+        if (cleanTown) parts.push(cleanTown);
+        if (cleanTaluk) parts.push(`${cleanTaluk} Taluk`);
+        if (cleanCity) parts.push(cleanCity);
+        if (cleanDistrict && cleanDistrict !== cleanCity) parts.push(cleanDistrict);
+        if (cleanState) parts.push(cleanState);
         if (finalPincode) parts.push(finalPincode);
         finalAddress = parts.join(', ');
     }
@@ -219,8 +227,8 @@ exports.createDealer = async (req, res) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 finalDealerName, finalContactPerson, finalPhone, email || '', finalAddress || '',
-                town_village || '', city || '', taluk || '', district || '', state || '', finalPincode,
-                visited_date || '', visited_by || '', finalGstNo, nearest_vrl || '', vrl_code || '', finalStatus, finalImageUrl
+                cleanTown, cleanCity, cleanTaluk, cleanDistrict, cleanState, finalPincode,
+                visited_date || '', visited_by || '', finalGstNo, cleanVrl, cleanVrlCode, finalStatus, finalImageUrl
             ]
         );
         res.status(201).json({ message: 'Dealer added successfully', dealer_id: result.insertId });
@@ -240,22 +248,29 @@ exports.updateDealer = async (req, res) => {
         nearest_vrl, vrl_code, status, image_url, image
     } = req.body;
 
-    const finalDealerName = firm_name || dealer_name || '';
-    const finalContactPerson = owner_name || dealer_owner_name || contact_person || '';
-    const finalPhone = phone_number || phone || contact || '';
-    const finalPincode = pincode || pin_code || '';
-    const finalGstNo = gst_no || gst_number || '';
+    const finalDealerName = validationUtils.sanitizeAlphanumeric(firm_name || dealer_name || '');
+    const finalContactPerson = validationUtils.sanitizeAlphabetOnly(owner_name || dealer_owner_name || contact_person || '');
+    const finalPhone = validationUtils.sanitizePhone(phone_number || phone || contact || '');
+    const finalPincode = validationUtils.sanitizePincode(pincode || pin_code || '');
+    const finalGstNo = validationUtils.sanitizeGSTIN(gst_no || gst_number || '');
+    const cleanCity = validationUtils.sanitizeAlphabetOnly(city || '');
+    const cleanTaluk = validationUtils.sanitizeAlphabetOnly(taluk || '');
+    const cleanDistrict = validationUtils.sanitizeAlphabetOnly(district || '');
+    const cleanState = validationUtils.sanitizeAlphabetOnly(state || '');
+    const cleanTown = validationUtils.sanitizeAlphabetOnly(town_village || '');
+    const cleanVrl = validationUtils.sanitizeAlphanumeric(nearest_vrl || '');
+    const cleanVrlCode = validationUtils.sanitizeAlphanumeric(vrl_code || '');
     const finalStatus = status || 'Active';
     const finalImageUrl = image_url || image || '';
 
-    let finalAddress = address;
-    if (!finalAddress || town_village || city || state) {
+    let finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : '';
+    if (!finalAddress || cleanTown || cleanCity || cleanState) {
         const parts = [];
-        if (town_village) parts.push(town_village);
-        if (taluk) parts.push(`${taluk} Taluk`);
-        if (city) parts.push(city);
-        if (district && district !== city) parts.push(district);
-        if (state) parts.push(state);
+        if (cleanTown) parts.push(cleanTown);
+        if (cleanTaluk) parts.push(`${cleanTaluk} Taluk`);
+        if (cleanCity) parts.push(cleanCity);
+        if (cleanDistrict && cleanDistrict !== cleanCity) parts.push(cleanDistrict);
+        if (cleanState) parts.push(cleanState);
         if (finalPincode) parts.push(finalPincode);
         finalAddress = parts.join(', ');
     }

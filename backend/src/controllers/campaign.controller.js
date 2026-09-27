@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const storageService = require('../services/storage.service');
 const logger = require('../utils/whatsappLogger');
 
 const processAutoReplies = async (campaign_id, auto_replies) => {
@@ -14,7 +15,6 @@ const processAutoReplies = async (campaign_id, auto_replies) => {
                 const extension = reply.mimeType.split('/')[1] || 'bin';
                 const fileName = `campaigns/${campaign_id}/auto-reply-${Date.now()}-${i}.${extension}`;
                 
-                const storageService = require('../services/storage.service');
                 const uploadResult = await storageService.uploadObject({
                   key: fileName,
                   body: buffer,

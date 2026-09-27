@@ -252,8 +252,8 @@ exports.getSalesTeam = async (req, res) => {
             SELECT u.user_id, u.name, u.email, u.phone, r.name as role_name, u.language
             FROM users u
             JOIN roles r ON u.role_id = r.role_id
-            WHERE (r.name LIKE '%telecaller%' OR r.name LIKE '%sales%' OR r.name LIKE '%manager%' OR r.name LIKE '%viewer%' OR r.name LIKE '%executive%') 
-            AND u.status = 'active'
+            WHERE (r.name LIKE '%telecaller%' OR r.name LIKE '%sales%' OR r.name LIKE '%manager%' OR r.name LIKE '%viewer%' OR r.name LIKE '%executive%' OR r.name LIKE '%dealer%') 
+            AND LOWER(COALESCE(u.status, 'active')) = 'active'
             ORDER BY u.name ASC
         `;
         const [users] = await db.execute(query);

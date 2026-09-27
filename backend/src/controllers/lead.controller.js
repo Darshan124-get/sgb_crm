@@ -1,13 +1,22 @@
 const pool = require('../config/db');
+const validationUtils = require('../utils/validation.utils');
 
 exports.getLeads = async (req, res) => {
-    const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit } = req.query;
+    const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit, module: moduleName, dealer_only } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
+    const isDealerModule = moduleName === 'dealer' || dealer_only === 'true';
+
     try {
-        let query = `
-            SELECT l.*, u.name as assigned_to_name,
+        let query = isDealerModule ? `
+            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name
+            FROM leads l 
+            LEFT JOIN users u ON l.assigned_to = u.user_id 
+            LEFT JOIN roles r ON u.role_id = r.role_id
+            WHERE 1=1
+        ` : `
+            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
                     ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
@@ -17,9 +26,23 @@ exports.getLeads = async (req, res) => {
                    (SELECT cs.variables FROM chatbot_sessions cs WHERE cs.lead_id = l.lead_id OR cs.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci ORDER BY cs.session_id DESC LIMIT 1) as bot_variables
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
+            LEFT JOIN roles r ON u.role_id = r.role_id
             WHERE 1=1
         `;
         let params = [];
+
+        // 🎯 Dealer Module Filtering: Strictly display B2B Dealer Leads (WhatsApp transfer to Dealer Manager OR CRM Order Conversion Wizard)
+        if (isDealerModule) {
+            query += ` AND (
+                LOWER(l.status) IN ('dealer', 'dealer_lead', 'dealer_converted')
+                OR l.lead_id IN (
+                    SELECT DISTINCT lead_id 
+                    FROM lead_notes 
+                    WHERE note LIKE '%Dealer Manager%' OR note LIKE '%transferred%Dealer%'
+                )
+                OR LOWER(COALESCE(r.name, '')) IN ('dealer_manager', 'dealer manager', 'dealer_executive', 'dealer_head')
+            )`;
+        }
 
         // 🛡️ SECURITY: Role-Based Data Isolation
         if ((userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp')) {
@@ -103,7 +126,9 @@ exports.getLeads = async (req, res) => {
         const totalLeads = countResult[0].total;
 
         // Apply Order
-        query += ' ORDER BY l.created_at DESC';
+        query += isDealerModule 
+            ? ' ORDER BY l.lead_id DESC' 
+            : ' ORDER BY COALESCE(l.updated_at, l.created_at) DESC, l.lead_id DESC';
 
         const reqPriority = (req.query.priority || '').toLowerCase();
 
@@ -233,12 +258,17 @@ exports.getLeadById = async (req, res) => {
         lead.order = allOrders[0] || null; // Most recent for top summary
         lead.order_history = allOrders; // Full list for history section
 
-        // Fetch recent feedback (last note that isn't an 'attempt' or automated)
+        // Fetch recent feedback / notes (prefer real user notes over automated system status updates)
         const [feedbackRows] = await pool.query(
-            'SELECT note FROM lead_notes WHERE lead_id = ? AND note NOT LIKE "%attempt%" AND note NOT LIKE "Lead created%" ORDER BY created_at DESC LIMIT 1',
+            'SELECT note FROM lead_notes WHERE lead_id = ? AND note NOT LIKE "%attempt%" AND note NOT LIKE "Lead created%" AND note NOT LIKE "Lead details updated%" ORDER BY created_at DESC LIMIT 1',
             [req.params.id]
         );
-        lead.feedback = feedbackRows[0] ? feedbackRows[0].note : '-';
+        const [allNotesRows] = await pool.query(
+            'SELECT n.*, u.name as author_name FROM lead_notes n LEFT JOIN users u ON n.user_id = u.user_id WHERE n.lead_id = ? ORDER BY n.created_at DESC',
+            [req.params.id]
+        );
+        lead.notes_history = allNotesRows;
+        lead.feedback = feedbackRows[0] ? feedbackRows[0].note : (allNotesRows[0] ? allNotesRows[0].note : null);
 
         // Count call attempts
         const [attemptRows] = await pool.query(
@@ -385,19 +415,26 @@ exports.createLead = async (req, res) => {
         console.log('Incoming Lead Request:', req.body);
         await connection.beginTransaction();
 
+        const cleanPhone = validationUtils.sanitizePhone(phone_number);
+        const cleanName = validationUtils.sanitizeAlphabetOnly(customer_name || '');
+        const cleanCity = validationUtils.sanitizeAlphabetOnly(city || '');
+        const cleanState = validationUtils.sanitizeAlphabetOnly(state || '');
+        const cleanDistrict = validationUtils.sanitizeAlphabetOnly(district || '');
+        const cleanPincode = validationUtils.sanitizePincode(pincode || '');
+
         // 1. Basic Validation
-        if (!phone_number) {
+        if (!cleanPhone) {
             await connection.rollback();
-            return res.status(400).json({ message: 'Phone number is required.' });
+            return res.status(400).json({ message: 'Valid 10-digit phone number is required.' });
         }
 
         // 🚫 DUPLICATE PREVENTION: Check if phone exists
-        const [existing] = await connection.query('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [phone_number]);
+        const [existing] = await connection.query('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [cleanPhone]);
         if (existing.length > 0) {
             await connection.rollback();
-            console.warn(`Lead creation blocked: Phone ${phone_number} already exists as Lead ID ${existing[0].lead_id}`);
+            console.warn(`Lead creation blocked: Phone ${cleanPhone} already exists as Lead ID ${existing[0].lead_id}`);
             return res.status(400).json({
-                message: `Lead already exists: ${existing[0].customer_name || 'Unnamed'} (${phone_number})`,
+                message: `Lead already exists: ${existing[0].customer_name || 'Unnamed'} (${cleanPhone})`,
                 lead_id: existing[0].lead_id,
                 duplicate: true
             });
@@ -434,22 +471,22 @@ exports.createLead = async (req, res) => {
             status = 'new';
         }
 
-        const combinedAddress = [city, district, state, pincode].filter(Boolean).join(', ');
-        const finalAddress = address || combinedAddress || null;
+        const combinedAddress = [cleanCity, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
+        const finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || null);
 
         const [result] = await connection.query(
             `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                phone_number,
-                customer_name || null,
+                cleanPhone,
+                cleanName || null,
                 first_message || null,
                 language || 'EN',
                 finalAddress,
-                city || null,
-                state || null,
-                district || null,
-                pincode || null,
+                cleanCity || null,
+                cleanState || null,
+                cleanDistrict || null,
+                cleanPincode || null,
                 source || 'manual',
                 status,
                 assignedTo,
@@ -480,7 +517,7 @@ exports.updateLead = async (req, res) => {
     const {
         phone_number, customer_name, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
-        current_crop, acreage, delivery_type, call_count
+        current_crop, acreage, delivery_type, call_count, notes, remarks
     } = req.body;
 
     let connection;
@@ -496,16 +533,24 @@ exports.updateLead = async (req, res) => {
         }
         const currentLead = rows[0];
 
+        const cleanPhone = phone_number !== undefined ? validationUtils.sanitizePhone(phone_number) : currentLead.phone_number;
+        const cleanName = customer_name !== undefined ? validationUtils.sanitizeAlphabetOnly(customer_name) : currentLead.customer_name;
         const finalStatus = status || currentLead.status;
         const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
-        const finalCity = city !== undefined ? city : currentLead.city;
-        const finalState = state !== undefined ? state : currentLead.state;
-        const finalDistrict = district !== undefined ? district : currentLead.district;
-        const finalPincode = pincode !== undefined ? pincode : currentLead.pincode;
+        const finalCity = city !== undefined ? validationUtils.sanitizeAlphabetOnly(city) : currentLead.city;
+        const finalState = state !== undefined ? validationUtils.sanitizeAlphabetOnly(state) : currentLead.state;
+        const finalDistrict = district !== undefined ? validationUtils.sanitizeAlphabetOnly(district) : currentLead.district;
+        const finalPincode = pincode !== undefined ? validationUtils.sanitizePincode(pincode) : currentLead.pincode;
 
         const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
-        const finalAddress = address !== undefined ? address : combinedAddress;
+        const finalAddress = address !== undefined ? validationUtils.sanitizeAlphanumeric(address) : combinedAddress;
+
+        const cleanFollowupDate = (next_followup_date && String(next_followup_date).trim() !== '') 
+            ? next_followup_date 
+            : (currentLead.next_followup_date || null);
+
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
 
         await connection.query(
             `UPDATE leads SET 
@@ -515,50 +560,53 @@ exports.updateLead = async (req, res) => {
                 current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
             WHERE lead_id = ?`,
             [
-                phone_number || currentLead.phone_number,
-                customer_name || currentLead.customer_name,
-                first_message || currentLead.first_message,
-                language || currentLead.language,
-                finalAddress,
-                finalCity,
-                finalState,
-                finalDistrict,
-                finalPincode,
+                cleanPhone,
+                cleanName,
+                first_message || currentLead.first_message || null,
+                language || currentLead.language || 'EN',
+                finalAddress || null,
+                finalCity || null,
+                finalState || null,
+                finalDistrict || null,
+                finalPincode || null,
                 finalStatus,
-                finalAssignedTo,
+                finalAssignedTo || null,
                 score || currentLead.score || 'cold',
-                next_followup_date || currentLead.next_followup_date,
-                lost_reason || currentLead.lost_reason,
-                lost_notes || currentLead.lost_notes,
-                current_crop || currentLead.current_crop,
-                acreage || currentLead.acreage,
-                delivery_type || currentLead.delivery_type,
+                cleanFollowupDate,
+                lost_reason || currentLead.lost_reason || null,
+                lost_notes || currentLead.lost_notes || null,
+                current_crop || currentLead.current_crop || null,
+                acreage || currentLead.acreage || null,
+                delivery_type || currentLead.delivery_type || null,
                 call_count !== undefined ? call_count : currentLead.call_count,
                 req.params.id
             ]
         );
 
         // Sync lead_followups if date changed
-        if (next_followup_date && next_followup_date !== currentLead.next_followup_date) {
+        if (cleanFollowupDate && cleanFollowupDate !== currentLead.next_followup_date) {
             // Check if there's already a pending followup
             const [existing] = await connection.query('SELECT followup_id FROM lead_followups WHERE lead_id = ? AND status = "pending"', [req.params.id]);
             if (existing.length > 0) {
-                await connection.query('UPDATE lead_followups SET followup_date = ? WHERE followup_id = ?', [next_followup_date, existing[0].followup_id]);
+                await connection.query('UPDATE lead_followups SET followup_date = ? WHERE followup_id = ?', [cleanFollowupDate, existing[0].followup_id]);
             } else {
                 await connection.query(
                     'INSERT INTO lead_followups (lead_id, followup_date, status, remarks, created_by) VALUES (?, ?, "pending", ?, ?)',
-                    [req.params.id, next_followup_date, `Scheduled via Update (${status})`, req.user.id]
+                    [req.params.id, cleanFollowupDate, `Scheduled via Update (${finalStatus})`, actingUserId]
                 );
             }
         }
 
-        await connection.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [req.params.id, req.user.id, `Lead details updated. Status: ${status}`]);
+        const userNote = notes || req.body.notes || req.body.remarks;
+        const noteToSave = userNote ? userNote : `Lead details updated. Status: ${finalStatus}`;
+        await connection.query('INSERT INTO lead_notes (lead_id, user_id, note, created_at) VALUES (?, ?, ?, NOW())',
+            [req.params.id, actingUserId, noteToSave]);
 
         await connection.commit();
         res.json({ message: 'Lead updated successfully' });
     } catch (err) {
         if (connection) await connection.rollback();
+        console.error('updateLead Error:', err);
         res.status(500).json({ message: 'Error updating lead: ' + err.message });
     } finally {
         if (connection) connection.release();
@@ -599,11 +647,34 @@ exports.assignLead = async (req, res) => {
 };
 
 exports.deleteLead = async (req, res) => {
+    const rawId = req.params.id;
+    const leadId = String(rawId).replace(/^LEAD-/i, '').trim();
+
+    if (!leadId || isNaN(Number(leadId))) {
+        return res.status(400).json({ message: 'Invalid lead ID' });
+    }
+
     try {
-        await pool.query('DELETE FROM leads WHERE lead_id = ?', [req.params.id]);
+        // Clean up or dissociate referenced tables before deleting lead
+        await pool.query('UPDATE chatbot_sessions SET lead_id = NULL WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('UPDATE orders SET lead_id = NULL WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('UPDATE dealers SET lead_id = NULL WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_notes WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_messages WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_followups WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_interest WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_advance_payments WHERE lead_id = ?', [leadId]).catch(() => {});
+
+        const [result] = await pool.query('DELETE FROM leads WHERE lead_id = ?', [leadId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Lead not found' });
+        }
+
         res.json({ message: 'Lead deleted successfully' });
     } catch (err) {
-        res.status(500).json({ message: 'Error deleting lead' });
+        console.error('Error deleting lead:', err);
+        res.status(500).json({ message: 'Error deleting lead: ' + err.message });
     }
 };
 
@@ -641,7 +712,10 @@ exports.transferLead = async (req, res) => {
         // 1. If direct userId is provided, use it
         if (userId) {
             const [userRows] = await connection.query(
-                'SELECT user_id, name, language FROM users WHERE user_id = ? AND status = "active"',
+                `SELECT u.user_id, u.name, u.language, r.name as role_name 
+                 FROM users u 
+                 LEFT JOIN roles r ON u.role_id = r.role_id 
+                 WHERE u.user_id = ? AND u.status = "active"`,
                 [userId]
             );
             if (userRows.length === 0) {
@@ -653,7 +727,7 @@ exports.transferLead = async (req, res) => {
         // 2. Otherwise, find the best target Sales staff for the new language (Round Robin)
         else if (target_language) {
             const [salesStaff] = await connection.query(
-                `SELECT u.user_id, u.name 
+                `SELECT u.user_id, u.name, r.name as role_name 
                  FROM users u 
                  JOIN roles r ON u.role_id = r.role_id 
                  JOIN departments d ON u.department_id = d.id
@@ -675,16 +749,25 @@ exports.transferLead = async (req, res) => {
         }
 
         // 3. Perform the transfer
+        const isDealerManager = (targetUser.role_name || '').toLowerCase().includes('dealer');
+        const roleLabel = isDealerManager ? 'Dealer Manager' : 'Telecaller';
         const finalLanguage = target_language || targetUser.language || 'EN';
+
+        let targetStatus = 'assigned';
+        if (isDealerManager) {
+            targetStatus = 'dealer';
+        }
+
         await connection.query(
-            'UPDATE leads SET assigned_to = ?, language = ?, status = "assigned" WHERE lead_id = ?',
-            [targetUser.user_id, finalLanguage, leadId]
+            'UPDATE leads SET assigned_to = ?, language = ?, status = CASE WHEN LOWER(status) IN ("dealer", "dealer_converted") THEN status ELSE ? END WHERE lead_id = ?',
+            [targetUser.user_id, finalLanguage, targetStatus, leadId]
         );
 
         // 4. Log the transfer
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
         await connection.query(
             'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [leadId, req.user.id, `Lead transferred to ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
+            [leadId, actingUserId, `Lead transferred to ${roleLabel} ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
         );
 
         // 5. Update target user's rotation timestamp
@@ -940,5 +1023,42 @@ exports.updateDecisionEngineState = async (req, res) => {
         res.status(500).json({ message: 'Database error', error: error.message });
     } finally {
         if (connection) connection.release();
+    }
+};
+
+exports.getLeadNotes = async (req, res) => {
+    try {
+        const leadId = req.params.id;
+        const [rows] = await pool.query(
+            `SELECT n.*, u.name as author_name 
+             FROM lead_notes n 
+             LEFT JOIN users u ON n.user_id = u.user_id 
+             WHERE n.lead_id = ? 
+             ORDER BY n.created_at DESC`,
+            [leadId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('getLeadNotes Error:', err);
+        res.status(500).json({ message: 'Error fetching lead notes: ' + err.message });
+    }
+};
+
+exports.addLeadNote = async (req, res) => {
+    try {
+        const leadId = req.params.id;
+        const { note } = req.body;
+        if (!note || !String(note).trim()) {
+            return res.status(400).json({ message: 'Note text is required' });
+        }
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+        const [result] = await pool.query(
+            'INSERT INTO lead_notes (lead_id, user_id, note, created_at) VALUES (?, ?, ?, NOW())',
+            [leadId, actingUserId, String(note).trim()]
+        );
+        res.status(201).json({ message: 'Note added successfully', note_id: result.insertId });
+    } catch (err) {
+        console.error('addLeadNote Error:', err);
+        res.status(500).json({ message: 'Error adding note: ' + err.message });
     }
 };

@@ -219,8 +219,7 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
         let extension = mimeMap[cleanMime] || (cleanMime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
         if (extension === 'jpeg') extension = 'jpg';
         const fileName = `${timestamp}-${phone}.${extension}`;
-        const filePath = `chats/${phone}/${fileName}`;
-
+        const filePath = `chats/${fileName}`;
         const storageService = require('./storage.service');
         try {
           const uploadResult = await storageService.uploadObject({
@@ -376,13 +375,17 @@ const getAllChatCustomers = async (user = null, options = {}) => {
           SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
           FROM chatbot_sessions cs1
           JOIN (
-            SELECT MAX(session_id) as max_session_id
+            SELECT phone, MAX(session_id) as max_session_id
             FROM chatbot_sessions
             WHERE status = 'paused_for_human'
-            GROUP BY COALESCE(lead_id, phone)
+<<<<<<< HEAD
+            GROUP BY phone
           ) cs2 ON cs1.session_id = cs2.max_session_id
-        ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
-           OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
+        ) cs_paused ON (
+          (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
+          OR (cs_paused.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci)
+          OR (cs_paused.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
+        )
         WHERE l.lead_id IN (${inClause})
         ORDER BY agg.last_message_at DESC, l.created_at DESC
       `;
@@ -422,13 +425,16 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
         FROM chatbot_sessions cs1
         JOIN (
-          SELECT MAX(session_id) as max_session_id
+          SELECT phone, MAX(session_id) as max_session_id
           FROM chatbot_sessions
           WHERE status = 'paused_for_human'
-          GROUP BY COALESCE(lead_id, phone)
+          GROUP BY phone
         ) cs2 ON cs1.session_id = cs2.max_session_id
-      ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
-         OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
+      ) cs_paused ON (
+        (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
+        OR (cs_paused.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci)
+        OR (cs_paused.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
+      )
       WHERE 1=1
     `;
     let params = [];

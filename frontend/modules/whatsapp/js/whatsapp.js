@@ -1429,12 +1429,18 @@ async function handleSaveDetails() {
     }
 }
 
+let currentTransferTab = 'dealer'; // default active tab: 'dealer' or 'telecaller'
+
 async function loadSalesUsers() {
     try {
         const fetchFunc = window.fetchWithRetry || fetch;
-        const response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
+        let response = await fetchFunc(`${USER_API_BASE}`, { headers: getAuthHeader() });
+        if (!response.ok) {
+            response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
+        }
         if (response.ok) {
-            salesUsers = await response.json();
+            const data = await response.json();
+            salesUsers = Array.isArray(data) ? data : (data.users || []);
             renderSalesList();
         }
     } catch (err) {
@@ -1442,28 +1448,83 @@ async function loadSalesUsers() {
     }
 }
 
+function switchTransferTab(tab) {
+    currentTransferTab = tab;
+    
+    const tabDealer = document.getElementById('transfer-tab-dealer');
+    const tabTelecaller = document.getElementById('transfer-tab-telecaller');
+    
+    if (tabDealer && tabTelecaller) {
+        if (tab === 'dealer') {
+            tabDealer.style.color = '#FF6B00';
+            tabDealer.style.borderBottom = '2.5px solid #FF6B00';
+            tabTelecaller.style.color = '#64748b';
+            tabTelecaller.style.borderBottom = '2.5px solid transparent';
+        } else {
+            tabTelecaller.style.color = '#FF6B00';
+            tabTelecaller.style.borderBottom = '2.5px solid #FF6B00';
+            tabDealer.style.color = '#64748b';
+            tabDealer.style.borderBottom = '2.5px solid transparent';
+        }
+    }
+    
+    const searchVal = salesSearchEl ? salesSearchEl.value : '';
+    renderSalesList(searchVal);
+}
+window.switchTransferTab = switchTransferTab;
+
 function renderSalesList(filter = '') {
+    if (!salesPersonListEl) return;
     salesPersonListEl.innerHTML = '';
-    const filteredUsers = salesUsers.filter(u =>
-        u.name.toLowerCase().includes(filter.toLowerCase()) ||
+
+    // Filter users based on active tab category
+    const tabUsers = salesUsers.filter(user => {
+        const role = (user.role_name || user.role || '').toLowerCase();
+        if (currentTransferTab === 'dealer') {
+            // Display ONLY Dealer Managers / Dealer roles
+            return role.includes('dealer');
+        } else {
+            // Telecaller tab: Display ONLY Telecallers (Telecaller Executives / Managers)
+            return role.includes('telecaller');
+        }
+    });
+
+    const filteredUsers = tabUsers.filter(u =>
+        (u.name && u.name.toLowerCase().includes(filter.toLowerCase())) ||
         (u.phone && u.phone.includes(filter))
     );
+
+    if (filteredUsers.length === 0) {
+        salesPersonListEl.innerHTML = `
+            <div style="padding: 28px 16px; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+                <i class="fas fa-users-slash" style="font-size: 1.6rem; margin-bottom: 8px; display: block; color: #cbd5e1;"></i>
+                No ${currentTransferTab === 'dealer' ? 'Dealer Managers' : 'Telecallers'} found
+            </div>`;
+        return;
+    }
 
     filteredUsers.forEach(user => {
         const item = document.createElement('div');
         item.className = `sales-person-item ${selectedTransferUserId === user.user_id ? 'selected' : ''}`;
+        const userRoleStr = (user.role_name || user.role || 'Staff').toUpperCase();
+        const isDealerRole = userRoleStr.includes('DEALER');
         item.innerHTML = `
             <div class="radio-circle"></div>
             <div class="sales-avatar" style="background: ${getRandomColor(user.name)}">${getInitials(user.name)}</div>
             <div class="sales-info">
-                <div class="sales-name">${user.name}</div>
+                <div class="sales-name">
+                    ${user.name} 
+                    <span style="font-size:0.72rem; font-weight:600; background: ${isDealerRole ? '#fff7ed' : '#eff6ff'}; color: ${isDealerRole ? '#ea580c' : '#2563eb'}; padding:2px 7px; border-radius:4px; margin-left:6px;">
+                        ${userRoleStr}
+                    </span>
+                </div>
                 <div class="sales-phone">${user.phone || 'No phone'}</div>
             </div>
         `;
         item.onclick = () => {
             selectedTransferUserId = user.user_id;
             confirmTransferBtnEl.disabled = (activeCustomer && selectedTransferUserId === activeCustomer.assigned_to);
-            renderSalesList(filter); // Re-render to show selection
+            renderSalesList(filter); // Re-render to update selected radio state
         };
         salesPersonListEl.appendChild(item);
     });
@@ -1496,7 +1557,8 @@ async function handleTransfer() {
         });
 
         if (response.ok) {
-            window.showAlert('Success', 'Lead transferred successfully', 'success');
+            const recipientLabel = currentTransferTab === 'dealer' ? 'Dealer Manager' : 'Telecaller';
+            window.showAlert('Success', `Lead transferred successfully to ${recipientLabel} and added to panel!`, 'success');
             transferModal.classList.remove('active');
             document.body.classList.remove('modal-open');
 
@@ -1510,11 +1572,18 @@ async function handleTransfer() {
 
             loadCustomers();
         } else {
-            const err = await response.json();
-            window.showAlert('Error', err.message || 'Transfer failed', 'error');
+            let errorMsg = 'Transfer failed';
+            try {
+                const err = await response.json();
+                errorMsg = err.message || errorMsg;
+            } catch (e) {
+                errorMsg = `Server error (${response.status})`;
+            }
+            window.showAlert('Error', errorMsg, 'error');
         }
     } catch (err) {
         console.error('Transfer error:', err);
+        window.showAlert('Error', 'Network or connection error during transfer', 'error');
     } finally {
         confirmTransferBtnEl.disabled = false;
         confirmTransferBtnEl.innerText = 'Transfer';
@@ -3255,11 +3324,38 @@ function filterAndShowPopover(searchTerm) {
         `;
         item.onclick = async () => {
             quickRepliesPopover.style.display = 'none';
-            if (!activeCustomer) return;
+            if (!activeCustomer || !activeCustomer.phone) return;
+
+            // CAPTURE THE TARGET CUSTOMER & PHONE AT THE MOMENT OF CLICK!
+            const targetCustomer = activeCustomer;
+            const targetPhone = targetCustomer.phone;
+
+            // Clear handoff state locally if customer was in handoff
+            const wasHandoff = targetCustomer.status === 'human_needed' || targetCustomer.lead_status === 'human_needed' || targetCustomer.session_status === 'paused_for_human' || targetCustomer.needs_human;
+            if (wasHandoff) {
+                targetCustomer.status = targetCustomer.status === 'human_needed' ? 'assigned' : targetCustomer.status;
+                targetCustomer.lead_status = targetCustomer.lead_status === 'human_needed' ? 'assigned' : targetCustomer.lead_status;
+                targetCustomer.session_status = null;
+                targetCustomer.needs_human = false;
+
+                const matchingInList = allCustomers.find(c => c.phone === targetPhone);
+                if (matchingInList) {
+                    matchingInList.status = targetCustomer.status;
+                    matchingInList.lead_status = targetCustomer.lead_status;
+                    matchingInList.session_status = null;
+                    matchingInList.needs_human = false;
+                }
+
+                if (activeCustomer && activeCustomer.phone === targetPhone) {
+                    const bannerEl = document.getElementById('handoff-action-banner');
+                    if (bannerEl) bannerEl.classList.add('hidden');
+                }
+                updateHandoffCounts();
+            }
 
             // If Quick Reply has media attached, send media upon explicit click
             if (qr.media_url && qr.media_url !== '[]') {
-                if (messageInputEl) {
+                if (messageInputEl && activeCustomer && activeCustomer.phone === targetPhone) {
                     messageInputEl.value = '';
                     messageInputEl.style.height = 'auto';
                 }
@@ -3278,26 +3374,80 @@ function filterAndShowPopover(searchTerm) {
                         types = [qr.media_type];
                     }
 
-                    // Send text message if any
+                    const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+                    let lastSnippetText = '';
+
+                    // 1. INSTANTLY APPEND TEMPORARY ELEMENTS TO UI AT 0ms LATENCY (ZERO DOM WIPE!)
+                    if (qr.message) {
+                        lastSnippetText = qr.message;
+                        const tempChatId = 'temp-qr-text-' + Date.now();
+                        const tempMsg = {
+                            chat_id: tempChatId,
+                            direction: 'outgoing',
+                            sender_id: currentUser.id || currentUser.user_id || 1,
+                            sender_name: currentUser.name || 'Agent',
+                            message_type: 'text',
+                            body: qr.message,
+                            timestamp: new Date().toISOString(),
+                            status: 'sending',
+                            quick_reply_name: qr.shortcut
+                        };
+
+                        if (activeCustomer && activeCustomer.phone === targetPhone) {
+                            const msgEl = createSingleMessageElement(tempMsg, currentHistory || []);
+                            messageContainerEl.appendChild(msgEl);
+                            if (Array.isArray(currentHistory)) currentHistory.push(tempMsg);
+                            messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+                        }
+                        updateCustomerItemSnippet(targetPhone, qr.message, 'admin', 'sending');
+                    }
+
+                    for (let i = 0; i < urls.length; i++) {
+                        const category = types[i] ? (types[i].startsWith('image') ? 'image' : (types[i].startsWith('video') ? 'video' : (types[i].startsWith('audio') ? 'audio' : 'document'))) : 'image';
+                        lastSnippetText = `[${category}]`;
+                        const tempChatId = 'temp-qr-media-' + Date.now() + '-' + i;
+                        const tempMsg = {
+                            chat_id: tempChatId,
+                            direction: 'outgoing',
+                            sender_id: currentUser.id || currentUser.user_id || 1,
+                            sender_name: currentUser.name || 'Agent',
+                            message_type: category,
+                            body: '',
+                            media_url: urls[i],
+                            mime_type: types[i],
+                            timestamp: new Date().toISOString(),
+                            status: 'sending',
+                            quick_reply_name: qr.shortcut
+                        };
+
+                        if (activeCustomer && activeCustomer.phone === targetPhone) {
+                            const msgEl = createSingleMessageElement(tempMsg, currentHistory || []);
+                            messageContainerEl.appendChild(msgEl);
+                            if (Array.isArray(currentHistory)) currentHistory.push(tempMsg);
+                            messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+                        }
+                        updateCustomerItemSnippet(targetPhone, `[${category}]`, 'admin', 'sending');
+                    }
+
+                    // 2. EXECUTE HTTP API CALLS BOUND STRICTLY TO targetPhone
                     if (qr.message) {
                         await fetch(`${API_BASE}/send`, {
                             method: 'POST',
                             headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                phone: activeCustomer.phone,
+                                phone: targetPhone,
                                 message: qr.message,
                                 quick_reply_shortcut: qr.shortcut
                             })
                         });
                     }
 
-                    // Send media messages individually
                     for (let i = 0; i < urls.length; i++) {
                         await fetch(`${API_BASE}/send`, {
                             method: 'POST',
                             headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                phone: activeCustomer.phone,
+                                phone: targetPhone,
                                 message: '', // Caption
                                 mediaData: urls[i],
                                 mimeType: types[i],
@@ -3306,14 +3456,29 @@ function filterAndShowPopover(searchTerm) {
                         });
                     }
 
-                    loadChatHistory(activeCustomer.phone);
+                    updateCustomerItemSnippet(targetPhone, lastSnippetText || 'Quick reply sent', 'admin', 'sent');
+
+                    // 3. UPDATE UI ONLY IF activeCustomer IS STILL targetPhone
+                    if (activeCustomer && activeCustomer.phone === targetPhone) {
+                        if (Array.isArray(currentHistory)) {
+                            currentHistory.forEach(m => {
+                                if (m.status === 'sending') m.status = 'sent';
+                            });
+                        }
+                        const sendingTicks = messageContainerEl.querySelectorAll('.message-time');
+                        sendingTicks.forEach(tick => {
+                            if (!tick.querySelector('.fa-check')) {
+                                tick.innerHTML = `${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} <i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+                            }
+                        });
+                    }
                 } catch (err) {
                     console.error('Send QR error:', err);
                     window.showAlert('Error', 'Failed to send quick reply', 'error');
                 }
             } else if (qr.message) {
                 // For text-only quick replies: populate input box for agent to review/edit before sending
-                if (messageInputEl) {
+                if (messageInputEl && activeCustomer && activeCustomer.phone === targetPhone) {
                     messageInputEl.value = qr.message;
                     messageInputEl.style.height = 'auto';
                     messageInputEl.style.height = (messageInputEl.scrollHeight < 100 ? messageInputEl.scrollHeight : 100) + 'px';

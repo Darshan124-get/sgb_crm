@@ -98,9 +98,9 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// Serve static frontend files with maxAge browser caching
+// Serve static frontend files (maxAge 0 for development fresh code fetching)
 app.use(express.static(path.join(__dirname, '../../frontend'), {
-    maxAge: '30d',
+    maxAge: 0,
     etag: true
 }));
 

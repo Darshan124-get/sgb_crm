@@ -219,6 +219,7 @@ const logChatMessage = async (phoneInput, direction, messageType, body, mediaDat
         let extension = mimeMap[cleanMime] || (cleanMime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
         if (extension === 'jpeg') extension = 'jpg';
         const fileName = `${timestamp}-${phone}.${extension}`;
+        const filePath = `chats/${fileName}`;
         const storageService = require('./storage.service');
         try {
           const uploadResult = await storageService.uploadObject({
@@ -388,7 +389,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         ORDER BY agg.last_message_at DESC, l.created_at DESC
       `;
 
-      const [rows] = await db.execute(searchQuery, [...leadIds, ...leadIds, ...leadIds]);
+      const [rows] = await db.execute(searchQuery, [...leadIds, ...leadIds]);
       return { customers: rows, totalCount: rows.length, unreadCount: 0, handoffCount: 0 };
     }
 

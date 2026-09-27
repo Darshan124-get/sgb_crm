@@ -1480,8 +1480,8 @@ function renderSalesList(filter = '') {
             // Display ONLY Dealer Managers / Dealer roles
             return role.includes('dealer');
         } else {
-            // Telecaller tab: Display Telecallers and other sales staff
-            return !role.includes('dealer');
+            // Telecaller tab: Display ONLY Telecallers (Telecaller Executives / Managers)
+            return role.includes('telecaller');
         }
     });
 
@@ -3326,11 +3326,38 @@ function filterAndShowPopover(searchTerm) {
         `;
         item.onclick = async () => {
             quickRepliesPopover.style.display = 'none';
-            if (!activeCustomer) return;
+            if (!activeCustomer || !activeCustomer.phone) return;
+
+            // CAPTURE THE TARGET CUSTOMER & PHONE AT THE MOMENT OF CLICK!
+            const targetCustomer = activeCustomer;
+            const targetPhone = targetCustomer.phone;
+
+            // Clear handoff state locally if customer was in handoff
+            const wasHandoff = targetCustomer.status === 'human_needed' || targetCustomer.lead_status === 'human_needed' || targetCustomer.session_status === 'paused_for_human' || targetCustomer.needs_human;
+            if (wasHandoff) {
+                targetCustomer.status = targetCustomer.status === 'human_needed' ? 'assigned' : targetCustomer.status;
+                targetCustomer.lead_status = targetCustomer.lead_status === 'human_needed' ? 'assigned' : targetCustomer.lead_status;
+                targetCustomer.session_status = null;
+                targetCustomer.needs_human = false;
+
+                const matchingInList = allCustomers.find(c => c.phone === targetPhone);
+                if (matchingInList) {
+                    matchingInList.status = targetCustomer.status;
+                    matchingInList.lead_status = targetCustomer.lead_status;
+                    matchingInList.session_status = null;
+                    matchingInList.needs_human = false;
+                }
+
+                if (activeCustomer && activeCustomer.phone === targetPhone) {
+                    const bannerEl = document.getElementById('handoff-action-banner');
+                    if (bannerEl) bannerEl.classList.add('hidden');
+                }
+                updateHandoffCounts();
+            }
 
             // If Quick Reply has media attached, send media upon explicit click
             if (qr.media_url && qr.media_url !== '[]') {
-                if (messageInputEl) {
+                if (messageInputEl && activeCustomer && activeCustomer.phone === targetPhone) {
                     messageInputEl.value = '';
                     messageInputEl.style.height = 'auto';
                 }
@@ -3349,26 +3376,80 @@ function filterAndShowPopover(searchTerm) {
                         types = [qr.media_type];
                     }
 
-                    // Send text message if any
+                    const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : {};
+                    let lastSnippetText = '';
+
+                    // 1. INSTANTLY APPEND TEMPORARY ELEMENTS TO UI AT 0ms LATENCY (ZERO DOM WIPE!)
+                    if (qr.message) {
+                        lastSnippetText = qr.message;
+                        const tempChatId = 'temp-qr-text-' + Date.now();
+                        const tempMsg = {
+                            chat_id: tempChatId,
+                            direction: 'outgoing',
+                            sender_id: currentUser.id || currentUser.user_id || 1,
+                            sender_name: currentUser.name || 'Agent',
+                            message_type: 'text',
+                            body: qr.message,
+                            timestamp: new Date().toISOString(),
+                            status: 'sending',
+                            quick_reply_name: qr.shortcut
+                        };
+
+                        if (activeCustomer && activeCustomer.phone === targetPhone) {
+                            const msgEl = createSingleMessageElement(tempMsg, currentHistory || []);
+                            messageContainerEl.appendChild(msgEl);
+                            if (Array.isArray(currentHistory)) currentHistory.push(tempMsg);
+                            messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+                        }
+                        updateCustomerItemSnippet(targetPhone, qr.message, 'admin', 'sending');
+                    }
+
+                    for (let i = 0; i < urls.length; i++) {
+                        const category = types[i] ? (types[i].startsWith('image') ? 'image' : (types[i].startsWith('video') ? 'video' : (types[i].startsWith('audio') ? 'audio' : 'document'))) : 'image';
+                        lastSnippetText = `[${category}]`;
+                        const tempChatId = 'temp-qr-media-' + Date.now() + '-' + i;
+                        const tempMsg = {
+                            chat_id: tempChatId,
+                            direction: 'outgoing',
+                            sender_id: currentUser.id || currentUser.user_id || 1,
+                            sender_name: currentUser.name || 'Agent',
+                            message_type: category,
+                            body: '',
+                            media_url: urls[i],
+                            mime_type: types[i],
+                            timestamp: new Date().toISOString(),
+                            status: 'sending',
+                            quick_reply_name: qr.shortcut
+                        };
+
+                        if (activeCustomer && activeCustomer.phone === targetPhone) {
+                            const msgEl = createSingleMessageElement(tempMsg, currentHistory || []);
+                            messageContainerEl.appendChild(msgEl);
+                            if (Array.isArray(currentHistory)) currentHistory.push(tempMsg);
+                            messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
+                        }
+                        updateCustomerItemSnippet(targetPhone, `[${category}]`, 'admin', 'sending');
+                    }
+
+                    // 2. EXECUTE HTTP API CALLS BOUND STRICTLY TO targetPhone
                     if (qr.message) {
                         await fetch(`${API_BASE}/send`, {
                             method: 'POST',
                             headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                phone: activeCustomer.phone,
+                                phone: targetPhone,
                                 message: qr.message,
                                 quick_reply_shortcut: qr.shortcut
                             })
                         });
                     }
 
-                    // Send media messages individually
                     for (let i = 0; i < urls.length; i++) {
                         await fetch(`${API_BASE}/send`, {
                             method: 'POST',
                             headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                phone: activeCustomer.phone,
+                                phone: targetPhone,
                                 message: '', // Caption
                                 mediaData: urls[i],
                                 mimeType: types[i],
@@ -3377,14 +3458,29 @@ function filterAndShowPopover(searchTerm) {
                         });
                     }
 
-                    loadChatHistory(activeCustomer.phone);
+                    updateCustomerItemSnippet(targetPhone, lastSnippetText || 'Quick reply sent', 'admin', 'sent');
+
+                    // 3. UPDATE UI ONLY IF activeCustomer IS STILL targetPhone
+                    if (activeCustomer && activeCustomer.phone === targetPhone) {
+                        if (Array.isArray(currentHistory)) {
+                            currentHistory.forEach(m => {
+                                if (m.status === 'sending') m.status = 'sent';
+                            });
+                        }
+                        const sendingTicks = messageContainerEl.querySelectorAll('.message-time');
+                        sendingTicks.forEach(tick => {
+                            if (!tick.querySelector('.fa-check')) {
+                                tick.innerHTML = `${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} <i class="fas fa-check" style="margin-left: 5px; font-size: 0.75rem; color: #8696a0;"></i>`;
+                            }
+                        });
+                    }
                 } catch (err) {
                     console.error('Send QR error:', err);
                     window.showAlert('Error', 'Failed to send quick reply', 'error');
                 }
             } else if (qr.message) {
                 // For text-only quick replies: populate input box for agent to review/edit before sending
-                if (messageInputEl) {
+                if (messageInputEl && activeCustomer && activeCustomer.phone === targetPhone) {
                     messageInputEl.value = qr.message;
                     messageInputEl.style.height = 'auto';
                     messageInputEl.style.height = (messageInputEl.scrollHeight < 100 ? messageInputEl.scrollHeight : 100) + 'px';

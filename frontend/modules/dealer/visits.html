@@ -587,22 +587,22 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Firm / Shop Name <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="nvFirmName" required placeholder="e.g. Sree Lakshmi Agri Store" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="nvFirmName" data-validate="alphanumeric" required placeholder="e.g. Sree Lakshmi Agri Store" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Dealer Name (Contact Person) <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="nvDealerName" required placeholder="e.g. Ramesh Kumar" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="nvDealerName" data-validate="alphabet" required placeholder="e.g. Ramesh Kumar" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                         </div>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Contact Number (Phone) <span style="color:#ef4444;">*</span></label>
-                                <input type="tel" id="nvContact" required placeholder="e.g. 9876543210" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="tel" id="nvContact" data-validate="phone" maxlength="10" inputmode="numeric" required placeholder="e.g. 9876543210" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Location / Town / Address <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="nvLocation" required placeholder="e.g. Tumkur Main Road, Tumkur" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="nvLocation" data-validate="alphanumeric" required placeholder="e.g. Tumkur Main Road, Tumkur" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                         </div>
 
@@ -613,7 +613,7 @@
                             </div>
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Visited By Staff <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="nvVisitedBy" required placeholder="Staff representative" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="nvVisitedBy" data-validate="alphabet" required placeholder="Staff representative" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                         </div>
 
@@ -827,22 +827,22 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Firm / Shop Name <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="evFirmName" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="evFirmName" data-validate="alphanumeric" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Dealer Name (Contact Person) <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="evDealerName" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="evDealerName" data-validate="alphabet" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                         </div>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Contact Number (Phone) <span style="color:#ef4444;">*</span></label>
-                                <input type="tel" id="evContact" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="tel" id="evContact" data-validate="phone" maxlength="10" inputmode="numeric" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Location / Town / Address <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="evLocation" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="evLocation" data-validate="alphanumeric" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                         </div>
 
@@ -853,7 +853,7 @@
                             </div>
                             <div>
                                 <label style="font-size:0.8rem;font-weight:700;color:#0f172a;display:block;margin-bottom:4px;">Visited By Staff <span style="color:#ef4444;">*</span></label>
-                                <input type="text" id="evVisitedBy" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
+                                <input type="text" id="evVisitedBy" data-validate="alphabet" required style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;outline:none;">
                             </div>
                         </div>
                     </div>
@@ -888,7 +888,7 @@
                             <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
                                 4. Approximately how many brush cutters do you sell per year?
                             </label>
-                            <input type="number" id="evVisitBrushCuttersQty" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                            <input type="number" id="evVisitBrushCuttersQty" data-validate="positive-number" inputmode="numeric" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
                         </div>
 
                         <div>
@@ -916,14 +916,14 @@
                             <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
                                 8. How many people are working in your business?
                             </label>
-                            <input type="number" id="evVisitStaffCount" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                            <input type="number" id="evVisitStaffCount" data-validate="positive-number" inputmode="numeric" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
                         </div>
 
                         <div>
                             <label style="display:block;font-weight:700;font-size:0.875rem;color:#0f172a;margin-bottom:0.4rem;">
                                 9. How many years has your shop/business been running?
                             </label>
-                            <input type="number" id="evVisitBusinessYears" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
+                            <input type="number" id="evVisitBusinessYears" data-validate="positive-number" inputmode="numeric" min="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1e293b;outline:none;background:#f8fafc;">
                         </div>
                     </div>
                 </div>
@@ -941,6 +941,7 @@
     <!-- Scripts -->
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
+    <script src="js/dealer-validation.js"></script>
     <script src="js/visits.js"></script>
 </body>
 

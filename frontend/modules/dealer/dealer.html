@@ -479,13 +479,13 @@
                                 <span class="orange-bar"></span> Basic Information
                             </div>
 
-                            <!-- Row 1 -->
+                             <!-- Row 1 -->
                             <div class="form-grid-3">
                                 <div class="form-group-custom">
                                     <label for="firm_name">Firm / Shop Name <span class="req">*</span></label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-store input-icon"></i>
-                                        <input type="text" id="firm_name" required
+                                        <input type="text" id="firm_name" data-validate="alphanumeric" required
                                             placeholder="Enter firm or shop name">
                                     </div>
                                 </div>
@@ -494,7 +494,7 @@
                                     <label for="owner_name">Dealer Name <span class="req">*</span></label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-user input-icon"></i>
-                                        <input type="text" id="owner_name" required placeholder="Enter dealer name">
+                                        <input type="text" id="owner_name" data-validate="alphabet" required placeholder="Enter dealer name">
                                     </div>
                                 </div>
 
@@ -502,7 +502,7 @@
                                     <label for="phone_number">Contact <span class="req">*</span></label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-phone input-icon"></i>
-                                        <input type="tel" id="phone_number" required placeholder="Enter contact number">
+                                        <input type="tel" id="phone_number" data-validate="phone" maxlength="10" inputmode="numeric" required placeholder="Enter contact number">
                                     </div>
                                 </div>
                             </div>
@@ -513,7 +513,7 @@
                                     <label for="gst_no">GST No.</label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-file-invoice input-icon"></i>
-                                        <input type="text" id="gst_no" placeholder="Enter GST number">
+                                        <input type="text" id="gst_no" data-validate="gstin" maxlength="15" placeholder="Enter GST number">
                                     </div>
                                 </div>
 
@@ -552,7 +552,7 @@
                                     <label for="town_village">Town / Village</label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-location-dot input-icon"></i>
-                                        <input type="text" id="town_village" placeholder="Enter town or village">
+                                        <input type="text" id="town_village" data-validate="alphabet" placeholder="Enter town or village">
                                     </div>
                                 </div>
 
@@ -560,7 +560,7 @@
                                     <label for="city">City <span class="req">*</span></label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-location-dot input-icon"></i>
-                                        <input type="text" id="city" required placeholder="Enter city">
+                                        <input type="text" id="city" data-validate="alphabet" required placeholder="Enter city">
                                     </div>
                                 </div>
 
@@ -568,7 +568,7 @@
                                     <label for="taluk">Taluk</label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-location-dot input-icon"></i>
-                                        <input type="text" id="taluk" placeholder="Enter taluk">
+                                        <input type="text" id="taluk" data-validate="alphabet" placeholder="Enter taluk">
                                     </div>
                                 </div>
                             </div>
@@ -579,7 +579,7 @@
                                     <label for="district">District</label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-location-dot input-icon"></i>
-                                        <input type="text" id="district" placeholder="Enter district">
+                                        <input type="text" id="district" data-validate="alphabet" placeholder="Enter district">
                                     </div>
                                 </div>
 
@@ -605,7 +605,7 @@
                                     <label for="pincode">Pin Code <span class="req">*</span></label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-landmark input-icon"></i>
-                                        <input type="text" id="pincode" required placeholder="Enter pin code">
+                                        <input type="text" id="pincode" data-validate="pincode" maxlength="6" inputmode="numeric" required placeholder="Enter pin code">
                                     </div>
                                 </div>
                             </div>
@@ -622,7 +622,7 @@
                                     <label for="nearest_vrl">Nearest VRL Location</label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-location-dot input-icon"></i>
-                                        <input type="text" id="nearest_vrl" placeholder="Enter nearest VRL location">
+                                        <input type="text" id="nearest_vrl" data-validate="alphanumeric" placeholder="Enter nearest VRL location">
                                     </div>
                                 </div>
 
@@ -630,7 +630,7 @@
                                     <label for="vrl_code">VRL Code</label>
                                     <div class="input-with-icon">
                                         <i class="fa-solid fa-barcode input-icon"></i>
-                                        <input type="text" id="vrl_code" placeholder="Enter VRL code">
+                                        <input type="text" id="vrl_code" data-validate="alphanumeric" placeholder="Enter VRL code">
                                     </div>
                                 </div>
                             </div>
@@ -855,8 +855,7 @@
                                 <div class="form-group-custom">
                                     <label
                                         style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Advance
-                                        Amount (₹)</label>
-                                    <input type="number" id="dealer-order-advance" value="0" min="0"
+                                                     <input type="number" id="dealer-order-advance" data-validate="positive-number" data-decimal="true" inputmode="decimal" value="0" min="0"
                                         oninput="recalcStage3Amounts()" onwheel="this.blur()"
                                         style="width:100%;max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.9rem;font-weight:700;outline:none;">
                                 </div>
@@ -896,9 +895,9 @@
                                     <label
                                         style="font-weight:700;color:#334155;font-size:0.8rem;display:block;margin-bottom:4px;">Specify
                                         Delivery Details <span style="color:#ef4444;">*</span></label>
-                                    <input type="text" id="dealer-delivery-other"
+                                    <input type="text" id="dealer-delivery-other" data-validate="alphanumeric"
                                         style="width:100%;max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.85rem;outline:none;"
-                                        placeholder="Enter transport details...">
+                                        placeholder="Enter transport details...">             placeholder="Enter transport details...">
                                 </div>
 
                                 <!-- Payment Method (Shown only when Advance Amount > 0) -->
@@ -1399,7 +1398,7 @@
                         4. Approximately how many brush cutters do you sell per year? <span
                             style="color:#EF4444;">*</span>
                     </label>
-                    <input type="number" id="visitBrushCuttersQty" min="0" placeholder="Type a number..." required
+                    <input type="number" id="visitBrushCuttersQty" data-validate="positive-number" inputmode="numeric" min="0" placeholder="Type a number..." required
                         style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#F8FAFC;">
                 </div>
 
@@ -1437,7 +1436,7 @@
                     <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
                         8. How many people are working in your business? <span style="color:#EF4444;">*</span>
                     </label>
-                    <input type="number" id="visitStaffCount" min="0" placeholder="Type a number..." required
+                    <input type="number" id="visitStaffCount" data-validate="positive-number" inputmode="numeric" min="0" placeholder="Type a number..." required
                         style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#F8FAFC;">
                 </div>
 
@@ -1470,7 +1469,7 @@
                     <label style="display:block;font-weight:700;font-size:0.875rem;color:#0F172A;margin-bottom:0.4rem;">
                         10. How many years has your shop/business been running? <span style="color:#EF4444;">*</span>
                     </label>
-                    <input type="number" id="visitBusinessYears" min="0" placeholder="Type a number..." required
+                    <input type="number" id="visitBusinessYears" data-validate="positive-number" inputmode="numeric" min="0" placeholder="Type a number..." required
                         style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:0.6rem 0.85rem;font-size:0.85rem;color:#1E293B;outline:none;background:#F8FAFC;">
                 </div>
 
@@ -2194,6 +2193,7 @@
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
     <script src="../../js/decision-engine.js"></script>
+    <script src="js/dealer-validation.js"></script>
     <script src="js/dealer.js"></script>
 </body>
 

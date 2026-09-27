@@ -431,7 +431,7 @@
                     <label for="pay_amount">Payment Amount (₹) <span style="color:#ef4444;">*</span></label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-indian-rupee-sign input-icon"></i>
-                        <input type="number" id="pay_amount" required min="1" step="1"
+                        <input type="number" id="pay_amount" data-validate="positive-number" data-decimal="true" inputmode="decimal" required min="1" step="1"
                             placeholder="Enter amount to pay...">
                     </div>
                 </div>
@@ -454,7 +454,7 @@
                     <label for="pay_notes">Notes / Reference No. (Optional)</label>
                     <div class="input-with-icon">
                         <i class="fa-regular fa-note-sticky input-icon"></i>
-                        <input type="text" id="pay_notes" placeholder="Enter transaction ref no or notes...">
+                        <input type="text" id="pay_notes" data-validate="alphanumeric" placeholder="Enter transaction ref no or notes...">
                     </div>
                 </div>
 
@@ -641,6 +641,7 @@
 
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
+    <script src="js/dealer-validation.js"></script>
     <script src="js/orders.js"></script>
 </body>
 

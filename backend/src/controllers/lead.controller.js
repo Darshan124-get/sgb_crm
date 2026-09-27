@@ -1,12 +1,21 @@
 const pool = require('../config/db');
+const validationUtils = require('../utils/validation.utils');
 
 exports.getLeads = async (req, res) => {
     const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit, module: moduleName, dealer_only } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
 
+    const isDealerModule = moduleName === 'dealer' || dealer_only === 'true';
+
     try {
-        let query = `
+        let query = isDealerModule ? `
+            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name
+            FROM leads l 
+            LEFT JOIN users u ON l.assigned_to = u.user_id 
+            LEFT JOIN roles r ON u.role_id = r.role_id
+            WHERE 1=1
+        ` : `
             SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
@@ -23,7 +32,7 @@ exports.getLeads = async (req, res) => {
         let params = [];
 
         // 🎯 Dealer Module Filtering: Strictly display B2B Dealer Leads (WhatsApp transfer to Dealer Manager OR CRM Order Conversion Wizard)
-        if (moduleName === 'dealer' || dealer_only === 'true') {
+        if (isDealerModule) {
             query += ` AND (
                 LOWER(l.status) IN ('dealer', 'dealer_lead', 'dealer_converted')
                 OR l.lead_id IN (
@@ -117,7 +126,9 @@ exports.getLeads = async (req, res) => {
         const totalLeads = countResult[0].total;
 
         // Apply Order
-        query += ' ORDER BY COALESCE(l.updated_at, l.created_at) DESC, l.lead_id DESC';
+        query += isDealerModule 
+            ? ' ORDER BY l.lead_id DESC' 
+            : ' ORDER BY COALESCE(l.updated_at, l.created_at) DESC, l.lead_id DESC';
 
         const reqPriority = (req.query.priority || '').toLowerCase();
 
@@ -404,19 +415,26 @@ exports.createLead = async (req, res) => {
         console.log('Incoming Lead Request:', req.body);
         await connection.beginTransaction();
 
+        const cleanPhone = validationUtils.sanitizePhone(phone_number);
+        const cleanName = validationUtils.sanitizeAlphabetOnly(customer_name || '');
+        const cleanCity = validationUtils.sanitizeAlphabetOnly(city || '');
+        const cleanState = validationUtils.sanitizeAlphabetOnly(state || '');
+        const cleanDistrict = validationUtils.sanitizeAlphabetOnly(district || '');
+        const cleanPincode = validationUtils.sanitizePincode(pincode || '');
+
         // 1. Basic Validation
-        if (!phone_number) {
+        if (!cleanPhone) {
             await connection.rollback();
-            return res.status(400).json({ message: 'Phone number is required.' });
+            return res.status(400).json({ message: 'Valid 10-digit phone number is required.' });
         }
 
         // 🚫 DUPLICATE PREVENTION: Check if phone exists
-        const [existing] = await connection.query('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [phone_number]);
+        const [existing] = await connection.query('SELECT lead_id, assigned_to, customer_name FROM leads WHERE phone_number = ?', [cleanPhone]);
         if (existing.length > 0) {
             await connection.rollback();
-            console.warn(`Lead creation blocked: Phone ${phone_number} already exists as Lead ID ${existing[0].lead_id}`);
+            console.warn(`Lead creation blocked: Phone ${cleanPhone} already exists as Lead ID ${existing[0].lead_id}`);
             return res.status(400).json({
-                message: `Lead already exists: ${existing[0].customer_name || 'Unnamed'} (${phone_number})`,
+                message: `Lead already exists: ${existing[0].customer_name || 'Unnamed'} (${cleanPhone})`,
                 lead_id: existing[0].lead_id,
                 duplicate: true
             });
@@ -453,22 +471,22 @@ exports.createLead = async (req, res) => {
             status = 'new';
         }
 
-        const combinedAddress = [city, district, state, pincode].filter(Boolean).join(', ');
-        const finalAddress = address || combinedAddress || null;
+        const combinedAddress = [cleanCity, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
+        const finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || null);
 
         const [result] = await connection.query(
             `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                phone_number,
-                customer_name || null,
+                cleanPhone,
+                cleanName || null,
                 first_message || null,
                 language || 'EN',
                 finalAddress,
-                city || null,
-                state || null,
-                district || null,
-                pincode || null,
+                cleanCity || null,
+                cleanState || null,
+                cleanDistrict || null,
+                cleanPincode || null,
                 source || 'manual',
                 status,
                 assignedTo,
@@ -515,16 +533,18 @@ exports.updateLead = async (req, res) => {
         }
         const currentLead = rows[0];
 
+        const cleanPhone = phone_number !== undefined ? validationUtils.sanitizePhone(phone_number) : currentLead.phone_number;
+        const cleanName = customer_name !== undefined ? validationUtils.sanitizeAlphabetOnly(customer_name) : currentLead.customer_name;
         const finalStatus = status || currentLead.status;
         const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
-        const finalCity = city !== undefined ? city : currentLead.city;
-        const finalState = state !== undefined ? state : currentLead.state;
-        const finalDistrict = district !== undefined ? district : currentLead.district;
-        const finalPincode = pincode !== undefined ? pincode : currentLead.pincode;
+        const finalCity = city !== undefined ? validationUtils.sanitizeAlphabetOnly(city) : currentLead.city;
+        const finalState = state !== undefined ? validationUtils.sanitizeAlphabetOnly(state) : currentLead.state;
+        const finalDistrict = district !== undefined ? validationUtils.sanitizeAlphabetOnly(district) : currentLead.district;
+        const finalPincode = pincode !== undefined ? validationUtils.sanitizePincode(pincode) : currentLead.pincode;
 
         const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
-        const finalAddress = address !== undefined ? address : combinedAddress;
+        const finalAddress = address !== undefined ? validationUtils.sanitizeAlphanumeric(address) : combinedAddress;
 
         const cleanFollowupDate = (next_followup_date && String(next_followup_date).trim() !== '') 
             ? next_followup_date 
@@ -540,8 +560,8 @@ exports.updateLead = async (req, res) => {
                 current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
             WHERE lead_id = ?`,
             [
-                phone_number || currentLead.phone_number,
-                customer_name || currentLead.customer_name,
+                cleanPhone,
+                cleanName,
                 first_message || currentLead.first_message || null,
                 language || currentLead.language || 'EN',
                 finalAddress || null,
@@ -627,11 +647,34 @@ exports.assignLead = async (req, res) => {
 };
 
 exports.deleteLead = async (req, res) => {
+    const rawId = req.params.id;
+    const leadId = String(rawId).replace(/^LEAD-/i, '').trim();
+
+    if (!leadId || isNaN(Number(leadId))) {
+        return res.status(400).json({ message: 'Invalid lead ID' });
+    }
+
     try {
-        await pool.query('DELETE FROM leads WHERE lead_id = ?', [req.params.id]);
+        // Clean up or dissociate referenced tables before deleting lead
+        await pool.query('UPDATE chatbot_sessions SET lead_id = NULL WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('UPDATE orders SET lead_id = NULL WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('UPDATE dealers SET lead_id = NULL WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_notes WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_messages WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_followups WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_interest WHERE lead_id = ?', [leadId]).catch(() => {});
+        await pool.query('DELETE FROM lead_advance_payments WHERE lead_id = ?', [leadId]).catch(() => {});
+
+        const [result] = await pool.query('DELETE FROM leads WHERE lead_id = ?', [leadId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Lead not found' });
+        }
+
         res.json({ message: 'Lead deleted successfully' });
     } catch (err) {
-        res.status(500).json({ message: 'Error deleting lead' });
+        console.error('Error deleting lead:', err);
+        res.status(500).json({ message: 'Error deleting lead: ' + err.message });
     }
 };
 

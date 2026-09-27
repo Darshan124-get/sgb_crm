@@ -2,7 +2,7 @@
 // leads.js — Dealer Leads Info Module Logic
 // ============================================================
 
-const API_LEADS_BASE = `${window.API_URL}/leads`;
+const getApiLeadsBase = () => (window.API_URL || 'http://localhost:5000/api') + '/leads';
 const token = () => localStorage.getItem('token') || '';
 
 let allLeads = [];
@@ -74,12 +74,13 @@ async function fetchDealerLeads() {
 
     try {
         // Fetch leads designated for dealer panel (WhatsApp transfer & CRM Order Conversion Wizard)
-        let response = await fetch(`${API_LEADS_BASE}?limit=all&module=dealer`, {
+        const base = getApiLeadsBase();
+        let response = await fetch(`${base}?limit=all&module=dealer`, {
             headers: { 'Authorization': `Bearer ${token()}` }
         });
 
         if (!response.ok) {
-            response = await fetch(`${API_LEADS_BASE}?module=dealer`, {
+            response = await fetch(`${base}?module=dealer`, {
                 headers: { 'Authorization': `Bearer ${token()}` }
             });
         }
@@ -570,27 +571,59 @@ async function convertToDealer(leadId) {
 
 // ── Delete Lead ──
 async function deleteLead(leadId) {
-    const lead = allLeads.find(l => l.lead_id === leadId || String(l.id) === String(leadId));
-    if (!lead) return;
+    if (!leadId) return;
 
-    if (!confirm(`Are you sure you want to delete lead ${lead.lead_id} (${lead.firm_name})?`)) return;
+    let lead = allLeads.find(l => 
+        l.lead_id === leadId || 
+        String(l.id) === String(leadId) || 
+        String(l.raw_id) === String(leadId) ||
+        String(l.lead_id).replace(/^LEAD-/i, '') === String(leadId).replace(/^LEAD-/i, '')
+    );
+
+    const displayName = lead ? (lead.firm_name || lead.customer_name || lead.lead_id) : leadId;
+
+    if (!confirm(`Are you sure you want to delete lead ${leadId} (${displayName})?`)) return;
 
     try {
-        const realId = lead.raw_id || lead.id || leadId;
-        await fetch(`${API_LEADS_BASE}/${realId}`, {
+        const rawId = lead ? (lead.raw_id || lead.id || lead.lead_id) : leadId;
+        const numericId = String(rawId).replace(/^LEAD-/i, '').trim();
+        const base = getApiLeadsBase();
+        const response = await fetch(`${base}/${numericId}`, {
             method: 'DELETE',
             headers: {
-                'Authorization': `Bearer ${token()}`
+                'Authorization': `Bearer ${token()}`,
+                'Content-Type': 'application/json'
             }
         });
-    } catch (err) {
-        console.warn('Backend API delete lead warning:', err);
-    }
 
-    allLeads = allLeads.filter(l => l.lead_id !== lead.lead_id && String(l.id) !== String(lead.id));
-    selectedLeadIds.delete(lead.lead_id);
-    applyLeadFilters();
-    if (window.showAlert) window.showAlert('Deleted', `Lead "${lead.firm_name}" removed successfully.`, 'info');
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to delete lead from server.');
+        }
+
+        allLeads = allLeads.filter(l => 
+            l.lead_id !== leadId && 
+            String(l.id) !== String(numericId) && 
+            String(l.raw_id) !== String(numericId) &&
+            String(l.lead_id).replace(/^LEAD-/i, '') !== String(numericId)
+        );
+        selectedLeadIds.delete(leadId);
+        applyLeadFilters();
+
+        if (window.showAlert) {
+            window.showAlert('Deleted', `Lead "${displayName}" removed successfully.`, 'info');
+        } else {
+            alert(`Lead "${displayName}" removed successfully.`);
+        }
+    } catch (err) {
+        console.error('Backend API delete lead error:', err);
+        if (window.showAlert) {
+            window.showAlert('Delete Failed', err.message || 'Error deleting lead from server.', 'error');
+        } else {
+            alert('Delete Failed: ' + (err.message || 'Error deleting lead from server.'));
+        }
+    }
 }
 
 // ── Export CSV ──
@@ -703,12 +736,13 @@ function openLeadConversionWizard(leadId) {
     if (document.getElementById('wizNotReceivedNotes')) document.getElementById('wizNotReceivedNotes').value = lead.notes || '';
 
     // Prefill Step 3 Order Form
-    if (document.getElementById('wizDeliveryType')) document.getElementById('wizDeliveryType').value = 'VRL Logistics';
+    if (document.getElementById('wizDeliveryType')) document.getElementById('wizDeliveryType').value = '';
     if (document.getElementById('wizDeliveryTypeOther')) {
         document.getElementById('wizDeliveryTypeOther').value = '';
         document.getElementById('wizDeliveryTypeOther').style.display = 'none';
     }
-    if (document.getElementById('wizPaymentDate')) document.getElementById('wizPaymentDate').value = new Date().toISOString().slice(0, 10);
+    if (document.getElementById('wizPaymentMethod')) document.getElementById('wizPaymentMethod').value = '';
+    if (document.getElementById('wizPaymentDate')) document.getElementById('wizPaymentDate').value = '';
     if (document.getElementById('wizAdvanceAmount')) document.getElementById('wizAdvanceAmount').value = '0';
     if (document.getElementById('wizOrderNotes')) document.getElementById('wizOrderNotes').value = '';
 
@@ -720,7 +754,12 @@ function openLeadConversionWizard(leadId) {
 
     // Show Modal
     const modal = document.getElementById('wizardModal');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.style.display = 'flex';
+        if (window.DealerValidation) {
+            window.DealerValidation.initAutoValidation(modal);
+        }
+    }
 }
 
 function toggleWizDeliveryTypeOther() {
@@ -784,10 +823,30 @@ function goToWizStep(step) {
         const dealer = (document.getElementById('wizOrderDealerName')?.value || '').trim();
         const phone = (document.getElementById('wizOrderContactNo')?.value || '').trim();
         const address = (document.getElementById('wizOrderAddress')?.value || '').trim();
+        const pincode = (document.getElementById('wizOrderPincode')?.value || '').trim();
+        const gstNo = (document.getElementById('wizOrderGstNo')?.value || '').trim();
 
         if (!shop || !dealer || !phone || !address) {
             if (window.showAlert) window.showAlert('Missing Information', 'Please fill in Shop Name, Dealer Name, Contact Number, and Address before proceeding to order products.', 'warning');
             else alert('Please fill in Shop Name, Dealer Name, Contact Number, and Address before proceeding.');
+            return;
+        }
+
+        if (window.DealerValidation && !DealerValidation.isValidPhone(phone)) {
+            if (window.showAlert) window.showAlert('Invalid Phone', 'Please enter a valid 10-digit mobile number.', 'warning');
+            else alert('Please enter a valid 10-digit mobile number.');
+            return;
+        }
+
+        if (pincode && window.DealerValidation && !DealerValidation.isValidPincode(pincode)) {
+            if (window.showAlert) window.showAlert('Invalid Pincode', 'Please enter a valid 6-digit PIN code.', 'warning');
+            else alert('Please enter a valid 6-digit PIN code.');
+            return;
+        }
+
+        if (gstNo && window.DealerValidation && !DealerValidation.isValidGSTIN(gstNo)) {
+            if (window.showAlert) window.showAlert('Invalid GST Number', 'Please enter a valid 15-character GSTIN.', 'warning');
+            else alert('Please enter a valid 15-character GSTIN.');
             return;
         }
 
@@ -1102,6 +1161,18 @@ async function submitWizCollectInfo() {
             return;
         }
 
+        if (window.DealerValidation && !DealerValidation.isValidPhone(phone)) {
+            if (window.showAlert) window.showAlert('Invalid Phone', 'Please enter a valid 10-digit mobile number.', 'warning');
+            else alert('Please enter a valid 10-digit mobile number.');
+            return;
+        }
+
+        if (pincode && window.DealerValidation && !DealerValidation.isValidPincode(pincode)) {
+            if (window.showAlert) window.showAlert('Invalid Pincode', 'Please enter a valid 6-digit PIN code.', 'warning');
+            else alert('Please enter a valid 6-digit PIN code.');
+            return;
+        }
+
         updatedFirm = shop;
         updatedCust = dealer;
         updatedPhone = phone;
@@ -1204,19 +1275,62 @@ async function submitWizPlaceOrderAndConvert() {
     const gstNo = (document.getElementById('wizOrderGstNo')?.value || '').trim();
     const nearestVrl = (document.getElementById('wizOrderNearestVrl')?.value || '').trim();
 
-    let deliveryType = document.getElementById('wizDeliveryType')?.value || 'VRL Logistics';
-    if (deliveryType === 'Others' || deliveryType === 'Other') {
-        const customOther = (document.getElementById('wizDeliveryTypeOther')?.value || '').trim();
-        deliveryType = customOther ? customOther : 'Others';
-    }
-    const paymentMethod = document.getElementById('wizPaymentMethod')?.value || 'Bank Transfer';
-    const paymentDate = document.getElementById('wizPaymentDate')?.value || new Date().toISOString().slice(0, 10);
+    const deliveryTypeVal = (document.getElementById('wizDeliveryType')?.value || '').trim();
+    const paymentMethod = (document.getElementById('wizPaymentMethod')?.value || '').trim();
+    const paymentDate = (document.getElementById('wizPaymentDate')?.value || '').trim();
     const advanceAmount = parseFloat(document.getElementById('wizAdvanceAmount')?.value || 0) || 0;
     const orderNotes = (document.getElementById('wizOrderNotes')?.value || '').trim();
 
     if (!shopName || !dealerName || !phone || !address) {
         if (window.showAlert) window.showAlert('Required Fields', 'Please fill in Shop Name, Dealer Name, Contact Number, and Address.', 'warning');
         else alert('Please fill in Shop Name, Dealer Name, Contact Number, and Address.');
+        return;
+    }
+
+    if (window.DealerValidation && !DealerValidation.isValidPhone(phone)) {
+        if (window.showAlert) window.showAlert('Invalid Phone', 'Please enter a valid 10-digit mobile number.', 'warning');
+        else alert('Please enter a valid 10-digit mobile number.');
+        return;
+    }
+
+    if (pincode && window.DealerValidation && !DealerValidation.isValidPincode(pincode)) {
+        if (window.showAlert) window.showAlert('Invalid Pincode', 'Please enter a valid 6-digit PIN code.', 'warning');
+        else alert('Please enter a valid 6-digit PIN code.');
+        return;
+    }
+
+    if (gstNo && window.DealerValidation && !DealerValidation.isValidGSTIN(gstNo)) {
+        if (window.showAlert) window.showAlert('Invalid GST Number', 'Please enter a valid 15-character GSTIN.', 'warning');
+        else alert('Please enter a valid 15-character GSTIN.');
+        return;
+    }
+
+    if (!deliveryTypeVal) {
+        if (window.showAlert) window.showAlert('Required Field', 'Please select a Delivery Method.', 'warning');
+        else alert('Please select a Delivery Method.');
+        return;
+    }
+
+    let deliveryType = deliveryTypeVal;
+    if (deliveryTypeVal === 'Others' || deliveryTypeVal === 'Other') {
+        const customOther = (document.getElementById('wizDeliveryTypeOther')?.value || '').trim();
+        if (!customOther) {
+            if (window.showAlert) window.showAlert('Required Field', 'Please enter custom Delivery Method details.', 'warning');
+            else alert('Please enter custom Delivery Method details.');
+            return;
+        }
+        deliveryType = customOther;
+    }
+
+    if (!paymentMethod) {
+        if (window.showAlert) window.showAlert('Required Field', 'Please select a Payment Method.', 'warning');
+        else alert('Please select a Payment Method.');
+        return;
+    }
+
+    if (!paymentDate) {
+        if (window.showAlert) window.showAlert('Required Field', 'Please select Purchase / Order Date.', 'warning');
+        else alert('Please select Purchase / Order Date.');
         return;
     }
 
@@ -1457,6 +1571,16 @@ function renderLeadDetailsBody(lead, numericId) {
         noteText = 'No notes or interaction remarks recorded yet.';
     }
 
+    const rawStatus = String(lead.status || 'NEW').toUpperCase().trim();
+    let displayStatus = 'NEW';
+    if (['CONVERTED', 'DEALER_CONVERTED'].includes(rawStatus)) {
+        displayStatus = 'CONVERTED';
+    } else if (['FOLLOWUP', 'CONTACTED', 'INTERESTED', 'CALLBACK'].includes(rawStatus)) {
+        displayStatus = 'FOLLOW UP';
+    } else {
+        displayStatus = 'NEW';
+    }
+
     let html = `
         <div style="display:flex;flex-direction:column;gap:1.25rem;">
             <!-- Top Summary Card -->
@@ -1475,19 +1599,8 @@ function renderLeadDetailsBody(lead, numericId) {
                 </div>
                 <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
                     <span style="font-size:0.75rem;font-weight:800;padding:0.3rem 0.75rem;border-radius:9999px;background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;">
-                        STATUS: ${escapeHtml((lead.status || 'NEW').toUpperCase())}
+                        STATUS: ${escapeHtml(displayStatus)}
                     </span>
-                    <span style="font-size:0.75rem;font-weight:800;padding:0.3rem 0.75rem;border-radius:9999px;background:#F1F5F9;color:#475569;border:1px solid #E2E8F0;">
-                        SOURCE: ${escapeHtml((lead.source || 'WHATSAPP').toUpperCase())}
-                    </span>
-                    ${cleanPhone ? `
-                        <a href="https://wa.me/${cleanPhone}" target="_blank" style="padding:0.4rem 0.85rem;background:#25D366;color:#ffffff;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-                            <i class="fa-brands fa-whatsapp"></i> WhatsApp
-                        </a>
-                        <a href="tel:${cleanPhone}" style="padding:0.4rem 0.85rem;background:#0284C7;color:#ffffff;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-                            <i class="fa-solid fa-phone"></i> Call
-                        </a>
-                    ` : ''}
                 </div>
             </div>
 

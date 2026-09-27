@@ -308,33 +308,33 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Firm / Business Name *</label>
-                        <input type="text" id="leadModalFirm" required placeholder="e.g. SGB Agro Agency" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                        <input type="text" id="leadModalFirm" data-validate="alphanumeric" required placeholder="e.g. SGB Agro Agency" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                     </div>
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Contact Person Name *</label>
-                        <input type="text" id="leadModalName" required placeholder="e.g. Ramesh Kumar" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                        <input type="text" id="leadModalName" data-validate="alphabet" required placeholder="e.g. Ramesh Kumar" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                     </div>
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Phone Number *</label>
-                        <input type="tel" id="leadModalPhone" required placeholder="10-digit mobile" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                        <input type="tel" id="leadModalPhone" data-validate="phone" maxlength="10" inputmode="numeric" required placeholder="10-digit mobile" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                     </div>
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Email Address</label>
-                        <input type="email" id="leadModalEmail" placeholder="dealer@example.com" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                        <input type="email" id="leadModalEmail" data-validate="email" placeholder="dealer@example.com" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                     </div>
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">City / Town</label>
-                        <input type="text" id="leadModalCity" placeholder="e.g. Mysore" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                        <input type="text" id="leadModalCity" data-validate="alphabet" placeholder="e.g. Mysore" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                     </div>
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">State</label>
-                        <input type="text" id="leadModalState" placeholder="e.g. Karnataka" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                        <input type="text" id="leadModalState" data-validate="alphabet" placeholder="e.g. Karnataka" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                     </div>
                     <div>
                         <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Status</label>
@@ -489,37 +489,37 @@
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Shop Name *</label>
-                                    <input type="text" id="wizCollectShopName" required placeholder="Shop / Firm Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizCollectShopName" data-validate="alphanumeric" required placeholder="Shop / Firm Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Dealer Name *</label>
-                                    <input type="text" id="wizCollectDealerName" required placeholder="Contact / Owner Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizCollectDealerName" data-validate="alphabet" required placeholder="Contact / Owner Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
                             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Contact Number *</label>
-                                    <input type="tel" id="wizCollectContactNo" required placeholder="Mobile Number" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="tel" id="wizCollectContactNo" data-validate="phone" maxlength="10" inputmode="numeric" required placeholder="Mobile Number" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Taluk</label>
-                                    <input type="text" id="wizCollectTaluk" placeholder="Taluk name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizCollectTaluk" data-validate="alphabet" placeholder="Taluk name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">District</label>
-                                    <input type="text" id="wizCollectDistrict" placeholder="District name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizCollectDistrict" data-validate="alphabet" placeholder="District name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">State</label>
-                                    <input type="text" id="wizCollectState" value="Karnataka" placeholder="State" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizCollectState" data-validate="alphabet" value="Karnataka" placeholder="State" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Pincode</label>
-                                    <input type="text" id="wizCollectPincode" placeholder="6-digit pincode" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizCollectPincode" data-validate="pincode" maxlength="6" inputmode="numeric" placeholder="6-digit pincode" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
@@ -549,52 +549,52 @@
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Shop Name *</label>
-                                    <input type="text" id="wizOrderShopName" required placeholder="Shop / Business Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderShopName" data-validate="alphanumeric" required placeholder="Shop / Business Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Dealer Name *</label>
-                                    <input type="text" id="wizOrderDealerName" required placeholder="Contact / Owner Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderDealerName" data-validate="alphabet" required placeholder="Contact / Owner Name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Contact Number *</label>
-                                    <input type="tel" id="wizOrderContactNo" required placeholder="10-digit Mobile Number" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="tel" id="wizOrderContactNo" data-validate="phone" maxlength="10" inputmode="numeric" required placeholder="10-digit Mobile Number" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Address *</label>
-                                    <input type="text" id="wizOrderAddress" required placeholder="Full Street / Shop Address" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderAddress" data-validate="alphanumeric" required placeholder="Full Street / Shop Address" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
                             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Taluk</label>
-                                    <input type="text" id="wizOrderTaluk" placeholder="Taluk name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderTaluk" data-validate="alphabet" placeholder="Taluk name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">District</label>
-                                    <input type="text" id="wizOrderDistrict" placeholder="District name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderDistrict" data-validate="alphabet" placeholder="District name" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">State</label>
-                                    <input type="text" id="wizOrderState" value="Karnataka" placeholder="State" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderState" data-validate="alphabet" value="Karnataka" placeholder="State" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
                             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Pincode</label>
-                                    <input type="text" id="wizOrderPincode" placeholder="Pincode" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderPincode" data-validate="pincode" maxlength="6" inputmode="numeric" placeholder="Pincode" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">GST No</label>
-                                    <input type="text" id="wizOrderGstNo" placeholder="GST Number (optional)" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderGstNo" data-validate="gstin" maxlength="15" placeholder="GST Number (optional)" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:0.785rem;font-weight:700;color:#334155;margin-bottom:0.35rem;">Nearest VRL</label>
-                                    <input type="text" id="wizOrderNearestVrl" placeholder="Nearest VRL Branch" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
+                                    <input type="text" id="wizOrderNearestVrl" data-validate="alphanumeric" placeholder="Nearest VRL Branch" style="width:100%;padding:0.55rem 0.85rem;border:1px solid #CBD5E1;border-radius:8px;font-size:0.85rem;">
                                 </div>
                             </div>
 
@@ -668,7 +668,7 @@
                             </div>
                             <div>
                                 <label style="display:block;font-size:0.75rem;font-weight:700;color:#64748B;margin-bottom:0.2rem;">Advance Payment</label>
-                                <input type="number" id="wizAdvanceAmount" min="0" value="0" oninput="recalcWizOrderTotals()" style="width:100%;padding:0.35rem 0.6rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.85rem;font-weight:700;color:#059669;">
+                                <input type="number" id="wizAdvanceAmount" data-validate="positive-number" data-decimal="true" inputmode="decimal" min="0" value="0" oninput="recalcWizOrderTotals()" style="width:100%;padding:0.35rem 0.6rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.85rem;font-weight:700;color:#059669;">
                             </div>
                             <div>
                                 <label style="display:block;font-size:0.75rem;font-weight:700;color:#64748B;margin-bottom:0.2rem;">Balance Due</label>
@@ -680,17 +680,19 @@
                     <!-- Payment & Delivery Details -->
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.25rem;">
                         <div>
-                            <label style="display:block;font-size:0.75rem;font-weight:700;color:#334155;margin-bottom:0.3rem;">Delivery Method</label>
+                            <label style="display:block;font-size:0.75rem;font-weight:700;color:#334155;margin-bottom:0.3rem;">Delivery Method *</label>
                             <select id="wizDeliveryType" onchange="toggleWizDeliveryTypeOther()" style="width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
+                                <option value="">-- Select Delivery Method --</option>
                                 <option value="VRL Logistics">VRL Logistics</option>
                                 <option value="India Post">India Post</option>
                                 <option value="Others">Others</option>
                             </select>
-                            <input type="text" id="wizDeliveryTypeOther" placeholder="Enter Delivery Method..." style="display:none;margin-top:0.35rem;width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
+                            <input type="text" id="wizDeliveryTypeOther" data-validate="alphanumeric" placeholder="Enter Delivery Method..." style="display:none;margin-top:0.35rem;width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
                         </div>
                         <div>
-                            <label style="display:block;font-size:0.75rem;font-weight:700;color:#334155;margin-bottom:0.3rem;">Payment Method</label>
+                            <label style="display:block;font-size:0.75rem;font-weight:700;color:#334155;margin-bottom:0.3rem;">Payment Method *</label>
                             <select id="wizPaymentMethod" style="width:100%;padding:0.45rem 0.65rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.825rem;background:#fff;">
+                                <option value="">-- Select Payment Method --</option>
                                 <option value="Bank Transfer">Bank Transfer / NEFT</option>
                                 <option value="UPI / PhonePe / GPay">UPI / PhonePe / GPay</option>
                                 <option value="Cash">Cash</option>
@@ -760,7 +762,8 @@
     <!-- Scripts -->
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
-    <script src="js/leads.js?v=3"></script>
+    <script src="js/dealer-validation.js"></script>
+    <script src="js/leads.js?v=7_delete_fix"></script>
 </body>
 
 </html>

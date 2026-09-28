@@ -19,8 +19,8 @@ exports.getAllUsers = async (req, res) => {
         `;
         let params = [];
         
-        // PBAC: If requester is a Manager, restrict to their department only
-        if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+        // PBAC: If requester is a Manager, restrict to their department only (unless all_departments=true is requested for cross-department transfers)
+        if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin' && req.query.all_departments !== 'true') {
             query += ' AND u.department_id = ?';
             params.push(req.user.department_id);
         }

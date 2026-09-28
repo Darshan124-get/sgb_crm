@@ -1434,9 +1434,9 @@ let currentTransferTab = 'dealer'; // default active tab: 'dealer' or 'telecalle
 async function loadSalesUsers() {
     try {
         const fetchFunc = window.fetchWithRetry || fetch;
-        let response = await fetchFunc(`${USER_API_BASE}`, { headers: getAuthHeader() });
+        let response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
         if (!response.ok) {
-            response = await fetchFunc(`${USER_API_BASE}/sales`, { headers: getAuthHeader() });
+            response = await fetchFunc(`${USER_API_BASE}?all_departments=true`, { headers: getAuthHeader() });
         }
         if (response.ok) {
             const data = await response.json();

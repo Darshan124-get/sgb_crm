@@ -378,7 +378,6 @@ const getAllChatCustomers = async (user = null, options = {}) => {
             SELECT phone, MAX(session_id) as max_session_id
             FROM chatbot_sessions
             WHERE status = 'paused_for_human'
-<<<<<<< HEAD
             GROUP BY phone
           ) cs2 ON cs1.session_id = cs2.max_session_id
         ) cs_paused ON (

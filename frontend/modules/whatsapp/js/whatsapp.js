@@ -1451,22 +1451,21 @@ async function loadSalesUsers() {
 function switchTransferTab(tab) {
     currentTransferTab = tab;
     
-    const tabDealer = document.getElementById('transfer-tab-dealer');
-    const tabTelecaller = document.getElementById('transfer-tab-telecaller');
-    
-    if (tabDealer && tabTelecaller) {
-        if (tab === 'dealer') {
-            tabDealer.style.color = '#FF6B00';
-            tabDealer.style.borderBottom = '2.5px solid #FF6B00';
-            tabTelecaller.style.color = '#64748b';
-            tabTelecaller.style.borderBottom = '2.5px solid transparent';
-        } else {
-            tabTelecaller.style.color = '#FF6B00';
-            tabTelecaller.style.borderBottom = '2.5px solid #FF6B00';
-            tabDealer.style.color = '#64748b';
-            tabDealer.style.borderBottom = '2.5px solid transparent';
+    const tabKeys = ['dealer', 'telecaller', 'sales_manager', 'whatsapp_manager'];
+    tabKeys.forEach(key => {
+        const btn = document.getElementById(`transfer-tab-${key}`);
+        if (btn) {
+            if (key === tab) {
+                btn.style.color = '#FF6B00';
+                btn.style.borderBottom = '2.5px solid #FF6B00';
+                btn.classList.add('active');
+            } else {
+                btn.style.color = '#64748b';
+                btn.style.borderBottom = '2.5px solid transparent';
+                btn.classList.remove('active');
+            }
         }
-    }
+    });
     
     const searchVal = salesSearchEl ? salesSearchEl.value : '';
     renderSalesList(searchVal);
@@ -1483,10 +1482,17 @@ function renderSalesList(filter = '') {
         if (currentTransferTab === 'dealer') {
             // Display ONLY Dealer Managers / Dealer roles
             return role.includes('dealer');
-        } else {
+        } else if (currentTransferTab === 'telecaller') {
             // Telecaller tab: Display ONLY Telecallers (Telecaller Executives / Managers)
             return role.includes('telecaller');
+        } else if (currentTransferTab === 'sales_manager') {
+            // Sales Manager tab: Display Sales Managers, Sales roles, or Managers
+            return role.includes('sales') || role === 'manager' || role.includes('admin');
+        } else if (currentTransferTab === 'whatsapp_manager') {
+            // WhatsApp Manager tab: Display WhatsApp Managers / WhatsApp roles
+            return role.includes('whatsapp');
         }
+        return true;
     });
 
     const filteredUsers = tabUsers.filter(u =>
@@ -1495,10 +1501,16 @@ function renderSalesList(filter = '') {
     );
 
     if (filteredUsers.length === 0) {
+        let labelName = 'Team members';
+        if (currentTransferTab === 'dealer') labelName = 'Dealer Managers';
+        else if (currentTransferTab === 'telecaller') labelName = 'Telecallers';
+        else if (currentTransferTab === 'sales_manager') labelName = 'Sales Managers';
+        else if (currentTransferTab === 'whatsapp_manager') labelName = 'WhatsApp Managers';
+
         salesPersonListEl.innerHTML = `
             <div style="padding: 28px 16px; text-align: center; color: #94a3b8; font-size: 0.9rem;">
                 <i class="fas fa-users-slash" style="font-size: 1.6rem; margin-bottom: 8px; display: block; color: #cbd5e1;"></i>
-                No ${currentTransferTab === 'dealer' ? 'Dealer Managers' : 'Telecallers'} found
+                No ${labelName} found
             </div>`;
         return;
     }
@@ -1507,14 +1519,31 @@ function renderSalesList(filter = '') {
         const item = document.createElement('div');
         item.className = `sales-person-item ${selectedTransferUserId === user.user_id ? 'selected' : ''}`;
         const userRoleStr = (user.role_name || user.role || 'Staff').toUpperCase();
-        const isDealerRole = userRoleStr.includes('DEALER');
+        const roleLower = userRoleStr.toLowerCase();
+
+        let badgeBg = '#eff6ff';
+        let badgeColor = '#2563eb';
+        if (roleLower.includes('dealer')) {
+            badgeBg = '#fff7ed';
+            badgeColor = '#ea580c';
+        } else if (roleLower.includes('telecaller')) {
+            badgeBg = '#f0fdf4';
+            badgeColor = '#16a34a';
+        } else if (roleLower.includes('sales') || roleLower.includes('manager')) {
+            badgeBg = '#faf5ff';
+            badgeColor = '#9333ea';
+        } else if (roleLower.includes('whatsapp')) {
+            badgeBg = '#ecfdf5';
+            badgeColor = '#059669';
+        }
+
         item.innerHTML = `
             <div class="radio-circle"></div>
             <div class="sales-avatar" style="background: ${getRandomColor(user.name)}">${getInitials(user.name)}</div>
             <div class="sales-info">
                 <div class="sales-name">
                     ${user.name} 
-                    <span style="font-size:0.72rem; font-weight:600; background: ${isDealerRole ? '#fff7ed' : '#eff6ff'}; color: ${isDealerRole ? '#ea580c' : '#2563eb'}; padding:2px 7px; border-radius:4px; margin-left:6px;">
+                    <span style="font-size:0.72rem; font-weight:600; background: ${badgeBg}; color: ${badgeColor}; padding:2px 7px; border-radius:4px; margin-left:6px;">
                         ${userRoleStr}
                     </span>
                 </div>

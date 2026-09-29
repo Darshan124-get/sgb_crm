@@ -133,6 +133,16 @@ const confirmTransferBtnEl = document.getElementById('confirm-transfer-btn');
 
 let selectedTransferUserId = null;
 
+// Role check for Telecallers (Hide Transfer button)
+const loggedUser = JSON.parse(localStorage.getItem('user') || '{}');
+const normRole = (loggedUser.role_name || loggedUser.role || '').replace(/[-_]/g, ' ').toLowerCase();
+const isManager = loggedUser.is_manager || normRole.includes('manager') || normRole.includes('admin') || normRole.includes('super');
+const isTelecallerUser = normRole.includes('telecaller') || normRole.includes('telecom') || (!isManager && (normRole.includes('sales') || normRole.includes('executive')));
+
+if (isTelecallerUser && transferBtnEl) {
+    transferBtnEl.style.setProperty('display', 'none', 'important');
+}
+
 // Right Sidebar Elements
 const detailsSidebarEl = document.getElementById('details-sidebar');
 const detailsNameEl = document.getElementById('details-name');
@@ -2865,15 +2875,19 @@ function initEventListeners() {
 
     // Transfer Modal
     if (transferBtnEl) {
-        transferBtnEl.onclick = () => {
-            transferModal.classList.remove('hidden'); // legacy cleanup
-            transferModal.classList.add('active');
-            document.body.classList.add('modal-open');
-            selectedTransferUserId = activeCustomer ? activeCustomer.assigned_to : null;
-            confirmTransferBtnEl.disabled = true; // initially disabled as it matches current assignee
-            salesSearchEl.value = '';
-            loadSalesUsers();
-        };
+        if (isTelecallerUser) {
+            transferBtnEl.style.setProperty('display', 'none', 'important');
+        } else {
+            transferBtnEl.onclick = () => {
+                transferModal.classList.remove('hidden'); // legacy cleanup
+                transferModal.classList.add('active');
+                document.body.classList.add('modal-open');
+                selectedTransferUserId = activeCustomer ? activeCustomer.assigned_to : null;
+                confirmTransferBtnEl.disabled = true; // initially disabled as it matches current assignee
+                salesSearchEl.value = '';
+                loadSalesUsers();
+            };
+        }
     }
 
     if (closeTransferModalBtn) {
@@ -3229,94 +3243,6 @@ function showQrList() {
     renderQrManagerList();
     qrListView.classList.remove('hidden');
     qrEditView.classList.add('hidden');
-}
-
-function showQrEdit(index = -1) {
-    qrListView.classList.add('hidden');
-    qrEditView.classList.remove('hidden');
-    qrEditIndex.value = index;
-    qrSelectedFiles = [];
-    if (qrEditMedia) qrEditMedia.value = '';
-    if (qrEditMediaName) qrEditMediaName.innerText = '';
-    if (qrEditMediaRemove) qrEditMediaRemove.classList.add('hidden');
-    if (index >= 0) {
-        // use the id from db if exists, otherwise index
-        qrEditShortcut.dataset.id = quickReplies[index].id || '';
-        qrEditShortcut.value = quickReplies[index].shortcut;
-        qrEditMessage.value = quickReplies[index].message;
-        qrDeleteBtn.classList.remove('hidden');
-        if (quickReplies[index].media_url && quickReplies[index].media_url !== '[]') {
-            let names = [];
-            try {
-                let urls = JSON.parse(quickReplies[index].media_url);
-                if (Array.isArray(urls)) {
-                    names = urls.map(url => url.split('/').pop());
-                } else {
-                    names = [quickReplies[index].media_url.split('/').pop()];
-                }
-            } catch (e) {
-                names = [quickReplies[index].media_url.split('/').pop()];
-            }
-            if (qrEditMediaName) qrEditMediaName.innerText = names.join(', ') || 'Attached Media';
-            if (qrEditMediaRemove) qrEditMediaRemove.classList.remove('hidden');
-        }
-    } else {
-        qrEditShortcut.dataset.id = '';
-        qrEditShortcut.value = '';
-        qrEditMessage.value = '';
-        qrDeleteBtn.classList.add('hidden');
-    }
-}
-
-function saveQrEdit() {
-    const shortcut = qrEditShortcut.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    const message = qrEditMessage.value.trim();
-    if (!shortcut) {
-        window.showAlert('Error', 'Shortcut is required', 'error');
-        return;
-    }
-    if (!message && qrSelectedFiles.length === 0 && !qrEditMediaName.innerText) {
-        window.showAlert('Error', 'Message or media is required', 'error');
-        return;
-    }
-
-    if (qrSaveBtn) {
-        qrSaveBtn.disabled = true;
-        qrSaveBtn.innerText = 'SAVING...';
-    }
-
-    const id = qrEditShortcut.dataset.id;
-
-    const performSave = (mediaData, mimeType) => {
-        saveQuickReplyAPI({ id: id || undefined, shortcut, message, mediaData, mimeType }).finally(() => {
-            if (qrSaveBtn) {
-                qrSaveBtn.disabled = false;
-                qrSaveBtn.innerText = 'SAVE';
-            }
-        });
-    };
-
-    if (qrSelectedFiles.length > 0) {
-        const promises = qrSelectedFiles.map(file => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve({ data: reader.result, type: file.type });
-            });
-        });
-
-        Promise.all(promises).then(results => {
-            const mediaData = results.map(r => r.data);
-            const mimeType = results.map(r => r.type);
-            performSave(mediaData, mimeType);
-        });
-    } else if (!qrEditMediaName.innerText) {
-        // If they removed existing media, send empty arrays
-        performSave([], []);
-    } else {
-        // If they didn't attach new files and didn't remove existing, keep existing media in DB
-        performSave();
-    }
 }
 
 function deleteQrEdit() {

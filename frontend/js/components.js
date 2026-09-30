@@ -104,37 +104,61 @@ document.addEventListener('DOMContentLoaded', async () => {
                 initSidebar(sidebarContainer.querySelectorAll('a'));
 
                 // ── Update Sidebar Role Label ──
-                if (role === 'super-admin') {
-                    const sidebarLabel = document.getElementById('sidebar-role-label');
-                    if (sidebarLabel) sidebarLabel.textContent = 'SUPER ADMIN PORTAL';
-                } else if (role.includes('dealer')) {
-                    const sidebarLabel = document.getElementById('sidebar-role-label');
-                    if (sidebarLabel) {
-                        if (role === 'dealer_manager') sidebarLabel.textContent = 'DEALER MANAGER PANEL';
-                        else if (role === 'dealer_executive') sidebarLabel.textContent = 'DEALER EXECUTIVE PANEL';
-                        else if (role === 'dealer_viewer') sidebarLabel.textContent = 'DEALER VIEWER PANEL';
-                        else sidebarLabel.textContent = 'DEALER PANEL';
+                const sidebarLabel = document.getElementById('sidebar-role-label');
+                const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
+
+                if (sidebarLabel) {
+                    const normRole = role.replace(/[-_]/g, ' ').toLowerCase();
+                    const isManager = user.is_manager || normRole.includes('manager');
+
+                    if (role === 'super-admin' || role === 'super_admin') {
+                        sidebarLabel.textContent = 'SUPER ADMIN PORTAL';
+                    } else if (role === 'admin') {
+                        sidebarLabel.textContent = 'ADMIN PANEL';
+                    } else if (normRole.includes('sales manager') || (isManager && normRole.includes('sales')) || (role === 'manager' && userPermissions.includes('sales_dashboard'))) {
+                        sidebarLabel.textContent = 'SALES MANAGER PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'Sales Manager Dashboard';
+                    } else if (normRole.includes('sales executive') || normRole === 'sales' || (normRole.includes('sales') && !isManager)) {
+                        sidebarLabel.textContent = 'SALES EXECUTIVE PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'Sales Executive Dashboard';
+                    } else if (normRole.includes('telecaller')) {
+                        sidebarLabel.textContent = 'TELECOM PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'Telecom Dashboard';
+                    } else if (normRole.includes('whatsapp manager')) {
+                        sidebarLabel.textContent = 'WHATSAPP MANAGER PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'WhatsApp Manager Dashboard';
+                    } else if (normRole.includes('whatsapp executive') || normRole.includes('whatsapp_management_executive') || (normRole.includes('whatsapp') && !isManager)) {
+                        sidebarLabel.textContent = 'WHATSAPP EXECUTIVE PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'WhatsApp Dashboard';
+                    } else if (normRole.includes('whatsapp')) {
+                        sidebarLabel.textContent = 'WHATSAPP EXECUTIVE PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'WhatsApp Dashboard';
+                    } else if (normRole.includes('billing manager')) {
+                        sidebarLabel.textContent = 'BILLING MANAGER PANEL';
+                    } else if (normRole.includes('billing')) {
+                        sidebarLabel.textContent = 'BILLING PANEL';
+                    } else if (normRole.includes('shipping manager')) {
+                        sidebarLabel.textContent = 'SHIPPING MANAGER PANEL';
+                    } else if (normRole.includes('shipping')) {
+                        sidebarLabel.textContent = 'SHIPPING PANEL';
+                    } else if (normRole.includes('packing manager') || normRole.includes('packaging manager')) {
+                        sidebarLabel.textContent = 'PACKING MANAGER PANEL';
+                    } else if (normRole.includes('packing') || normRole.includes('packaging')) {
+                        sidebarLabel.textContent = 'PACKING PANEL';
+                    } else if (normRole.includes('dealer manager')) {
+                        sidebarLabel.textContent = 'DEALER MANAGER PANEL';
+                    } else if (normRole.includes('dealer executive')) {
+                        sidebarLabel.textContent = 'DEALER EXECUTIVE PANEL';
+                    } else if (normRole.includes('dealer viewer')) {
+                        sidebarLabel.textContent = 'DEALER VIEWER PANEL';
+                    } else if (normRole.includes('dealer')) {
+                        sidebarLabel.textContent = 'DEALER PANEL';
+                    } else if (normRole.includes('viewer')) {
+                        sidebarLabel.textContent = 'VIEWER PANEL';
+                        if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
+                    } else if (role) {
+                        sidebarLabel.textContent = normRole.toUpperCase() + ' PANEL';
                     }
-                } else if (role === 'manager' && userPermissions.includes('sales_dashboard')) {
-                    const sidebarLabel = document.getElementById('sidebar-role-label');
-                    if (sidebarLabel) sidebarLabel.textContent = 'SALES MANAGER PANEL';
-                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
-                    if (dashboardLabel) dashboardLabel.textContent = 'Sales Manager Dashboard';
-                } else if (role.includes('telecaller')) {
-                    const sidebarLabel = document.getElementById('sidebar-role-label');
-                    if (sidebarLabel) sidebarLabel.textContent = 'TELECOM PANEL';
-                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
-                    if (dashboardLabel) dashboardLabel.textContent = 'Telecom Dashboard';
-                } else if (role.includes('whatsapp')) {
-                    const sidebarLabel = document.getElementById('sidebar-role-label');
-                    if (sidebarLabel) sidebarLabel.textContent = 'WHATSAPP PANEL';
-                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
-                    if (dashboardLabel) dashboardLabel.textContent = 'WhatsApp Dashboard';
-                } else if (role === 'viewer') {
-                    const sidebarLabel = document.getElementById('sidebar-role-label');
-                    if (sidebarLabel) sidebarLabel.textContent = 'VIEWER PANEL';
-                    const dashboardLabel = document.querySelector('#nav-dashboard-sales .nav-label');
-                    if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
                 }
 
                 // Initialize B2B Dealer Mode Toggle (Only for Admin & Super Admin)
@@ -2679,6 +2703,9 @@ window.fetchPendingHumanAlerts = async function() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    // Skip polling if browser network IO is suspended or offline
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
     // Check Notification settings
     const notifEnabled = localStorage.getItem('notifications_enabled') !== 'false';
     const soundMuted = localStorage.getItem('notification_sound_muted') === 'true';
@@ -2690,10 +2717,20 @@ window.fetchPendingHumanAlerts = async function() {
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
         const res = await fetch(`${window.API_URL}/chatbot/sessions/human-needed`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 'Authorization': `Bearer ${token}` },
+            signal: controller.signal
+        }).catch(err => {
+            // Silently swallow suspended network / offline errors
+            return null;
         });
-        if (!res.ok) return;
+
+        clearTimeout(timeoutId);
+
+        if (!res || !res.ok) return;
 
         const alerts = await res.json();
         if (!Array.isArray(alerts) || alerts.length === 0) {
@@ -2782,7 +2819,7 @@ window.fetchPendingHumanAlerts = async function() {
             </div>
         `;
     } catch (err) {
-        console.warn('[PENDING ALERTS POLL ERROR]', err);
+        // Silently swallow network polling errors
     }
 };
 
@@ -2803,3 +2840,416 @@ document.addEventListener('wheel', function(e) {
         document.activeElement.blur();
     }
 }, { passive: true });
+
+// ============================================================
+// Global OTP Reset / Change Password Modal
+// ============================================================
+window.openPasswordResetOtpModal = function(options = {}) {
+    const targetUserId = options.targetUserId || null;
+    const targetUserEmail = options.targetUserEmail || null;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('sgbOtpResetModal');
+    if (existingModal) existingModal.remove();
+
+    // Create Modal Element
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'sgbOtpResetModal';
+    modalDiv.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 999999; animation: fadeInModal 0.2s ease-out;
+    `;
+
+    modalDiv.innerHTML = `
+        <style>
+            @keyframes fadeInModal { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+            .otp-digit-box {
+                width: 50px; height: 55px; text-align: center; font-size: 1.5rem; font-weight: 700;
+                border: 2px solid #cbd5e1; border-radius: 10px; outline: none; transition: all 0.2s;
+                background: #f8fafc; color: #0f172a;
+            }
+            .otp-digit-box:focus {
+                border-color: #2563eb; background: #ffffff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+            }
+            .otp-digit-box:disabled {
+                background: #e2e8f0; cursor: not-allowed; opacity: 0.6;
+            }
+        </style>
+        <div style="background: #ffffff; width: 100%; max-width: 480px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; font-family: inherit;">
+            <!-- Modal Header -->
+            <div style="background: linear-gradient(135deg, #064e3b 0%, #047857 100%); padding: 1.25rem 1.5rem; color: #ffffff; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 36px; height: 36px; background: rgba(255,255,255,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                        <i class="fas fa-key"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #ffffff;">Reset Password</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: #a7f3d0;">OTP Email Verification</p>
+                    </div>
+                </div>
+                <button type="button" id="closeOtpModalBtn" style="background: none; border: none; color: #ffffff; font-size: 1.5rem; cursor: pointer; opacity: 0.8; transition: opacity 0.2s;">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div style="padding: 1.5rem;">
+                <!-- Error Alert Box -->
+                <div id="otpModalAlert" style="display: none; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1.25rem; font-weight: 500;"></div>
+
+                <!-- Password Inputs -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.4rem;">New Password</label>
+                    <div style="position: relative;">
+                        <input type="password" id="otpNewPasswordInput" placeholder="Enter new password (min 6 chars)" style="width: 100%; padding: 0.65rem 2.5rem 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+                        <i class="fas fa-eye" id="toggleNewPwdEye" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; cursor: pointer;"></i>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1.25rem;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.4rem;">Confirm Password</label>
+                    <div style="position: relative;">
+                        <input type="password" id="otpConfirmPasswordInput" placeholder="Re-enter new password" style="width: 100%; padding: 0.65rem 2.5rem 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+                        <i class="fas fa-eye" id="toggleConfirmPwdEye" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; cursor: pointer;"></i>
+                    </div>
+                </div>
+
+                <!-- Send OTP Button -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 0.75rem;">
+                    <button type="button" id="btnSendResetOtp" class="btn btn-primary" style="flex: 1; padding: 0.65rem 1rem; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <i class="fas fa-paper-plane"></i> <span id="btnSendOtpText">Send OTP to Email</span>
+                    </button>
+                    <button type="button" id="btnResendResetOtp" class="btn btn-outline" style="display: none; padding: 0.65rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; font-weight: 600; cursor: pointer;">
+                        Resend OTP <span id="resendCountdownSpan"></span>
+                    </button>
+                </div>
+
+                <!-- OTP Input Area (Initially Disabled) -->
+                <div id="otpInputSection" style="opacity: 0.5; pointer-events: none; transition: all 0.3s; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 1.25rem; text-align: center;">
+                    <div style="font-size: 0.82rem; color: #475569; margin-bottom: 1rem; font-weight: 500;">
+                        Enter 4-Digit OTP received on email <span id="maskedEmailSpan" style="font-weight: 700; color: #0f172a;"></span>
+                    </div>
+
+                    <div style="display: flex; justify-content: center; gap: 0.75rem; margin-bottom: 1rem;">
+                        <input type="text" maxlength="1" class="otp-digit-box" id="otpBox1" autocomplete="off" disabled>
+                        <input type="text" maxlength="1" class="otp-digit-box" id="otpBox2" autocomplete="off" disabled>
+                        <input type="text" maxlength="1" class="otp-digit-box" id="otpBox3" autocomplete="off" disabled>
+                        <input type="text" maxlength="1" class="otp-digit-box" id="otpBox4" autocomplete="off" disabled>
+                    </div>
+
+                    <div id="otpAttemptsBadge" style="font-size: 0.78rem; font-weight: 600; color: #0284c7; margin-bottom: 0.5rem;">
+                        Attempts remaining: 4 of 4
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="background: #f8fafc; padding: 1rem 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" id="btnCancelOtpModal" style="padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-weight: 600; cursor: pointer;">Cancel</button>
+                <button type="button" id="btnSubmitOtpReset" disabled style="padding: 0.6rem 1.4rem; border-radius: 8px; background: #10b981; color: #ffffff; font-weight: 600; border: none; cursor: not-allowed; opacity: 0.6; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-check-circle"></i> Reset Password
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modalDiv);
+
+    // Elements
+    const alertBox = document.getElementById('otpModalAlert');
+    const newPwdInput = document.getElementById('otpNewPasswordInput');
+    const confirmPwdInput = document.getElementById('otpConfirmPasswordInput');
+    const btnSendOtp = document.getElementById('btnSendResetOtp');
+    const btnSendOtpText = document.getElementById('btnSendOtpText');
+    const btnResendOtp = document.getElementById('btnResendResetOtp');
+    const resendCountdownSpan = document.getElementById('resendCountdownSpan');
+    const otpSection = document.getElementById('otpInputSection');
+    const maskedEmailSpan = document.getElementById('maskedEmailSpan');
+    const attemptsBadge = document.getElementById('otpAttemptsBadge');
+    const btnSubmit = document.getElementById('btnSubmitOtpReset');
+    const boxes = [
+        document.getElementById('otpBox1'),
+        document.getElementById('otpBox2'),
+        document.getElementById('otpBox3'),
+        document.getElementById('otpBox4')
+    ];
+
+    let resendTimer = null;
+    let lockTimer = null;
+
+    function showAlert(msg, isError = true) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = isError ? '#fef2f2' : '#f0fdf4';
+        alertBox.style.color = isError ? '#991b1b' : '#166534';
+        alertBox.style.border = isError ? '1px solid #fecaca' : '1px solid #bbf7d0';
+        alertBox.innerHTML = msg;
+    }
+
+    function hideAlert() {
+        alertBox.style.display = 'none';
+    }
+
+    // Toggle Password Visibility
+    document.getElementById('toggleNewPwdEye').addEventListener('click', function() {
+        const type = newPwdInput.type === 'password' ? 'text' : 'password';
+        newPwdInput.type = type;
+        this.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+    });
+
+    document.getElementById('toggleConfirmPwdEye').addEventListener('click', function() {
+        const type = confirmPwdInput.type === 'password' ? 'text' : 'password';
+        confirmPwdInput.type = type;
+        this.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+    });
+
+    // Handle Close
+    function closeModal() {
+        if (resendTimer) clearInterval(resendTimer);
+        if (lockTimer) clearInterval(lockTimer);
+        modalDiv.remove();
+    }
+    document.getElementById('closeOtpModalBtn').addEventListener('click', closeModal);
+    document.getElementById('btnCancelOtpModal').addEventListener('click', closeModal);
+
+    // Auto-focus and navigation for OTP Boxes
+    boxes.forEach((box, index) => {
+        box.addEventListener('input', (e) => {
+            const val = box.value.replace(/[^0-9]/g, '');
+            box.value = val;
+            if (val && index < 3) {
+                boxes[index + 1].focus();
+            }
+            checkOtpComplete();
+        });
+
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !box.value && index > 0) {
+                boxes[index - 1].focus();
+            }
+        });
+
+        box.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim().replace(/[^0-9]/g, '');
+            if (pasteData.length >= 4) {
+                for (let i = 0; i < 4; i++) {
+                    boxes[i].value = pasteData[i] || '';
+                }
+                boxes[3].focus();
+                checkOtpComplete();
+            }
+        });
+    });
+
+    function checkOtpComplete() {
+        const code = boxes.map(b => b.value).join('');
+        if (code.length === 4) {
+            btnSubmit.disabled = false;
+            btnSubmit.style.cursor = 'pointer';
+            btnSubmit.style.opacity = '1';
+        } else {
+            btnSubmit.disabled = true;
+            btnSubmit.style.cursor = 'not-allowed';
+            btnSubmit.style.opacity = '0.6';
+        }
+    }
+
+    function startResendCooldown(seconds = 30) {
+        btnResendOtp.style.display = 'inline-block';
+        btnResendOtp.disabled = true;
+        let left = seconds;
+        resendCountdownSpan.textContent = `(${left}s)`;
+        if (resendTimer) clearInterval(resendTimer);
+        resendTimer = setInterval(() => {
+            left--;
+            if (left <= 0) {
+                clearInterval(resendTimer);
+                resendCountdownSpan.textContent = '';
+                btnResendOtp.disabled = false;
+            } else {
+                resendCountdownSpan.textContent = `(${left}s)`;
+            }
+        }, 1000);
+    }
+
+    function startLockoutCountdown(lockSeconds = 120) {
+        boxes.forEach(b => { b.disabled = true; b.value = ''; });
+        btnSubmit.disabled = true;
+        btnSubmit.style.cursor = 'not-allowed';
+        btnSubmit.style.opacity = '0.6';
+        btnSendOtp.disabled = true;
+        btnResendOtp.disabled = true;
+
+        let left = lockSeconds;
+        showAlert(`🔒 Maximum 4 OTP attempts exceeded. Locked for <strong id="lockTimerSec">${Math.floor(left / 60)}m ${left % 60}s</strong>.`, true);
+        
+        if (lockTimer) clearInterval(lockTimer);
+        lockTimer = setInterval(() => {
+            left--;
+            const min = Math.floor(left / 60);
+            const sec = left % 60;
+            const timerEl = document.getElementById('lockTimerSec');
+            if (timerEl) timerEl.textContent = `${min}m ${sec < 10 ? '0' : ''}${sec}s`;
+
+            if (left <= 0) {
+                clearInterval(lockTimer);
+                hideAlert();
+                attemptsBadge.textContent = 'Lock period ended. Please click Send OTP to try again.';
+                attemptsBadge.style.color = '#10b981';
+                btnSendOtp.disabled = false;
+            }
+        }, 1000);
+    }
+
+    // Function to Request OTP
+    async function requestOtp() {
+        hideAlert();
+        const pwd = newPwdInput.value;
+        const confirmPwd = confirmPwdInput.value;
+
+        if (!pwd || pwd.length < 6) {
+            showAlert('New password must be at least 6 characters long.');
+            newPwdInput.focus();
+            return;
+        }
+
+        if (pwd !== confirmPwd) {
+            showAlert('New password and confirm password do not match.');
+            confirmPwdInput.focus();
+            return;
+        }
+
+        btnSendOtp.disabled = true;
+        btnSendOtpText.textContent = 'Sending...';
+
+        try {
+            const apiBase = window.API_URL || (window.BASE_URL ? `${window.BASE_URL}/api` : '/api');
+            const url = targetUserId ? `${apiBase}/users/${targetUserId}/send-reset-otp` : `${apiBase}/users/send-reset-otp`;
+            const token = localStorage.getItem('token');
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ target_user_id: targetUserId })
+            });
+
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (jsonErr) {
+                console.warn('Non-JSON response received:', jsonErr);
+            }
+
+            if (!res.ok) {
+                if (data.locked) {
+                    startLockoutCountdown(120);
+                } else {
+                    showAlert(data.message || `Failed to send OTP email (Server HTTP ${res.status}).`);
+                }
+                btnSendOtp.disabled = false;
+                btnSendOtpText.textContent = 'Send OTP to Email';
+                return;
+            }
+
+            // Success sending OTP
+            showAlert(`✅ 4-Digit OTP sent successfully to ${data.masked_email || 'your email'}.`, false);
+            maskedEmailSpan.textContent = `(${data.masked_email || ''})`;
+
+            // Enable OTP input boxes
+            otpSection.style.opacity = '1';
+            otpSection.style.pointerEvents = 'auto';
+            boxes.forEach(b => { b.disabled = false; b.value = ''; });
+            boxes[0].focus();
+
+            attemptsBadge.textContent = 'Attempts remaining: 4 of 4';
+            attemptsBadge.style.color = '#0284c7';
+
+            btnSendOtpText.textContent = 'OTP Sent';
+            startResendCooldown(30);
+
+        } catch (err) {
+            console.error('Error requesting OTP:', err);
+            showAlert('Network error. Unable to send OTP email.');
+            btnSendOtp.disabled = false;
+            btnSendOtpText.textContent = 'Send OTP to Email';
+        }
+    }
+
+    btnSendOtp.addEventListener('click', requestOtp);
+    btnResendOtp.addEventListener('click', requestOtp);
+
+    // Submit Password Reset with OTP
+    btnSubmit.addEventListener('click', async () => {
+        hideAlert();
+        const pwd = newPwdInput.value;
+        const otpCode = boxes.map(b => b.value).join('');
+
+        if (otpCode.length !== 4) {
+            showAlert('Please enter the full 4-digit OTP code.');
+            return;
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Verifying...`;
+
+        try {
+            const apiBase = window.API_URL || (window.BASE_URL ? `${window.BASE_URL}/api` : '/api');
+            const url = targetUserId ? `${apiBase}/users/${targetUserId}/verify-reset-otp` : `${apiBase}/users/verify-reset-otp`;
+            const token = localStorage.getItem('token');
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    target_user_id: targetUserId,
+                    otp: otpCode,
+                    newPassword: pwd
+                })
+            });
+
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (jsonErr) {
+                console.warn('Non-JSON response received:', jsonErr);
+            }
+
+            if (!res.ok) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<i class="fas fa-check-circle"></i> Reset Password`;
+
+                if (data.locked) {
+                    startLockoutCountdown(120);
+                } else {
+                    if (data.remainingAttempts !== undefined) {
+                        attemptsBadge.textContent = `Attempts remaining: ${data.remainingAttempts} of 4`;
+                        attemptsBadge.style.color = data.remainingAttempts <= 1 ? '#dc2626' : '#d97706';
+                    }
+                    showAlert(data.message || `Invalid OTP code (HTTP ${res.status}).`);
+                }
+                return;
+            }
+
+            // SUCCESS!
+            closeModal();
+            if (window.showAlert) {
+                window.showAlert('Success', 'Password has been reset successfully!', 'success');
+            } else {
+                alert('Password has been reset successfully!');
+            }
+
+        } catch (err) {
+            console.error('Error verifying OTP:', err);
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = `<i class="fas fa-check-circle"></i> Reset Password`;
+            showAlert('Network error while resetting password.');
+        }
+    });
+};
+

@@ -97,18 +97,20 @@ async function loadUserProfileData(currentUser) {
         const isUserAdmin = userName.toLowerCase().includes('admin') || userRole.includes('ADMIN');
         const userEmail = user.email || '';
         const userPhone = user.phone || '';
-        const userEmpId = user.employee_id || '';
+        const userEmpId = user.employee_id || 'SGB100';
+        const userAddress = user.address || 'SGB Industries Office, Koppa Rural, KOPPA 577126';
 
         document.getElementById('myProfileEmail').innerHTML = `<i class="far fa-envelope" style="margin-right:0.3rem;"></i>${userEmail || '-'}`;
         document.getElementById('myProfilePhone').textContent = userPhone || '-';
-        document.getElementById('myProfileEmpId').textContent = userEmpId || '-';
+        document.getElementById('myProfileEmpId').textContent = userEmpId;
         
         const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-        document.getElementById('myProfileJoinedDate').textContent = joinDate;
+        const joinedDateEl = document.getElementById('myProfileJoinedDate');
+        if (joinedDateEl) joinedDateEl.textContent = joinDate;
 
         document.getElementById('myProfileDept').textContent = userDept;
         document.getElementById('myProfileReporting').textContent = user.reporting_to || 'Admin';
-        document.getElementById('myProfileLocation').textContent = user.address || 'Coimbatore, Tamil Nadu, India';
+        document.getElementById('myProfileLocation').textContent = userAddress;
         document.getElementById('myProfileLastLogin').textContent = user.last_login ? new Date(user.last_login).toLocaleString() : 'Recent';
         
         const statusTextEl = document.getElementById('myProfileStatusText');
@@ -126,7 +128,7 @@ async function loadUserProfileData(currentUser) {
         document.getElementById('infoMyFullName').textContent = userName;
         document.getElementById('infoMyEmail').textContent = userEmail || '-';
         document.getElementById('infoMyPhone').textContent = userPhone || '-';
-        document.getElementById('infoMyEmpId').textContent = userEmpId || '-';
+        document.getElementById('infoMyEmpId').textContent = userEmpId;
         document.getElementById('infoMyDept').textContent = userDept;
         document.getElementById('infoMyRole').textContent = userRole;
         document.getElementById('infoMyJoining').textContent = joinDate;
@@ -137,7 +139,7 @@ async function loadUserProfileData(currentUser) {
             infoStatusEl.textContent = isActive ? 'Active' : 'Inactive';
         }
         
-        document.getElementById('infoMyAddress').textContent = user.address || 'Tamil Nadu, India';
+        document.getElementById('infoMyAddress').textContent = userAddress;
         document.getElementById('infoMyBio').textContent = user.bio || `Staff member assigned to ${userDept} as ${userRole}.`;
 
         // 4. Roles & Permissions Card
@@ -200,10 +202,10 @@ async function loadUserProfileData(currentUser) {
             window.showAlert('Edit Profile', 'Profile edit window opened.', 'info');
         });
         document.getElementById('btnResetMyPassword')?.addEventListener('click', () => {
-            window.showAlert('Reset Password', 'Password reset email sent to your registered email.', 'success');
+            window.openPasswordResetOtpModal();
         });
         document.getElementById('btnChangePasswordAction')?.addEventListener('click', () => {
-            window.showAlert('Change Password', 'Enter your current password to update.', 'info');
+            window.openPasswordResetOtpModal();
         });
     } catch (err) {
         console.error('Failed to load profile data:', err);

@@ -2,15 +2,46 @@
     <div class="sidebar-logo">
         <img src="../../assets/logo.png" alt="SGB Agro Logo" style="height: 32px; width: auto; object-fit: contain;">
         <span>SGB Agro <span
-                style="font-size:0.65rem;font-weight:500;color:#10b981;letter-spacing:0.05em;display:block;margin-top:-4px;">WHATSAPP MGMT</span></span>
+                style="font-size:0.65rem;font-weight:500;color:#10b981;letter-spacing:0.05em;display:block;margin-top:-4px;" id="sidebar-role-label">WHATSAPP MANAGER PANEL</span></span>
     </div>
     <nav class="nav-menu">
-        <div class="nav-group-title">WhatsApp</div>
+        <div class="nav-group-title">Dashboards & Overview</div>
+        <div class="nav-item">
+            <a href="modules/sales/dashboard.html" class="nav-link" id="nav-dashboard-sales">
+                <i class="fas fa-th-large"></i> <span class="nav-label">WhatsApp Manager Dashboard</span>
+            </a>
+        </div>
+
+        <div class="nav-group-title">Team Management</div>
+        <div class="nav-item" data-perm="manage_users">
+            <a href="modules/admin/users.html" class="nav-link" id="nav-users">
+                <i class="fas fa-users"></i> <span class="nav-label">My Team / Users</span>
+            </a>
+        </div>
+
+        <div class="nav-group-title">Sales & CRM</div>
+        <div class="nav-item">
+            <a href="modules/sales/leads.html" class="nav-link" id="nav-leads-sales">
+                <i class="fas fa-id-card"></i> <span class="nav-label">My Leads</span>
+            </a>
+        </div>
         <div class="nav-item">
             <a href="modules/whatsapp/whatsapp.html" class="nav-link" id="nav-whatsapp">
                 <i class="fab fa-whatsapp"></i> <span class="nav-label">WhatsApp Chats</span>
             </a>
         </div>
+        <div class="nav-item">
+            <a href="modules/sales/followups.html" class="nav-link" id="nav-followups-sales">
+                <i class="fas fa-clock"></i> <span class="nav-label">My Follow-ups</span>
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="modules/sales/conversions.html" class="nav-link" id="nav-conversions-sales">
+                <i class="fas fa-shopping-cart"></i> <span class="nav-label">My Conversions</span>
+            </a>
+        </div>
+
+        <div class="nav-group-title">Analytics & Chatbot</div>
         <div class="nav-item dropdown" data-perm="chatbot_management">
             <a href="#" class="nav-link dropdown-toggle" id="nav-chatbot">
                 <i class="fa-solid fa-robot"></i> <span class="nav-label">Chatbot</span>
@@ -42,8 +73,8 @@
         
         <div class="nav-group-title">Preferences</div>
         <div class="nav-item">
-            <a href="#" class="nav-link" id="nav-settings">
-                <i class="fas fa-cog"></i> <span class="nav-label">Settings</span>
+            <a href="modules/sales/settings.html" class="nav-link" id="nav-sales-settings">
+                <i class="fas fa-user-cog"></i> <span class="nav-label">Profile & Settings</span>
             </a>
         </div>
     </nav>

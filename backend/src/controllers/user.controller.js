@@ -1,15 +1,22 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const { sendWelcomeEmail, sendOtpEmail } = require('../services/email.service');
+
+// In-Memory OTP Store: key = userId, value = { otp, expiresAt, attempts, lockedUntil, lastSentAt }
+const otpStore = new Map();
 
 exports.getAllUsers = async (req, res) => {
     const { role, status } = req.query;
     try {
+        // Ensure address column exists
+        try { await db.execute("ALTER TABLE users ADD COLUMN address VARCHAR(255) NULL"); } catch(e){}
+
         let query = `
             SELECT 
                 u.user_id, u.name, 
                 SUBSTRING_INDEX(u.name, ' ', 1) as first_name,
                 SUBSTRING_INDEX(u.name, ' ', -1) as last_name,
-                u.email, u.phone, u.employee_id, u.language, u.status, u.permissions, u.role_id, u.department_id, u.created_at, 
+                u.email, u.phone, u.employee_id, u.address, u.language, u.status, u.permissions, u.role_id, u.department_id, u.created_at, 
                 r.name as role_name,
                 (SELECT COUNT(*) FROM leads l WHERE l.assigned_to = u.user_id) as leads_handled,
                 (SELECT COUNT(*) FROM leads l WHERE l.assigned_to = u.user_id AND l.status = 'converted') as conversions
@@ -52,7 +59,7 @@ exports.getUserById = async (req, res) => {
     try {
         const query = `
             SELECT 
-                u.user_id, u.name, u.email, u.phone, u.employee_id, u.language, u.status, u.permissions, u.role_id, u.department_id, u.created_at,
+                u.user_id, u.name, u.email, u.phone, u.employee_id, u.address, u.language, u.status, u.permissions, u.role_id, u.department_id, u.created_at,
                 COALESCE(u.updated_at, u.created_at) as updated_at,
                 r.name as role_name,
                 d.name as department_name,
@@ -336,26 +343,49 @@ exports.deleteRole = async (req, res) => {
 };
 
 exports.createUser = async (req, res) => {
-    let { name, email, phone, employee_id, password, role_id, department_id, language, permissions } = req.body;
+    let { name, email, phone, employee_id, address, password, role_id, department_id, language, permissions } = req.body;
     try {
+        // Ensure address column exists
+        try { await db.execute("ALTER TABLE users ADD COLUMN address VARCHAR(255) NULL"); } catch(e){}
+
         // PBAC: If requester is a Manager, force department_id to be their own
         if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
             department_id = req.user.department_id;
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const userAddress = (address && address.trim()) ? address.trim() : 'SGB Industries Office, Koppa Rural, KOPPA 577126';
+
         const [result] = await db.execute(
-            'INSERT INTO users (name, email, phone, employee_id, password_hash, role_id, department_id, language, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, email, phone || null, employee_id || null, hashedPassword, role_id, department_id || null, language || 'EN', permissions ? JSON.stringify(permissions) : null]
+            'INSERT INTO users (name, email, phone, employee_id, address, password_hash, role_id, department_id, language, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, email, phone || null, employee_id || null, userAddress, hashedPassword, role_id, department_id || null, language || 'EN', permissions ? JSON.stringify(permissions) : null]
         );
         const newUserId = result.insertId;
 
         // Auto-assign department manager if user's role is Manager and a department is specified
-        if (role_id && department_id) {
+        let roleName = 'CRM Staff';
+        try {
             const [[roleRow]] = await db.execute('SELECT name FROM roles WHERE role_id = ?', [role_id]);
-            if (roleRow && (roleRow.name.toLowerCase().includes('manager') || role_id === 'manager')) {
-                await db.execute('UPDATE departments SET manager_id = ? WHERE id = ?', [newUserId, department_id]);
+            if (roleRow && roleRow.name) {
+                roleName = roleRow.name;
+                if ((roleRow.name.toLowerCase().includes('manager') || role_id === 'manager') && department_id) {
+                    await db.execute('UPDATE departments SET manager_id = ? WHERE id = ?', [newUserId, department_id]);
+                }
             }
+        } catch(e) {}
+
+        // Send Welcome Email with Credentials (Asynchronous & Non-blocking)
+        if (email) {
+            sendWelcomeEmail({
+                email,
+                name,
+                roleName,
+                password,
+                phone,
+                portalUrl: process.env.APP_PORTAL_URL || 'https://sgbcrm.crafzio.in/'
+            }).catch(emailErr => {
+                console.error('Welcome email dispatch notice:', emailErr.message);
+            });
         }
 
         res.status(201).json({ message: 'User created successfully', user_id: newUserId });
@@ -373,11 +403,11 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
     const { id } = req.params;
-    let { name, email, phone, employee_id, role_id, department_id, language, status, permissions, password } = req.body;
+    let { name, email, phone, employee_id, address, role_id, department_id, language, status, permissions, password } = req.body;
     try {
         // Fetch current row
         const [[current]] = await db.execute(
-            'SELECT language, status, department_id, role_id FROM users WHERE user_id = ?', [id]
+            'SELECT language, status, department_id, role_id, address FROM users WHERE user_id = ?', [id]
         );
 
         if (!current) return res.status(404).json({ message: 'User not found' });
@@ -393,17 +423,18 @@ exports.updateUser = async (req, res) => {
 
         const safeLang   = (language != null && language !== '') ? language : (current?.language ?? null);
         const safeStatus = (status   != null && status   !== '') ? status   : (current?.status ?? 'active');
+        const userAddress = (address && address.trim()) ? address.trim() : (current?.address || 'SGB Industries Office, Koppa Rural, KOPPA 577126');
 
         if (password && password !== '********') {
             const hashedPassword = await bcrypt.hash(password, 10);
             await db.execute(
-                'UPDATE users SET name = ?, email = ?, phone = ?, employee_id = ?, role_id = ?, department_id = ?, language = ?, status = ?, permissions = ?, password_hash = ? WHERE user_id = ?',
-                [name, email, phone || null, employee_id || null, role_id, department_id || null, safeLang, safeStatus, permissions ? JSON.stringify(permissions) : null, hashedPassword, id]
+                'UPDATE users SET name = ?, email = ?, phone = ?, employee_id = ?, address = ?, role_id = ?, department_id = ?, language = ?, status = ?, permissions = ?, password_hash = ? WHERE user_id = ?',
+                [name, email, phone || null, employee_id || null, userAddress, role_id, department_id || null, safeLang, safeStatus, permissions ? JSON.stringify(permissions) : null, hashedPassword, id]
             );
         } else {
             await db.execute(
-                'UPDATE users SET name = ?, email = ?, phone = ?, employee_id = ?, role_id = ?, department_id = ?, language = ?, status = ?, permissions = ? WHERE user_id = ?',
-                [name, email, phone || null, employee_id || null, role_id, department_id || null, safeLang, safeStatus, permissions ? JSON.stringify(permissions) : null, id]
+                'UPDATE users SET name = ?, email = ?, phone = ?, employee_id = ?, address = ?, role_id = ?, department_id = ?, language = ?, status = ?, permissions = ? WHERE user_id = ?',
+                [name, email, phone || null, employee_id || null, userAddress, role_id, department_id || null, safeLang, safeStatus, permissions ? JSON.stringify(permissions) : null, id]
             );
         }
 
@@ -456,6 +487,180 @@ exports.resetPassword = async (req, res) => {
         res.json({ message: 'Password reset successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+};
+
+/**
+ * Request OTP for Password Reset / Change Password
+ */
+exports.requestPasswordResetOtp = async (req, res) => {
+    const rawTargetId = req.body.target_user_id || req.params.id || (req.user ? (req.user.id || req.user.user_id) : null);
+    const targetUserId = parseInt(rawTargetId, 10);
+
+    if (!targetUserId || isNaN(targetUserId)) {
+        return res.status(400).json({ success: false, message: 'Invalid or missing user ID for password reset.' });
+    }
+
+    try {
+        const [[targetUser]] = await db.execute(
+            'SELECT user_id, name, email, phone, department_id FROM users WHERE user_id = ?', 
+            [targetUserId]
+        );
+
+        if (!targetUser) {
+            return res.status(404).json({ success: false, message: 'User account not found.' });
+        }
+
+        if (!targetUser.email) {
+            return res.status(400).json({ success: false, message: 'User does not have a registered email address for OTP delivery.' });
+        }
+
+        // PBAC constraint for managers
+        if (req.user && req.user.is_manager && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            if (targetUser.department_id !== req.user.department_id) {
+                return res.status(403).json({ success: false, message: 'Unauthorized to reset password for user in another department' });
+            }
+        }
+
+        const existing = otpStore.get(targetUser.user_id);
+        const now = Date.now();
+
+        // Check 2-minute lock out penalty if failed attempts >= 4
+        if (existing && existing.lockedUntil && now < existing.lockedUntil) {
+            const remainingSec = Math.ceil((existing.lockedUntil - now) / 1000);
+            return res.status(429).json({
+                success: false,
+                locked: true,
+                message: `Too many failed attempts. Please wait ${remainingSec} seconds before trying again.`
+            });
+        }
+
+        // Check resend cooldown (30 seconds)
+        if (existing && existing.lastSentAt && (now - existing.lastSentAt < 30000)) {
+            const waitSec = Math.ceil((30000 - (now - existing.lastSentAt)) / 1000);
+            return res.status(429).json({
+                success: false,
+                message: `Please wait ${waitSec} seconds before resending OTP.`
+            });
+        }
+
+        // Generate random 4-digit numeric OTP
+        const otpCode = String(Math.floor(1000 + Math.random() * 9000));
+        const expiresAt = now + (10 * 60 * 1000); // 10 minutes
+
+        otpStore.set(targetUser.user_id, {
+            otp: otpCode,
+            expiresAt,
+            attempts: 0,
+            lockedUntil: null,
+            lastSentAt: now
+        });
+
+        // Send OTP email
+        await sendOtpEmail({
+            email: targetUser.email,
+            name: targetUser.name,
+            otp: otpCode
+        });
+
+        const maskedEmail = targetUser.email.replace(/^(.{2})(.*)(@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.max(b.length, 3)) + c);
+
+        res.json({
+            success: true,
+            message: `4-digit OTP sent successfully to ${maskedEmail}`,
+            user_id: targetUser.user_id,
+            email: targetUser.email,
+            masked_email: maskedEmail
+        });
+    } catch (err) {
+        console.error('Error in requestPasswordResetOtp:', err);
+        res.status(500).json({ success: false, message: 'Failed to send OTP email: ' + err.message });
+    }
+};
+
+/**
+ * Verify OTP and Update Password (Maximum 4 attempts, 2-min lock)
+ */
+exports.verifyOtpAndUpdatePassword = async (req, res) => {
+    const rawTargetId = req.body.target_user_id || req.params.id || (req.user ? (req.user.id || req.user.user_id) : null);
+    const targetUserId = parseInt(rawTargetId, 10);
+    const { otp, newPassword } = req.body;
+
+    if (!targetUserId || isNaN(targetUserId)) {
+        return res.status(400).json({ success: false, message: 'Invalid or missing user ID for password reset.' });
+    }
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 6) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
+    }
+
+    if (!otp || String(otp).trim().length !== 4) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid 4-digit OTP code' });
+    }
+
+    const now = Date.now();
+    const targetIdNum = parseInt(targetUserId);
+    const otpRecord = otpStore.get(targetIdNum);
+
+    if (!otpRecord) {
+        return res.status(400).json({ success: false, message: 'No OTP session found. Please click "Send OTP" first.' });
+    }
+
+    // Check Lockout
+    if (otpRecord.lockedUntil && now < otpRecord.lockedUntil) {
+        const remainingSec = Math.ceil((otpRecord.lockedUntil - now) / 1000);
+        return res.status(429).json({
+            success: false,
+            locked: true,
+            message: `Account verification locked due to failed attempts. Try again in ${remainingSec} seconds.`
+        });
+    }
+
+    // Check Expiration
+    if (now > otpRecord.expiresAt) {
+        otpStore.delete(targetIdNum);
+        return res.status(400).json({ success: false, message: 'OTP has expired. Please click "Resend OTP" for a new code.' });
+    }
+
+    // Verify 4-Digit OTP
+    if (String(otpRecord.otp).trim() !== String(otp).trim()) {
+        otpRecord.attempts += 1;
+
+        if (otpRecord.attempts >= 4) {
+            // Lock for 2 minutes (120,000 ms) after 4 failed attempts
+            otpRecord.lockedUntil = now + (2 * 60 * 1000);
+            return res.status(429).json({
+                success: false,
+                locked: true,
+                attempts: otpRecord.attempts,
+                message: 'Maximum 4 OTP attempts exceeded. Locked for 2 minutes before trying again.'
+            });
+        }
+
+        const remainingAttempts = 4 - otpRecord.attempts;
+        return res.status(400).json({
+            success: false,
+            attempts: otpRecord.attempts,
+            remainingAttempts,
+            message: `Invalid OTP code. You have ${remainingAttempts} attempt(s) remaining.`
+        });
+    }
+
+    // OTP Correct! Hash and Update Password
+    try {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await db.execute('UPDATE users SET password_hash = ? WHERE user_id = ?', [hashedPassword, targetIdNum]);
+
+        // Clear OTP Store for this user
+        otpStore.delete(targetIdNum);
+
+        res.json({
+            success: true,
+            message: 'Password updated successfully!'
+        });
+    } catch (err) {
+        console.error('Error updating password via OTP:', err);
+        res.status(500).json({ success: false, message: 'Failed to update password: ' + err.message });
     }
 };
 

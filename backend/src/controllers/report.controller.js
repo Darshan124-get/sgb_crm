@@ -81,9 +81,10 @@ exports.getDashboardStats = async (req, res) => {
         const role = (req.user.role || '').toLowerCase();
         const isAdminUser = role.includes('admin');
 
-        // Contextual filter: If not admin, only show stats for assigned leads
-        let leadFilter = isAdminUser ? '1=1' : `assigned_to = ${userId}`;
-        let creatorFilter = isAdminUser ? '1=1' : `created_by = ${userId}`;
+        // Contextual filter: If admin, manager, or whatsapp role, show department/company lead stats
+        const isManagerOrAdmin = isAdminUser || req.user.is_manager || role.includes('manager') || role.includes('whatsapp');
+        let leadFilter = isManagerOrAdmin ? '1=1' : `assigned_to = ${userId}`;
+        let creatorFilter = isManagerOrAdmin ? '1=1' : `created_by = ${userId}`;
 
         // Ensure system_logs table exists
         await pool.execute(`
@@ -585,6 +586,7 @@ exports.getDashboardStats = async (req, res) => {
             },
             whatsapp: {
                 received: waStats.received || 0,
+                sent: waStats.sent || 0,
                 unread: waStats.unread || 0,
                 replyRate: waStats.received > 0 ? Math.min(100, Math.round((waStats.sent / waStats.received) * 100)) : 100,
                 readRate: Math.round(waStats.read_rate || 0)

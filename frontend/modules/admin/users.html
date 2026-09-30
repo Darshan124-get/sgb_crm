@@ -104,7 +104,7 @@
                 <aside class="settings-sidebar">
                     <div class="settings-nav-title">Organization</div>
                     <button class="settings-nav-item active" data-tab="departments"><i class="fas fa-building"></i> Departments</button>
-                    <button class="settings-nav-item" data-tab="admins"><i class="fas fa-user-shield"></i> Admin & Manager</button>
+                    <button class="settings-nav-item" data-tab="admins"><i class="fas fa-user-shield"></i> Admin Creation</button>
                     <!-- Roles tab removed as roles are now fixed -->
                     <button class="settings-nav-item" data-tab="users"><i class="fas fa-users"></i> Users</button>
                 </aside>
@@ -155,12 +155,12 @@
                             <div>
                                 <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
                                     <div style="width:28px;height:28px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;">2</div>
-                                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Admin & Manager Creation</h1>
+                                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;">Admin Creation</h1>
                                 </div>
-                                <p style="color:#64748b;font-size:0.875rem;margin-left:2.25rem;">Manage system administrators and department managers</p>
+                                <p style="color:#64748b;font-size:0.875rem;margin-left:2.25rem;">Manage system administrators</p>
                             </div>
                             <button class="btn btn-primary" id="btnCreateAdmin">
-                                <i class="fas fa-user-plus"></i> Create Admin / Manager
+                                <i class="fas fa-user-plus"></i> Create Admin
                             </button>
                         </div>
 
@@ -302,7 +302,7 @@
                                             <i class="fas fa-location-dot profile-inline-icon"></i>
                                             <div>
                                                 <div class="profile-meta-label">Location</div>
-                                                <div class="profile-meta-value" id="userProfileLocation">Tamil Nadu, India</div>
+                                                <div class="profile-meta-value" id="userProfileLocation">SGB Industries Office, Koppa Rural, KOPPA 577126</div>
                                             </div>
                                         </div>
                                         <div class="profile-meta-item-inline">
@@ -457,7 +457,7 @@
                                             <div class="info-table-row">
                                                 <div class="info-table-label">Address</div>
                                                 <div class="info-table-colon">:</div>
-                                                <div class="info-table-value" id="infoAddress">Coimbatore, Tamil Nadu, India</div>
+                                                <div class="info-table-value" id="infoAddress">SGB Industries Office, Koppa Rural, KOPPA 577126</div>
                                             </div>
                                             <div class="info-table-row">
                                                 <div class="info-table-label">Bio</div>
@@ -661,7 +661,7 @@
         <div class="modal-header">
             <div style="display:flex;align-items:center;gap:0.5rem;">
                 <div style="width:24px;height:24px;background:#3b82f6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;">2</div>
-                <h2 style="font-size:1.1rem;font-weight:700;color:#1e293b;" id="adminModalTitle">Create Admin / Manager</h2>
+                <h2 style="font-size:1.1rem;font-weight:700;color:#1e293b;" id="adminModalTitle">Create Admin</h2>
             </div>
             <button style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;" id="btnCloseAdminModal"><i class="fas fa-times"></i></button>
         </div>
@@ -679,11 +679,22 @@
                     </div>
                     <div class="form-group">
                         <label for="adminPhone">Phone Number</label>
-                        <input type="text" id="adminPhone" placeholder="+1 234 567 8900">
+                        <input type="text" id="adminPhone" placeholder="+91 98765 43210">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminEmployeeId">Employee ID</label>
+                        <input type="text" id="adminEmployeeId" placeholder="e.g. SGB100">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminAddress">Location / Address <span style="font-size:0.75rem;color:#64748b;">(Optional)</span></label>
+                        <input type="text" id="adminAddress" placeholder="Default: SGB Industries Office, Koppa Rural, KOPPA 577126">
                     </div>
                     <div class="form-group">
                         <label for="adminPassword">Password <span style="color:#ef4444;" id="adminPassAsterisk">*</span></label>
-                        <input type="password" id="adminPassword" placeholder="Set temporary password" autocomplete="new-password">
+                        <div style="position:relative;">
+                            <input type="password" id="adminPassword" placeholder="Set password" autocomplete="new-password" style="width:100%;padding-right:35px;">
+                            <button type="button" onclick="togglePasswordVisibility('adminPassword', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;"><i class="far fa-eye"></i></button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="adminRole">Role / Access Level <span style="color:#ef4444;">*</span></label>
@@ -691,7 +702,7 @@
                             <!-- Populated via JS -->
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="display:none;">
                         <label for="adminDepartment">Department Assignment</label>
                         <select id="adminDepartment">
                             <option value="">-- No Department (Global) --</option>
@@ -753,7 +764,11 @@
                         </div>
                         <div class="form-group">
                             <label for="wizardEmployeeId">Employee ID <span style="color:#ef4444;">*</span></label>
-                            <input type="text" id="wizardEmployeeId" required placeholder="EMP00123">
+                            <input type="text" id="wizardEmployeeId" required placeholder="e.g. SGB100">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="wizardAddress">Location / Address <span style="font-size:0.75rem;color:#64748b;">(Optional, default: SGB Industries Office, Koppa Rural, KOPPA 577126)</span></label>
+                            <input type="text" id="wizardAddress" placeholder="SGB Industries Office, Koppa Rural, KOPPA 577126">
                         </div>
                         <div class="form-group">
                             <label for="wizardPassword">Password <span style="color:#ef4444;">*</span></label>

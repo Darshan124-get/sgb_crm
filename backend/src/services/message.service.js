@@ -302,6 +302,12 @@ const getChatHistory = async (phoneInput, user = null) => {
   }
 };
 
+const isScopedUser = (u) => {
+  if (!u || !u.role || !u.id) return false;
+  const role = String(u.role).toLowerCase();
+  return (role.includes('executive') || role.includes('telecaller') || role === 'viewer' || role === 'sales') && !role.includes('whatsapp') && !u.is_manager;
+};
+
 /**
  * Gets a list of all leads who have chats
  */
@@ -311,6 +317,55 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     const page = parseInt(options.page) > 0 ? parseInt(options.page) : 1;
     const offset = (page - 1) * limit;
 
+    // Compute total unread count (scoped if user is telecaller/executive)
+    let unreadQuery = ``;
+    let unreadParams = [];
+    if (isScopedUser(user)) {
+      unreadQuery = `
+        SELECT COUNT(DISTINCT cm.session_id) AS total_unread 
+        FROM chat_messages cm
+        JOIN chat_sessions cs ON cm.session_id = cs.session_id
+        JOIN leads l ON cs.lead_id = l.lead_id
+        WHERE cm.sender_type = 'user' AND cm.status = 'sent' AND l.assigned_to = ?
+      `;
+      unreadParams.push(user.id);
+    } else {
+      unreadQuery = `
+        SELECT COUNT(DISTINCT session_id) AS total_unread 
+        FROM chat_messages 
+        WHERE sender_type = 'user' AND status = 'sent'
+      `;
+    }
+
+    // Compute total handoff count (scoped if user is telecaller/executive)
+    let handoffQuery = ``;
+    let handoffParams = [];
+    if (isScopedUser(user)) {
+      handoffQuery = `
+        SELECT COUNT(DISTINCT l.lead_id) AS total_handoff 
+        FROM leads l 
+        LEFT JOIN (
+          SELECT cs1.lead_id, cs1.phone, cs1.status
+          FROM chatbot_sessions cs1
+          JOIN (
+            SELECT MAX(session_id) as max_session_id
+            FROM chatbot_sessions
+            WHERE status = 'paused_for_human'
+            GROUP BY COALESCE(lead_id, phone)
+          ) cs2 ON cs1.session_id = cs2.max_session_id
+        ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
+           OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
+        WHERE l.assigned_to = ? AND (l.status = 'human_needed' OR cs_paused.status = 'paused_for_human')
+      `;
+      handoffParams.push(user.id);
+    } else {
+      handoffQuery = `
+        SELECT COUNT(DISTINCT COALESCE(cs1.lead_id, cs1.phone)) AS total_handoff 
+        FROM chatbot_sessions cs1
+        WHERE cs1.status = 'paused_for_human'
+      `;
+    }
+
     if (options.search) {
       const trimmedSearch = options.search.trim().toLowerCase();
       const searchDigits = trimmedSearch.replace(/\D/g, '');
@@ -319,7 +374,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       let leadQuery = `SELECT l.lead_id FROM leads l WHERE 1=1`;
       let leadParams = [];
 
-      if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
+      if (isScopedUser(user)) {
         leadQuery += " AND l.assigned_to = ?";
         leadParams.push(user.id);
       }
@@ -338,8 +393,15 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       const [matchingLeads] = await db.execute(leadQuery, leadParams);
       const leadIds = matchingLeads.map(l => l.lead_id);
 
+      const [[unreadRows], [handoffRows]] = await Promise.all([
+        db.execute(unreadQuery, unreadParams),
+        db.execute(handoffQuery, handoffParams)
+      ]);
+      const unreadCount = unreadRows[0] ? parseInt(unreadRows[0].total_unread) : 0;
+      const handoffCount = handoffRows[0] ? parseInt(handoffRows[0].total_handoff) : 0;
+
       if (leadIds.length === 0) {
-        return { customers: [], totalCount: 0, unreadCount: 0, handoffCount: 0 };
+        return { customers: [], totalCount: 0, unreadCount, handoffCount };
       }
 
       const inClause = leadIds.map(() => '?').join(',');
@@ -390,7 +452,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       `;
 
       const [rows] = await db.execute(searchQuery, [...leadIds, ...leadIds]);
-      return { customers: rows, totalCount: rows.length, unreadCount: 0, handoffCount: 0 };
+      return { customers: rows, totalCount: rows.length, unreadCount, handoffCount };
     }
 
     let query = `
@@ -438,7 +500,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     `;
     let params = [];
 
-    if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
+    if (isScopedUser(user)) {
       query += " AND l.assigned_to = ?";
       params.push(user.id);
     }
@@ -475,7 +537,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       WHERE 1=1
     `;
     let countParams = [];
-    if (user && (user.role.toLowerCase().includes('executive') || user.role.toLowerCase() === 'viewer' || user.role.toLowerCase() === 'sales') && !user.role.toLowerCase().includes('whatsapp')) {
+    if (isScopedUser(user)) {
       countQuery += " AND l.assigned_to = ?";
       countParams.push(user.id);
     }
@@ -491,23 +553,6 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     } else if (options.tab === 'resolved') {
       countQuery += " AND l.status IN ('converted', 'closed', 'lost')";
     }
-
-    // Compute total unread count across DB
-    let unreadQuery = `
-      SELECT COUNT(DISTINCT session_id) AS total_unread 
-      FROM chat_messages 
-      WHERE sender_type = 'user' AND status = 'sent'
-    `;
-    let unreadParams = [];
-
-    // Compute total handoff count across DB
-    let handoffQuery = `
-      SELECT COUNT(DISTINCT COALESCE(cs1.lead_id, cs1.phone)) AS total_handoff 
-      FROM chatbot_sessions cs1
-      WHERE cs1.status = 'paused_for_human'
-    `;
-    let handoffParams = [];
-
 
     const [[rows], [countRows], [unreadRows], [handoffRows]] = await Promise.all([
       db.execute(query, params),

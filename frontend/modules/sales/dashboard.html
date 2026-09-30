@@ -1,93 +1,616 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Dashboard | SGB Agro CRM</title>
-    <meta name="description" content="Sales rep personal dashboard — my leads, pipeline, tasks and revenue.">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Manager Command Center | SGB Agro CRM</title>
+    <meta name="description" content="Sales Manager Panel — Team performance tracking, call connection rates, revenue analytics, and pipeline conversion dashboard.">
     <link rel="stylesheet" href="../../css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --sm-primary: #10b981;
+            --sm-indigo: #6366f1;
+            --sm-purple: #8b5cf6;
+            --sm-amber: #f59e0b;
+            --sm-rose: #f43f5e;
+            --sm-card-bg: #ffffff;
+            --sm-border: #e2e8f0;
+        }
+
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Executive Header Banner */
+        .sm-dashboard-header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+            border-radius: 16px;
+            padding: 1.75rem 2rem;
+            color: #ffffff;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.25);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sm-dashboard-header::after {
+            content: '';
+            position: absolute;
+            top: -40%;
+            right: -5%;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(16, 185, 129, 0) 70%);
+            pointer-events: none;
+        }
+
+        .sm-header-badge {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34d399;
+            padding: 0.3rem 0.85rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            letter-spacing: 0.04em;
+        }
+
+        /* Period Filter Control Bar */
+        .sm-filter-bar {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 0.85rem 1.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.75rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .sm-pill-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .sm-period-btn {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            padding: 0.45rem 0.95rem;
+            border-radius: 8px;
+            font-size: 0.825rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sm-period-btn:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .sm-period-btn.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        /* Executive KPI Scorecards Grid */
+        .sm-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1.25rem;
+            margin-bottom: 1.75rem;
+        }
+
+        @media (max-width: 1280px) {
+            .sm-kpi-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sm-kpi-grid {
+                grid-template-columns: repeat(1, 1fr);
+            }
+        }
+
+        .sm-kpi-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1.25rem 1.35rem;
+            position: relative;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .sm-kpi-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
+            border-color: #cbd5e1;
+        }
+
+        .sm-kpi-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .sm-badge-trend {
+            font-size: 0.725rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .sm-trend-up { background: #ecfdf5; color: #059669; }
+        .sm-trend-down { background: #fef2f2; color: #dc2626; }
+
+        .sm-progress-bar {
+            height: 6px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .sm-progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Layout Grids */
+        .sm-grid-main {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .sm-grid-dual {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.75rem;
+        }
+
+        @media (max-width: 1024px) {
+            .sm-grid-main, .sm-grid-dual {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .sm-chart-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .chart-tab-btn {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+            padding: 0.35rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.775rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chart-tab-btn.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: #ffffff;
+        }
+
+        /* Table Container Styling */
+        .sm-table-container {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+            margin-bottom: 1.75rem;
+        }
+
+        .sm-table-header {
+            padding: 1.25rem 1.5rem;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .sm-search-input {
+            padding: 0.5rem 1rem 0.5rem 2.25rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            outline: none;
+            width: 240px;
+            background: #ffffff;
+            font-family: inherit;
+        }
+
+        .sm-search-input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .avatar-circle {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: #ffffff;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+            flex-shrink: 0;
+        }
+
+        .btn-action-icon {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            padding: 0.45rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-action-icon:hover {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: #ffffff;
+        }
+    </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
     <div id="sidebar-container"></div>
     <main class="main-content">
         <header class="topbar">
-            <div class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Search my leads..."></div>
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="globalLeadSearch" placeholder="Search my leads, deals, or team members...">
+            </div>
             <div class="profile-section">
-                <span class="profile-name" id="profileName">Sales Rep</span>
-                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                <span class="profile-name" id="profileName">Sales Manager</span>
+                <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
             </div>
         </header>
 
         <div class="content-body" id="contentBody">
-            <div style="margin-bottom:2rem;display:flex;justify-content:space-between;align-items:flex-end;">
+            <!-- Sleek Executive Command Header -->
+            <div class="sm-dashboard-header">
                 <div>
-                    <h1 style="font-size:1.5rem;font-weight:800;color:#1e293b;" id="welcomeMessage">My Dashboard</h1>
-                    <p style="color:#64748b;font-size:0.875rem;">Your personal performance — leads, tasks, conversions.</p>
-                </div>
-                <span id="todayDate" style="font-size:0.8rem;color:#94a3b8;font-weight:500;"></span>
-            </div>
-
-            <!-- KPI Cards -->
-            <div class="stats-grid" style="margin-bottom:2.5rem;">
-                <div class="stat-card premium-card" style="display:flex;align-items:center;gap:1.25rem;padding:1.5rem;border-bottom:3px solid #3b82f6;">
-                    <div style="width:48px;height:48px;border-radius:12px;background:#eff6ff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:1.25rem;"><i class="fas fa-bullseye"></i></div>
-                    <div>
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">My Leads Today / MTD</p>
-                        <p style="font-size:1.5rem;font-weight:800;"><span id="leadsToday">0</span> <span style="font-size:0.875rem;color:#94a3b8;font-weight:500;">/ <span id="leadsMTD">0</span></span></p>
+                    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.4rem;">
+                        <span class="sm-header-badge" id="headerBadge"><i class="fas fa-crown"></i> EXECUTIVE SALES COMMAND CENTER</span>
+                        <span style="font-size:0.8rem;color:#94a3b8;"><i class="far fa-clock"></i> Live Real-Time Feed</span>
                     </div>
+                    <h1 style="font-size:1.75rem;font-weight:800;letter-spacing:-0.02em;" id="welcomeMessage">Sales Manager Command Center</h1>
+                    <p style="color:#94a3b8;font-size:0.875rem;margin-top:0.25rem;" id="welcomeDesc">Real-time revenue monitoring, telecaller call productivity, pipeline conversion, and product analytics.</p>
                 </div>
-                <div class="stat-card premium-card" style="display:flex;align-items:center;gap:1.25rem;padding:1.5rem;border-bottom:3px solid #ef4444;">
-                    <div style="width:48px;height:48px;border-radius:12px;background:#fef2f2;color:#ef4444;display:flex;align-items:center;justify-content:center;font-size:1.25rem;"><i class="fas fa-clock"></i></div>
-                    <div>
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Overdue Tasks</p>
-                        <p style="font-size:1.5rem;font-weight:800;color:#ef4444;" id="urgentAlerts">0</p>
+                <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+                    <div style="text-align:right;">
+                        <span id="todayDate" style="font-size:0.875rem;color:#cbd5e1;font-weight:600;display:block;"></span>
+                        <span style="font-size:0.75rem;color:#94a3b8;" id="deptLabel">Department: Sales & Operations</span>
                     </div>
-                </div>
-                <div class="stat-card premium-card" style="display:flex;align-items:center;gap:1.25rem;padding:1.5rem;border-bottom:3px solid #10b981;">
-                    <div style="width:48px;height:48px;border-radius:12px;background:#ecfdf5;color:#10b981;display:flex;align-items:center;justify-content:center;font-size:1.25rem;"><i class="fas fa-chart-line"></i></div>
-                    <div>
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">My Conv. Rate</p>
-                        <p style="font-size:1.5rem;font-weight:800;" id="conversionRate">0%</p>
-                    </div>
-                </div>
-                <div class="stat-card premium-card" style="display:flex;align-items:center;gap:1.25rem;padding:1.5rem;border-bottom:3px solid #f59e0b;">
-                    <div style="width:48px;height:48px;border-radius:12px;background:#fffbeb;color:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:1.25rem;"><i class="fas fa-wallet"></i></div>
-                    <div>
-                        <p style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;">Advance Collected</p>
-                        <p style="font-size:1.5rem;font-weight:800;" id="revenueMTD">₹0</p>
-                    </div>
+                    <button id="btnExportSummary" class="btn-action-icon" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:white;" onclick="window.print()">
+                        <i class="fas fa-download"></i> Export Analytics
+                    </button>
                 </div>
             </div>
 
-            <!-- Main Panels -->
-            <div style="display:grid;grid-template-columns:1fr;gap:2rem;margin-bottom:2.5rem;">
-                <!-- Urgent Tasks -->
-                <div class="smart-panel premium-card" style="overflow:hidden;">
-                    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;">
+            <!-- Filter Control Bar -->
+            <div class="sm-filter-bar">
+                <div class="sm-pill-group">
+                    <span style="font-size:0.85rem;font-weight:700;color:#334155;margin-right:0.5rem;"><i class="fas fa-calendar-alt" style="color:#6366f1;"></i> Period:</span>
+                    <button class="sm-period-btn" data-period="today">Today</button>
+                    <button class="sm-period-btn" data-period="yesterday">Yesterday</button>
+                    <button class="sm-period-btn" data-period="this_week">This Week</button>
+                    <button class="sm-period-btn active" data-period="this_month">This Month (MTD)</button>
+                    <button class="sm-period-btn" data-period="last_month">Last Month</button>
+                    <button class="sm-period-btn" data-period="custom">Custom Range</button>
+                </div>
+
+                <div id="customDateRange" style="display:none;align-items:center;gap:0.5rem;">
+                    <input type="date" id="filterStartDate" class="sm-search-input" style="width:140px;padding-left:0.75rem;">
+                    <span style="color:#94a3b8;font-size:0.8rem;">to</span>
+                    <input type="date" id="filterEndDate" class="sm-search-input" style="width:140px;padding-left:0.75rem;">
+                    <button id="btnApplyCustomDate" class="btn-action-icon" style="background:#6366f1;color:white;border:none;">Apply</button>
+                </div>
+
+                <div>
+                    <button id="btnRefreshData" class="btn-action-icon"><i class="fas fa-arrows-rotate"></i> Refresh Feed</button>
+                </div>
+            </div>
+
+            <!-- Top 5 Executive KPI Scorecards Grid -->
+            <div class="sm-kpi-grid">
+                <!-- KPI 1: Revenue & Target -->
+                <div class="sm-kpi-card" style="border-top:4px solid #10b981;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                         <div>
-                            <h3 style="font-size:1rem;font-weight:700;color:#0f172a;">🚨 My Urgent Follow-ups</h3>
-                            <p style="font-size:0.75rem;color:#64748b;">These leads need your call right now.</p>
+                            <span style="font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Total Sales Revenue</span>
+                            <div style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-top:0.2rem;" id="kpiTotalRevenue">₹0</div>
                         </div>
-                        <span id="overdueBadge" style="background:#fee2e2;color:#ef4444;font-weight:700;padding:4px 12px;border-radius:20px;font-size:0.75rem;">0 Overdue</span>
+                        <div class="sm-kpi-icon" style="background:#ecfdf5;color:#10b981;"><i class="fas fa-indian-rupee-sign"></i></div>
                     </div>
-                    <div id="urgentPanel" style="min-height:320px;"><div style="padding:3rem;text-align:center;color:#94a3b8;"><i class="fas fa-circle-notch fa-spin fa-2x"></i></div></div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;">
+                            <span class="sm-badge-trend sm-trend-up" id="kpiRevenueTrend"><i class="fas fa-arrow-up"></i> +18.4%</span>
+                            <span style="font-size:0.75rem;color:#64748b;font-weight:600;">Today: <strong style="color:#0f172a;" id="kpiTodayRevenue">₹0</strong></span>
+                        </div>
+                        <div class="sm-progress-bar">
+                            <div id="targetProgressBar" class="sm-progress-fill" style="width: 0%; background: linear-gradient(90deg, #10b981, #059669);"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.725rem;color:#64748b;margin-top:0.35rem;">
+                            <span>Target: <strong id="kpiTargetAmount">₹25L</strong></span>
+                            <span id="kpiTargetPct" style="font-weight:700;color:#059669;">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 2: Total Leads & Conversion Rate -->
+                <div class="sm-kpi-card" style="border-top:4px solid #6366f1;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <span style="font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Leads & Deals Closed</span>
+                            <div style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-top:0.2rem;">
+                                <span id="kpiLeadsCount">0</span>
+                                <span style="font-size:0.85rem;color:#64748b;font-weight:600;">(<span id="kpiConvertedCount">0</span> Closed)</span>
+                            </div>
+                        </div>
+                        <div class="sm-kpi-icon" style="background:#eef2ff;color:#6366f1;"><i class="fas fa-bullseye"></i></div>
+                    </div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;">
+                            <span class="sm-badge-trend sm-trend-up" id="kpiLeadsTrend"><i class="fas fa-arrow-up"></i> +12.5%</span>
+                            <span style="font-size:0.8rem;font-weight:700;color:#6366f1;" id="kpiWinRate">0% Win Rate</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 3: Telecaller Calls & Connection Rate -->
+                <div class="sm-kpi-card" style="border-top:4px solid #8b5cf6;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <span style="font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Call Volume & Connection</span>
+                            <div style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-top:0.2rem;">
+                                <span id="kpiCallsConnected">0</span>
+                                <span style="font-size:0.8rem;color:#64748b;font-weight:600;">Connected</span>
+                            </div>
+                        </div>
+                        <div class="sm-kpi-icon" style="background:#f5f3ff;color:#8b5cf6;"><i class="fas fa-headset"></i></div>
+                    </div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;">
+                            <span style="font-size:0.75rem;color:#64748b;font-weight:600;"><i class="fas fa-user-group" style="color:#8b5cf6;"></i> <span id="kpiActiveReps">0</span> Reps Active</span>
+                            <span style="font-size:0.8rem;font-weight:700;color:#8b5cf6;" id="kpiConnectionRate">0% Conn. Rate</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 4: Average Deal Size -->
+                <div class="sm-kpi-card" style="border-top:4px solid #f59e0b;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <span style="font-size:0.725rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Average Deal Value</span>
+                            <div style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-top:0.2rem;" id="kpiAvgDealValue">₹0</div>
+                        </div>
+                        <div class="sm-kpi-icon" style="background:#fffbeb;color:#f59e0b;"><i class="fas fa-scale-balanced"></i></div>
+                    </div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;">
+                            <span style="font-size:0.75rem;color:#64748b;font-weight:600;">Orders Billed: <strong style="color:#0f172a;" id="kpiOrdersCount">0</strong></span>
+                            <span style="font-size:0.75rem;font-weight:700;color:#f59e0b;">High Margin</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 5: Urgent Action Items -->
+                <div class="sm-kpi-card" style="border-top:4px solid #f43f5e;background:linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <span style="font-size:0.725rem;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.05em;">Urgent Follow-ups</span>
+                            <div style="font-size:1.6rem;font-weight:800;color:#e11d48;margin-top:0.2rem;" id="kpiOverdueCount">0</div>
+                        </div>
+                        <div class="sm-kpi-icon" style="background:#ffe4e6;color:#e11d48;"><i class="fas fa-bell"></i></div>
+                    </div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;">
+                            <span style="font-size:0.75rem;color:#9f1239;font-weight:600;">Needs Immediate Call</span>
+                            <span style="font-size:0.75rem;font-weight:700;color:#e11d48;" id="overdueBadge">0 Overdue</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Chart -->
-            <div class="chart-outer premium-card" style="padding:2rem;">
-                <h3 style="font-size:1.125rem;font-weight:700;margin-bottom:1.5rem;">My Performance This Month</h3>
-                <div style="height:280px;"><canvas id="performanceChart"></canvas></div>
+            <!-- Multi-Chart Analytics Grid (Revenue Trend + Funnel Breakdown) -->
+            <div class="sm-grid-main">
+                <!-- Revenue & Conversion Trend Chart (2/3 width) -->
+                <div class="sm-chart-card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
+                        <div>
+                            <h3 style="font-size:1.1rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:0.5rem;" id="mainChartTitle">
+                                <i class="fas fa-chart-line" style="color:#10b981;"></i> Revenue & Lead Conversion Growth Trend
+                            </h3>
+                            <p style="font-size:0.775rem;color:#64748b;" id="mainChartSubtitle">Tracking gross sales revenue collected vs deals converted over time</p>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.4rem;" id="mainChartTabs">
+                            <button class="chart-tab-btn active" data-chart="revenue">Revenue</button>
+                            <button class="chart-tab-btn" data-chart="funnel">Funnel Bar</button>
+                            <button class="chart-tab-btn" data-chart="products">Products</button>
+                        </div>
+                    </div>
+                    <div style="height:320px;position:relative;">
+                        <canvas id="revenueTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Pipeline Funnel Breakdown (1/3 width) -->
+                <div class="sm-chart-card">
+                    <div>
+                        <h3 style="font-size:1.05rem;font-weight:700;color:#0f172a;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;" id="funnelTitle">
+                            <i class="fas fa-filter" style="color:#6366f1;"></i> Lead Pipeline Funnel
+                        </h3>
+                        <p style="font-size:0.775rem;color:#64748b;margin-bottom:1.25rem;" id="funnelSubtitle">Stage-by-stage distribution of active leads</p>
+
+                        <div id="pipelineFunnelList" style="display:flex;flex-direction:column;gap:0.85rem;">
+                            <div style="text-align:center;padding:2rem;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading pipeline...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <!-- Secondary Charts Grid (Telecaller Calls + Product Mix) -->
+            <div class="sm-grid-dual">
+                <!-- Telecaller Call Volume Bar Chart -->
+                <div class="sm-chart-card">
+                    <h3 style="font-size:1.05rem;font-weight:700;color:#0f172a;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;" id="dualChart1Title">
+                        <i class="fas fa-headset" style="color:#8b5cf6;"></i> Telecaller Call Volume vs Closed Deals
+                    </h3>
+                    <p style="font-size:0.775rem;color:#64748b;margin-bottom:1rem;" id="dualChart1Subtitle">Comparing calls made vs successful conversions per telecaller rep</p>
+                    <div style="height:260px;position:relative;">
+                        <canvas id="telecallerBarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Product Revenue Doughnut Chart -->
+                <div class="sm-chart-card">
+                    <h3 style="font-size:1.05rem;font-weight:700;color:#0f172a;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;" id="dualChart2Title">
+                        <i class="fas fa-boxes-stacked" style="color:#f59e0b;"></i> Product Sales & Revenue Share
+                    </h3>
+                    <p style="font-size:0.775rem;color:#64748b;margin-bottom:1rem;" id="dualChart2Subtitle">Breakdown of units sold and gross revenue by product category</p>
+                    <div style="height:260px;position:relative;">
+                        <canvas id="productDoughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telecaller Team Performance Leaderboard Table -->
+            <div class="sm-table-container">
+                <div class="sm-table-header">
+                    <div>
+                        <h2 style="font-size:1.15rem;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:0.5rem;" id="table1Title">
+                            <i class="fas fa-users-gear" style="color:#6366f1;"></i> Telecaller & Sales Executive Performance Roster
+                        </h2>
+                        <p style="font-size:0.8rem;color:#64748b;" id="table1Subtitle">Live performance tracking of assigned leads, call connections, units sold, and revenue per sales rep.</p>
+                    </div>
+                    <div style="position:relative;">
+                        <i class="fas fa-search" style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;"></i>
+                        <input type="text" id="telecallerSearch" placeholder="Search team member..." class="sm-search-input">
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f1f5f9;color:#334155;font-size:0.775rem;text-transform:uppercase;letter-spacing:0.04em;" id="table1Thead">
+                                <th style="padding:0.9rem 1.25rem;text-align:left;">Sales Executive / Telecaller</th>
+                                <th style="padding:0.9rem 1rem;text-align:center;">Assigned</th>
+                                <th style="padding:0.9rem 1rem;text-align:center;">Calls Made / Conn.</th>
+                                <th style="padding:0.9rem 1rem;text-align:center;">Connection Rate</th>
+                                <th style="padding:0.9rem 1rem;text-align:center;">Products Sold</th>
+                                <th style="padding:0.9rem 1.25rem;text-align:right;">Total Revenue</th>
+                                <th style="padding:0.9rem 1rem;text-align:center;">Win Rate</th>
+                                <th style="padding:0.9rem 1.25rem;text-align:center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="telecallerTableBody">
+                            <tr><td colspan="8" style="text-align:center;padding:3rem;color:#94a3b8;"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:0.5rem;">Loading Telecaller Roster...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Top Products Performance Breakdown Table -->
+            <div class="sm-table-container">
+                <div class="sm-table-header">
+                    <div>
+                        <h2 style="font-size:1.15rem;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:0.5rem;" id="table2Title">
+                            <i class="fas fa-award" style="color:#10b981;"></i> Product Sales & Revenue Distribution
+                        </h2>
+                        <p style="font-size:0.8rem;color:#64748b;" id="table2Subtitle">Top grossing products, total quantity sold, and top sales representative per category.</p>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f1f5f9;color:#334155;font-size:0.775rem;text-transform:uppercase;letter-spacing:0.04em;">
+                                <th style="padding:0.9rem 1.25rem;text-align:left;">Product Name & Model</th>
+                                <th style="padding:0.9rem 1rem;text-align:center;">Units Sold</th>
+                                <th style="padding:0.9rem 1.25rem;text-align:right;">Total Revenue Value</th>
+                                <th style="padding:0.9rem 1.25rem;text-align:left;">Top Performing Representative</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productSalesTableBody">
+                            <tr><td colspan="4" style="text-align:center;padding:2.5rem;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading product sales leaderboard...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </main>
 </div>
+
 <script src="../../js/config.js"></script>
 <script src="../../js/components.js"></script>
-<script src="js/dashboard.js"></script>
+<script src="js/dashboard.js?v=4.0"></script>
 <script src="../../js/decision-engine.js"></script>
 </body>
 </html>

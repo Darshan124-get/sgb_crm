@@ -349,7 +349,7 @@ function renderSidebarTabs() {
     const totalCount = totalLeadsCount || (allCustomers || []).length;
 
     // Calculate unread count (from DB if available)
-    const unreadCount = totalUnreadCount !== undefined && totalUnreadCount > 0 
+    const unreadCount = (totalUnreadCount !== undefined && totalUnreadCount !== null) 
         ? totalUnreadCount 
         : (allCustomers || []).filter(c => parseInt(c.unread_msg_count || 0) > 0).length;
 

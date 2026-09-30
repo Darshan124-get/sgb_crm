@@ -810,7 +810,7 @@ exports.getStats = async (req, res) => {
         let baseWhere = 'WHERE 1=1';
         let params = [];
 
-        if (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') {
+        if ((userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp')) {
             baseWhere += ' AND assigned_to = ?';
             params.push(userId);
         }

@@ -19,11 +19,11 @@ router.delete('/fcm-token', authenticateToken, userController.deleteFcmToken);
 
 // Allow any authenticated staff to view their own profile
 router.get('/profile/me', authenticateToken, (req, res, next) => {
-    req.params.id = req.user.user_id;
+    req.params.id = req.user.id || req.user.user_id;
     return userController.getUserById(req, res, next);
 });
 router.get('/me', authenticateToken, (req, res, next) => {
-    req.params.id = req.user.user_id;
+    req.params.id = req.user.id || req.user.user_id;
     return userController.getUserById(req, res, next);
 });
 
@@ -34,6 +34,10 @@ router.post('/', authenticateToken, isManagerOrAdmin, userController.createUser)
 router.put('/:id', authenticateToken, isManagerOrAdmin, userController.updateUser);
 router.patch('/:id/status', authenticateToken, isManagerOrAdmin, userController.toggleUserStatus);
 router.patch('/:id/password', authenticateToken, isManagerOrAdmin, userController.resetPassword);
+router.post('/send-reset-otp', authenticateToken, userController.requestPasswordResetOtp);
+router.post('/verify-reset-otp', authenticateToken, userController.verifyOtpAndUpdatePassword);
+router.post('/:id/send-reset-otp', authenticateToken, userController.requestPasswordResetOtp);
+router.post('/:id/verify-reset-otp', authenticateToken, userController.verifyOtpAndUpdatePassword);
 router.delete('/:id', authenticateToken, isManagerOrAdmin, userController.deleteUser);
 
 module.exports = router;

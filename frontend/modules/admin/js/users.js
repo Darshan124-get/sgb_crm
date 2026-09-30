@@ -310,9 +310,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (allRoles.length > 0) {
                 roleSelect.innerHTML = '<option value="">-- Select Role --</option>';
                 
-                // Only allow Admin and Manager for this form
+                // Only allow Admin and Super-Admin for this form
                 const adminRole = allRoles.find(r => r.name.toLowerCase() === 'admin');
-                const managerRole = allRoles.find(r => r.name.toLowerCase() === 'manager') || { role_id: 'manager', name: 'Manager' }; // Fallback if 'manager' role doesn't exist yet
+                const superAdminRole = allRoles.find(r => r.name.toLowerCase() === 'super-admin' || r.name.toLowerCase() === 'super_admin');
                 
                 if (adminRole) {
                     const optAdmin = document.createElement('option');
@@ -320,11 +320,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     optAdmin.textContent = 'Admin';
                     roleSelect.appendChild(optAdmin);
                 }
-                
-                const optManager = document.createElement('option');
-                optManager.value = managerRole.role_id;
-                optManager.textContent = 'Manager';
-                roleSelect.appendChild(optManager);
+
+                if (superAdminRole) {
+                    const optSuper = document.createElement('option');
+                    optSuper.value = superAdminRole.role_id;
+                    optSuper.textContent = 'Super Admin';
+                    roleSelect.appendChild(optSuper);
+                }
             }
             
             renderRolesTable();
@@ -496,34 +498,82 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    function getNextEmployeeId() {
+        let maxNum = 99;
+        const sourceList = (pbacUsersList && pbacUsersList.length > 0) ? pbacUsersList : allUsers;
+        if (Array.isArray(sourceList)) {
+            sourceList.forEach(u => {
+                if (u && u.employee_id) {
+                    const match = String(u.employee_id).match(/SGB-?(\d+)/i);
+                    if (match) {
+                        const num = parseInt(match[1], 10);
+                        if (num > maxNum) maxNum = num;
+                    }
+                }
+            });
+        }
+        return `SGB${maxNum + 1}`;
+    }
+
     async function openAdminModal(admin = null) {
         if (allRoles.length === 0) await fetchRoles();
         populateAdminDepartments();
         
         // Hide department by default
-        departmentGroup.style.display = 'none';
+        if (departmentGroup) departmentGroup.style.display = 'none';
+
+        // Reset password input type and eye icon
+        const adminPwdInput = document.getElementById('adminPassword');
+        if (adminPwdInput) {
+            adminPwdInput.type = 'password';
+            adminPwdInput.value = '';
+            const eyeBtn = adminPwdInput.parentElement ? adminPwdInput.parentElement.querySelector('i') : null;
+            if (eyeBtn) eyeBtn.className = 'far fa-eye';
+        }
 
         if (admin) {
-            document.getElementById('adminModalTitle').textContent = 'Edit Admin / Manager';
+            document.getElementById('adminModalTitle').textContent = 'Edit Admin';
             document.getElementById('adminId').value = admin.user_id;
             document.getElementById('adminName').value = admin.name;
             document.getElementById('adminEmail').value = admin.email;
             document.getElementById('adminPhone').value = admin.phone || '';
-            document.getElementById('adminPassword').required = false;
+            const empIdInput = document.getElementById('adminEmployeeId');
+            if (empIdInput) empIdInput.value = admin.employee_id || getNextEmployeeId();
+            const addrInput = document.getElementById('adminAddress');
+            if (addrInput) addrInput.value = admin.address || 'SGB Industries Office, Koppa Rural, KOPPA 577126';
+
+            if (adminPwdInput) {
+                adminPwdInput.type = 'password';
+                adminPwdInput.value = '********';
+                adminPwdInput.placeholder = '********';
+                adminPwdInput.required = false;
+                const eyeBtn = adminPwdInput.parentElement ? adminPwdInput.parentElement.querySelector('i') : null;
+                if (eyeBtn) eyeBtn.className = 'far fa-eye';
+            }
             document.getElementById('adminPassAsterisk').style.display = 'none';
             
-            // Set role and trigger change event to show/hide department
             document.getElementById('adminRole').value = admin.role_id || '';
-            const event = new Event('change');
-            document.getElementById('adminRole').dispatchEvent(event);
-            
             document.getElementById('adminDepartment').value = admin.department_id || '';
         } else {
-            document.getElementById('adminModalTitle').textContent = 'Create Admin / Manager';
+            document.getElementById('adminModalTitle').textContent = 'Create Admin';
             adminForm.reset();
             document.getElementById('adminId').value = '';
-            document.getElementById('adminPassword').required = true;
+            const empIdInput = document.getElementById('adminEmployeeId');
+            if (empIdInput) empIdInput.value = getNextEmployeeId();
+            const addrInput = document.getElementById('adminAddress');
+            if (addrInput) addrInput.value = 'SGB Industries Office, Koppa Rural, KOPPA 577126';
+
+            if (adminPwdInput) {
+                adminPwdInput.type = 'password';
+                adminPwdInput.value = '';
+                adminPwdInput.placeholder = 'Set password';
+                adminPwdInput.required = true;
+                const eyeBtn = adminPwdInput.parentElement ? adminPwdInput.parentElement.querySelector('i') : null;
+                if (eyeBtn) eyeBtn.className = 'far fa-eye';
+            }
             document.getElementById('adminPassAsterisk').style.display = 'inline';
+            const adminRole = allRoles.find(r => r.name.toLowerCase() === 'admin');
+            if (adminRole) document.getElementById('adminRole').value = adminRole.role_id;
         }
         adminModal.classList.add('active');
     }
@@ -536,16 +586,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.preventDefault();
         
         const id = document.getElementById('adminId').value;
+        const empIdInput = document.getElementById('adminEmployeeId');
+        const addrInput = document.getElementById('adminAddress');
+
         const payload = {
             name: document.getElementById('adminName').value,
             email: document.getElementById('adminEmail').value,
             phone: document.getElementById('adminPhone').value,
+            employee_id: (empIdInput && empIdInput.value.trim()) ? empIdInput.value.trim() : getNextEmployeeId(),
+            address: (addrInput && addrInput.value.trim()) ? addrInput.value.trim() : 'SGB Industries Office, Koppa Rural, KOPPA 577126',
             role_id: document.getElementById('adminRole').value,
             department_id: document.getElementById('adminDepartment').value || null
         };
         
         const pwd = document.getElementById('adminPassword').value;
-        if (pwd) payload.password = pwd;
+        if (pwd && pwd !== '********') payload.password = pwd;
 
         const method = id ? 'PUT' : 'POST';
         const url = id ? `${window.API_URL}/users/${id}` : `${window.API_URL}/users`;
@@ -590,11 +645,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (res.ok) {
                 adminTbody.innerHTML = '';
-                // Filter to show admins, super-admins, or people assigned to departments
-                const filteredUsers = usersList.filter(u => u.role_name === 'admin' || u.role_name === 'super-admin' || u.role_name?.includes('manager'));
+                // Filter to show admins or super-admins only
+                const filteredUsers = usersList.filter(u => u.role_name === 'admin' || u.role_name === 'super-admin');
 
                 if(filteredUsers.length === 0) {
-                     adminTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;">No admins or managers found.</td></tr>';
+                     adminTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;">No admins found.</td></tr>';
                      return;
                 }
 
@@ -849,7 +904,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', (e) => {
                 const id = e.currentTarget.getAttribute('data-id');
                 const user = pbacUsersList.find(u => u.user_id == id);
-                if (user) openUserWizard(user);
+                if (user) {
+                    if (user.role_name === 'admin' || user.role_name === 'super-admin') {
+                        openAdminModal(user);
+                    } else {
+                        openUserWizard(user);
+                    }
+                }
             });
         });
 
@@ -896,9 +957,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function openUserWizard(user = null) {
+        // Safeguard: Admin users use the simplified Admin Modal
+        if (user && (user.role_name === 'admin' || user.role_name === 'super-admin')) {
+            openAdminModal(user);
+            return;
+        }
+
         wizardForm.reset();
         document.getElementById('wizardUserId').value = user ? user.user_id : '';
         selectedPermissions = [];
+
+        // Reset password input types and eye icons
+        ['wizardPassword', 'wizardConfirmPassword'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.type = 'password';
+                input.value = '';
+                const eyeBtn = input.parentElement ? input.parentElement.querySelector('i') : null;
+                if (eyeBtn) eyeBtn.className = 'far fa-eye';
+            }
+        });
+
         if (allRoles.length === 0) await fetchRoles();
         if (allDepartments.length === 0) await fetchDepartments();
         populateWizardDropdowns();
@@ -907,11 +986,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('wizardName').value = user.name || '';
             document.getElementById('wizardEmail').value = user.email || '';
             document.getElementById('wizardPhone').value = user.phone || '';
-            document.getElementById('wizardEmployeeId').value = user.employee_id || '';
-            document.getElementById('wizardPassword').value = '********';
-            document.getElementById('wizardConfirmPassword').value = '********';
-            document.getElementById('wizardPassword').removeAttribute('required');
-            document.getElementById('wizardConfirmPassword').removeAttribute('required');
+            const empIdInput = document.getElementById('wizardEmployeeId');
+            if (empIdInput) empIdInput.value = user.employee_id || getNextEmployeeId();
+            const addrInput = document.getElementById('wizardAddress');
+            if (addrInput) addrInput.value = user.address || 'SGB Industries Office, Koppa Rural, KOPPA 577126';
+            
+            ['wizardPassword', 'wizardConfirmPassword'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.type = 'password';
+                    input.value = '********';
+                    input.placeholder = '********';
+                    input.removeAttribute('required');
+                    const eyeBtn = input.parentElement ? input.parentElement.querySelector('i') : null;
+                    if (eyeBtn) eyeBtn.className = 'far fa-eye';
+                }
+            });
+
             document.getElementById('wizardDept').value = user.department_id || '';
             populateFilteredWizardRoles();
             document.getElementById('wizardRole').value = user.role_id || '';
@@ -944,8 +1035,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 selectedPermissions = [];
             }
         } else {
-            document.getElementById('wizardPassword').setAttribute('required', 'true');
-            document.getElementById('wizardConfirmPassword').setAttribute('required', 'true');
+            const empIdInput = document.getElementById('wizardEmployeeId');
+            if (empIdInput) empIdInput.value = getNextEmployeeId();
+            const addrInput = document.getElementById('wizardAddress');
+            if (addrInput) addrInput.value = 'SGB Industries Office, Koppa Rural, KOPPA 577126';
+
+            ['wizardPassword', 'wizardConfirmPassword'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.type = 'password';
+                    input.value = '';
+                    input.placeholder = '********';
+                    input.setAttribute('required', 'true');
+                    const eyeBtn = input.parentElement ? input.parentElement.querySelector('i') : null;
+                    if (eyeBtn) eyeBtn.className = 'far fa-eye';
+                }
+            });
             // Uncheck all languages for new user
             document.querySelectorAll('input[name="wizardLanguages"]').forEach(cb => cb.checked = false);
         }
@@ -1184,15 +1289,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleWizardNext() {
         // Basic validation before next
         if(wizardCurrentStep === 1) {
+            const isEditing = !!document.getElementById('wizardUserId').value;
+            const pwd = document.getElementById('wizardPassword').value;
+            const confirmPwd = document.getElementById('wizardConfirmPassword').value;
+
             if(!document.getElementById('wizardName').value || 
                !document.getElementById('wizardEmail').value || 
                !document.getElementById('wizardPhone').value ||
                !document.getElementById('wizardEmployeeId').value ||
-               !document.getElementById('wizardPassword').value) {
+               (!isEditing && (!pwd || pwd === '********'))) {
                 window.showAlert('Validation', 'Please fill all required personal details.', 'error');
                 return;
             }
-            if(document.getElementById('wizardPassword').value !== document.getElementById('wizardConfirmPassword').value) {
+            if((pwd || confirmPwd) && pwd !== '********' && pwd !== confirmPwd) {
                 window.showAlert('Validation', 'Passwords do not match.', 'error');
                 return;
             }
@@ -1297,18 +1406,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function handleWizardSubmit(e) {
         e.preventDefault();
         const selectedLanguages = Array.from(document.querySelectorAll('input[name="wizardLanguages"]:checked')).map(cb => cb.value).join(',');
+        const pwd = document.getElementById('wizardPassword').value;
+
+        const empIdVal = document.getElementById('wizardEmployeeId')?.value?.trim();
+        const addrVal = document.getElementById('wizardAddress')?.value?.trim();
 
         const payload = {
             name: document.getElementById('wizardName').value,
             email: document.getElementById('wizardEmail').value,
             phone: document.getElementById('wizardPhone').value,
-            employee_id: document.getElementById('wizardEmployeeId').value,
-            password: document.getElementById('wizardPassword').value,
+            employee_id: empIdVal || getNextEmployeeId(),
+            address: addrVal || 'SGB Industries Office, Koppa Rural, KOPPA 577126',
             department_id: document.getElementById('wizardDept').value,
             role_id: document.getElementById('wizardRole').value,
             permissions: selectedPermissions,
             language: selectedLanguages || 'EN'
         };
+
+        if (pwd && pwd !== '********') {
+            payload.password = pwd;
+        }
 
         const userId = document.getElementById('wizardUserId').value;
         const method = userId ? 'PUT' : 'POST';
@@ -1404,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Meta grid
             document.getElementById('userProfilePhone').textContent = user.phone || '-';
-            document.getElementById('userProfileLocation').textContent = user.address || 'Tamil Nadu, India';
+            document.getElementById('userProfileLocation').textContent = user.address || 'SGB Industries Office, Koppa Rural, KOPPA 577126';
             document.getElementById('userProfileDept').textContent = user.department_name || (allDepartments.find(d => d.id == user.department_id)?.name) || 'Sales';
             document.getElementById('userProfileReporting').textContent = user.reporting_to || 'Admin';
             
@@ -1445,7 +1562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('infoRole').textContent = formattedRole;
             document.getElementById('infoJoining').textContent = joinDate;
             document.getElementById('infoStatus').innerHTML = `<span class="status-badge ${isOnline ? 'active' : 'inactive'}">${isOnline ? 'Active' : 'Inactive'}</span>`;
-            document.getElementById('infoAddress').textContent = user.address || 'Coimbatore, Tamil Nadu, India';
+            document.getElementById('infoAddress').textContent = user.address || 'SGB Industries Office, Koppa Rural, KOPPA 577126';
             document.getElementById('infoBio').textContent = user.bio || `Handles ${formattedRole} leads, follow-ups, and customer conversions.`;
 
             // 4. Activity Timeline
@@ -1566,40 +1683,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Edit user triggers from profile
     document.getElementById('btnEditUserProfile')?.addEventListener('click', () => {
-        if (activeProfileUserObj) openUserWizard(activeProfileUserObj);
+        if (activeProfileUserObj) {
+            if (activeProfileUserObj.role_name === 'admin' || activeProfileUserObj.role_name === 'super-admin') {
+                openAdminModal(activeProfileUserObj);
+            } else {
+                openUserWizard(activeProfileUserObj);
+            }
+        }
     });
     document.getElementById('btnEditUserSection')?.addEventListener('click', () => {
-        if (activeProfileUserObj) openUserWizard(activeProfileUserObj);
+        if (activeProfileUserObj) {
+            if (activeProfileUserObj.role_name === 'admin' || activeProfileUserObj.role_name === 'super-admin') {
+                openAdminModal(activeProfileUserObj);
+            } else {
+                openUserWizard(activeProfileUserObj);
+            }
+        }
     });
 
     // Password reset from profile
-    document.getElementById('btnResetUserPassword')?.addEventListener('click', async () => {
+    document.getElementById('btnResetUserPassword')?.addEventListener('click', () => {
         if (!activeProfileUserId) return;
-        const newPwd = prompt('Enter new password for this user (at least 6 characters):');
-        if (!newPwd) return;
-        if (newPwd.length < 6) {
-            alert('Password must be at least 6 characters.');
-            return;
-        }
-
-        try {
-            const res = await fetch(`${window.API_URL}/users/${activeProfileUserId}/password`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({ newPassword: newPwd })
-            });
-            const data = await res.json();
-            if (res.ok || data.success) {
-                window.showAlert('Success', 'User password reset successfully', 'success');
-            } else {
-                window.showAlert('Error', data.message || 'Failed to reset password', 'error');
-            }
-        } catch (err) {
-            console.error('Password reset error:', err);
-            window.showAlert('Error', 'Server connection failed', 'error');
-        }
+        window.openPasswordResetOtpModal({ targetUserId: activeProfileUserId });
     });
 });

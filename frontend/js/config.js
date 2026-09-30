@@ -133,8 +133,8 @@ window.ROLE_REDIRECTS = {
     shipping_manager: 'modules/shipping/dashboard.html',
     shipping_executive: 'modules/shipping/dashboard.html',
     shipping_viewer: 'modules/shipping/dashboard.html',
-    shipment: 'modules/shipping/dashboard.html',
-    whatsapp_manager: 'modules/whatsapp/whatsapp.html'
+    whatsapp_manager: 'modules/sales/dashboard.html',
+    whatsapp_management_executive: 'modules/sales/dashboard.html'
 };
 
 window.getHomeUrl = function (user) {

@@ -839,7 +839,7 @@ async function initLeadList(filters = {}, page = 1) {
                 });
                 if (response.ok) {
                     const allUsers = await response.json();
-                    const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
+                    const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name.includes('sales') || u.role_name.includes('manager') || u.role_name.includes('telecaller') || u.role_name.includes('dealer') || u.role_name === 'viewer' || u.role_name === 'sales'));
 
                     const val = staffF.value;
                     staffF.innerHTML = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
@@ -1319,7 +1319,8 @@ window.updateBulkActionsBar = function () {
     if (!bar) return;
 
     const user = window.getCurrentUser();
-    const canManageBulk = ['admin', 'super-admin', 'sales', 'manager'].includes((user.role || '').toLowerCase());
+    const role = (user.role || '').toLowerCase();
+    const canManageBulk = ['admin', 'super-admin', 'sales', 'manager', 'sales_manager', 'telecaller_manager', 'whatsapp_manager', 'sales_executive'].includes(role) || role.includes('manager') || role.includes('admin') || role.includes('sales') || !!user.is_manager;
 
     if (window.currentSelectedLeadIds.length > 0 && canManageBulk) {
         bar.style.display = 'flex';
@@ -1354,7 +1355,7 @@ window.openBulkAssignModal = async function () {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const allUsers = await response.json();
-        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
+        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name.includes('sales') || u.role_name.includes('manager') || u.role_name.includes('telecaller') || u.role_name.includes('dealer') || u.role_name === 'viewer' || u.role_name === 'sales'));
 
         let warningHtml = '';
         if (alreadyAssigned.length > 0) {

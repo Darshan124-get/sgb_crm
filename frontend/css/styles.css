@@ -250,6 +250,15 @@ input[type=number] {
     background: var(--bg-color);
 }
 
+/* Sidebar Container */
+#sidebar-container {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 100;
+}
+
 /* Sidebar Styling (High Contrast Premium) */
 .sidebar {
     width: var(--sidebar-width);
@@ -261,6 +270,9 @@ input[type=number] {
     height: 100vh;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
     overflow: hidden;
+    position: sticky;
+    top: 0;
+    flex-shrink: 0;
 }
 
 .nav-group-title {

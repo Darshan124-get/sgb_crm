@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Support Settings &amp; Rules | SGB CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/support.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="support-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="support-main">
+            <!-- Header -->
+            <div class="support-header">
+                <div>
+                    <a href="dashboard.html" style="text-decoration: none; color: #64748b; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                    <div class="support-title-block">
+                        <h1>
+                            <span>Support Rules &amp; Follow-Up Configuration</span>
+                        </h1>
+                        <p>Configure automated 30-day product checks, delivery triggers, auto-assignment, and support executive roster.</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button class="btn btn-outline" id="btnSyncDelivered">
+                        <i class="fas fa-sync"></i> Scan Delivered Orders Now
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                
+                <!-- Card 1: 30-Day Follow-Up Configuration -->
+                <div class="premium-card" style="padding: 1.75rem; background: white; border-radius: 12px; border: 1px solid var(--support-border);">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;">Automated Follow-Up Rules</h3>
+                            <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Scheduled after initial support completion</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Follow-Up Schedule Window</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Scheduled 30 calendar days post-support</div>
+                            </div>
+                            <span class="badge badge-delivered" style="font-size: 0.85rem; font-weight: 700;">30 Calendar Days</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Scheduler Engine</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Backend periodic processor (every hour)</div>
+                            </div>
+                            <span class="badge" style="background: #dcfce7; color: #15803d; font-size: 0.8rem;">Active / Hourly</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Duplicate Follow-Up Prevention</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Unique DB index on (case_id, followup_type)</div>
+                            </div>
+                            <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.8rem;">Enforced (DB Index)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Delivery Event Integration & Eligibility Rules -->
+                <div class="premium-card" style="padding: 1.75rem; background: white; border-radius: 12px; border: 1px solid var(--support-border);">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                            <i class="fas fa-truck-ramp-box"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;">Order Delivery Integration</h3>
+                            <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Logistics event triggers and verification</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">B2C Direct Orders Only</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Lead source = 'lead' &amp; Purchase source = 'SGB Direct'</div>
+                            </div>
+                            <span class="badge" style="background: #ecfdf5; color: #059669; font-size: 0.8rem;">Filtered</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">B2B Dealer Orders Exclusion</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Dealer orders (order_source='dealer') strictly excluded</div>
+                            </div>
+                            <span class="badge" style="background: #fee2e2; color: #b91c1c; font-size: 0.8rem;">Excluded</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Idempotency Guard</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Unique DB constraint on order_id prevents duplicates</div>
+                            </div>
+                            <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.8rem;">1 Case / Order</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Auto-Assignment Engine -->
+                <div class="premium-card" style="padding: 1.75rem; background: white; border-radius: 12px; border: 1px solid var(--support-border);">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #f3e8ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                            <i class="fas fa-users-gear"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;">Executive Auto-Assignment</h3>
+                            <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Workload balancing across support staff</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Assignment Algorithm</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Round-Robin across active support executives</div>
+                            </div>
+                            <span class="badge" style="background: #f3e8ff; color: #7e22ce; font-size: 0.8rem;">Round-Robin</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Department Mapping</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Department ID 19 (Customer Support)</div>
+                            </div>
+                            <span class="badge" style="background: #e0f2fe; color: #0284c7; font-size: 0.8rem;">Department 19</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 4: Multi-Photo Upload Storage -->
+                <div class="premium-card" style="padding: 1.75rem; background: white; border-radius: 12px; border: 1px solid var(--support-border);">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                            <i class="fas fa-images"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;">Installation Photo Storage</h3>
+                            <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Uploaded fitting verification photos</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Storage Engine</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Disk Storage (/uploads) with DB reference URL</div>
+                            </div>
+                            <span class="badge" style="background: #dcfce7; color: #15803d; font-size: 0.8rem;">Static File Storage</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">Max File Limit</div>
+                                <div style="font-size: 0.75rem; color: #64748b;">Up to 10 images per batch, 10MB each</div>
+                            </div>
+                            <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.8rem;">10MB / JPG, PNG, WEBP</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Customer Support Staff Roster -->
+            <div class="premium-card" style="padding: 1.75rem; background: white; border-radius: 12px; border: 1px solid var(--support-border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">Customer Support Team Roster</h3>
+                        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">Active executives receiving automatic assignment of delivered orders.</p>
+                    </div>
+                    <a href="../admin/users.html" class="btn btn-outline btn-sm">
+                        <i class="fas fa-user-plus"></i> Manage Users in Admin
+                    </a>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Executive Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Active Cases</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staffTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #94a3b8; padding: 2rem;">Loading team members...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/support-common.js"></script>
+    <script src="js/settings.js"></script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders Delivered — Customer Support | SGB CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/support.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="support-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="support-main">
+            <!-- Header -->
+            <div class="support-header">
+                <div class="support-title-block">
+                    <h1><i class="fas fa-box-open" style="color: #0284c7;"></i> Orders Delivered (Initial Support Queue)</h1>
+                    <p>Direct B2C orders marked delivered by logistics. Reach out to guide customers through unboxing and installation.</p>
+                </div>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button type="button" id="btnOpenManualCase" class="btn btn-primary" onclick="window.openManualCaseModal()" data-action="open-manual-case" title="Manually enter customer phone & details to initiate support call">
+                        <i class="fas fa-plus-circle"></i> New Support Case / Call
+                    </button>
+                    <a href="dashboard.html" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search" style="color: #94a3b8;"></i>
+                    <input type="text" id="searchInput" placeholder="Search by customer, phone, order #, case #...">
+                </div>
+                <div class="filter-actions">
+                    <select id="stageFilter" class="filter-select">
+                        <option value="delivered">Freshly Delivered (Not Contacted)</option>
+                        <option value="pending_contact">Callback Required / Pending</option>
+                        <option value="">All Active Queue</option>
+                    </select>
+                    <button class="btn btn-primary" id="btnRefresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="table-card">
+                <div style="overflow-x: auto;">
+                    <table class="support-table">
+                        <thead>
+                            <tr>
+                                <th>Case & Customer</th>
+                                <th>Phone Number</th>
+                                <th>Delivered Products</th>
+                                <th>Order #</th>
+                                <th>Delivery Date</th>
+                                <th>Assigned Executive</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deliveredTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 3rem; color: #64748b;">
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
+                                    Loading delivered orders...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="paginationBar" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--support-border); background: #fafafa;">
+                    <span id="pageInfo" style="font-size: 0.85rem; color: #64748b;">Showing 0 of 0 cases</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline btn-sm" id="btnPrevPage" disabled><i class="fas fa-chevron-left"></i> Previous</button>
+                        <button class="btn btn-outline btn-sm" id="btnNextPage" disabled>Next <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/support-common.js"></script>
+    <script src="js/orders_delivered.js"></script>
+</body>
+</html>

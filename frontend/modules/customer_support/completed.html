@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Completed Support Cases | SGB CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/support.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="support-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="support-main">
+            <!-- Header -->
+            <div class="support-header">
+                <div class="support-title-block">
+                    <h1><i class="fas fa-clipboard-check" style="color: #10b981;"></i> Completed Support Cases</h1>
+                    <p>Historical record of successfully assisted customers, verified installation guides, and photo logs.</p>
+                </div>
+                <div>
+                    <a href="dashboard.html" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search" style="color: #94a3b8;"></i>
+                    <input type="text" id="searchInput" placeholder="Search customer, phone, order #, case #...">
+                </div>
+                <div class="filter-actions">
+                    <button class="btn btn-primary" id="btnRefresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="table-card">
+                <div style="overflow-x: auto;">
+                    <table class="support-table">
+                        <thead>
+                            <tr>
+                                <th>Case & Customer</th>
+                                <th>Mobile Number</th>
+                                <th>Product Summary</th>
+                                <th>Order #</th>
+                                <th>Completion Date</th>
+                                <th>Installation Status</th>
+                                <th>Follow-up Status</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completedTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 3rem; color: #64748b;">
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
+                                    Loading completed cases...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="paginationBar" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--support-border); background: #fafafa;">
+                    <span id="pageInfo" style="font-size: 0.85rem; color: #64748b;">Showing 0 of 0 cases</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline btn-sm" id="btnPrevPage" disabled><i class="fas fa-chevron-left"></i> Previous</button>
+                        <button class="btn btn-outline btn-sm" id="btnNextPage" disabled>Next <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/support-common.js"></script>
+    <script src="js/completed.js"></script>
+</body>
+</html>

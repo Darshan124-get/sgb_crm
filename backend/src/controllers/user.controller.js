@@ -100,6 +100,8 @@ exports.getUserById = async (req, res) => {
             roleCategory = 'packing';
         } else if (roleName.includes('ship') || deptName.includes('ship') || roleName.includes('logistics')) {
             roleCategory = 'shipping';
+        } else if (roleName.includes('support') || deptName.includes('support')) {
+            roleCategory = 'support';
         }
 
         let statCards = [];
@@ -181,6 +183,14 @@ exports.getUserById = async (req, res) => {
                 { label: 'Delivered Orders', value: delivered, icon: 'fa-house-circle-check', bg: '#fff7ed', color: '#f97316' },
                 { label: 'In-Transit Orders', value: Number(sStats.transit_count || 0), icon: 'fa-route', bg: '#faf5ff', color: '#a855f7' },
                 { label: 'Delivery Success Rate', value: `${successRate}%`, icon: 'fa-chart-line', bg: '#f0fdfa', color: '#14b8a6' }
+            ];
+        } else if (roleCategory === 'support') {
+            statCards = [
+                { label: 'Tickets Handled', value: 0, icon: 'fa-ticket', bg: '#eff6ff', color: '#3b82f6' },
+                { label: 'Tickets Resolved', value: 0, icon: 'fa-circle-check', bg: '#f0fdf4', color: '#10b981' },
+                { label: 'Pending Queries', value: 0, icon: 'fa-clock', bg: '#fff7ed', color: '#f97316' },
+                { label: 'Customer Rating', value: '5.0 ★', icon: 'fa-star', bg: '#faf5ff', color: '#a855f7' },
+                { label: 'Resolution Rate', value: '100%', icon: 'fa-chart-line', bg: '#f0fdfa', color: '#14b8a6' }
             ];
         } else {
             // Default Sales / Telecaller / Admin

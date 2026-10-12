@@ -320,6 +320,13 @@ exports.updateStatus = async (req, res) => {
                     if (creatorId) {
                         await notificationService.sendToUser(creatorId, 'Order Delivered', `Your Order ${orderRef} has been successfully delivered.`, { orderId: String(id), type: 'order_delivered' });
                     }
+                    // Trigger B2C Customer Support Workflow
+                    try {
+                        const customerSupportService = require('../services/customer_support.service');
+                        await customerSupportService.handleOrderDelivered(id);
+                    } catch (csErr) {
+                        console.error('[CustomerSupport Hook Error in order.controller]:', csErr.message);
+                    }
                     break;
                 case 'cancelled':
                     // Notify Admins & Creator

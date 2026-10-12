@@ -134,7 +134,12 @@ window.ROLE_REDIRECTS = {
     shipping_executive: 'modules/shipping/dashboard.html',
     shipping_viewer: 'modules/shipping/dashboard.html',
     whatsapp_manager: 'modules/sales/dashboard.html',
-    whatsapp_management_executive: 'modules/sales/dashboard.html'
+    whatsapp_management_executive: 'modules/sales/dashboard.html',
+    customer_support_executive: 'modules/customer_support/dashboard.html',
+    customer_support_manager: 'modules/customer_support/dashboard.html',
+    customer_support_viewer: 'modules/customer_support/dashboard.html',
+    support: 'modules/customer_support/dashboard.html',
+    support_executive: 'modules/customer_support/dashboard.html'
 };
 
 window.getHomeUrl = function (user) {
@@ -162,9 +167,11 @@ window.getHomeUrl = function (user) {
     if (userPermissions.includes('packing_dashboard')) return 'modules/packing/dashboard.html';
     if (userPermissions.includes('shipping_dashboard')) return 'modules/shipping/dashboard.html';
     if (userPermissions.includes('billing_billing')) return 'modules/billing/billing.html';
+    if (userPermissions.includes('customer_support_dashboard') || userPermissions.includes('support_dashboard')) return 'modules/customer_support/dashboard.html';
 
-    // Dealer role fallback
+    // Role fallbacks
     if (role.includes('dealer')) return 'modules/dealer/dashboard.html';
+    if (role.includes('support')) return 'modules/customer_support/dashboard.html';
 
     // If they have PBAC permissions but don't match the above, or are a manager, route them to the unified dashboard as fallback
     if ((userPermissions.length > 0 || user.is_manager) && role !== 'admin' && role !== 'super-admin') {

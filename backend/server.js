@@ -7,6 +7,18 @@ const PORT = process.env.PORT || 5000;
 function startServer() {
     const server = app.listen(PORT, () => {
         console.log(`🚀 Modular Server running on port ${PORT}`);
+
+        // Periodic Customer Support 30-Day Follow-Up Checker (runs every hour)
+        try {
+            const customerSupportService = require('./src/services/customer_support.service');
+            customerSupportService.processDueFollowups().catch(e => console.warn('[CS Follow-up Checker Init]:', e.message));
+            setInterval(() => {
+                customerSupportService.processDueFollowups().catch(e => console.warn('[CS Follow-up Checker Interval]:', e.message));
+            }, 60 * 60 * 1000); // 1 hour
+            console.log('⏱️ Customer Support 30-day Follow-up background scheduler active.');
+        } catch (csErr) {
+            console.warn('⚠️ Could not start customer support background scheduler:', csErr.message);
+        }
     });
 
     server.on('error', (err) => {

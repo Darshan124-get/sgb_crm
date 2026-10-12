@@ -77,6 +77,9 @@ exports.login = async (req, res) => {
             } else if (roleName.includes('ship') || (deptName && deptName.includes('ship'))) {
                 if (!perms.includes('shipping_dashboard')) perms.push('shipping_dashboard');
                 if (!perms.includes('shipping_shipping')) perms.push('shipping_shipping');
+            } else if (roleName.includes('support') || (deptName && deptName.includes('support'))) {
+                const supportPerms = ['customer_support_dashboard', 'customer_support_tickets', 'customer_support_queries', 'customer_support_feedback', 'support_dashboard', 'support_tickets'];
+                supportPerms.forEach(p => { if (!perms.includes(p)) perms.push(p); });
             }
         }
 

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Call & Installation Guidance | SGB CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/support.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="support-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="support-main">
+            <!-- Header -->
+            <div class="support-header">
+                <div>
+                    <a href="#" id="backToCaseLink" style="text-decoration: none; color: #64748b; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem;">
+                        <i class="fas fa-arrow-left"></i> Back to Case Details
+                    </a>
+                    <div class="support-title-block">
+                        <h1>
+                            <span>Customer Call &amp; Installation Guidance</span>
+                            <span id="caseBadge"></span>
+                        </h1>
+                        <p id="caseHeaderSubtitle">Record customer call outcome, product guidance, notes, and fitting photos.</p>
+                    </div>
+                </div>
+
+                <!-- Call Customer Actions -->
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button class="btn btn-call" id="btnCallCustomerTop">
+                        <i class="fas fa-phone"></i> Call Customer
+                    </button>
+                    <button class="btn btn-outline" id="btnVideoCallTop" title="Initiate video session">
+                        <i class="fas fa-video"></i> Video Call
+                    </button>
+                </div>
+            </div>
+
+            <!-- Customer & Order Context Bar -->
+            <div class="premium-card" style="padding: 1.25rem 1.5rem; background: white; border-radius: 12px; border: 1px solid var(--support-border); margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
+                <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <span style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Customer</span>
+                        <div id="ctxCustName" style="font-size: 1rem; font-weight: 700; color: #0f172a;">Loading...</div>
+                    </div>
+                    <div style="border-left: 1px solid #e2e8f0; padding-left: 1.5rem;">
+                        <span style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Phone Number</span>
+                        <div id="ctxCustPhone" style="font-size: 0.95rem; font-weight: 600; color: #0284c7;">-</div>
+                    </div>
+                    <div style="border-left: 1px solid #e2e8f0; padding-left: 1.5rem;">
+                        <span style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Order #</span>
+                        <div id="ctxOrderNum" style="font-size: 0.95rem; font-weight: 700; color: #334155;">-</div>
+                    </div>
+                    <div style="border-left: 1px solid #e2e8f0; padding-left: 1.5rem;">
+                        <span style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Delivered Products</span>
+                        <div id="ctxProducts" style="font-size: 0.9rem; font-weight: 500; color: #475569;">-</div>
+                    </div>
+                </div>
+                <div>
+                    <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.85rem;" id="ctxDeliveryDate">Delivered on: -</span>
+                </div>
+            </div>
+
+            <!-- Main Form Card -->
+            <form id="callCompletionForm" class="premium-card" style="padding: 2rem; background: white; border-radius: 12px; border: 1px solid var(--support-border);">
+                
+                <!-- Section 1: Call Outcome -->
+                <div style="margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">1</span>
+                            Customer Call Outcome <span style="color: #ef4444;">*</span>
+                        </h2>
+                        <span style="font-size: 0.8rem; color: #64748b;">Must record actual outcome after phone call</span>
+                    </div>
+
+                    <div class="pill-selector" id="callOutcomeSelector">
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="answered" required checked>
+                            <span><i class="fas fa-check-circle" style="color: #10b981;"></i> Customer Answered</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="not_answered">
+                            <span><i class="fas fa-phone-slash" style="color: #ef4444;"></i> Customer Did Not Answer</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="callback_required">
+                            <span><i class="fas fa-clock" style="color: #f59e0b;"></i> Callback Required</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="no_assistance_needed">
+                            <span><i class="fas fa-thumbs-up" style="color: #6366f1;"></i> Customer Does Not Need Assistance</span>
+                        </label>
+                    </div>
+
+                    <div id="notAnsweredNotice" style="display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 0.85rem; color: #92400e;">
+                        <i class="fas fa-info-circle"></i> <strong>Note:</strong> If the customer did not answer or requested a callback, support will remain pending. Installation cannot be marked completed.
+                    </div>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.5rem 0;">
+
+                <!-- Section 2: Installation Status -->
+                <div id="installationSection" style="margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">2</span>
+                            Installation / Fitting Status <span style="color: #ef4444;">*</span>
+                        </h2>
+                        <span style="font-size: 0.8rem; color: #64748b;">Current physical installation state</span>
+                    </div>
+
+                    <div class="pill-selector" id="installStatusSelector">
+                        <label class="pill-option">
+                            <input type="radio" name="installation_status" value="successfully_installed" checked>
+                            <span><i class="fas fa-check-double" style="color: #10b981;"></i> Successfully Installed</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="installation_status" value="in_progress">
+                            <span><i class="fas fa-spinner fa-spin" style="color: #0284c7;"></i> Installation In Progress</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="installation_status" value="needs_guidance">
+                            <span><i class="fas fa-question-circle" style="color: #f59e0b;"></i> Customer Needs More Guidance</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="installation_status" value="technician_required">
+                            <span><i class="fas fa-wrench" style="color: #ef4444;"></i> Technician Required</span>
+                        </label>
+                    </div>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.5rem 0;">
+
+                <!-- Section 3: Product Guidance Details -->
+                <div id="guidanceFieldsSection" style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">3</span>
+                        Assistance &amp; Guidance Provided
+                    </h2>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Guidance Provided
+                            </label>
+                            <input type="text" id="guidanceProvided" name="guidance_provided" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;" placeholder="e.g. Explained biofloc blower pipe fittings & pump wiring">
+                        </div>
+
+                        <div>
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Installation Instructions Explained
+                            </label>
+                            <input type="text" id="installInstructions" name="installation_instructions" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;" placeholder="e.g. Leveling foundation, Teflon tape sealing, voltage check">
+                        </div>
+
+                        <div>
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Product Usage Guidance
+                            </label>
+                            <input type="text" id="productUsageGuidance" name="product_usage_guidance" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;" placeholder="e.g. Daily operating hours, filter cleaning interval">
+                        </div>
+
+                        <div>
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Customer Questions Asked
+                            </label>
+                            <input type="text" id="customerQuestions" name="customer_questions" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;" placeholder="e.g. Customer asked about warranty and monsoon protection">
+                        </div>
+
+                        <div style="grid-column: 1 / -1;">
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Reported Problems / Defects (if any)
+                            </label>
+                            <input type="text" id="reportedProblems" name="reported_problems" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem;" placeholder="e.g. Minor scratch on outer casing, but functioning smoothly">
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.5rem 0;">
+
+                <!-- Section 4: Customer Notes -->
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">4</span>
+                        Customer Notes &amp; Historical Remarks
+                    </h2>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Customer Feedback / Notes
+                            </label>
+                            <textarea id="notesContent" name="notes" rows="3" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; font-family: inherit;" placeholder="Customer was satisfied with prompt guidance. Expressed interest in farm expansion next month."></textarea>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                                Executive Remarks / Internal Advice
+                            </label>
+                            <textarea id="remarksContent" name="remarks" rows="3" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; font-family: inherit;" placeholder="All parts accounted for. Customer comfortable operating independently."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.5rem 0;">
+
+                <!-- Section 5: Fitting / Installation Photos -->
+                <div style="margin-bottom: 2.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">5</span>
+                            Upload Fitting / Installation Photos
+                        </h2>
+                        <span style="font-size: 0.8rem; color: #64748b;">Supports JPG, PNG, WEBP (Max 10MB each)</span>
+                    </div>
+
+                    <!-- Dropzone -->
+                    <div class="photo-upload-dropzone" id="photoDropzone">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--support-primary); margin-bottom: 0.5rem;"></i>
+                        <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.25rem;">
+                            Drag and drop photos here, or <span style="color: var(--support-primary); text-decoration: underline;">browse files</span>
+                        </h4>
+                        <p style="font-size: 0.8rem; color: #64748b;">Multiple photos allowed. Take live site photos or upload received customer photos.</p>
+                        <input type="file" id="stagedPhotosInput" multiple accept="image/jpeg,image/png,image/webp" style="display: none;">
+                    </div>
+
+                    <!-- Staged Photos Previews -->
+                    <div id="stagedPhotosList" class="photo-previews" style="margin-top: 1rem;"></div>
+                </div>
+
+                <!-- Form Footer Actions -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <button type="button" class="btn btn-outline" id="btnSaveCallOnly">
+                            <i class="fas fa-save"></i> Save Call Log Only (Keep Open)
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button type="button" class="btn btn-outline" onclick="history.back()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-success" id="btnCompleteSupport" style="padding: 0.75rem 1.75rem; font-size: 0.95rem;">
+                            <i class="fas fa-check-circle"></i> Complete Support &amp; Schedule 30-Day Follow-Up
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/support-common.js"></script>
+    <script src="js/call_completion.js"></script>
+</body>
+</html>

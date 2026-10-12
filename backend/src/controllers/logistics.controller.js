@@ -243,6 +243,11 @@ exports.updateShipmentStatus = async (req, res) => {
                     const courier = (shipment[0].courier_name || '').toLowerCase();
                     if (!courier.includes('post')) {
                         await connection.query('UPDATE orders SET order_status = "delivered" WHERE order_id = ?', [shipment[0].order_id]);
+                        // Trigger B2C Customer Support Workflow
+                        try {
+                            const customerSupportService = require('../services/customer_support.service');
+                            customerSupportService.handleOrderDelivered(shipment[0].order_id).catch(e => console.error('[CS Hook Err]:', e.message));
+                        } catch(e) {}
                     }
                 }
             }
@@ -275,6 +280,11 @@ exports.updateCheckReceived = async (req, res) => {
             const [shipment] = await connection.query('SELECT order_id FROM shipments WHERE shipment_id = ?', [id]);
             if (shipment.length) {
                 await connection.query('UPDATE orders SET order_status = "delivered" WHERE order_id = ?', [shipment[0].order_id]);
+                // Trigger B2C Customer Support Workflow
+                try {
+                    const customerSupportService = require('../services/customer_support.service');
+                    customerSupportService.handleOrderDelivered(shipment[0].order_id).catch(e => console.error('[CS Hook Err]:', e.message));
+                } catch(e) {}
             }
             
             await connection.commit();

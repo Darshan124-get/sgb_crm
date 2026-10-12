@@ -699,7 +699,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         'Shipping': ['Shipping'],
         'Packing': ['Packing'],
         'WhatsApp': ['WhatsApp Chats'],
-        'Dealer': ['Dealer Management', 'Dealer Orders', 'Dealer Inventory', 'Dealer Reports']
+        'Dealer': ['Dealer Management', 'Dealer Orders', 'Dealer Inventory', 'Dealer Reports'],
+        'Support': ['Dashboard', 'Tickets', 'Queries', 'Feedback']
     };
 
     let selectedPermissions = [];
@@ -1112,7 +1113,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             'billing': ['billing_executive', 'billing_manager', 'billing_viewer'],
             'shipping': ['shipping_executive', 'shipping_manager', 'shipping_viewer', 'shipping'],
             'packing': ['packing_executive', 'packing_manager', 'packing_viewer', 'packaging', 'packing'],
-            'whatsapp': ['whatsapp_management_executive', 'whatsapp_manager']
+            'whatsapp': ['whatsapp_management_executive', 'whatsapp_manager'],
+            'support': ['customer_support_executive', 'customer_support_manager', 'customer_support_viewer', 'support_executive']
         };
 
         // Determine which department key matches (supporting spelling variations like DELAR B2B and SHIPING in DB)
@@ -1130,6 +1132,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 activeDeptKey = 'packing';
             } else if (deptName.includes('whatsapp')) {
                 activeDeptKey = 'whatsapp';
+            } else if (deptName.includes('support') || deptName.includes('customer')) {
+                activeDeptKey = 'support';
             }
         }
 
@@ -1361,10 +1365,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const container = document.getElementById('permissionCheckboxes');
         container.innerHTML = '';
 
-        const features = PERMISSION_SCHEMA[selectedCategory];
+        const features = PERMISSION_SCHEMA[selectedCategory] || [];
         
         features.forEach(feature => {
-            const permId = `${selectedCategory.toLowerCase()}_${feature.toLowerCase().replace(/\s+/g, '_')}`;
+            const catKey = selectedCategory.toLowerCase().replace(/\s+/g, '_');
+            const permId = `${catKey}_${feature.toLowerCase().replace(/\s+/g, '_')}`;
             const isChecked = selectedPermissions.includes(permId);
             
             const label = document.createElement('label');

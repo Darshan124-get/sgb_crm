@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telephony (Acefone) | SGB Agro CRM</title>
+    <meta name="description" content="Acefone Cloud Telephony Integration Dashboard - Track calls, agents, DIDs, CDR logs, and recordings.">
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/acefone.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <!-- Sidebar Container (Dynamically loaded by components.js) -->
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <!-- Top Navigation / Search Header -->
+        <header class="topbar">
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="topbar-search" placeholder="Search anything...">
+            </div>
+            <div class="profile-section" style="margin-left: auto; display: flex; align-items: center; gap: 1rem;">
+                <div class="notif-bell" style="position: relative; cursor: pointer;" onclick="openAcefoneModal('modalNotifications')">
+                    <i class="far fa-bell" style="font-size: 1.2rem; color: #6b7280;"></i>
+                    <span style="position: absolute; top: -5px; right: -6px; background: #ef4444; color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 9px; display: flex; align-items: center; justify-content: center; font-weight: 800;">3</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    <div style="text-align: right;">
+                        <p class="profile-name" id="profileName" style="margin: 0; line-height: 1.2; font-size: 0.85rem; font-weight: 800; color: #0f172a;">Admin</p>
+                        <p style="margin: 0; font-size: 0.68rem; color: #64748b; font-weight: 600;">Super Admin</p>
+                    </div>
+                    <div class="avatar" style="background: #1e293b; color: #ffffff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; flex-shrink: 0;">AD</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="acefone-wrapper">
+            <!-- 1. Header Title Card -->
+            <div class="acefone-header-card">
+                <div class="acefone-header-left">
+                    <div class="acefone-icon-box">
+                        <i class="fas fa-home"></i>
+                    </div>
+                    <div>
+                        <h1 class="acefone-header-title">Telephony (Acefone)</h1>
+                        <p class="acefone-header-subtitle">Manage your Acefone cloud telephony integration, agents, DIDs and call settings.</p>
+                    </div>
+                </div>
+                <div class="acefone-header-right">
+                    <div class="acefone-status-badge">
+                        <span class="acefone-status-dot"></span> Acefone Connected
+                    </div>
+                    <div class="acefone-brand-logo">
+                        <span class="acefone-logo-triangle">▲</span> acefone
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Sub-Navigation Tabs Bar -->
+            <div class="acefone-tabs-nav">
+                <button class="acefone-tab-btn active" data-tab="overview">
+                    <i class="fas fa-th-large"></i> Overview
+                </button>
+                <button class="acefone-tab-btn" data-tab="api">
+                    <i class="fas fa-plug"></i> API Integration
+                </button>
+                <button class="acefone-tab-btn" data-tab="agents">
+                    <i class="fas fa-user-cog"></i> Agents & Mapping
+                </button>
+                <button class="acefone-tab-btn" data-tab="dids">
+                    <i class="fas fa-hashtag"></i> DIDs / Caller IDs
+                </button>
+                <button class="acefone-tab-btn" data-tab="settings">
+                    <i class="fas fa-sliders-h"></i> Call Settings
+                </button>
+                <button class="acefone-tab-btn" data-tab="logs">
+                    <i class="fas fa-list-alt"></i> Call Logs (CDR)
+                </button>
+                <button class="acefone-tab-btn" data-tab="recordings">
+                    <i class="fas fa-compact-disc"></i> Recordings
+                </button>
+                <button class="acefone-tab-btn" data-tab="performance">
+                    <i class="fas fa-chart-line"></i> Performance
+                </button>
+            </div>
+
+            <!-- Tab Content Panel: Overview (Default) -->
+            <div class="acefone-tab-panel" id="tab-panel-overview" style="display: block;">
+                <!-- 3. Top KPI Cards Row -->
+                <div class="acefone-kpi-grid">
+                    <!-- Total Calls -->
+                    <div class="acefone-kpi-card">
+                        <div class="acefone-kpi-icon blue">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="acefone-kpi-details">
+                            <span class="acefone-kpi-title">Total Calls</span>
+                            <span class="acefone-kpi-value">124</span>
+                            <span class="acefone-kpi-sub">Today <span class="trend-up"><i class="fas fa-arrow-up"></i> 12%</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Connected -->
+                    <div class="acefone-kpi-card">
+                        <div class="acefone-kpi-icon green">
+                            <i class="fas fa-phone"></i>
+                        </div>
+                        <div class="acefone-kpi-details">
+                            <span class="acefone-kpi-title">Connected</span>
+                            <span class="acefone-kpi-value">96</span>
+                            <span class="acefone-kpi-sub">Today <span class="trend-up"><i class="fas fa-arrow-up"></i> 8%</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Missed -->
+                    <div class="acefone-kpi-card">
+                        <div class="acefone-kpi-icon red">
+                            <i class="fas fa-phone-slash"></i>
+                        </div>
+                        <div class="acefone-kpi-details">
+                            <span class="acefone-kpi-title">Missed</span>
+                            <span class="acefone-kpi-value">18</span>
+                            <span class="acefone-kpi-sub">Today <span class="trend-down"><i class="fas fa-arrow-down"></i> 5%</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Total Talk Time -->
+                    <div class="acefone-kpi-card">
+                        <div class="acefone-kpi-icon blue">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="acefone-kpi-details">
+                            <span class="acefone-kpi-title">Total Talk Time</span>
+                            <span class="acefone-kpi-value">4h 32m</span>
+                            <span class="acefone-kpi-sub">Today <span class="trend-up"><i class="fas fa-arrow-up"></i> 10%</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Total Agents -->
+                    <div class="acefone-kpi-card">
+                        <div class="acefone-kpi-icon blue">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="acefone-kpi-details">
+                            <span class="acefone-kpi-title">Total Agents</span>
+                            <span class="acefone-kpi-value">5</span>
+                            <span class="acefone-kpi-sub">Active <span class="sub-active-green">4 Active</span></span>
+                        </div>
+                    </div>
+
+                    <!-- DIDs Configured -->
+                    <div class="acefone-kpi-card">
+                        <div class="acefone-kpi-icon blue">
+                            <i class="fas fa-sim-card"></i>
+                        </div>
+                        <div class="acefone-kpi-details">
+                            <span class="acefone-kpi-title">DIDs Configured</span>
+                            <span class="acefone-kpi-value">5</span>
+                            <span class="acefone-kpi-sub">Assigned <span class="sub-active-green">5 Active</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Middle Row: Recent Calls | Quick Actions | Integration Status -->
+                <div class="acefone-row-grid-3" style="margin-top: 1.25rem;">
+                    <!-- Card 1: Recent Calls -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">Recent Calls</h3>
+                            <a href="#" class="acefone-link-btn" onclick="openAcefoneModal('modalAllLogs')">View All</a>
+                        </div>
+                        <div class="acefone-card-body" style="padding: 0;">
+                            <div class="acefone-table-wrapper">
+                                <table class="acefone-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Agent</th>
+                                            <th>Customer Number</th>
+                                            <th>Status</th>
+                                            <th>Duration</th>
+                                            <th>Recording</th>
+                                            <th>Lead</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>10:32 AM</td>
+                                            <td>Rahul Kumar</td>
+                                            <td>+91 9902018031</td>
+                                            <td><span class="badge-status badge-connected">Connected</span></td>
+                                            <td>04:28</td>
+                                            <td>
+                                                <button class="btn-play-icon" onclick="playRecordingSimulation('452')" title="Play Recording">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                            </td>
+                                            <td><a href="#" class="lead-id-tag">#452</a></td>
+                                        </tr>
+                                        <tr>
+                                            <td>10:15 AM</td>
+                                            <td>Priya Sharma</td>
+                                            <td>+91 9876543210</td>
+                                            <td><span class="badge-status badge-missed">Missed</span></td>
+                                            <td>00:00</td>
+                                            <td style="color: #94a3b8; font-weight: bold;">-</td>
+                                            <td><a href="#" class="lead-id-tag">#451</a></td>
+                                        </tr>
+                                        <tr>
+                                            <td>09:50 AM</td>
+                                            <td>Arun Raj</td>
+                                            <td>+91 9888776655</td>
+                                            <td><span class="badge-status badge-connected">Connected</span></td>
+                                            <td>03:12</td>
+                                            <td>
+                                                <button class="btn-play-icon" onclick="playRecordingSimulation('450')" title="Play Recording">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                            </td>
+                                            <td><a href="#" class="lead-id-tag">#450</a></td>
+                                        </tr>
+                                        <tr>
+                                            <td>09:21 AM</td>
+                                            <td>Sneha K</td>
+                                            <td>+91 8765432109</td>
+                                            <td><span class="badge-status badge-busy">Busy</span></td>
+                                            <td>00:00</td>
+                                            <td style="color: #94a3b8; font-weight: bold;">-</td>
+                                            <td><a href="#" class="lead-id-tag">#449</a></td>
+                                        </tr>
+                                        <tr>
+                                            <td>08:45 AM</td>
+                                            <td>Rahul Kumar</td>
+                                            <td>+91 7012345678</td>
+                                            <td><span class="badge-status badge-connected">Connected</span></td>
+                                            <td>02:56</td>
+                                            <td>
+                                                <button class="btn-play-icon" onclick="playRecordingSimulation('448')" title="Play Recording">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                            </td>
+                                            <td><a href="#" class="lead-id-tag">#448</a></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Quick Actions -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">Quick Actions</h3>
+                        </div>
+                        <div class="acefone-card-body">
+                            <div class="quick-actions-grid">
+                                <div class="quick-action-btn" onclick="openAcefoneModal('modalTestConnection')">
+                                    <div class="quick-action-icon">
+                                        <i class="fas fa-wifi"></i>
+                                    </div>
+                                    <span class="quick-action-label">Test Connection</span>
+                                </div>
+                                <div class="quick-action-btn" onclick="openAcefoneModal('modalAddAgent')">
+                                    <div class="quick-action-icon">
+                                        <i class="fas fa-user-plus"></i>
+                                    </div>
+                                    <span class="quick-action-label">Add Agent</span>
+                                </div>
+                                <div class="quick-action-btn" onclick="openAcefoneModal('modalManageDids')">
+                                    <div class="quick-action-icon">
+                                        <i class="fas fa-sim-card"></i>
+                                    </div>
+                                    <span class="quick-action-label">Manage DIDs</span>
+                                </div>
+                                <div class="quick-action-btn" onclick="openAcefoneModal('modalAllLogs')">
+                                    <div class="quick-action-icon">
+                                        <i class="fas fa-file-alt"></i>
+                                    </div>
+                                    <span class="quick-action-label">View Call Logs</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Integration Status -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">Integration Status</h3>
+                            <span class="badge-status badge-connected" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">
+                                <span class="acefone-status-dot" style="width:6px;height:6px;margin-right:4px;"></span> Connected
+                            </span>
+                        </div>
+                        <div class="acefone-card-body">
+                            <div style="text-align: right; margin-bottom: 0.75rem;">
+                                <div class="acefone-brand-logo" style="justify-content: flex-end; font-size: 1.25rem;">
+                                    <span class="acefone-logo-triangle">▲</span> acefone
+                                </div>
+                            </div>
+                            <div class="integration-status-list">
+                                <div class="integration-status-item">
+                                    <span class="integration-label">Provider</span>
+                                    <span class="integration-val">Acefone (Cloud Telephony)</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label">API Token</span>
+                                    <span class="integration-val">
+                                        <span id="apiTokenVal">********************</span>
+                                        <i class="far fa-eye" id="toggleApiToken" style="cursor: pointer; color: #2563eb; margin-left: 4px;"></i>
+                                    </span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label">Environment</span>
+                                    <span class="integration-val">Production</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label">Last Tested</span>
+                                    <span class="integration-val">
+                                        <span style="color: #10b981;">●</span> 30 Sep 2025, 10:32 AM
+                                        <button class="btn-test-again" onclick="openAcefoneModal('modalTestConnection')">Test Again</button>
+                                    </span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label">Last Webhook</span>
+                                    <span class="integration-val"><span style="color: #10b981;">●</span> 30 Sep 2025, 10:31 AM</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label">Status</span>
+                                    <span class="integration-val" style="color: #10b981;"><span style="color: #10b981;">●</span> Active</span>
+                                </div>
+                            </div>
+                            <button class="btn-view-details-full" onclick="openAcefoneModal('modalIntegrationDetails')">
+                                View Integration Details <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Lower Row: Today's Call Summary Chart | Call Status Distribution | Top Agents Today -->
+                <div class="acefone-row-grid-lower" style="margin-top: 1.25rem;">
+                    <!-- Card 1: Today's Call Summary Chart -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header" style="flex-wrap: wrap; gap: 0.5rem;">
+                            <h3 class="acefone-card-title">Today's Call Summary</h3>
+                            <div class="summary-legend-row" style="margin: 0;">
+                                <span class="summary-pill summary-pill-connected">● Connected 96</span>
+                                <span class="summary-pill summary-pill-missed">● Missed 18</span>
+                                <span class="summary-pill summary-pill-busy">● Busy 7</span>
+                                <span class="summary-pill summary-pill-total">● Total 124</span>
+                            </div>
+                        </div>
+                        <div class="acefone-card-body" style="height: 240px; position: relative;">
+                            <canvas id="callSummaryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Call Status Distribution Donut -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">Call Status Distribution</h3>
+                        </div>
+                        <div class="acefone-card-body" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                            <div style="width: 140px; height: 140px; position: relative;">
+                                <canvas id="callDistributionChart"></canvas>
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                                    <div style="font-size: 1.25rem; font-weight: 900; color: #0f172a; line-height: 1;">124</div>
+                                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">Total Calls</div>
+                                </div>
+                            </div>
+                            <div class="donut-legend-list" style="flex: 1;">
+                                <div class="donut-legend-item">
+                                    <div class="donut-legend-label">
+                                        <span class="legend-dot" style="background: #10b981;"></span> Connected
+                                    </div>
+                                    <div style="font-weight: 800; color: #0f172a;">96 <span style="font-weight: 500; color: #64748b;">(77%)</span></div>
+                                </div>
+                                <div class="donut-legend-item">
+                                    <div class="donut-legend-label">
+                                        <span class="legend-dot" style="background: #ef4444;"></span> Missed
+                                    </div>
+                                    <div style="font-weight: 800; color: #0f172a;">18 <span style="font-weight: 500; color: #64748b;">(15%)</span></div>
+                                </div>
+                                <div class="donut-legend-item">
+                                    <div class="donut-legend-label">
+                                        <span class="legend-dot" style="background: #f59e0b;"></span> Busy
+                                    </div>
+                                    <div style="font-weight: 800; color: #0f172a;">7 <span style="font-weight: 500; color: #64748b;">(6%)</span></div>
+                                </div>
+                                <div class="donut-legend-item">
+                                    <div class="donut-legend-label">
+                                        <span class="legend-dot" style="background: #2563eb;"></span> Failed
+                                    </div>
+                                    <div style="font-weight: 800; color: #0f172a;">3 <span style="font-weight: 500; color: #64748b;">(2%)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Top Agents Today -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">Top Agents Today</h3>
+                            <a href="#" class="acefone-link-btn" onclick="openAcefoneModal('modalAllAgents')">View All</a>
+                        </div>
+                        <div class="acefone-card-body" style="padding: 0;">
+                            <div class="acefone-table-wrapper">
+                                <table class="acefone-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Agent</th>
+                                            <th>Calls</th>
+                                            <th>Connected</th>
+                                            <th>Missed</th>
+                                            <th>Talk Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="font-weight: 700; color: #0f172a;">Rahul Kumar</td>
+                                            <td>32</td>
+                                            <td style="color: #10b981; font-weight: 700;">26</td>
+                                            <td style="color: #ef4444; font-weight: 700;">4</td>
+                                            <td>1h 18m</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700; color: #0f172a;">Priya Sharma</td>
+                                            <td>28</td>
+                                            <td style="color: #10b981; font-weight: 700;">21</td>
+                                            <td style="color: #ef4444; font-weight: 700;">5</td>
+                                            <td>1h 05m</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700; color: #0f172a;">Arun Raj</td>
+                                            <td>24</td>
+                                            <td style="color: #10b981; font-weight: 700;">18</td>
+                                            <td style="color: #ef4444; font-weight: 700;">4</td>
+                                            <td>54m</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700; color: #0f172a;">Sneha K</td>
+                                            <td>20</td>
+                                            <td style="color: #10b981; font-weight: 700;">16</td>
+                                            <td style="color: #ef4444; font-weight: 700;">3</td>
+                                            <td>42m</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700; color: #0f172a;">Vikram S</td>
+                                            <td>20</td>
+                                            <td style="color: #10b981; font-weight: 700;">15</td>
+                                            <td style="color: #ef4444; font-weight: 700;">5</td>
+                                            <td>33m</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Bottom Banner: How It Works? -->
+                <div class="acefone-workflow-card" style="margin-top: 1.25rem;">
+                    <div class="acefone-workflow-header">
+                        <div class="acefone-workflow-title">
+                            <i class="fas fa-info-circle" style="color: #059669;"></i> How It Works?
+                        </div>
+                        <a href="https://www.acefone.com/docs" target="_blank" class="btn-docs-link">
+                            View Documentation <i class="fas fa-external-link-alt" style="font-size: 0.7rem;"></i>
+                        </a>
+                    </div>
+                    <div class="acefone-workflow-steps">
+                        <!-- Step 1 -->
+                        <div class="workflow-step-item">
+                            <div class="workflow-step-num">1</div>
+                            <div class="workflow-step-content">
+                                <div class="workflow-step-title">
+                                    <i class="fas fa-laptop-code workflow-step-icon"></i> Configure API
+                                </div>
+                                <div class="workflow-step-desc">Add Acefone API token and settings</div>
+                            </div>
+                        </div>
+
+                        <div class="workflow-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                        <!-- Step 2 -->
+                        <div class="workflow-step-item">
+                            <div class="workflow-step-num">2</div>
+                            <div class="workflow-step-content">
+                                <div class="workflow-step-title">
+                                    <i class="fas fa-users-cog workflow-step-icon"></i> Map Agents
+                                </div>
+                                <div class="workflow-step-desc">Map CRM users with Acefone agents & DIDs</div>
+                            </div>
+                        </div>
+
+                        <div class="workflow-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                        <!-- Step 3 -->
+                        <div class="workflow-step-item">
+                            <div class="workflow-step-num">3</div>
+                            <div class="workflow-step-content">
+                                <div class="workflow-step-title">
+                                    <i class="fas fa-phone-volume workflow-step-icon"></i> Click to Call
+                                </div>
+                                <div class="workflow-step-desc">Telecaller clicks call from lead details</div>
+                            </div>
+                        </div>
+
+                        <div class="workflow-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                        <!-- Step 4 -->
+                        <div class="workflow-step-item">
+                            <div class="workflow-step-num">4</div>
+                            <div class="workflow-step-content">
+                                <div class="workflow-step-title">
+                                    <i class="fas fa-tower-broadcast workflow-step-icon"></i> Live Call & Webhook
+                                </div>
+                                <div class="workflow-step-desc">Call events received in real-time</div>
+                            </div>
+                        </div>
+
+                        <div class="workflow-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                        <!-- Step 5 -->
+                        <div class="workflow-step-item">
+                            <div class="workflow-step-num">5</div>
+                            <div class="workflow-step-content">
+                                <div class="workflow-step-title">
+                                    <i class="fas fa-chart-line workflow-step-icon"></i> Track & Analyze
+                                </div>
+                                <div class="workflow-step-desc">View CDR, recordings and performance</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content Panel: API Integration -->
+            <div class="acefone-tab-panel" id="tab-panel-api" style="display: none;">
+                <!-- 1. Top Success Connection Banner -->
+                <div class="api-banner-success">
+                    <div class="api-banner-left">
+                        <div class="api-banner-check-icon">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div>
+                            <h3 class="api-banner-title">Acefone is connected successfully!</h3>
+                            <p class="api-banner-sub">Your API token is valid and connection is working.</p>
+                        </div>
+                    </div>
+                    <div class="api-banner-right">
+                        <span style="font-size: 0.8rem; color: #64748b; font-weight: 500;">Last tested: 30 Sep 2025, 10:32 AM</span>
+                        <button class="btn-solid-green" onclick="openAcefoneModal('modalTestConnection')">
+                            <i class="fas fa-sync-alt"></i> Test Connection
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Middle Row: API Configuration & Connection Status / Quick Actions -->
+                <div class="acefone-row-grid-api" style="margin-top: 1.25rem;">
+                    <!-- Left Column: API Configuration Card -->
+                    <div class="acefone-card acefone-card-full-height">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">
+                                <i class="fas fa-cog" style="color: #2563eb;"></i> API Configuration
+                            </h3>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <a href="https://www.acefone.com/docs" target="_blank" class="btn-outline-blue">
+                                    <i class="far fa-file-alt"></i> Documentation
+                                </a>
+                                <div class="acefone-brand-logo" style="font-size: 1.2rem;">
+                                    <span class="acefone-logo-triangle">▲</span> acefone
+                                </div>
+                            </div>
+                        </div>
+                        <div class="acefone-card-body">
+                            <form onsubmit="event.preventDefault(); alert('API Configuration Saved Successfully!');">
+                                <div>
+                                    <!-- Provider -->
+                                    <div class="api-form-group" style="margin-bottom: 0.75rem;">
+                                        <label class="api-form-label">Provider</label>
+                                        <select class="api-form-select">
+                                            <option selected>Acefone (Cloud Telephony)</option>
+                                            <option>Other Provider</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- API Token & Environment Row -->
+                                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 0.75rem;">
+                                        <div>
+                                            <label class="api-form-label">API Token <span style="color: #ef4444;">*</span></label>
+                                            <div style="position: relative;">
+                                                <input type="password" id="apiConfigTokenInput" value="ace_live_8f93a19b2c4e710d8a" class="api-form-input" style="padding-right: 2.5rem;">
+                                                <i class="far fa-eye" id="btnToggleConfigToken" style="position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); cursor: pointer; color: #2563eb;"></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="api-form-label">Environment</label>
+                                            <select class="api-form-select">
+                                                <option selected>Production</option>
+                                                <option>Sandbox / Staging</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Token Status Badges -->
+                                    <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.85rem;">
+                                        <span style="font-size: 0.8rem; font-weight: 700; color: #64748b;">Token Status</span>
+                                        <span class="badge-token-valid"><span style="color: #10b981;">●</span> Valid</span>
+                                        <span class="badge-token-lifetime">Lifetime Token (until revoked)</span>
+                                    </div>
+
+                                    <!-- IP Restriction -->
+                                    <div class="api-form-group" style="margin-bottom: 0.75rem;">
+                                        <label class="api-form-label">IP Restriction (Optional)</label>
+                                        <input type="text" value="203.0.113.10" class="api-form-input" placeholder="e.g. 203.0.113.10">
+                                        <p style="font-size: 0.72rem; color: #64748b; margin-top: 0.2rem;">Add your server IP (one per line). Leave empty to allow all IPs.</p>
+                                    </div>
+
+                                    <!-- API Scopes (Permissions) -->
+                                    <div style="margin-bottom: 0.85rem;">
+                                        <label class="api-form-label">API Scopes (Permissions)</label>
+                                        <div class="api-scopes-grid">
+                                            <div class="scope-card active">
+                                                <input type="checkbox" checked class="scope-checkbox">
+                                                <div>
+                                                    <div class="scope-title">Click to Call</div>
+                                                    <div class="scope-desc">Make outbound calls via API</div>
+                                                </div>
+                                            </div>
+                                            <div class="scope-card active">
+                                                <input type="checkbox" checked class="scope-checkbox">
+                                                <div>
+                                                    <div class="scope-title">CDR</div>
+                                                    <div class="scope-desc">Access call logs and recordings</div>
+                                                </div>
+                                            </div>
+                                            <div class="scope-card active">
+                                                <input type="checkbox" checked class="scope-checkbox">
+                                                <div>
+                                                    <div class="scope-title">Live Calls</div>
+                                                    <div class="scope-desc">View active calls and monitoring</div>
+                                                </div>
+                                            </div>
+                                            <div class="scope-card">
+                                                <input type="checkbox" class="scope-checkbox">
+                                                <div>
+                                                    <div class="scope-title">Broadcast</div>
+                                                    <div class="scope-desc">Bulk calling (Not required now)</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Form Buttons Row -->
+                                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem;">
+                                    <button type="button" class="btn-outline-blue" style="padding: 0.55rem 1.15rem;" onclick="openAcefoneModal('modalTestConnection')">
+                                        <i class="fas fa-wifi"></i> Test Connection
+                                    </button>
+                                    <button type="submit" class="btn-solid-green" style="padding: 0.55rem 1.35rem;">
+                                        <i class="fas fa-save"></i> Save Settings
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Connection Status & Quick Actions (Unified Compact Card) -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header" style="padding: 0.75rem 1.25rem;">
+                            <h3 class="acefone-card-title">
+                                <i class="fas fa-signal" style="color: #10b981;"></i> Connection Status & Actions
+                            </h3>
+                            <div class="acefone-brand-logo" style="font-size: 1.15rem;">
+                                <span class="acefone-logo-triangle">▲</span> acefone
+                            </div>
+                        </div>
+                        <div class="acefone-card-body" style="padding: 1rem 1.25rem;">
+                            <!-- Status Indicator -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.55rem 0.85rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                                    <span class="acefone-status-dot" style="width: 10px; height: 10px;"></span>
+                                    <div>
+                                        <div style="font-size: 0.9rem; font-weight: 800; color: #10b981;">Connected</div>
+                                        <div style="font-size: 0.72rem; color: #047857;">Acefone integration is active</div>
+                                    </div>
+                                </div>
+                                <a href="#" class="acefone-link-btn" onclick="openAcefoneModal('modalIntegrationDetails')" style="font-size: 0.76rem;">
+                                    <i class="fas fa-edit"></i> Edit Settings
+                                </a>
+                            </div>
+
+                            <!-- 2-Column Key-Value Attributes -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; margin-bottom: 0.85rem; font-size: 0.76rem;">
+                                <div class="integration-status-item" style="padding-bottom: 0.3rem; margin: 0;">
+                                    <span class="integration-label">Provider</span>
+                                    <span class="integration-val">Acefone</span>
+                                </div>
+                                <div class="integration-status-item" style="padding-bottom: 0.3rem; margin: 0;">
+                                    <span class="integration-label">Environment</span>
+                                    <span class="integration-val">Production</span>
+                                </div>
+                                <div class="integration-status-item" style="padding-bottom: 0.3rem; margin: 0;">
+                                    <span class="integration-label">Last Tested</span>
+                                    <span class="integration-val">30 Sep, 10:32 AM</span>
+                                </div>
+                                <div class="integration-status-item" style="padding-bottom: 0.3rem; margin: 0;">
+                                    <span class="integration-label">Last Webhook</span>
+                                    <span class="integration-val">30 Sep, 10:31 AM</span>
+                                </div>
+                                <div class="integration-status-item" style="padding-bottom: 0.3rem; margin: 0;">
+                                    <span class="integration-label">Token Status</span>
+                                    <span class="integration-val" style="color: #10b981;"><span style="color: #10b981;">●</span> Valid</span>
+                                </div>
+                                <div class="integration-status-item" style="padding-bottom: 0.3rem; margin: 0;">
+                                    <span class="integration-label">Mode</span>
+                                    <span class="integration-val">Automatic</span>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions Header -->
+                            <div style="font-size: 0.8rem; font-weight: 800; color: #0f172a; margin-bottom: 0.55rem; border-top: 1px dashed #e2e8f0; padding-top: 0.65rem; display: flex; align-items: center; gap: 0.4rem;">
+                                <i class="fas fa-bolt" style="color: #2563eb;"></i> Quick Actions
+                            </div>
+
+                            <!-- 4 Compact Action Pills -->
+                            <div class="quick-actions-grid" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                <div class="quick-action-btn quick-action-btn-compact" onclick="openAcefoneModal('modalTestConnection')" style="padding: 0.5rem 0.6rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important;">
+                                    <div class="quick-action-icon" style="width: 26px !important; height: 26px !important; font-size: 0.8rem !important;"><i class="fas fa-wifi"></i></div>
+                                    <div style="text-align: left;">
+                                        <div class="quick-action-label" style="font-size: 0.74rem;">Test Connection</div>
+                                        <div style="font-size: 0.63rem; color: #64748b;">Verify API token</div>
+                                    </div>
+                                </div>
+                                <div class="quick-action-btn quick-action-btn-compact" onclick="window.open('https://www.acefone.com/docs', '_blank')" style="padding: 0.5rem 0.6rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important;">
+                                    <div class="quick-action-icon" style="width: 26px !important; height: 26px !important; font-size: 0.8rem !important;"><i class="fas fa-file-alt"></i></div>
+                                    <div style="text-align: left;">
+                                        <div class="quick-action-label" style="font-size: 0.74rem;">Webhook Guide</div>
+                                        <div style="font-size: 0.63rem; color: #64748b;">Setup instructions</div>
+                                    </div>
+                                </div>
+                                <div class="quick-action-btn quick-action-btn-compact" onclick="alert('API Limits: 10,000 calls/day. Current Usage: 124 calls.')" style="padding: 0.5rem 0.6rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important;">
+                                    <div class="quick-action-icon" style="width: 26px !important; height: 26px !important; font-size: 0.8rem !important;"><i class="fas fa-chart-bar"></i></div>
+                                    <div style="text-align: left;">
+                                        <div class="quick-action-label" style="font-size: 0.74rem;">API Limits</div>
+                                        <div style="font-size: 0.63rem; color: #64748b;">124 / 10k calls</div>
+                                    </div>
+                                </div>
+                                <div class="quick-action-btn quick-action-btn-compact" onclick="openAcefoneModal('modalAllLogs')" style="padding: 0.5rem 0.6rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important;">
+                                    <div class="quick-action-icon" style="width: 26px !important; height: 26px !important; font-size: 0.8rem !important;"><i class="fas fa-file-invoice"></i></div>
+                                    <div style="text-align: left;">
+                                        <div class="quick-action-label" style="font-size: 0.74rem;">Webhook Logs</div>
+                                        <div style="font-size: 0.63rem; color: #64748b;">View recent events</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Bottom Row: API Information | Important Notes | Supported API Features -->
+                <div class="acefone-row-grid-api-bottom" style="margin-top: 1.25rem;">
+                    <!-- API Information Card -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">
+                                <i class="fas fa-code" style="color: #2563eb;"></i> API Information
+                            </h3>
+                        </div>
+                        <div class="acefone-card-body" style="display: flex; flex-direction: column; justify-content: space-between;">
+                            <div class="integration-status-list">
+                                <div class="api-info-item">
+                                    <span class="integration-label">Base URL</span>
+                                    <span class="api-code-box">
+                                        https://api.acefone.in
+                                        <button class="btn-copy-sm" onclick="copyToClipboard('https://api.acefone.in')"><i class="far fa-copy"></i></button>
+                                    </span>
+                                </div>
+                                <div class="api-info-item">
+                                    <span class="integration-label">Click to Call Endpoint</span>
+                                    <span class="api-code-box">
+                                        POST /v1/click_to_call
+                                        <button class="btn-copy-sm" onclick="copyToClipboard('POST /v1/click_to_call')"><i class="far fa-copy"></i></button>
+                                    </span>
+                                </div>
+                                <div class="api-info-item">
+                                    <span class="integration-label">Authentication</span>
+                                    <span class="api-code-box">
+                                        Authorization: Bearer &lt;API_TOKEN&gt;
+                                        <button class="btn-copy-sm" onclick="copyToClipboard('Authorization: Bearer <API_TOKEN>')"><i class="far fa-copy"></i></button>
+                                    </span>
+                                </div>
+                                <div class="api-info-item">
+                                    <span class="integration-label">Content Type</span>
+                                    <span style="font-weight: 700; color: #0f172a;">application/json</span>
+                                </div>
+                                <div class="api-info-item">
+                                    <span class="integration-label">Response Format</span>
+                                    <span style="font-weight: 700; color: #0f172a;">JSON (Asynchronous)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Important Notes Card -->
+                    <div class="important-notes-card">
+                        <div>
+                            <div class="important-notes-title">
+                                <i class="fas fa-exclamation-triangle"></i> Important Notes
+                            </div>
+                            <ol class="important-notes-list">
+                                <li>Store the API token securely on your server.</li>
+                                <li>API response only confirms the request is accepted.</li>
+                                <li>Actual call status (answered, missed, etc.) will be received via Webhooks.</li>
+                                <li>Portal-generated API tokens are lifetime-valid until revoked.</li>
+                                <li>Use IP restriction for better security.</li>
+                            </ol>
+                        </div>
+                        <div style="text-align: center; margin-top: 0.85rem;">
+                            <a href="https://www.acefone.com/docs" target="_blank" class="acefone-link-btn" style="font-size: 0.82rem;">
+                                View Full Documentation <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Supported API Features Card -->
+                    <div class="acefone-card">
+                        <div class="acefone-card-header">
+                            <h3 class="acefone-card-title">
+                                <i class="fas fa-sliders-h" style="color: #2563eb;"></i> Supported API Features
+                            </h3>
+                        </div>
+                        <div class="acefone-card-body">
+                            <div class="integration-status-list">
+                                <div class="integration-status-item">
+                                    <span class="integration-label"><i class="fas fa-phone-alt" style="color: #059669; margin-right: 6px;"></i> Click to Call (Outbound Calls)</span>
+                                    <span class="badge-feat-enabled">● Enabled</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label"><i class="fas fa-file-alt" style="color: #059669; margin-right: 6px;"></i> Call Detail Records (CDR)</span>
+                                    <span class="badge-feat-enabled">● Enabled</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label"><i class="fas fa-broadcast-tower" style="color: #059669; margin-right: 6px;"></i> Live Calls (Active Call Monitoring)</span>
+                                    <span class="badge-feat-enabled">● Enabled</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label"><i class="fas fa-bullhorn" style="color: #64748b; margin-right: 6px;"></i> Broadcast</span>
+                                    <span class="badge-feat-disabled">● Disabled</span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label"><i class="fas fa-headset" style="color: #dc2626; margin-right: 6px;"></i> Click to Call Support API</span>
+                                    <span style="display: flex; align-items: center;">
+                                        <span class="badge-feat-notconf">● Not Configured</span>
+                                        <button class="btn-setup-sm" onclick="openAcefoneModal('modalTestConnection')">Setup</button>
+                                    </span>
+                                </div>
+                                <div class="integration-status-item">
+                                    <span class="integration-label"><i class="fas fa-project-diagram" style="color: #94a3b8; margin-right: 6px;"></i> API Dialplan</span>
+                                    <span class="badge-feat-notreq">● Not Required</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="acefone-tab-panel" id="tab-panel-agents" style="display: none;">
+                <div class="acefone-card">
+                    <div class="acefone-card-header"><h3 class="acefone-card-title">Agents & Mapping List</h3></div>
+                    <div class="acefone-card-body">
+                        <p style="color: #64748b; font-size: 0.85rem;">Mapping CRM users to Acefone Extensions and Virtual Numbers.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="acefone-tab-panel" id="tab-panel-dids" style="display: none;">
+                <div class="acefone-card">
+                    <div class="acefone-card-header"><h3 class="acefone-card-title">Configured DIDs (Direct Inward Dialing)</h3></div>
+                    <div class="acefone-card-body"><p style="color: #64748b; font-size: 0.85rem;">5 DIDs configured and active.</p></div>
+                </div>
+            </div>
+
+            <div class="acefone-tab-panel" id="tab-panel-settings" style="display: none;">
+                <div class="acefone-card">
+                    <div class="acefone-card-header"><h3 class="acefone-card-title">Call Handling & Routing Settings</h3></div>
+                    <div class="acefone-card-body"><p style="color: #64748b; font-size: 0.85rem;">Configure IVR, call recording preferences, and fallback queues.</p></div>
+                </div>
+            </div>
+
+            <div class="acefone-tab-panel" id="tab-panel-logs" style="display: none;">
+                <div class="acefone-card">
+                    <div class="acefone-card-header"><h3 class="acefone-card-title">Full Call Logs (CDR)</h3></div>
+                    <div class="acefone-card-body"><p style="color: #64748b; font-size: 0.85rem;">Detailed call detailed record logs filterable by agent and status.</p></div>
+                </div>
+            </div>
+
+            <div class="acefone-tab-panel" id="tab-panel-recordings" style="display: none;">
+                <div class="acefone-card">
+                    <div class="acefone-card-header"><h3 class="acefone-card-title">Call Recordings Library</h3></div>
+                    <div class="acefone-card-body"><p style="color: #64748b; font-size: 0.85rem;">Listen and download encrypted call recordings.</p></div>
+                </div>
+            </div>
+
+            <div class="acefone-tab-panel" id="tab-panel-performance" style="display: none;">
+                <div class="acefone-card">
+                    <div class="acefone-card-header"><h3 class="acefone-card-title">Telephony Performance Analytics</h3></div>
+                    <div class="acefone-card-body"><p style="color: #64748b; font-size: 0.85rem;">Conversion rates, average handle times, and call volume trends.</p></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal Popups for Interactive Actions -->
+<div class="acefone-modal-overlay" id="modalTestConnection" style="display: none;">
+    <div class="acefone-modal-card">
+        <div class="acefone-modal-header">
+            <h4 class="acefone-modal-title"><i class="fas fa-wifi" style="color:#2563eb;"></i> Test Acefone Connection</h4>
+            <button class="acefone-modal-close" onclick="closeAcefoneModal('modalTestConnection')">&times;</button>
+        </div>
+        <div class="acefone-modal-body" style="text-align: center; padding: 2rem 1.5rem;">
+            <div style="width: 60px; height: 60px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1rem;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 style="font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">Connection Successful!</h3>
+            <p style="font-size: 0.85rem; color: #64748b;">Acefone Cloud Telephony API latency is 42ms. Webhooks are healthy.</p>
+        </div>
+        <div class="acefone-modal-footer">
+            <button onclick="closeAcefoneModal('modalTestConnection')" style="background: #10b981; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; cursor: pointer;">Done</button>
+        </div>
+    </div>
+</div>
+
+<div class="acefone-modal-overlay" id="modalAddAgent" style="display: none;">
+    <div class="acefone-modal-card">
+        <div class="acefone-modal-header">
+            <h4 class="acefone-modal-title"><i class="fas fa-user-plus" style="color:#10b981;"></i> Add Telephony Agent</h4>
+            <button class="acefone-modal-close" onclick="closeAcefoneModal('modalAddAgent')">&times;</button>
+        </div>
+        <div class="acefone-modal-body">
+            <form onsubmit="event.preventDefault(); alert('Agent Added Successfully!'); closeAcefoneModal('modalAddAgent');">
+                <div style="margin-bottom: 1rem;">
+                    <label style="font-weight: 700; font-size: 0.82rem; display: block; margin-bottom: 0.35rem;">Agent Name</label>
+                    <input type="text" placeholder="e.g. Vikram Sharma" required style="width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="font-weight: 700; font-size: 0.82rem; display: block; margin-bottom: 0.35rem;">Acefone Extension ID</label>
+                    <input type="text" placeholder="e.g. 106" required style="width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+                <button type="submit" style="width: 100%; background: #10b981; color: white; border: none; padding: 0.65rem; border-radius: 6px; font-weight: 700; cursor: pointer;">Add Agent</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Config JS & Components JS -->
+<script src="../../js/config.js"></script>
+<script src="../../js/components.js"></script>
+<script src="js/acefone.js"></script>
+</body>
+</html>

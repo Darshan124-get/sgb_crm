@@ -59,6 +59,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sidebarFileName = 'sidebar-billing_manager.html';
             } else if (role === 'shipping_manager' || (role === 'manager' && userPermissions.includes('shipping_dashboard'))) {
                 sidebarFileName = 'sidebar-shipping_manager.html';
+            } else if (role.includes('support') || userPermissions.includes('customer_support_dashboard') || userPermissions.includes('support_dashboard')) {
+                sidebarFileName = 'sidebar-support.html';
             }
             // If user has zero specific permissions, load their role's original default sidebar.
             else if (userPermissions.length === 0 && role) {
@@ -156,6 +158,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else if (normRole.includes('viewer')) {
                         sidebarLabel.textContent = 'VIEWER PANEL';
                         if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
+                    } else if (normRole.includes('customer support executive') || normRole.includes('support executive')) {
+                        sidebarLabel.textContent = 'CUSTOMER SUPPORT EXECUTIVE';
+                    } else if (normRole.includes('customer support manager') || normRole.includes('support manager')) {
+                        sidebarLabel.textContent = 'CUSTOMER SUPPORT MANAGER';
+                    } else if (normRole.includes('support')) {
+                        sidebarLabel.textContent = 'CUSTOMER SUPPORT PANEL';
                     } else if (role) {
                         sidebarLabel.textContent = normRole.toUpperCase() + ' PANEL';
                     }
@@ -199,10 +207,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ── Super Admin Read-Only UI Adjustments ──
     if (role === 'super-admin') {
         const path = window.location.pathname;
-        const isAccessControlPage = path.includes('users.html') || path.includes('departments.html') || path.includes('roles.html');
+        const isAccessControlPage = path.includes('users.html') || path.includes('departments.html') || path.includes('roles.html') || path.includes('customer_support');
 
         const bannerText = isAccessControlPage
-            ? 'SUPER ADMIN MODE: You have full modification access on this User Management page.'
+            ? (path.includes('customer_support') ? 'SUPER ADMIN MODE: You have full access to the Customer Support module.' : 'SUPER ADMIN MODE: You have full modification access on this User Management page.')
             : 'MONITORING MODE: You have full read-only access to the system. Modifications are disabled.';
 
         const banner = document.createElement('div');
@@ -215,7 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const style = document.createElement('style');
             style.innerHTML = `
                 /* Attempt to hide obvious creation/deletion action buttons */
-                .btn-primary, .btn-danger, .btn-success, .btn-add-lead, [onclick*="delete"], [onclick*="save"], [onclick*="create"], [onclick*="add"], [onclick*="mark"], [onclick*="convert"], [onclick*="ship"], [onclick*="verify"], [onclick*="approve"], [onclick*="reject"] {
+                .btn-primary:not(.support-wrapper *), .btn-danger:not(.support-wrapper *), .btn-success:not(.support-wrapper *), .btn-add-lead, [onclick*="delete"], [onclick*="save"], [onclick*="create"], [onclick*="add"], [onclick*="mark"], [onclick*="convert"], [onclick*="ship"], [onclick*="verify"], [onclick*="approve"], [onclick*="reject"] {
                     opacity: 0.5;
                     pointer-events: none !important;
                 }

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contacted & Follow-ups — Customer Support | SGB CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/support.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="support-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="support-main">
+            <!-- Header -->
+            <div class="support-header">
+                <div class="support-title-block">
+                    <h1><i class="fas fa-phone-volume" style="color: #8b5cf6;"></i> Contacted / Follow Up</h1>
+                    <p>Manage in-progress installation support and scheduled 30-day product condition follow-ups.</p>
+                </div>
+                <div>
+                    <a href="dashboard.html" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tab Switcher Navigation -->
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--support-border); padding-bottom: 0.5rem;">
+                <button class="btn btn-primary" id="tabBtnFollowups" style="border-radius: 999px;">
+                    <i class="fas fa-calendar-check"></i> 30-Day Product Follow-ups
+                </button>
+                <button class="btn btn-outline" id="tabBtnInProgress" style="border-radius: 999px;">
+                    <i class="fas fa-tools"></i> Installation In-Progress / Callbacks
+                </button>
+            </div>
+
+            <!-- 1. FOLLOW-UPS SECTION -->
+            <div id="sectionFollowups">
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <i class="fas fa-search" style="color: #94a3b8;"></i>
+                        <input type="text" id="searchFollowupsInput" placeholder="Search customer, phone, order #...">
+                    </div>
+                    <div class="filter-actions">
+                        <select id="followupStatusFilter" class="filter-select">
+                            <option value="">All Follow-ups</option>
+                            <option value="DUE">Due Today</option>
+                            <option value="OVERDUE">Overdue</option>
+                            <option value="UPCOMING">Upcoming</option>
+                        </select>
+                        <button class="btn btn-primary" id="btnRefreshFollowups">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div style="overflow-x: auto;">
+                        <table class="support-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer Name</th>
+                                    <th>Mobile Number</th>
+                                    <th>Delivered Product</th>
+                                    <th>Order #</th>
+                                    <th>Scheduled Date</th>
+                                    <th>Assigned Executive</th>
+                                    <th>Follow-up Status</th>
+                                    <th style="text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="followupsTableBody">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                                        <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
+                                        Loading follow-ups...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. IN-PROGRESS / CALLBACKS SECTION -->
+            <div id="sectionInProgress" style="display: none;">
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <i class="fas fa-search" style="color: #94a3b8;"></i>
+                        <input type="text" id="searchInProgressInput" placeholder="Search case #, customer, phone...">
+                    </div>
+                    <div class="filter-actions">
+                        <select id="inProgressStatusFilter" class="filter-select">
+                            <option value="contacted_followup">All In-Progress & Callbacks</option>
+                            <option value="pending_contact">Callback Required</option>
+                            <option value="guidance_in_progress">Guidance In Progress</option>
+                        </select>
+                        <button class="btn btn-primary" id="btnRefreshInProgress">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div style="overflow-x: auto;">
+                        <table class="support-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer & Case</th>
+                                    <th>Mobile Number</th>
+                                    <th>Product Summary</th>
+                                    <th>Order #</th>
+                                    <th>Delivery Date</th>
+                                    <th>Assigned Executive</th>
+                                    <th>Current Stage</th>
+                                    <th style="text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inProgressTableBody">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                                        Loading in-progress cases...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/support-common.js"></script>
+    <script src="js/contacted_followup.js"></script>
+</body>
+</html>

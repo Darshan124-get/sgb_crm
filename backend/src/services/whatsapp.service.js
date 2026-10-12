@@ -434,6 +434,64 @@ const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
 };
 
 /**
+ * Sends a Native WhatsApp Flow (In-App Form) message
+ */
+const sendFlow = async (to, headerText, bodyText, buttonText, flowId, screenId = 'DELIVERY_DETAILS', flowToken = 'flow_token', senderId = null) => {
+  try {
+    const recipient = formatForWhatsApp(to);
+    const data = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        header: {
+          type: 'text',
+          text: headerText || 'Blade Protector Order'
+        },
+        body: {
+          text: bodyText || 'Please tap below to fill your delivery details.'
+        },
+        footer: {
+          text: 'SGB Agro Industries'
+        },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_token: flowToken,
+            flow_id: String(flowId),
+            flow_cta: buttonText || 'Fill Delivery Details',
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen: screenId
+            }
+          }
+        }
+      }
+    };
+
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const metaMsgId = response.data?.messages?.[0]?.id || null;
+    const logText = `[WhatsApp Flow] ${headerText} - ${bodyText}`;
+    await messageService.logChatMessage(to, 'outgoing', 'interactive', logText, null, null, senderId, metaMsgId, 'sent').catch(() => {});
+
+    logger.info(`WhatsApp Flow sent to ${to}: ${response.status}`);
+    return response.data;
+  } catch (err) {
+    logger.error('Error sending WhatsApp Flow:', err.response ? JSON.stringify(err.response.data) : err.message);
+    throw err;
+  }
+};
+
+/**
  * Revokes/Deletes a sent WhatsApp message for everyone via Meta Cloud API
  */
 const deleteMessageForEveryone = async (messageId) => {
@@ -461,6 +519,7 @@ module.exports = {
   sendMessage,
   sendButtons,
   sendList,
+  sendFlow,
   uploadMedia,
   getOrCreateMetaMediaId,
   sendMediaMessage,

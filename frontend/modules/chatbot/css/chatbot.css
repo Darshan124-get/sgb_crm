@@ -335,6 +335,9 @@
 .media-node-accent { border-top: 4px solid #10b981; }
 .logic-node-accent { border-top: 4px solid #ec4899; }
 .integration-node-accent { border-top: 4px solid #6366f1; }
+.form-node-accent { border-top: 4px solid #0d9488; }
+.payment-node-accent { border-top: 4px solid #ea580c; }
+.wait-media-node-accent { border-top: 4px solid #9333ea; }
 
 .node-header-icon {
     font-size: 0.85rem;
@@ -345,6 +348,9 @@
 .media-node-accent .node-header-icon { color: #10b981; }
 .logic-node-accent .node-header-icon { color: #ec4899; }
 .integration-node-accent .node-header-icon { color: #6366f1; }
+.form-node-accent .node-header-icon { color: #0d9488; }
+.payment-node-accent .node-header-icon { color: #ea580c; }
+.wait-media-node-accent .node-header-icon { color: #9333ea; }
 
 .node-header .node-type {
     flex: 1;

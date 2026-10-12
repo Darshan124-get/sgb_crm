@@ -23,6 +23,7 @@ let allCustomers = [];
 let totalLeadsCount = 0;
 let totalUnreadCount = 0;
 let totalHandoffCount = 0;
+let totalPaymentCount = 0;
 let isLoadingMoreConversations = false;
 let currentTab = 'all';
 let salesUsers = [];
@@ -366,12 +367,17 @@ function renderSidebarTabs() {
     const customLists = loadCustomLists();
     const isCustomListActive = customLists.some(list => list.id === currentTab) || currentTab === 'undefined' || currentTab === 'resolved';
     const isHandoffActive = currentTab === 'handoff' || currentTab === 'my_handoff';
+    const isPaymentActive = currentTab === 'payment';
+    const paymentCount = totalPaymentCount !== undefined ? totalPaymentCount : (allCustomers || []).filter(c => c.has_pending_payment).length;
 
     let html = `
         <div class="tab-item ${currentTab === 'all' ? 'active' : ''}" data-tab="all">All <span id="all-unread-count" style="margin-left: 4px;">${totalCount}</span></div>
         <div class="tab-item ${currentTab === 'unviewed' ? 'active' : ''}" data-tab="unviewed">Unread <span id="unread-count" style="margin-left: 4px;">${unreadCount}</span></div>
         <div class="tab-item ${isHandoffActive ? 'active' : ''}" data-tab="${isAdminOrManager ? 'handoff' : 'my_handoff'}" id="tab-handoff-pill" style="${isHandoffActive ? 'color: #ef4444; border-color: #ef4444; background: #fef2f2;' : 'color: #ef4444; border-color: #fca5a5;'} font-weight: 700;">
             Handoff <span id="handoff-pill-count" style="margin-left: 4px; font-weight: 800;">${handoffCount}</span>
+        </div>
+        <div class="tab-item ${isPaymentActive ? 'active' : ''}" data-tab="payment" id="tab-payment-pill" style="${isPaymentActive ? 'color: #e11d48; border-color: #e11d48; background: #fff1f2;' : 'color: #e11d48; border-color: #fda4af;'} font-weight: 700;">
+            Payment <span id="payment-pill-count" style="margin-left: 4px; background: #e11d48; color: #ffffff; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">${paymentCount}</span>
         </div>
         
         <select id="campaign-filter-select" class="tab-select ${isCampaignActive ? 'active' : ''}" style="
@@ -782,6 +788,145 @@ window.retriggerBotFromBanner = async function() {
     }
 };
 
+function updatePaymentCounts() {
+    if (!Array.isArray(allCustomers)) return;
+    const paymentCustomers = allCustomers.filter(c => c.has_pending_payment);
+    const paymentDisplay = totalPaymentCount !== undefined ? totalPaymentCount : paymentCustomers.length;
+
+    const topPaymentEl = document.getElementById('top-payment-count');
+    if (topPaymentEl) topPaymentEl.textContent = paymentDisplay;
+
+    const paymentPillEl = document.getElementById('payment-pill-count');
+    if (paymentPillEl) paymentPillEl.textContent = paymentDisplay;
+}
+
+window.switchToPaymentTab = function() {
+    currentTab = 'payment';
+    loadCustomers('payment');
+
+    const btnTopPayment = document.getElementById('btn-top-payment');
+    if (btnTopPayment) {
+        btnTopPayment.style.borderColor = '#059669';
+        btnTopPayment.style.background = '#ecfdf5';
+    }
+
+    const container = document.getElementById('sidebar-tabs-container');
+    if (container) {
+        container.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        const pillEl = document.getElementById('tab-payment-pill');
+        if (pillEl) pillEl.classList.add('active');
+    }
+
+    renderCustomerList();
+};
+
+window.verifyCurrentPayment = async function() {
+    if (!activeCustomer) return;
+    const phone = activeCustomer.phone;
+    const orderId = activeCustomer.payment_order_id;
+    const customerName = activeCustomer.customer_name || phone;
+    const amount = activeCustomer.payment_amount || 600;
+
+    const confirmVerify = confirm(`Verify payment of ₹${amount} for ${customerName}?\n\nThis will confirm order #${orderId || ''} in CRM.`);
+    if (!confirmVerify) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/payments/verify`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeader(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phone, orderId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to verify payment');
+
+        activeCustomer.has_pending_payment = false;
+        activeCustomer.payment_order_id = null;
+
+        const customerInList = allCustomers.find(c => c.phone === phone);
+        if (customerInList) {
+            customerInList.has_pending_payment = false;
+            customerInList.payment_order_id = null;
+        }
+
+        const paymentHeaderActions = document.getElementById('payment-header-actions');
+        if (paymentHeaderActions) paymentHeaderActions.style.display = 'none';
+
+        if (totalPaymentCount > 0) totalPaymentCount--;
+        updatePaymentCounts();
+        renderSidebarTabs();
+        renderCustomerList();
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Payment Verified', '✅ Payment verified successfully! Order confirmed.', 'success');
+        } else {
+            alert('✅ Payment verified successfully! Order confirmed.');
+        }
+    } catch (err) {
+        console.error('Error verifying payment:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message || 'Failed to verify payment', 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
+    }
+};
+
+window.rejectCurrentPayment = async function() {
+    if (!activeCustomer) return;
+    const phone = activeCustomer.phone;
+    const orderId = activeCustomer.payment_order_id;
+    const customerName = activeCustomer.customer_name || phone;
+
+    const reason = prompt(`Enter rejection reason for ${customerName}:`, 'Invalid screenshot or payment not received');
+    if (reason === null) return; // User cancelled prompt
+
+    try {
+        const res = await fetch(`${API_BASE}/payments/reject`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeader(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phone, orderId, reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to reject payment');
+
+        activeCustomer.has_pending_payment = false;
+        activeCustomer.payment_order_id = null;
+
+        const customerInList = allCustomers.find(c => c.phone === phone);
+        if (customerInList) {
+            customerInList.has_pending_payment = false;
+            customerInList.payment_order_id = null;
+        }
+
+        const paymentHeaderActions = document.getElementById('payment-header-actions');
+        if (paymentHeaderActions) paymentHeaderActions.style.display = 'none';
+
+        if (totalPaymentCount > 0) totalPaymentCount--;
+        updatePaymentCounts();
+        renderSidebarTabs();
+        renderCustomerList();
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Payment Rejected', 'Payment marked as rejected. Order cancelled.', 'info');
+        } else {
+            alert('❌ Payment marked as rejected. Order cancelled.');
+        }
+    } catch (err) {
+        console.error('Error rejecting payment:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message || 'Failed to reject payment', 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
+    }
+};
+
 /**
  * Fetch and Render Customer List
  */
@@ -812,6 +957,7 @@ async function loadCustomers(tabParam = null, searchParam = null) {
             if (rawData.totalCount !== undefined && (tabToFetch === 'all' || !totalLeadsCount)) totalLeadsCount = parseInt(rawData.totalCount);
             if (rawData.unreadCount !== undefined) totalUnreadCount = parseInt(rawData.unreadCount);
             if (rawData.handoffCount !== undefined) totalHandoffCount = parseInt(rawData.handoffCount);
+            if (rawData.paymentCount !== undefined) totalPaymentCount = parseInt(rawData.paymentCount);
         }
 
         // Merge incoming customer records with existing in-memory allCustomers array
@@ -820,6 +966,7 @@ async function loadCustomers(tabParam = null, searchParam = null) {
         allCustomers = Array.from(existingMap.values());
 
         updateHandoffCounts();
+        updatePaymentCounts();
         renderSidebarTabs(); // update unread and total count
         renderCustomerList();
 
@@ -882,6 +1029,8 @@ function renderCustomerList(shouldResetLimit = true) {
             } else {
                 matchesTab = isHumanNeeded;
             }
+        } else if (currentTab === 'payment') {
+            matchesTab = Boolean(customer.has_pending_payment);
         } else if (currentTab === 'undefined') {
             if (resolved) {
                 matchesTab = false;
@@ -1041,6 +1190,13 @@ function renderCustomerList(shouldResetLimit = true) {
             handoffBadgeHtml = `<span class="score-badge" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; font-weight: 800; padding: 2px 6px;">Needs Human ${waitingStr ? '• Waiting ' + waitingStr : ''}</span>`;
         }
 
+        let paymentBadgeHtml = '';
+        if (customer.has_pending_payment) {
+            paymentBadgeHtml = `<span class="score-badge" style="background: #ffe4e6; color: #e11d48; border: 1px solid #fecdd3; font-weight: 800; padding: 2px 7px; border-radius: 10px;">Payment Pending</span>`;
+        }
+
+        const snippetDisplay = customer.has_pending_payment ? '🖼️ Payment screenshot received' : (lastMsg || customer.phone);
+
         item.innerHTML = `
             <div class="avatar-wrap">
                 <div class="avatar" style="background-color: ${color}">${initials}</div>
@@ -1057,10 +1213,11 @@ function renderCustomerList(shouldResetLimit = true) {
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                    <p class="last-message-snippet" style="flex: 1; min-width: 0;">${tickHtml}${lastMsg || customer.phone}</p>
+                    <p class="last-message-snippet" style="flex: 1; min-width: 0;">${tickHtml}${snippetDisplay}</p>
                     ${hasUnread ? `<span class="unread-badge" style="background-color: var(--whatsapp-green); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">${customer.unread_msg_count}</span>` : ''}
                 </div>
                 <div class="customer-meta-footer">
+                    ${paymentBadgeHtml}
                     ${handoffBadgeHtml}
                     ${scoreLabel ? `<span class="score-badge badge-${scoreClass}">${scoreLabel}</span>` : ''}
                     ${customer.assigned_name ? `<div class="assigned-badge"><i class="fas fa-user-check"></i> ${customer.assigned_name}</div>` : ''}
@@ -1279,6 +1436,12 @@ async function selectCustomer(customer) {
         } else {
             handoffBanner.classList.add('hidden');
         }
+    }
+
+    // Payment Verification Header Actions
+    const paymentHeaderActions = document.getElementById('payment-header-actions');
+    if (paymentHeaderActions) {
+        paymentHeaderActions.style.display = customer.has_pending_payment ? 'inline-flex' : 'none';
     }
 
     // Highlight active item

@@ -934,7 +934,12 @@ class FlowEngine {
             else if (node.node_type === 'question' || node.node_type === 'buttons' || node.node_type === 'list' || node.node_type === 'contact_time' || node.node_type === 'text_input' || node.node_type === 'number_input' || (node.node_type === 'message' && config.inputType === 'image')) {
                 // Interactive Node: Send prompt question / options and stop execution loop, pausing at this node waiting for user response
                 await this.sendNodePrompt(session.phone, node, config, session);
-                await pool.query('UPDATE chatbot_sessions SET current_node_key = ?, variables = ? WHERE session_id = ?', [currentKey, JSON.stringify(session.variables), session.session_id]);
+                const newStatus = (session.variables && session.variables.needs_payment_verification) ? 'paused_for_human' : (session.status || 'active');
+                const pausedAtVal = newStatus === 'paused_for_human' ? new Date() : (session.paused_at || null);
+                await pool.query(
+                    'UPDATE chatbot_sessions SET status = ?, paused_at = COALESCE(paused_at, ?), current_node_key = ?, variables = ? WHERE session_id = ?', 
+                    [newStatus, pausedAtVal, currentKey, JSON.stringify(session.variables), session.session_id]
+                );
                 await this.syncLeadFromChatbotSession(session);
                 return;
             } 
@@ -1378,8 +1383,9 @@ class FlowEngine {
         const vars = session.variables || {};
         vars.payment_screenshot_url = evidenceUrl;
         vars.payment_evidence_timestamp = new Date().toISOString();
-        vars.payment_verification_status = 'Payment Verification Pending';
+        vars.payment_verification_status = 'pending_verification';
         vars.payment_status = 'pending_verification';
+        vars.needs_payment_verification = true;
 
         const customerName = vars.customer_name || 'WhatsApp Customer';
         const deliveryAddress = vars.delivery_address || 'Address provided';
@@ -1409,7 +1415,14 @@ class FlowEngine {
             }
             vars.order_id = orderId;
             vars.payment_status = 'pending_verification';
-            vars.payment_verification_status = 'Payment Verification Pending';
+            vars.payment_verification_status = 'pending_verification';
+            vars.needs_payment_verification = true;
+
+            const phoneTen = phone.replace(/\D/g, '').slice(-10);
+            await pool.query(
+                'UPDATE leads SET last_message = "🖼️ Payment screenshot received" WHERE lead_id = ? OR phone_number LIKE ?',
+                [session.lead_id || 0, `%${phoneTen}`]
+            ).catch(() => {});
         } catch (ordErr) {
             console.error('[FlowEngine] Error recording order for evidence receipt:', ordErr.message);
         }

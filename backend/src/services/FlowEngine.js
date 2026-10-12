@@ -811,7 +811,7 @@ class FlowEngine {
                 if (config.actionType === 'callback_task' || config.reason === 'Call Support') {
                     const callbackRemarks = `Callback Request: ${config.reason || 'Call Support'} for ${config.product || 'SGB Blade Protector'} via WhatsApp Chatbot`;
                     await pool.query(
-                        'INSERT INTO lead_followups (lead_id, followup_date, status, remarks, created_by) VALUES (?, NOW(), "pending", ?, -1)',
+                        'INSERT INTO lead_followups (lead_id, followup_date, status, remarks, created_by) VALUES (?, NOW(), "pending", ?, NULL)',
                         [leadId, callbackRemarks]
                     ).catch(err => console.error('[CALLBACK TASK INSERT ERROR]', err.message));
 

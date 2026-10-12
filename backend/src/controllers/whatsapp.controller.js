@@ -90,12 +90,31 @@ const receiveMessage = async (req, res) => {
           let mediaBuffer = null;
           let mimeType = null;
 
+          let parsedFlowData = null;
+
           // 1. Parse Input Type
           if (msg.type === 'text') {
             inputText = msg.text.body;
           } else if (msg.type === 'interactive') {
             const interactive = msg.interactive;
-            inputText = interactive.button_reply?.title || interactive.list_reply?.title || 'Interactive response';
+            if (interactive.type === 'nfm_reply' && interactive.nfm_reply?.response_json) {
+              try {
+                parsedFlowData = typeof interactive.nfm_reply.response_json === 'string'
+                  ? JSON.parse(interactive.nfm_reply.response_json)
+                  : interactive.nfm_reply.response_json;
+                
+                const name = parsedFlowData.customer_name || '';
+                const addr = parsedFlowData.delivery_address || '';
+                const pin = parsedFlowData.pincode || '';
+                inputText = `Name: ${name}\nAddress: ${addr}\nPIN: ${pin}\nConfirmed: Yes`;
+                logger.info(`Received native WhatsApp Flow submission for ${fromNumber}: ${name}, ${addr}, ${pin}`);
+              } catch (e) {
+                logger.error('Failed to parse Flow response_json:', e.message);
+                inputText = interactive.nfm_reply.body || 'Flow submitted';
+              }
+            } else {
+              inputText = interactive.button_reply?.title || interactive.list_reply?.title || 'Interactive response';
+            }
           } else if (['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type)) {
             const mediaId = msg[msg.type]?.id;
             const caption = msg[msg.type]?.caption || '';
@@ -138,7 +157,14 @@ const receiveMessage = async (req, res) => {
               if (msg.type && ['image', 'document', 'audio', 'video'].includes(msg.type)) {
                 mediaUrl = `https://graph.facebook.com/v21.0/${msg[msg.type].id}`;
               }
-              await FlowEngine.handleMessage(fromNumber, inputText, mediaUrl);
+              await FlowEngine.handleMessage(fromNumber, inputText, mediaUrl, {
+                msgType: msg.type,
+                mimeType,
+                mediaBuffer,
+                messageId: msg.id,
+                mediaId: msg[msg.type]?.id,
+                flowData: parsedFlowData
+              });
             } catch (err) {
               logger.error(`FlowEngine execution failed for ${fromNumber}:`, err.message);
             }

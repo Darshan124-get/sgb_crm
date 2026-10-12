@@ -186,6 +186,22 @@
                                         <span class="node-item-desc">Choose time slot</span>
                                     </div>
                                 </div>
+                                <div class="draggable-node-item" data-type="form"
+                                    onclick="addNodeToCanvas('form')">
+                                    <span class="node-icon teal-node-icon" style="background:#ccfbf1; color:#0d9488; border:1px solid #99f6e4;"><i class="fa-solid fa-rectangle-list"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Form</span>
+                                        <span class="node-item-desc">Delivery details & fields</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="wait_for_media"
+                                    onclick="addNodeToCanvas('wait_for_media')">
+                                    <span class="node-icon purple-node-icon" style="background:#f3e8ff; color:#9333ea; border:1px solid #e9d5ff;"><i class="fa-solid fa-file-arrow-up"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Wait for Media</span>
+                                        <span class="node-item-desc">Screenshot / evidence capture</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Category 2: Message Nodes -->
@@ -211,6 +227,14 @@
                                     <div class="node-item-info">
                                         <span class="node-item-name">Video</span>
                                         <span class="node-item-desc">Send video</span>
+                                    </div>
+                                </div>
+                                <div class="draggable-node-item" data-type="payment"
+                                    onclick="addNodeToCanvas('payment')">
+                                    <span class="node-icon orange-node-icon" style="background:#ffedd5; color:#ea580c; border:1px solid #fed7aa;"><i class="fa-solid fa-qrcode"></i></span>
+                                    <div class="node-item-info">
+                                        <span class="node-item-name">Payment / QR</span>
+                                        <span class="node-item-desc">Send payment details & QR</span>
                                     </div>
                                 </div>
                                 <div class="draggable-node-item" data-type="document"

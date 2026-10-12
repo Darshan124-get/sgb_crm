@@ -109,7 +109,7 @@ class FlowEngine {
     /**
      * Entry point: processes incoming messages for a phone number
      */
-    static async handleMessage(phone, messageText, mediaUrl = null) {
+    static async handleMessage(phone, messageText, mediaUrl = null, mediaDetails = {}) {
         console.log(`[FlowEngine] Received message from ${phone}: "${messageText}"`);
         const cleanedText = (messageText || '').trim().toLowerCase();
         const phoneTenDigits = (phone || '').replace(/\D/g, '').slice(-10);
@@ -145,15 +145,23 @@ class FlowEngine {
             for (const f of flows) {
                 const config = typeof f.config === 'string' ? JSON.parse(f.config) : f.config;
                 if (config) {
-                    const keywordStr = config.keywords || config.campaignTagline || '';
-                    if (keywordStr) {
-                        const words = keywordStr.split(/,|\n/).map(w => w.trim().toLowerCase()).filter(Boolean);
-                        // Strict exact match: incoming message must equal keyword/tagline exactly
-                        if (words.some(w => cleanedText === w)) {
+                    // Collect all valid trigger strings from both keywords and campaignTagline
+                    const triggerList = [];
+                    if (config.keywords) {
+                        triggerList.push(...String(config.keywords).split(/,|\n/).map(w => w.trim().toLowerCase()).filter(Boolean));
+                    }
+                    if (config.campaignTagline) {
+                        triggerList.push(...String(config.campaignTagline).split(/,|\n/).map(w => w.trim().toLowerCase()).filter(Boolean));
+                    }
+
+                    if (triggerList.length > 0) {
+                        // Strict exact match: incoming message must equal any keyword or campaign tagline
+                        if (triggerList.some(w => cleanedText === w)) {
                             // Check if this tagline/keyword is linked to a Campaign in the database
+                            const campaignSearch = config.campaignTagline || config.campaignId || '';
                             const [campaignRows] = await pool.query(
-                                'SELECT id, status, campaign_id, tag_line FROM campaigns WHERE LOWER(TRIM(tag_line)) = LOWER(TRIM(?)) OR LOWER(TRIM(tag_line)) = LOWER(TRIM(?))',
-                                [keywordStr, cleanedText]
+                                'SELECT id, status, campaign_id, tag_line FROM campaigns WHERE LOWER(TRIM(tag_line)) = LOWER(TRIM(?)) OR LOWER(TRIM(tag_line)) = LOWER(TRIM(?)) OR campaign_id = ?',
+                                [campaignSearch, cleanedText, config.campaignId || '']
                             );
 
                             let isCampaignFlow = false;
@@ -242,8 +250,36 @@ class FlowEngine {
                     [session.version_id]
                 );
 
-                if (edgeRows.length > 0) {
-                    session.current_node_key = edgeRows[0].target_node_key;
+                let nextKey = edgeRows.length > 0 ? edgeRows[0].target_node_key : null;
+
+                // Validate that nextKey exists in chatbot_nodes
+                if (nextKey) {
+                    const [chkNode] = await pool.query(
+                        'SELECT node_key FROM chatbot_nodes WHERE version_id = ? AND node_key = ? LIMIT 1',
+                        [session.version_id, nextKey]
+                    );
+                    if (chkNode.length === 0) {
+                        console.warn(`[FlowEngine] Start node edge points to non-existent node "${nextKey}". Falling back to start node config.nextNode.`);
+                        nextKey = null;
+                    }
+                }
+
+                // Fallback to startNode config.nextNode
+                if (!nextKey) {
+                    const [startNodes] = await pool.query(
+                        'SELECT config FROM chatbot_nodes WHERE version_id = ? AND node_key = "node-start" LIMIT 1',
+                        [session.version_id]
+                    );
+                    if (startNodes.length > 0) {
+                        const sCfg = typeof startNodes[0].config === 'string' ? JSON.parse(startNodes[0].config) : startNodes[0].config;
+                        if (sCfg && sCfg.nextNode) {
+                            nextKey = sCfg.nextNode;
+                        }
+                    }
+                }
+
+                if (nextKey) {
+                    session.current_node_key = nextKey;
                     await pool.query('UPDATE chatbot_sessions SET current_node_key = ?, variables = ? WHERE session_id = ?', 
                         [session.current_node_key, JSON.stringify(session.variables), session.session_id]);
                     await this.executeFlowLoop(session);
@@ -277,9 +313,17 @@ class FlowEngine {
         let nextNodeKey = null;
         let answerValue = messageText;
 
-        // Global check for human escape during active node prompt
-        const humanEscapes = ['agent', 'human', 'support', 'representative', 'talk to human'];
-        if (humanEscapes.some(h => cleanedText.includes(h))) {
+        // Global check for human escape during active node prompt (unless current node explicitly offers a matching button/choice)
+        const isChoiceNode = ['question', 'buttons', 'list', 'contact_time'].includes(currentNode.node_type);
+        const rawChoicesForCheck = isChoiceNode ? (config.choices || config.slots || (config.options ? config.options.map(o => o.label || o.value) : [])) : [];
+        const hasMatchingChoice = rawChoicesForCheck.some(c => {
+            const str = typeof c === 'string' ? c : (c.label || c.value || '');
+            const sLower = str.toLowerCase().trim();
+            return sLower === cleanedText || cleanedText.includes(sLower) || sLower.includes(cleanedText);
+        });
+
+        const humanEscapes = ['agent', 'human', 'representative', 'talk to human'];
+        if (!hasMatchingChoice && (humanEscapes.some(h => cleanedText.includes(h)) || cleanedText === 'support')) {
             await this.triggerHumanTakeover(session, 'Customer requested human support mid-prompt');
             return;
         }
@@ -440,6 +484,26 @@ class FlowEngine {
                 await whatsappService.sendMessage(phone, "Please attach a photo/image file to continue.", null, -1);
                 return;
             }
+        } else if (currentNode.node_type === 'form') {
+            // Reusable Form Node input processing
+            const formResult = await this.handleFormNodeInput(session, currentNode, config, messageText, phone, mediaDetails);
+            if (!formResult.success) {
+                await whatsappService.sendMessage(phone, formResult.message, null, -1);
+                return;
+            }
+            inputAccepted = true;
+            answerValue = formResult.summary;
+            nextNodeKey = await this.getNextTargetNodeKey(session.version_id, session.current_node_key, config);
+        } else if (currentNode.node_type === 'wait_for_media') {
+            // Reusable Wait for Media / Evidence Capture Node processing
+            const mediaResult = await this.handleWaitForMediaInput(session, currentNode, config, messageText, mediaUrl, mediaDetails, phone);
+            if (!mediaResult.success) {
+                await whatsappService.sendMessage(phone, mediaResult.message, null, -1);
+                return;
+            }
+            inputAccepted = true;
+            answerValue = mediaResult.summary;
+            nextNodeKey = await this.getNextTargetNodeKey(session.version_id, session.current_node_key, config);
         }
 
         if (inputAccepted && nextNodeKey) {
@@ -606,16 +670,19 @@ class FlowEngine {
                     let description = config.desc || config.description || '';
                     let imageUrl = config.image || config.image_url || '';
 
+                    let priceText = config.price || (config.amount ? `₹${config.amount}` : '');
+
                     // Look up catalog details ONLY if fields are missing
                     let catRows = [];
                     if (config.productId) {
-                        [catRows] = await pool.query('SELECT name, description, image_url FROM chatbot_products WHERE id = ?', [config.productId]);
+                        [catRows] = await pool.query('SELECT name, price, description, image_url FROM chatbot_products WHERE id = ?', [config.productId]);
                     }
                     if (catRows.length === 0 && productName) {
-                        [catRows] = await pool.query('SELECT name, description, image_url FROM chatbot_products WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))', [productName]);
+                        [catRows] = await pool.query('SELECT name, price, description, image_url FROM chatbot_products WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))', [productName]);
                     }
                     if (catRows.length > 0) {
                         productName = productName || catRows[0].name;
+                        priceText = priceText || (catRows[0].price ? `₹${parseFloat(catRows[0].price).toLocaleString('en-IN')}` : '');
                         description = description || catRows[0].description;
                         // ONLY use catalog image_url if node config image is completely empty
                         if (!imageUrl && catRows[0].image_url) {
@@ -625,10 +692,20 @@ class FlowEngine {
 
                     productName = productName || node.name || 'Product Details';
 
-                    // Format card text COMPLETELY WITHOUT price line
+                    // Format professional product card text
                     let cardText = `📦 *${productName}*`;
+                    if (priceText && config.showPrice !== false && config.show_price !== false) {
+                        const formattedPrice = String(priceText).startsWith('₹') ? priceText : `₹${priceText}`;
+                        cardText += `\n💰 *Price:* ${formattedPrice}`;
+                    }
                     if (description && description.trim()) {
-                        cardText += `\n\n${description.trim()}`;
+                        let cleanDesc = description.trim();
+                        if (priceText && config.showPrice !== false && config.show_price !== false) {
+                            cleanDesc = cleanDesc.replace(/\s*Price:\s*₹?\d+[\d,.]*\.?/gi, '').trim();
+                        }
+                        if (cleanDesc) {
+                            cardText += `\n\n${cleanDesc}`;
+                        }
                     }
 
                     if (imageUrl) {
@@ -730,6 +807,34 @@ class FlowEngine {
                     console.log(`[FlowEngine] Updated Lead ID ${leadId} ("${finalCustomerName}", Lang: ${flowLang || 'Unassigned'}) in CRM Lead Management.`);
                 }
 
+                // Support Call / Callback Task handling
+                if (config.actionType === 'callback_task' || config.reason === 'Call Support') {
+                    const callbackRemarks = `Callback Request: ${config.reason || 'Call Support'} for ${config.product || 'SGB Blade Protector'} via WhatsApp Chatbot`;
+                    await pool.query(
+                        'INSERT INTO lead_followups (lead_id, followup_date, status, remarks, created_by) VALUES (?, NOW(), "pending", ?, -1)',
+                        [leadId, callbackRemarks]
+                    ).catch(err => console.error('[CALLBACK TASK INSERT ERROR]', err.message));
+
+                    // Immediately alert admin
+                    const notifTitle = 'New Blade Protector Callback Request';
+                    const notifMsg = `Customer ${finalCustomerName} (${session.phone}) requested Call Support for ${config.product || 'SGB Blade Protector'}.`;
+                    await pool.query(
+                        'INSERT INTO notifications (lead_id, type, message, recipient_phone, status, sent_at) VALUES (?, "callback_request", ?, ?, "sent", NOW())',
+                        [leadId, notifMsg, session.phone]
+                    ).catch(() => {});
+
+                    await notificationService.sendToRole('admin', notifTitle, notifMsg, {
+                        phone: session.phone,
+                        type: 'callback_request',
+                        leadId: String(leadId)
+                    }).catch(() => {});
+                    await notificationService.sendToRole('whatsapp_manager', notifTitle, notifMsg, {
+                        phone: session.phone,
+                        type: 'callback_request',
+                        leadId: String(leadId)
+                    }).catch(() => {});
+                }
+
                 session.lead_id = leadId;
                 await pool.query('UPDATE chatbot_sessions SET lead_id = ?, variables = ? WHERE session_id = ?', 
                     [leadId, JSON.stringify(session.variables), session.session_id]);
@@ -785,6 +890,47 @@ class FlowEngine {
                     currentKey = matchedNextNode;
                 }
             } 
+            else if (node.node_type === 'payment' || node.node_type === 'qr_code') {
+                try {
+                    const payableAmount = config.amount || 600;
+                    session.variables.payable_amount = payableAmount;
+                    session.variables.payment_status = 'pending_verification';
+                    session.variables.order_product = config.productName || 'SGB Blade Protector';
+
+                    let paymentMsg = config.message || `Thank you, Sir!\n\nYour SGB Blade Protector delivery details have been saved.\n\nAmount to pay: ₹{{payable_amount}}\n\nPlease scan the official payment QR code below to complete your payment.\n\nAfter completing the payment, please send your payment screenshot here on WhatsApp.\n\nOur team will verify your payment and process your order.`;
+                    paymentMsg = this.formatTextVariables(paymentMsg, session.variables);
+
+                    // Dynamically use uploaded QR code image from node config (never hardcoded)
+                    const qrUrl = config.qrImageUrl || config.qr_image_url || config.mediaUrl || config.image || config.image_url || config.file_url || '';
+                    if (qrUrl) {
+                        const sendRes = await whatsappService.sendMediaMessage(session.phone, qrUrl, 'image', paymentMsg, null, botSenderId);
+                        await this.waitForMediaDelivery(sendRes);
+                    } else {
+                        await whatsappService.sendMessage(session.phone, paymentMsg, null, botSenderId);
+                    }
+                } catch (err) {
+                    console.error(`[FlowEngine] Error executing Payment node ${currentKey}:`, err.message);
+                }
+                currentKey = await this.getNextTargetNodeKey(session.version_id, currentKey, config);
+            }
+            else if (node.node_type === 'form') {
+                await this.sendFormPrompt(session.phone, node, config, session);
+                await pool.query('UPDATE chatbot_sessions SET current_node_key = ?, variables = ? WHERE session_id = ?', [currentKey, JSON.stringify(session.variables), session.session_id]);
+                await this.syncLeadFromChatbotSession(session);
+                return;
+            }
+            else if (node.node_type === 'wait_for_media') {
+                const instructions = config.instructions || "Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.";
+                const formattedInstructions = this.formatTextVariables(instructions, session.variables);
+                // If the previous node in this execution cycle was already the Payment QR card with full instructions, avoid duplicate text
+                const wasPaymentExecuted = Array.from(visitedNodes).some(k => k.includes('payment') || k.includes('qr'));
+                if (!wasPaymentExecuted && formattedInstructions) {
+                    await whatsappService.sendMessage(session.phone, formattedInstructions, null, botSenderId);
+                }
+                await pool.query('UPDATE chatbot_sessions SET current_node_key = ?, variables = ? WHERE session_id = ?', [currentKey, JSON.stringify(session.variables), session.session_id]);
+                await this.syncLeadFromChatbotSession(session);
+                return;
+            }
             else if (node.node_type === 'question' || node.node_type === 'buttons' || node.node_type === 'list' || node.node_type === 'contact_time' || node.node_type === 'text_input' || node.node_type === 'number_input' || (node.node_type === 'message' && config.inputType === 'image')) {
                 // Interactive Node: Send prompt question / options and stop execution loop, pausing at this node waiting for user response
                 await this.sendNodePrompt(session.phone, node, config, session);
@@ -820,7 +966,8 @@ class FlowEngine {
         if (['question', 'buttons', 'list', 'contact_time'].includes(node.node_type)) {
             const rawChoices = config.choices || config.slots || (config.options ? config.options.map(o => o.label || o.value) : []);
             const choices = rawChoices.map((item, idx) => typeof item === 'string' ? item : (item.label || item.title || `Option ${idx + 1}`));
-            const promptText = config.question || 'Please select an option:';
+            const rawPrompt = config.question || config.message || 'Please select an option:';
+            const promptText = this.formatTextVariables(rawPrompt, session ? session.variables : {});
             
             try {
                 if ((node.node_type === 'buttons' || config.responseType === 'buttons' || (choices.length > 0 && choices.length <= 3)) && choices.length > 0 && choices.length <= 3) {
@@ -851,9 +998,12 @@ class FlowEngine {
                 }
             }
         } else if (node.node_type === 'text_input' || node.node_type === 'number_input') {
-            await whatsappService.sendMessage(phone, config.question || 'Please enter details:', null, botSenderId);
+            const rawPrompt = config.question || config.message || 'Please enter details:';
+            const promptText = this.formatTextVariables(rawPrompt, session ? session.variables : {});
+            await whatsappService.sendMessage(phone, promptText, null, botSenderId);
         } else if (node.node_type === 'message' && config.inputType === 'image') {
-            await whatsappService.sendMessage(phone, config.message, null, botSenderId);
+            const promptText = this.formatTextVariables(config.message || '', session ? session.variables : {});
+            await whatsappService.sendMessage(phone, promptText, null, botSenderId);
         }
     }
 
@@ -1024,6 +1174,277 @@ class FlowEngine {
             console.error('[FlowEngine] Error in pauseSessionForAgent:', err.message);
             return { success: false, error: err.message };
         }
+    }
+
+    /**
+     * Helper to send form prompt instructions via Native WhatsApp Flow
+     */
+    static async sendFormPrompt(phone, node, config, session) {
+        const botSenderId = -1;
+        const flowId = config.flowId || config.flow_id || process.env.META_FLOW_ID || '1471575221542737';
+
+        try {
+            await whatsappService.sendFlow(
+                phone,
+                config.title || 'Blade Protector Order',
+                config.description || 'Please tap below to fill your delivery details inside WhatsApp.',
+                config.submitButtonLabel || config.buttonText || 'Fill Delivery Details',
+                flowId,
+                'DELIVERY_DETAILS',
+                `flow_token_${session?.session_id || Date.now()}`,
+                botSenderId
+            );
+            console.log(`[FlowEngine] Native WhatsApp Flow (${flowId}) sent to ${phone}.`);
+        } catch (flowErr) {
+            console.warn(`[FlowEngine] Native WhatsApp Flow send failed (${flowErr.message}), falling back to text prompt:`);
+            const formPrompt = `📋 *${config.title || 'Blade Protector Delivery Details'}*\n\n${config.description || 'Please enter your delivery details.'}\n\nPlease reply with:\n1. *Full Name*\n2. *Delivery Address* (House no, Street, Village/Town)\n3. *PIN Code* (6 digits)\n4. *Confirmation*: Type "Yes" to confirm details are correct\n\n_Example:_\nRamesh Kumar\nNear Temple, Main Road, Kunigal, Tumkur\n572130\nYes`;
+            await whatsappService.sendMessage(phone, formPrompt, null, botSenderId);
+        }
+    }
+
+    /**
+     * Handles customer responses at the Form Node
+     */
+    static async handleFormNodeInput(session, currentNode, config, messageText, phone, mediaDetails = {}) {
+        const raw = (messageText || '').trim();
+        const vars = session.variables || {};
+
+        let extractedName = null;
+        let extractedAddr = null;
+        let extractedPin = null;
+        let extractedConfirm = false;
+
+        // Check if data came directly from Meta WhatsApp Flow submission
+        if (mediaDetails?.flowData) {
+            extractedName = (mediaDetails.flowData.customer_name || '').trim();
+            extractedAddr = (mediaDetails.flowData.delivery_address || '').trim();
+            extractedPin = (mediaDetails.flowData.pincode || '').toString().trim();
+            extractedConfirm = true;
+        }
+
+        const pinMatch = raw.match(/\b[1-9][0-9]{5}\b/);
+        const hasConfirmWord = /(?:yes|confirm|confirmed|correct|ok|ha|sari|true|1)\b/i.test(raw);
+
+        // Check if message is multi-line or labeled
+        const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        
+        const nameMatch = raw.match(/(?:name|full\s*name|hesaru)\s*[:=-]\s*([^\n,]+)/i);
+        const addrMatch = raw.match(/(?:address|delivery\s*address|ooru|vilasa)\s*[:=-]\s*([^\n]+)/i);
+
+        if (!extractedName) extractedName = nameMatch ? nameMatch[1].trim() : null;
+        if (!extractedAddr) extractedAddr = addrMatch ? addrMatch[1].trim() : null;
+        if (!extractedPin) extractedPin = pinMatch ? pinMatch[0] : null;
+        if (!extractedConfirm) extractedConfirm = hasConfirmWord;
+
+        if (!extractedName && lines.length >= 2) {
+            const candidateName = lines[0].replace(/^(?:1[.)]|\-)\s*/, '').trim();
+            if (!/^\d+$/.test(candidateName) && candidateName.length >= 2) {
+                extractedName = candidateName;
+            }
+        }
+
+        if (!extractedAddr && lines.length >= 3) {
+            const middleLines = lines.slice(1).filter(l => !l.match(/\b[1-9][0-9]{5}\b/) && !/^(?:yes|confirm|ok|1)$/i.test(l));
+            if (middleLines.length > 0) {
+                extractedAddr = middleLines.join(', ');
+            }
+        }
+
+        // Single message complete submission
+        if (extractedName && extractedAddr && extractedPin && extractedConfirm) {
+            vars.customer_name = extractedName;
+            vars.delivery_address = extractedAddr;
+            vars.pincode = extractedPin;
+            vars.address_confirmed = 'Yes';
+            vars.form_submitted_at = new Date().toISOString();
+
+            if (session.lead_id) {
+                await pool.query('UPDATE leads SET customer_name = ?, address = ?, pincode = ? WHERE lead_id = ?', [extractedName, extractedAddr, extractedPin, session.lead_id]).catch(() => {});
+            } else {
+                const phoneTen = phone.replace(/\D/g, '').slice(-10);
+                await pool.query('UPDATE leads SET customer_name = ?, address = ?, pincode = ? WHERE phone_number LIKE ?', [extractedName, extractedAddr, extractedPin, `%${phoneTen}`]).catch(() => {});
+            }
+
+            return {
+                success: true,
+                summary: `${extractedName}, ${extractedAddr}, ${extractedPin}`
+            };
+        }
+
+        // Sequential step fallback if not all supplied in one message:
+        if (!vars.customer_name) {
+            if (/^\d+$/.test(raw) || raw.replace(/\D/g, '').length >= 7) {
+                return {
+                    success: false,
+                    message: "⚠️ Please enter a valid customer name (pure numbers or phone numbers are not allowed as name)."
+                };
+            }
+            if (raw.length < 2) {
+                return {
+                    success: false,
+                    message: "⚠️ Please enter your Full Name:"
+                };
+            }
+            vars.customer_name = raw;
+            await pool.query('UPDATE chatbot_sessions SET variables = ? WHERE session_id = ?', [JSON.stringify(vars), session.session_id]);
+            return {
+                success: false,
+                message: `Thank you, Sir! Name saved: *${raw}*.\n\nPlease now enter your complete *Delivery Address* (House no, Street, Village/Town):`
+            };
+        } else if (!vars.delivery_address) {
+            if (raw.length < 5) {
+                return {
+                    success: false,
+                    message: "⚠️ Please enter a complete Delivery Address (House no, Street, Village/Town, Locality):"
+                };
+            }
+            if (pinMatch) {
+                vars.pincode = pinMatch[0];
+                vars.delivery_address = raw.replace(pinMatch[0], '').replace(/,\s*$/, '').trim();
+            } else {
+                vars.delivery_address = raw;
+            }
+            await pool.query('UPDATE chatbot_sessions SET variables = ? WHERE session_id = ?', [JSON.stringify(vars), session.session_id]);
+
+            if (vars.pincode) {
+                return {
+                    success: false,
+                    message: `Address saved: *${vars.delivery_address}*\nPIN Code: *${vars.pincode}*\n\nPlease reply *'Yes'* to confirm: "I confirm that my name, delivery address and PIN code are correct."`
+                };
+            } else {
+                return {
+                    success: false,
+                    message: `Delivery Address saved.\n\nPlease enter your *6-digit PIN Code* (e.g. 560001):`
+                };
+            }
+        } else if (!vars.pincode) {
+            if (!/^\d{6}$/.test(raw)) {
+                return {
+                    success: false,
+                    message: "⚠️ Invalid PIN code! PIN code must be exactly 6 digits (e.g. 572130). Please enter a valid 6-digit PIN code:"
+                };
+            }
+            vars.pincode = raw;
+            await pool.query('UPDATE chatbot_sessions SET variables = ? WHERE session_id = ?', [JSON.stringify(vars), session.session_id]);
+            return {
+                success: false,
+                message: `PIN code saved: *${raw}*.\n\nPlease reply *'Yes'* to confirm: "I confirm that my name, delivery address and PIN code are correct."`
+            };
+        } else {
+            const isConfirmed = /(?:yes|confirm|confirmed|correct|ok|ha|sari|true|1)\b/i.test(raw);
+            if (isConfirmed) {
+                vars.address_confirmed = 'Yes';
+                vars.form_submitted_at = new Date().toISOString();
+
+                if (session.lead_id) {
+                    await pool.query('UPDATE leads SET customer_name = ?, address = ?, pincode = ? WHERE lead_id = ?', [vars.customer_name, vars.delivery_address, vars.pincode, session.lead_id]).catch(() => {});
+                } else {
+                    const phoneTen = phone.replace(/\D/g, '').slice(-10);
+                    await pool.query('UPDATE leads SET customer_name = ?, address = ?, pincode = ? WHERE phone_number LIKE ?', [vars.customer_name, vars.delivery_address, vars.pincode, `%${phoneTen}`]).catch(() => {});
+                }
+
+                return {
+                    success: true,
+                    summary: `${vars.customer_name}, ${vars.delivery_address}, ${vars.pincode}`
+                };
+            } else {
+                return {
+                    success: false,
+                    message: `Please reply *'Yes'* to confirm your delivery details, or type your address again to edit it.`
+                };
+            }
+        }
+    }
+
+    /**
+     * Handles customer responses at the Wait for Media / Screenshot Capture Node
+     */
+    static async handleWaitForMediaInput(session, currentNode, config, messageText, mediaUrl, mediaDetails = {}, phone) {
+        const isMedia = Boolean(
+            mediaUrl ||
+            (mediaDetails && ['image', 'document'].includes(mediaDetails.msgType)) ||
+            (typeof messageText === 'string' && (messageText.startsWith('http://') || messageText.startsWith('https://') || messageText.includes('/api/media/')))
+        );
+
+        if (!isMedia) {
+            const reminder = config.reminderText || "⚠️ Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.";
+            return {
+                success: false,
+                message: reminder
+            };
+        }
+
+        const evidenceUrl = mediaUrl || (typeof messageText === 'string' && messageText.startsWith('http') ? messageText : '/api/media/received_evidence');
+        const vars = session.variables || {};
+        vars.payment_screenshot_url = evidenceUrl;
+        vars.payment_evidence_timestamp = new Date().toISOString();
+        vars.payment_verification_status = 'Payment Verification Pending';
+        vars.payment_status = 'pending_verification';
+
+        const customerName = vars.customer_name || 'WhatsApp Customer';
+        const deliveryAddress = vars.delivery_address || 'Address provided';
+        const pincode = vars.pincode || 'PIN provided';
+        const payableAmount = vars.payable_amount || config.amount || 600;
+
+        let orderId = null;
+        try {
+            const [existingOrders] = await pool.query(
+                'SELECT order_id FROM orders WHERE (lead_id = ? OR phone = ?) AND total_amount = ? ORDER BY order_id DESC LIMIT 1',
+                [session.lead_id || 0, phone, payableAmount]
+            );
+
+            if (existingOrders.length > 0) {
+                orderId = existingOrders[0].order_id;
+                await pool.query('UPDATE orders SET order_status = "in_review" WHERE order_id = ?', [orderId]);
+            } else {
+                const [ordRes] = await pool.query(
+                    'INSERT INTO orders (order_source, purchase_source, lead_id, customer_name, phone, address, pincode, total_amount, balance_amount, order_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    ['lead', 'whatsapp_chatbot', session.lead_id || null, customerName, phone, deliveryAddress, pincode, payableAmount, payableAmount, 'in_review']
+                );
+                orderId = ordRes.insertId;
+                await pool.query(
+                    'INSERT INTO order_items (order_id, product_name, quantity, price, total_amount) VALUES (?, ?, ?, ?, ?)',
+                    [orderId, config.product || 'SGB Blade Protector', 1, payableAmount, payableAmount]
+                ).catch(() => {});
+            }
+            vars.order_id = orderId;
+            vars.payment_status = 'pending_verification';
+            vars.payment_verification_status = 'Payment Verification Pending';
+        } catch (ordErr) {
+            console.error('[FlowEngine] Error recording order for evidence receipt:', ordErr.message);
+        }
+
+        // Trigger Admin Notifications
+        try {
+            const notifTitle = 'Blade Protector — Payment Screenshot Received';
+            const notifMsg = `Customer: ${customerName} (${phone})\nProduct: ${config.product || 'SGB Blade Protector'} (₹${payableAmount})\nAddress: ${deliveryAddress}, PIN: ${pincode}\nOrder ID: #${orderId || 'N/A'}\nStatus: Payment Verification Pending\nEvidence: ${evidenceUrl}`;
+
+            await pool.query(
+                'INSERT INTO notifications (order_id, lead_id, type, message, recipient_phone, status, sent_at) VALUES (?, ?, "payment_evidence", ?, ?, "sent", NOW())',
+                [orderId || null, session.lead_id || null, notifMsg, phone]
+            ).catch(err => console.error('[NOTIFICATION INSERT ERROR]', err.message));
+
+            await notificationService.sendToRole('admin', notifTitle, notifMsg, {
+                phone,
+                type: 'payment_screenshot',
+                orderId: String(orderId || ''),
+                sessionId: String(session.session_id)
+            }).catch(() => {});
+
+            await notificationService.sendToRole('whatsapp_manager', notifTitle, notifMsg, {
+                phone,
+                type: 'payment_screenshot',
+                orderId: String(orderId || ''),
+                sessionId: String(session.session_id)
+            }).catch(() => {});
+        } catch (notifErr) {
+            console.error('[FlowEngine] Error sending admin notification for payment screenshot:', notifErr.message);
+        }
+
+        return {
+            success: true,
+            summary: `Screenshot received (${evidenceUrl})`
+        };
     }
 }
 

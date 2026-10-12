@@ -366,6 +366,13 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       `;
     }
 
+    // Compute total pending payment verification count
+    const paymentQuery = `
+      SELECT COUNT(DISTINCT phone) AS total_payment 
+      FROM orders 
+      WHERE purchase_source = 'whatsapp_chatbot' AND order_status = 'in_review'
+    `;
+
     if (options.search) {
       const trimmedSearch = options.search.trim().toLowerCase();
       const searchDigits = trimmedSearch.replace(/\D/g, '');
@@ -393,15 +400,17 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       const [matchingLeads] = await db.execute(leadQuery, leadParams);
       const leadIds = matchingLeads.map(l => l.lead_id);
 
-      const [[unreadRows], [handoffRows]] = await Promise.all([
+      const [[unreadRows], [handoffRows], [paymentRows]] = await Promise.all([
         db.execute(unreadQuery, unreadParams),
-        db.execute(handoffQuery, handoffParams)
+        db.execute(handoffQuery, handoffParams),
+        db.execute(paymentQuery)
       ]);
       const unreadCount = unreadRows[0] ? parseInt(unreadRows[0].total_unread) : 0;
       const handoffCount = handoffRows[0] ? parseInt(handoffRows[0].total_handoff) : 0;
+      const paymentCount = paymentRows[0] ? parseInt(paymentRows[0].total_payment) : 0;
 
       if (leadIds.length === 0) {
-        return { customers: [], totalCount: 0, unreadCount, handoffCount };
+        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount };
       }
 
       const inClause = leadIds.map(() => '?').join(',');
@@ -417,7 +426,11 @@ const getAllChatCustomers = async (user = null, options = {}) => {
           COALESCE(agg.unread_msg_count, 0) AS unread_msg_count,
           cm_last.message AS last_message,
           cm_last.sender_type AS last_message_sender_type,
-          cm_last.status AS last_message_status
+          cm_last.status AS last_message_status,
+          p_ord.order_id AS payment_order_id,
+          p_ord.total_amount AS payment_amount,
+          p_ord.order_status AS payment_order_status,
+          p_ord.session_variables AS payment_session_variables
         FROM leads l
         LEFT JOIN users u ON l.assigned_to = u.user_id
         LEFT JOIN (
@@ -447,12 +460,40 @@ const getAllChatCustomers = async (user = null, options = {}) => {
           OR (cs_paused.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci)
           OR (cs_paused.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
         )
+        LEFT JOIN (
+          SELECT o.order_id, o.phone, o.customer_name, o.total_amount, o.order_status, cs.variables AS session_variables
+          FROM orders o
+          LEFT JOIN (
+            SELECT phone, MAX(session_id) as max_session_id
+            FROM chatbot_sessions
+            GROUP BY phone
+          ) cs_max ON (cs_max.phone COLLATE utf8mb4_unicode_ci = o.phone COLLATE utf8mb4_unicode_ci OR cs_max.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(o.phone, 10)) COLLATE utf8mb4_unicode_ci)
+          LEFT JOIN chatbot_sessions cs ON cs.session_id = cs_max.max_session_id
+          WHERE o.purchase_source = 'whatsapp_chatbot' AND o.order_status = 'in_review'
+        ) p_ord ON (p_ord.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci OR p_ord.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
         WHERE l.lead_id IN (${inClause})
         ORDER BY agg.last_message_at DESC, l.created_at DESC
       `;
 
       const [rows] = await db.execute(searchQuery, [...leadIds, ...leadIds]);
-      return { customers: rows, totalCount: rows.length, unreadCount, handoffCount };
+      const mappedRows = rows.map(r => {
+        let paymentScreenshotUrl = null;
+        if (r.payment_session_variables) {
+          try {
+            const pVars = typeof r.payment_session_variables === 'string' ? JSON.parse(r.payment_session_variables) : r.payment_session_variables;
+            paymentScreenshotUrl = pVars.payment_screenshot_url || null;
+          } catch (e) {}
+        }
+        return {
+          ...r,
+          has_pending_payment: Boolean(r.payment_order_id),
+          payment_order_id: r.payment_order_id || null,
+          payment_amount: r.payment_amount || null,
+          payment_screenshot_url: paymentScreenshotUrl
+        };
+      });
+
+      return { customers: mappedRows, totalCount: rows.length, unreadCount, handoffCount, paymentCount };
     }
 
     let query = `
@@ -467,7 +508,11 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         COALESCE(agg.unread_msg_count, 0) AS unread_msg_count,
         cm_last.message AS last_message,
         cm_last.sender_type AS last_message_sender_type,
-        cm_last.status AS last_message_status
+        cm_last.status AS last_message_status,
+        p_ord.order_id AS payment_order_id,
+        p_ord.total_amount AS payment_amount,
+        p_ord.order_status AS payment_order_status,
+        p_ord.session_variables AS payment_session_variables
       FROM leads l
       LEFT JOIN users u ON l.assigned_to = u.user_id
       LEFT JOIN (
@@ -496,6 +541,17 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         OR (cs_paused.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci)
         OR (cs_paused.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
       )
+      LEFT JOIN (
+        SELECT o.order_id, o.phone, o.customer_name, o.total_amount, o.order_status, cs.variables AS session_variables
+        FROM orders o
+        LEFT JOIN (
+          SELECT phone, MAX(session_id) as max_session_id
+          FROM chatbot_sessions
+          GROUP BY phone
+        ) cs_max ON (cs_max.phone COLLATE utf8mb4_unicode_ci = o.phone COLLATE utf8mb4_unicode_ci OR cs_max.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(o.phone, 10)) COLLATE utf8mb4_unicode_ci)
+        LEFT JOIN chatbot_sessions cs ON cs.session_id = cs_max.max_session_id
+        WHERE o.purchase_source = 'whatsapp_chatbot' AND o.order_status = 'in_review'
+      ) p_ord ON (p_ord.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci OR p_ord.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
       WHERE 1=1
     `;
     let params = [];
@@ -511,6 +567,8 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         query += " AND l.assigned_to = ?";
         params.push(user.id);
       }
+    } else if (options.tab === 'payment') {
+      query += " AND p_ord.order_id IS NOT NULL";
     } else if (options.tab === 'unviewed') {
       query += " AND COALESCE(agg.unread_msg_count, 0) > 0";
     } else if (options.tab === 'resolved') {
@@ -547,6 +605,12 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         countQuery += " AND l.assigned_to = ?";
         countParams.push(user.id);
       }
+    } else if (options.tab === 'payment') {
+      countQuery += ` AND EXISTS (
+        SELECT 1 FROM orders ord 
+        WHERE ord.purchase_source = 'whatsapp_chatbot' AND ord.order_status = 'in_review' 
+          AND (ord.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci OR ord.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(l.phone_number, 10)) COLLATE utf8mb4_unicode_ci)
+      )`;
     } else if (options.tab === 'unviewed') {
       // count unread
       countQuery += " AND EXISTS (SELECT 1 FROM chat_sessions cs JOIN chat_messages cm ON cs.session_id = cm.session_id WHERE cs.lead_id = l.lead_id AND cm.sender_type = 'user' AND cm.status = 'sent')";
@@ -554,22 +618,42 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       countQuery += " AND l.status IN ('converted', 'closed', 'lost')";
     }
 
-    const [[rows], [countRows], [unreadRows], [handoffRows]] = await Promise.all([
+    const [[rows], [countRows], [unreadRows], [handoffRows], [paymentRows]] = await Promise.all([
       db.execute(query, params),
       db.execute(countQuery, countParams),
       db.execute(unreadQuery, unreadParams),
-      db.execute(handoffQuery, handoffParams)
+      db.execute(handoffQuery, handoffParams),
+      db.execute(paymentQuery)
     ]);
 
     const totalCount = countRows[0] ? parseInt(countRows[0].total) : rows.length;
     const unreadCount = unreadRows[0] ? parseInt(unreadRows[0].total_unread) : 0;
     const handoffCount = handoffRows[0] ? parseInt(handoffRows[0].total_handoff) : 0;
+    const paymentCount = paymentRows[0] ? parseInt(paymentRows[0].total_payment) : 0;
+
+    const mappedCustomers = rows.map(r => {
+      let paymentScreenshotUrl = null;
+      if (r.payment_session_variables) {
+        try {
+          const pVars = typeof r.payment_session_variables === 'string' ? JSON.parse(r.payment_session_variables) : r.payment_session_variables;
+          paymentScreenshotUrl = pVars.payment_screenshot_url || null;
+        } catch (e) {}
+      }
+      return {
+        ...r,
+        has_pending_payment: Boolean(r.payment_order_id),
+        payment_order_id: r.payment_order_id || null,
+        payment_amount: r.payment_amount || null,
+        payment_screenshot_url: paymentScreenshotUrl
+      };
+    });
 
     return {
-      customers: rows,
+      customers: mappedCustomers,
       totalCount: totalCount,
       unreadCount: unreadCount,
       handoffCount: handoffCount,
+      paymentCount: paymentCount,
       page: page,
       limit: limit
     };

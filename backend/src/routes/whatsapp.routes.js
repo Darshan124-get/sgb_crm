@@ -13,6 +13,10 @@ router.get('/media/:chatId', authenticateToken, whatsappController.getMedia);
 router.get('/message/:chatId', authenticateToken, whatsappController.getMedia); // just correcting an earlier comment if any, but wait, there was getMedia
 router.delete('/message/:chatId', authenticateToken, whatsappController.deleteMessage);
 
+// Payment Verification Endpoints (Blade Protector Flow)
+router.post('/payments/verify', authenticateToken, whatsappController.verifyPayment);
+router.post('/payments/reject', authenticateToken, whatsappController.rejectPayment);
+
 // Quick Replies Endpoints
 router.get('/quick-replies', authenticateToken, whatsappController.getQuickReplies);
 router.post('/quick-replies', authenticateToken, whatsappController.saveQuickReply);

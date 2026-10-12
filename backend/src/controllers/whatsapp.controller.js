@@ -544,6 +544,114 @@ const markUnread = async (req, res) => {
   }
 };
 
+/**
+ * Verify a customer's payment screenshot for Blade Protector order
+ */
+const verifyPayment = async (req, res) => {
+  const { phone, orderId, notes } = req.body;
+  const staffUserId = req.user ? (req.user.id || req.user.user_id) : null;
+  const phoneTen = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+
+  try {
+    // 1. Update orders table
+    if (orderId) {
+      await pool.query(
+        'UPDATE orders SET order_status = "confirmed", balance_amount = 0, advance_amount = total_amount, updated_at = NOW() WHERE order_id = ?',
+        [orderId]
+      );
+    } else if (phoneTen) {
+      await pool.query(
+        'UPDATE orders SET order_status = "confirmed", balance_amount = 0, advance_amount = total_amount, updated_at = NOW() WHERE purchase_source = "whatsapp_chatbot" AND phone LIKE ? AND order_status = "in_review"',
+        [`%${phoneTen}`]
+      );
+    }
+
+    // 2. Update chatbot_sessions variables and keep paused for human staff
+    if (phoneTen) {
+      const [sessions] = await pool.query(
+        'SELECT session_id, variables FROM chatbot_sessions WHERE phone LIKE ? ORDER BY session_id DESC LIMIT 1',
+        [`%${phoneTen}`]
+      );
+      if (sessions.length > 0) {
+        let vars = {};
+        try {
+          vars = typeof sessions[0].variables === 'string' ? JSON.parse(sessions[0].variables) : (sessions[0].variables || {});
+        } catch (e) {}
+        vars.payment_verification_status = 'verified';
+        vars.payment_verified_at = new Date().toISOString();
+        vars.payment_verified_by = staffUserId;
+        vars.payment_verified_notes = notes || null;
+        vars.needs_payment_verification = false;
+
+        await pool.query(
+          'UPDATE chatbot_sessions SET status = "paused_for_human", variables = ? WHERE session_id = ?',
+          [JSON.stringify(vars), sessions[0].session_id]
+        );
+      }
+    }
+
+    logger.info(`[Payment Verification] Verified payment for phone ${phone || phoneTen}, orderId: ${orderId}`);
+    res.json({ success: true, message: 'Payment verified successfully. Order confirmed.' });
+  } catch (err) {
+    logger.error('Error verifying payment:', err.message);
+    res.status(500).json({ error: 'Failed to verify payment', details: err.message });
+  }
+};
+
+/**
+ * Reject a customer's payment screenshot for Blade Protector order
+ */
+const rejectPayment = async (req, res) => {
+  const { phone, orderId, reason } = req.body;
+  const staffUserId = req.user ? (req.user.id || req.user.user_id) : null;
+  const phoneTen = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+
+  try {
+    // 1. Update orders table
+    if (orderId) {
+      await pool.query(
+        'UPDATE orders SET order_status = "cancelled", updated_at = NOW() WHERE order_id = ?',
+        [orderId]
+      );
+    } else if (phoneTen) {
+      await pool.query(
+        'UPDATE orders SET order_status = "cancelled", updated_at = NOW() WHERE purchase_source = "whatsapp_chatbot" AND phone LIKE ? AND order_status = "in_review"',
+        [`%${phoneTen}`]
+      );
+    }
+
+    // 2. Update chatbot_sessions variables and keep paused for human staff
+    if (phoneTen) {
+      const [sessions] = await pool.query(
+        'SELECT session_id, variables FROM chatbot_sessions WHERE phone LIKE ? ORDER BY session_id DESC LIMIT 1',
+        [`%${phoneTen}`]
+      );
+      if (sessions.length > 0) {
+        let vars = {};
+        try {
+          vars = typeof sessions[0].variables === 'string' ? JSON.parse(sessions[0].variables) : (sessions[0].variables || {});
+        } catch (e) {}
+        vars.payment_verification_status = 'rejected';
+        vars.payment_rejected_at = new Date().toISOString();
+        vars.payment_rejected_reason = reason || 'Payment screenshot rejected by staff';
+        vars.payment_rejected_by = staffUserId;
+        vars.needs_payment_verification = false;
+
+        await pool.query(
+          'UPDATE chatbot_sessions SET status = "paused_for_human", variables = ? WHERE session_id = ?',
+          [JSON.stringify(vars), sessions[0].session_id]
+        );
+      }
+    }
+
+    logger.info(`[Payment Verification] Rejected payment for phone ${phone || phoneTen}, orderId: ${orderId}, reason: ${reason}`);
+    res.json({ success: true, message: 'Payment marked as rejected. Order cancelled.' });
+  } catch (err) {
+    logger.error('Error rejecting payment:', err.message);
+    res.status(500).json({ error: 'Failed to reject payment', details: err.message });
+  }
+};
+
 module.exports = {
   verifyWebhook,
   receiveMessage,
@@ -556,5 +664,7 @@ module.exports = {
   saveQuickReply,
   deleteQuickReply,
   markRead,
-  markUnread
+  markUnread,
+  verifyPayment,
+  rejectPayment
 };

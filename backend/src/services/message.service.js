@@ -350,9 +350,9 @@ const getAllChatCustomers = async (user = null, options = {}) => {
           JOIN (
             SELECT MAX(session_id) as max_session_id
             FROM chatbot_sessions
-            WHERE status = 'paused_for_human'
             GROUP BY COALESCE(lead_id, phone)
           ) cs2 ON cs1.session_id = cs2.max_session_id
+          WHERE cs1.status = 'paused_for_human'
         ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
            OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
         WHERE l.assigned_to = ? AND (l.status = 'human_needed' OR cs_paused.status = 'paused_for_human')
@@ -360,9 +360,20 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       handoffParams.push(user.id);
     } else {
       handoffQuery = `
-        SELECT COUNT(DISTINCT COALESCE(cs1.lead_id, cs1.phone)) AS total_handoff 
-        FROM chatbot_sessions cs1
-        WHERE cs1.status = 'paused_for_human'
+        SELECT COUNT(DISTINCT l.lead_id) AS total_handoff 
+        FROM leads l 
+        LEFT JOIN (
+          SELECT cs1.lead_id, cs1.phone, cs1.status
+          FROM chatbot_sessions cs1
+          JOIN (
+            SELECT MAX(session_id) as max_session_id
+            FROM chatbot_sessions
+            GROUP BY COALESCE(lead_id, phone)
+          ) cs2 ON cs1.session_id = cs2.max_session_id
+          WHERE cs1.status = 'paused_for_human'
+        ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
+           OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
+        WHERE (l.status = 'human_needed' OR cs_paused.status = 'paused_for_human')
       `;
     }
 
@@ -421,6 +432,8 @@ const getAllChatCustomers = async (user = null, options = {}) => {
           u.name AS assigned_name,
           cs_paused.status AS session_status,
           cs_paused.paused_at AS paused_at,
+          cs_paused.paused_session_variables,
+          cs_paused.paused_node_key,
           agg.last_message_at,
           agg.last_inbound_at,
           COALESCE(agg.unread_msg_count, 0) AS unread_msg_count,
@@ -447,14 +460,14 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         ) agg ON l.lead_id = agg.lead_id
         LEFT JOIN chat_messages cm_last ON cm_last.chat_id = agg.max_chat_id
         LEFT JOIN (
-          SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
+          SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at, cs1.current_node_key AS paused_node_key, cs1.variables AS paused_session_variables
           FROM chatbot_sessions cs1
           JOIN (
             SELECT phone, MAX(session_id) as max_session_id
             FROM chatbot_sessions
-            WHERE status = 'paused_for_human'
             GROUP BY phone
           ) cs2 ON cs1.session_id = cs2.max_session_id
+          WHERE cs1.status = 'paused_for_human'
         ) cs_paused ON (
           (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
           OR (cs_paused.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci)
@@ -484,8 +497,26 @@ const getAllChatCustomers = async (user = null, options = {}) => {
             paymentScreenshotUrl = pVars.payment_screenshot_url || null;
           } catch (e) {}
         }
+
+        let isCallSupport = false;
+        let callSupportProduct = 'SGB Blade Protector';
+        if (r.paused_session_variables) {
+          try {
+            const sVars = typeof r.paused_session_variables === 'string' ? JSON.parse(r.paused_session_variables) : r.paused_session_variables;
+            if (sVars.is_call_support === true || sVars.call_support_requested === true || sVars.handoff_reason === 'Call Support') {
+              isCallSupport = true;
+              if (sVars.call_support_product) callSupportProduct = sVars.call_support_product;
+            }
+          } catch (e) {}
+        }
+        if (!isCallSupport && (r.paused_node_key === 'node-support-callback' || r.paused_node_key === 'node-support-ack')) {
+          isCallSupport = true;
+        }
+
         return {
           ...r,
+          is_call_support: isCallSupport,
+          call_support_product: callSupportProduct,
           has_pending_payment: Boolean(r.payment_order_id),
           payment_order_id: r.payment_order_id || null,
           payment_amount: r.payment_amount || null,
@@ -503,6 +534,8 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         u.name AS assigned_name,
         cs_paused.status AS session_status,
         cs_paused.paused_at AS paused_at,
+        cs_paused.paused_session_variables,
+        cs_paused.paused_node_key,
         agg.last_message_at,
         agg.last_inbound_at,
         COALESCE(agg.unread_msg_count, 0) AS unread_msg_count,
@@ -528,14 +561,14 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       ) agg ON l.lead_id = agg.lead_id
       LEFT JOIN chat_messages cm_last ON cm_last.chat_id = agg.max_chat_id
       LEFT JOIN (
-        SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at
+        SELECT cs1.lead_id, cs1.phone, cs1.status, cs1.paused_at, cs1.current_node_key AS paused_node_key, cs1.variables AS paused_session_variables
         FROM chatbot_sessions cs1
         JOIN (
           SELECT phone, MAX(session_id) as max_session_id
           FROM chatbot_sessions
-          WHERE status = 'paused_for_human'
           GROUP BY phone
         ) cs2 ON cs1.session_id = cs2.max_session_id
+        WHERE cs1.status = 'paused_for_human'
       ) cs_paused ON (
         (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
         OR (cs_paused.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci)
@@ -587,9 +620,9 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         JOIN (
           SELECT MAX(session_id) as max_session_id
           FROM chatbot_sessions
-          WHERE status = 'paused_for_human'
           GROUP BY COALESCE(lead_id, phone)
         ) cs2 ON cs1.session_id = cs2.max_session_id
+        WHERE cs1.status = 'paused_for_human'
       ) cs_paused ON (cs_paused.lead_id IS NOT NULL AND l.lead_id = cs_paused.lead_id)
          OR (RIGHT(REPLACE(l.phone_number, '+', ''), 10) COLLATE utf8mb4_general_ci = RIGHT(REPLACE(cs_paused.phone, '+', ''), 10) COLLATE utf8mb4_general_ci AND LENGTH(REPLACE(cs_paused.phone, '+', '')) >= 10)
       WHERE 1=1
@@ -639,8 +672,26 @@ const getAllChatCustomers = async (user = null, options = {}) => {
           paymentScreenshotUrl = pVars.payment_screenshot_url || null;
         } catch (e) {}
       }
+
+      let isCallSupport = false;
+      let callSupportProduct = 'SGB Blade Protector';
+      if (r.paused_session_variables) {
+        try {
+          const sVars = typeof r.paused_session_variables === 'string' ? JSON.parse(r.paused_session_variables) : r.paused_session_variables;
+          if (sVars.is_call_support === true || sVars.call_support_requested === true || sVars.handoff_reason === 'Call Support') {
+            isCallSupport = true;
+            if (sVars.call_support_product) callSupportProduct = sVars.call_support_product;
+          }
+        } catch (e) {}
+      }
+      if (!isCallSupport && (r.paused_node_key === 'node-support-callback' || r.paused_node_key === 'node-support-ack')) {
+        isCallSupport = true;
+      }
+
       return {
         ...r,
+        is_call_support: isCallSupport,
+        call_support_product: callSupportProduct,
         has_pending_payment: Boolean(r.payment_order_id),
         payment_order_id: r.payment_order_id || null,
         payment_amount: r.payment_amount || null,

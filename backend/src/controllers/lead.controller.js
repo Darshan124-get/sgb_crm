@@ -284,12 +284,30 @@ exports.getLeadById = async (req, res) => {
              FROM chatbot_sessions cs
              JOIN chatbot_flows cf ON cs.flow_id = cf.flow_id
              WHERE cs.lead_id = ? OR cs.phone = ? OR cs.phone LIKE ?
-             ORDER BY cs.session_id DESC LIMIT 1`,
+             ORDER BY cs.session_id DESC LIMIT 20`,
             [lead.lead_id, lead.phone_number, `%${phoneTen}`]
         );
 
         if (sessionRows.length > 0) {
-            const session = sessionRows[0];
+            const isAnswerKey = (k) => ![
+                'first_message', 'is_campaign', '_retry_count', 'flow_id', 'version_id',
+                'payment_verification_status', 'payment_rejected_at', 'payment_rejected_reason',
+                'payment_rejected_by', 'needs_payment_verification', 'payment_verified_at', 'payment_verified_by', 'payment_verified_notes'
+            ].includes(k);
+
+            const countAnswers = (s) => {
+                try {
+                    const v = typeof s.variables === 'string' ? JSON.parse(s.variables) : (s.variables || {});
+                    return Object.keys(v).filter(isAnswerKey).length;
+                } catch(e) { return 0; }
+            };
+
+            let session = sessionRows[0];
+            const maxSession = sessionRows.reduce((prev, curr) => countAnswers(curr) > countAnswers(prev) ? curr : prev, sessionRows[0]);
+            if (countAnswers(maxSession) > countAnswers(session)) {
+                session = maxSession;
+            }
+
             let vars = {};
             try {
                 vars = typeof session.variables === 'string' ? JSON.parse(session.variables) : (session.variables || {});
@@ -306,7 +324,7 @@ exports.getLeadById = async (req, res) => {
                 [session.version_id]
             );
 
-            const questionNodes = nodes.filter(n => ['question', 'buttons', 'list', 'contact_time', 'text_input', 'number_input'].includes(n.node_type));
+            const questionNodes = nodes.filter(n => ['question', 'buttons', 'list', 'contact_time', 'text_input', 'number_input', 'form', 'wait_for_media'].includes(n.node_type));
 
             let steps = [];
             let answeredCount = 0;
@@ -319,13 +337,23 @@ exports.getLeadById = async (req, res) => {
                     } catch (e) {}
 
                     const saveKey = cfg.saveResponseTo || cfg.saveTo;
-                    const qText = cfg.question || node.name || `Question ${idx + 1}`;
+                    const qText = cfg.question || cfg.title || node.name || `Question ${idx + 1}`;
                     let cleanTitle = qText.replace(/^Q:\s*/i, '').split('\n')[0];
                     if (cleanTitle.length > 40) cleanTitle = cleanTitle.substring(0, 37) + '...';
 
                     let answerVal = null;
                     if (saveKey && vars[saveKey] !== undefined && vars[saveKey] !== null) {
                         answerVal = vars[saveKey];
+                    } else if (node.node_type === 'form') {
+                        if (vars.delivery_address) {
+                            answerVal = `${vars.delivery_address}${vars.pincode ? ' (PIN: ' + vars.pincode + ')' : ''}`;
+                        } else if (vars.address) {
+                            answerVal = `${vars.address}${vars.pincode ? ' (PIN: ' + vars.pincode + ')' : ''}`;
+                        }
+                    } else if (node.node_type === 'wait_for_media') {
+                        if (vars.payment_screenshot_url) {
+                            answerVal = 'Payment Screenshot Received';
+                        }
                     }
 
                     const isAnswered = answerVal !== null && answerVal !== undefined && String(answerVal).trim() !== '';
@@ -399,6 +427,97 @@ exports.getLeadById = async (req, res) => {
         } else {
             lead.chatbot_summary = null;
         }
+
+        // 🛡️ BLADE PROTECTOR DELIVERY DETAILS DISCOVERY
+        let bladeDelivery = null;
+
+        // Check if any session is linked to Flow 43 or Blade Protector
+        const bladeSession = sessionRows.find(s => 
+            s.flow_id === 43 || 
+            (s.flow_name && s.flow_name.toLowerCase().includes('blade protector'))
+        );
+
+        // Find session with delivery address (either Blade Protector or general)
+        const sessionWithAddress = sessionRows.find(s => {
+            let v = {};
+            try { v = typeof s.variables === 'string' ? JSON.parse(s.variables) : (s.variables || {}); } catch(e){}
+            return (v.delivery_address && String(v.delivery_address).trim() !== '') || 
+                   (v.address && String(v.address).trim() !== '');
+        });
+
+        const deliverySession = sessionWithAddress || bladeSession || (sessionRows.length > 0 ? sessionRows[0] : null);
+        let deliveryVars = {};
+        if (deliverySession) {
+            try {
+                deliveryVars = typeof deliverySession.variables === 'string' ? JSON.parse(deliverySession.variables) : (deliverySession.variables || {});
+            } catch(e) {
+                deliveryVars = {};
+            }
+        }
+
+        const bladeOrder = (lead.order_history || []).find(o => 
+            (o.items_summary && o.items_summary.toLowerCase().includes('blade protector')) ||
+            (o.purchase_source === 'whatsapp_chatbot' && parseFloat(o.total_amount) === 600)
+        ) || null;
+
+        const isBladeCustomer = Boolean(
+            bladeSession ||
+            bladeOrder ||
+            (deliverySession && deliverySession.flow_id === 43) ||
+            (deliverySession && deliverySession.flow_name && deliverySession.flow_name.toLowerCase().includes('blade protector')) ||
+            (deliveryVars.order_product && deliveryVars.order_product.toLowerCase().includes('blade')) ||
+            (deliveryVars.product_name && deliveryVars.product_name.toLowerCase().includes('blade')) ||
+            (deliveryVars.call_support_product && deliveryVars.call_support_product.toLowerCase().includes('blade')) ||
+            (lead.first_message && lead.first_message.toLowerCase().includes('blade'))
+        );
+
+        const extractedAddress = deliveryVars.delivery_address || deliveryVars.address || (bladeOrder ? bladeOrder.address : null) || lead.address || null;
+        const extractedPincode = deliveryVars.pincode || (bladeOrder ? bladeOrder.pincode : null) || lead.pincode || null;
+        const extractedName = deliveryVars.customer_name || (bladeOrder ? bladeOrder.customer_name : null) || lead.customer_name || null;
+        const extractedOrderId = deliveryVars.order_id || (bladeOrder ? bladeOrder.order_id : null) || null;
+        const extractedConfirmed = deliveryVars.address_confirmed || (extractedAddress ? 'Yes' : null);
+        const submittedTimestamp = deliveryVars.form_submitted_at || deliveryVars.payment_evidence_timestamp || (bladeOrder ? bladeOrder.created_at : null) || (deliverySession ? deliverySession.updated_at : null);
+        let screenshotUrl = deliveryVars.payment_screenshot_url || null;
+        if (phoneTen) {
+            try {
+                const [cmRows] = await pool.query(
+                    "SELECT cm.media_url FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id JOIN leads l ON cs.lead_id = l.lead_id WHERE (l.phone_number LIKE ? OR l.phone_number = ?) AND cm.sender_type = 'user' AND cm.message_type = 'image' AND cm.media_url IS NOT NULL ORDER BY cm.chat_id DESC LIMIT 1",
+                    [`%${phoneTen}`, lead.phone_number]
+                );
+                if (cmRows.length > 0 && cmRows[0].media_url) {
+                    screenshotUrl = cmRows[0].media_url;
+                }
+            } catch (cmErr) {}
+        }
+        if (screenshotUrl && screenshotUrl.includes('graph.facebook.com')) {
+            const mediaId = screenshotUrl.split('/').pop().replace(/\D/g, '');
+            if (mediaId) {
+                screenshotUrl = `/api/whatsapp/meta-media/${mediaId}`;
+            }
+        }
+        const paymentStatus = deliveryVars.payment_verification_status || deliveryVars.payment_status || (bladeOrder ? bladeOrder.order_status : null);
+
+        if (isBladeCustomer || (extractedAddress && String(extractedAddress).trim() !== '')) {
+            bladeDelivery = {
+                is_blade_protector: isBladeCustomer,
+                has_address: Boolean(extractedAddress && String(extractedAddress).trim() !== ''),
+                product_name: deliveryVars.order_product || deliveryVars.product_name || 'SGB Blade Protector',
+                payable_amount: deliveryVars.payable_amount || (bladeOrder ? bladeOrder.total_amount : 600),
+                recipient_name: extractedName,
+                delivery_address: extractedAddress,
+                pincode: extractedPincode,
+                address_confirmed: extractedConfirmed,
+                submitted_at: submittedTimestamp,
+                order_id: extractedOrderId,
+                payment_status: paymentStatus,
+                payment_screenshot_url: screenshotUrl,
+                session_id: deliverySession ? deliverySession.session_id : null,
+                flow_id: deliverySession ? deliverySession.flow_id : (bladeSession ? bladeSession.flow_id : 43),
+                flow_name: deliverySession ? deliverySession.flow_name : (bladeSession ? bladeSession.flow_name : 'SGB Blade Protector — Direct WhatsApp Sales')
+            };
+        }
+
+        lead.blade_delivery = bladeDelivery;
 
         res.json(lead);
     } catch (err) {

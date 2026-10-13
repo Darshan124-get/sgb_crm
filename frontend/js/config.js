@@ -10,10 +10,11 @@ const isLocal = window.location.origin.includes('localhost') ||
 
 const PROD_BACKEND_URL = 'https://paleturquoise-elk-361855.hostingersite.com';
 
-if (isLocal) {
+if (window.location.hostname.includes('ngrok')) {
+    window.BASE_URL = window.location.origin.replace(/\/$/, '');
+} else if (isLocal) {
     window.BASE_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 } else {
-    // If hosted directly on hostingersite.com backend domain, use origin; otherwise use production backend cloud URL
     if (window.location.hostname.includes('hostingersite.com')) {
         window.BASE_URL = window.location.origin.replace(/\/$/, '');
     } else {
@@ -37,6 +38,13 @@ window.resolveMediaUrl = function (rawUrl) {
     }
 
     let cleanPath = trimmed;
+    if (cleanPath.includes('graph.facebook.com')) {
+        const mediaId = cleanPath.split('/').pop().replace(/\D/g, '');
+        if (mediaId) {
+            cleanPath = `/api/whatsapp/meta-media/${mediaId}`;
+        }
+    }
+
     if (cleanPath.startsWith('http://127.0.0.1:5000') || cleanPath.startsWith('http://localhost:5000')) {
         cleanPath = cleanPath.replace(/^http:\/\/(127\.0\.0\.1|localhost):5000/, '');
     } else if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {

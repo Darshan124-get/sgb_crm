@@ -386,6 +386,32 @@ const getMedia = async (req, res) => {
   }
 };
 
+/**
+ * Public Streamer: Fetch & stream media from Meta Graph API using WhatsApp Cloud Token
+ */
+const getMetaMedia = async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    if (!mediaId) return res.status(400).send('Missing media ID');
+
+    const cleanId = String(mediaId).split('/').pop().replace(/\D/g, '');
+    if (!cleanId) return res.status(400).send('Invalid media ID');
+
+    const whatsappService = require('../services/whatsapp.service');
+    const { buffer, mimeType } = await whatsappService.downloadMedia(cleanId);
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Content-Type', mimeType || 'image/jpeg');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (err) {
+    logger.error(`Error streaming Meta media (${req.params.mediaId}):`, err.message);
+    res.status(500).send('Failed to load media');
+  }
+};
+
 const deleteMessage = async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -566,7 +592,7 @@ const verifyPayment = async (req, res) => {
       );
     }
 
-    // 2. Update chatbot_sessions variables and keep paused for human staff
+    // 2. Update chatbot_sessions: complete session and clear handoff flags
     if (phoneTen) {
       const [sessions] = await pool.query(
         'SELECT session_id, variables FROM chatbot_sessions WHERE phone LIKE ? ORDER BY session_id DESC LIMIT 1',
@@ -582,12 +608,27 @@ const verifyPayment = async (req, res) => {
         vars.payment_verified_by = staffUserId;
         vars.payment_verified_notes = notes || null;
         vars.needs_payment_verification = false;
+        delete vars.is_call_support;
+        delete vars.call_support_requested;
+        delete vars.handoff_reason;
 
         await pool.query(
-          'UPDATE chatbot_sessions SET status = "paused_for_human", variables = ? WHERE session_id = ?',
+          'UPDATE chatbot_sessions SET status = "completed", completed_at = NOW(), paused_at = NULL, variables = ? WHERE session_id = ?',
           [JSON.stringify(vars), sessions[0].session_id]
         );
       }
+
+      // Ensure any other active or paused sessions for this phone are also closed
+      await pool.query(
+        'UPDATE chatbot_sessions SET status = "completed", completed_at = NOW(), paused_at = NULL WHERE (phone LIKE ? OR phone = ?) AND (status = "paused_for_human" OR status = "active")',
+        [`%${phoneTen}`, phoneTen]
+      );
+
+      // 3. Update lead status out of human_needed to converted/assigned
+      await pool.query(
+        'UPDATE leads SET status = CASE WHEN status = "human_needed" THEN "converted" ELSE status END WHERE phone_number LIKE ?',
+        [`%${phoneTen}`]
+      );
     }
 
     logger.info(`[Payment Verification] Verified payment for phone ${phone || phoneTen}, orderId: ${orderId}`);
@@ -620,7 +661,7 @@ const rejectPayment = async (req, res) => {
       );
     }
 
-    // 2. Update chatbot_sessions variables and keep paused for human staff
+    // 2. Update chatbot_sessions: complete session and clear handoff flags
     if (phoneTen) {
       const [sessions] = await pool.query(
         'SELECT session_id, variables FROM chatbot_sessions WHERE phone LIKE ? ORDER BY session_id DESC LIMIT 1',
@@ -636,11 +677,35 @@ const rejectPayment = async (req, res) => {
         vars.payment_rejected_reason = reason || 'Payment screenshot rejected by staff';
         vars.payment_rejected_by = staffUserId;
         vars.needs_payment_verification = false;
+        delete vars.is_call_support;
+        delete vars.call_support_requested;
+        delete vars.handoff_reason;
 
         await pool.query(
-          'UPDATE chatbot_sessions SET status = "paused_for_human", variables = ? WHERE session_id = ?',
+          'UPDATE chatbot_sessions SET status = "completed", completed_at = NOW(), paused_at = NULL, variables = ? WHERE session_id = ?',
           [JSON.stringify(vars), sessions[0].session_id]
         );
+      }
+
+      // Ensure any other active or paused sessions for this phone are also closed
+      await pool.query(
+        'UPDATE chatbot_sessions SET status = "completed", completed_at = NOW(), paused_at = NULL WHERE (phone LIKE ? OR phone = ?) AND (status = "paused_for_human" OR status = "active")',
+        [`%${phoneTen}`, phoneTen]
+      );
+
+      // 3. Clear human_needed from lead
+      await pool.query(
+        'UPDATE leads SET status = CASE WHEN status = "human_needed" THEN "assigned" ELSE status END WHERE phone_number LIKE ?',
+        [`%${phoneTen}`]
+      );
+
+      // 4. Send WhatsApp rejection message to customer
+      try {
+        const whatsappService = require('../services/whatsapp.service');
+        const rejectMsg = `⚠️ *Payment Verification Update*\n\nYour payment screenshot could not be verified.\n*Reason:* ${reason || 'Invalid screenshot or payment not received'}.\n\nPlease send a clear payment screenshot or contact our support team.`;
+        await whatsappService.sendMessage(phone || phoneTen, rejectMsg, null, -1);
+      } catch (msgErr) {
+        logger.error('[Payment Verification] Rejection message error:', msgErr.message);
       }
     }
 
@@ -652,6 +717,99 @@ const rejectPayment = async (req, res) => {
   }
 };
 
+/**
+ * Get summary of pending payment verifications for live floating alerts & topbar counts
+ */
+const getPendingPaymentSummary = async (req, res) => {
+  try {
+    const [countRows] = await pool.query(
+      "SELECT COUNT(DISTINCT phone) AS total_pending FROM orders WHERE purchase_source = 'whatsapp_chatbot' AND order_status = 'in_review'"
+    );
+    const count = countRows[0] ? parseInt(countRows[0].total_pending) : 0;
+
+    let pending = [];
+    let latest = null;
+
+    if (count > 0) {
+      const [latestRows] = await pool.query(`
+        SELECT 
+          o.order_id,
+          o.phone,
+          o.customer_name,
+          o.total_amount,
+          o.order_status,
+          o.created_at,
+          o.updated_at,
+          cs.variables
+        FROM orders o
+        LEFT JOIN (
+          SELECT phone, MAX(session_id) as max_session_id
+          FROM chatbot_sessions
+          GROUP BY phone
+        ) cs_max ON (cs_max.phone COLLATE utf8mb4_unicode_ci = o.phone COLLATE utf8mb4_unicode_ci OR cs_max.phone COLLATE utf8mb4_unicode_ci LIKE CONCAT('%', RIGHT(o.phone, 10)) COLLATE utf8mb4_unicode_ci)
+        LEFT JOIN chatbot_sessions cs ON cs.session_id = cs_max.max_session_id
+        WHERE o.purchase_source = 'whatsapp_chatbot' AND o.order_status = 'in_review'
+        ORDER BY GREATEST(COALESCE(o.updated_at, '1970-01-01'), COALESCE(o.created_at, '1970-01-01')) DESC, o.order_id DESC
+        LIMIT 10
+      `);
+
+      for (const row of latestRows) {
+        let screenshotUrl = null;
+        let customerName = row.customer_name || 'WhatsApp Customer';
+        if (row.variables) {
+          try {
+            const v = typeof row.variables === 'string' ? JSON.parse(row.variables) : row.variables;
+            if (v.customer_name) customerName = v.customer_name;
+            screenshotUrl = v.payment_screenshot_url || null;
+          } catch (e) {}
+        }
+
+        // Try getting actual image from chat_messages if available
+        const phoneTen = String(row.phone || '').replace(/\D/g, '').slice(-10);
+        if (phoneTen) {
+          const [cmRows] = await pool.query(
+            "SELECT cm.chat_id, cm.media_url FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id JOIN leads l ON cs.lead_id = l.lead_id WHERE (l.phone_number LIKE ? OR l.phone_number = ?) AND cm.sender_type = 'user' AND cm.message_type = 'image' ORDER BY cm.chat_id DESC LIMIT 1",
+            [`%${phoneTen}`, row.phone]
+          );
+          if (cmRows.length > 0 && cmRows[0].media_url) {
+            screenshotUrl = cmRows[0].media_url;
+          }
+        }
+
+        if (screenshotUrl && screenshotUrl.includes('graph.facebook.com')) {
+          const mediaId = screenshotUrl.split('/').pop().replace(/\D/g, '');
+          if (mediaId) {
+            screenshotUrl = `/api/whatsapp/meta-media/${mediaId}`;
+          }
+        }
+
+        pending.push({
+          order_id: row.order_id,
+          order_number: `SGB-${row.order_id}`,
+          customer_name: customerName,
+          phone: row.phone,
+          total_amount: parseFloat(row.total_amount) || 600,
+          screenshot_url: screenshotUrl,
+          created_at: row.created_at,
+          updated_at: row.updated_at
+        });
+      }
+
+      latest = pending.length > 0 ? pending[0] : null;
+    }
+
+    res.json({
+      success: true,
+      count,
+      pending,
+      latest
+    });
+  } catch (err) {
+    logger.error('Error fetching pending payment summary:', err.message);
+    res.status(500).json({ error: 'Failed to fetch pending payment summary' });
+  }
+};
+
 module.exports = {
   verifyWebhook,
   receiveMessage,
@@ -659,6 +817,7 @@ module.exports = {
   getHistory,
   sendReply,
   getMedia,
+  getMetaMedia,
   deleteMessage,
   getQuickReplies,
   saveQuickReply,
@@ -666,5 +825,6 @@ module.exports = {
   markRead,
   markUnread,
   verifyPayment,
-  rejectPayment
+  rejectPayment,
+  getPendingPaymentSummary
 };

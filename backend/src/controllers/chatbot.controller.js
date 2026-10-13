@@ -148,7 +148,7 @@ exports.createFlowFromTemplate = async (req, res) => {
                 { key: 'node-wait-media', type: 'wait_for_media', name: 'Wait for Blade Protector Payment Evidence', x: 2820, y: 200, config: { title: 'Wait for Blade Protector Payment Evidence', acceptedTypes: ['image', 'document'], expectedEvidence: 'Payment screenshot', instructions: 'Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.', reminderText: '⚠️ Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.', product: 'SGB Blade Protector', amount: 600, nextNode: 'node-final-ack' } },
                 { key: 'node-final-ack', type: 'question', name: 'Final Customer Acknowledgment', x: 3100, y: 200, config: { question: 'Thank you, Sir! We have received your payment screenshot.\n\nOur team will verify your payment and contact you regarding the order.\n\nIf you need assistance, you can request a call from our team.\n\nThank you for choosing SGB Agro Industries!', responseType: 'buttons', choices: ['Call Support'], options: [{ label: 'Call Support', value: 'call_support', nextNode: 'node-support-callback' }], saveResponseTo: 'post_payment_choice' } },
                 { key: 'node-support-callback', type: 'create_lead', name: 'Call Support Callback Task', x: 1680, y: 500, config: { status: 'human_needed', source: 'WhatsApp Chatbot', actionType: 'callback_task', product: 'SGB Blade Protector', reason: 'Call Support', nextNode: 'node-support-ack' } },
-                { key: 'node-support-ack', type: 'end', name: 'Support Acknowledgment', x: 1980, y: 500, config: { message: 'Thank you, Sir! A support callback request has been registered for the SGB Blade Protector. Our sales and support team will contact you shortly.' } }
+                { key: 'node-support-ack', type: 'end', name: 'Support Acknowledgment', x: 1980, y: 500, config: { message: 'Thank you, Sir! A support callback request has been registered for the SGB Blade Protector.\n\nOur sales and support team will call you shortly.\n\nIf you need to call us directly, please contact:\n📞 *8277009667*' } }
             ];
             edges = [
                 { source: 'node-start', target: 'node-intro-img' },
@@ -1266,37 +1266,168 @@ exports.getPendingHumanAlerts = async (req, res) => {
         const isAdminUser = role === 'admin' || role === 'super-admin' || role.includes('admin');
         const isWhatsappManager = role === 'whatsapp_manager' || role.includes('whatsapp');
 
-        let sql = `
-            SELECT 
-                cs.session_id, cs.flow_id, cs.phone, cs.status as session_status, cs.paused_at, cs.current_node_key,
-                l.lead_id, l.customer_name, l.status as lead_status, l.assigned_to, l.score, l.city,
-                (
-                    SELECT message FROM chat_messages cm 
-                    JOIN chat_sessions s ON cm.session_id = s.session_id 
-                    WHERE s.lead_id = l.lead_id ORDER BY cm.chat_id DESC LIMIT 1
-                ) as last_message
+        // 1. Fetch active paused chatbot sessions
+        const [pausedSessions] = await pool.query(`
+            SELECT cs.session_id, cs.flow_id, cs.lead_id, cs.phone, cs.status as session_status, cs.paused_at, cs.current_node_key, cs.variables
             FROM chatbot_sessions cs
-            LEFT JOIN leads l ON (cs.lead_id IS NOT NULL AND cs.lead_id = l.lead_id) OR (l.phone_number COLLATE utf8mb4_general_ci LIKE CONCAT('%', RIGHT(REPLACE(cs.phone, '+', ''), 10)) COLLATE utf8mb4_general_ci)
-            WHERE (cs.status = 'paused_for_human' OR l.status = 'human_needed')
+            WHERE cs.status = 'paused_for_human'
+            ORDER BY cs.paused_at DESC, cs.session_id DESC
+            LIMIT 50
+        `);
+
+        // 2. Fetch leads marked human_needed
+        let leadSql = `
+            SELECT l.lead_id, l.customer_name, l.phone_number, l.status as lead_status, l.assigned_to, l.score, l.city, l.updated_at
+            FROM leads l
+            WHERE l.status = 'human_needed'
         `;
-
-        const queryParams = [];
-
-        // Telecallers / Executives only see handoff alerts for leads assigned to them
+        const leadParams = [];
         if (!isAdminUser && !isWhatsappManager) {
             if (userId) {
-                sql += ` AND l.assigned_to = ?`;
-                queryParams.push(userId);
+                leadSql += ` AND (l.assigned_to = ? OR l.assigned_to IS NULL)`;
+                leadParams.push(userId);
             } else {
                 return res.json([]);
             }
         }
+        leadSql += ` ORDER BY l.updated_at DESC, l.lead_id DESC LIMIT 50`;
+        const [humanLeads] = await pool.query(leadSql, leadParams);
 
-        sql += ` ORDER BY cs.paused_at DESC, cs.session_id DESC`;
+        // Map together into fast dictionary
+        const alertsMap = new Map();
 
-        const [rows] = await pool.query(sql, queryParams);
+        for (const s of pausedSessions) {
+            let vars = {};
+            try { vars = typeof s.variables === 'string' ? JSON.parse(s.variables) : (s.variables || {}); } catch (e) {}
+            const phoneClean = (s.phone || '').replace(/\D/g, '').slice(-10);
 
-        res.json(rows);
+            const isCallSupport = !!(
+                vars.is_call_support === true ||
+                vars.call_support_requested === true ||
+                vars.handoff_reason === 'Call Support' ||
+                s.current_node_key === 'node-support-callback' ||
+                s.current_node_key === 'node-support-ack'
+            );
+
+            alertsMap.set(s.session_id, {
+                session_id: s.session_id,
+                flow_id: s.flow_id,
+                phone: s.phone,
+                phoneClean,
+                session_status: s.session_status,
+                paused_at: s.paused_at,
+                current_node_key: s.current_node_key,
+                variables: s.variables,
+                lead_id: s.lead_id || null,
+                customer_name: null,
+                lead_status: 'human_needed',
+                assigned_to: null,
+                score: null,
+                city: null,
+                last_message: null,
+                is_call_support: isCallSupport,
+                call_support_product: vars.call_support_product || 'SGB Blade Protector',
+                call_support_requested_at: vars.call_support_requested_at || s.paused_at
+            });
+        }
+
+        // Fill lead details for sessions
+        for (const [sId, alert] of alertsMap) {
+            let lead = null;
+            if (alert.lead_id) {
+                const [lRows] = await pool.query('SELECT lead_id, customer_name, phone_number, status, assigned_to, score, city FROM leads WHERE lead_id = ? LIMIT 1', [alert.lead_id]);
+                if (lRows.length > 0) lead = lRows[0];
+            } else if (alert.phoneClean) {
+                const [lRows] = await pool.query('SELECT lead_id, customer_name, phone_number, status, assigned_to, score, city FROM leads WHERE phone_number LIKE ? LIMIT 1', [`%${alert.phoneClean}`]);
+                if (lRows.length > 0) lead = lRows[0];
+            }
+            if (lead) {
+                // If telecaller/executive, verify assignment
+                if (!isAdminUser && !isWhatsappManager && userId && lead.assigned_to && lead.assigned_to !== userId) {
+                    alertsMap.delete(sId);
+                    continue;
+                }
+                alert.lead_id = lead.lead_id;
+                alert.customer_name = lead.customer_name;
+                alert.lead_status = lead.status;
+                alert.assigned_to = lead.assigned_to;
+                alert.score = lead.score;
+                alert.city = lead.city;
+            } else if (!isAdminUser && !isWhatsappManager) {
+                alertsMap.delete(sId);
+            }
+        }
+
+        // Add human_needed leads that aren't already represented
+        for (const hl of humanLeads) {
+            const hlPhoneClean = (hl.phone_number || '').replace(/\D/g, '').slice(-10);
+            const exists = Array.from(alertsMap.values()).some(a => a.lead_id === hl.lead_id || (hlPhoneClean && a.phoneClean === hlPhoneClean));
+            if (!exists) {
+                // Check latest session or pending callback followup for this lead to accurately classify Call Support
+                const [[latestSession]] = await pool.query(
+                    'SELECT session_id, flow_id, current_node_key, variables, paused_at FROM chatbot_sessions WHERE (lead_id = ? OR phone LIKE ?) ORDER BY session_id DESC LIMIT 1',
+                    [hl.lead_id, `%${hlPhoneClean}`]
+                );
+                let leadIsCallSupport = false;
+                let sVars = {};
+                if (latestSession) {
+                    try { sVars = typeof latestSession.variables === 'string' ? JSON.parse(latestSession.variables) : (latestSession.variables || {}); } catch (e) {}
+                    if (sVars.is_call_support || sVars.call_support_requested || sVars.handoff_reason === 'Call Support' || latestSession.current_node_key === 'node-support-callback' || latestSession.current_node_key === 'node-support-ack') {
+                        leadIsCallSupport = true;
+                    }
+                }
+                if (!leadIsCallSupport) {
+                    const [[followupRow]] = await pool.query(
+                        'SELECT followup_id FROM lead_followups WHERE lead_id = ? AND (remarks LIKE "%Call Support%" OR remarks LIKE "%callback%") AND status = "pending" LIMIT 1',
+                        [hl.lead_id]
+                    );
+                    if (followupRow) leadIsCallSupport = true;
+                }
+
+                alertsMap.set(`lead_${hl.lead_id}`, {
+                    session_id: latestSession ? latestSession.session_id : null,
+                    flow_id: latestSession ? latestSession.flow_id : null,
+                    phone: hl.phone_number,
+                    phoneClean: hlPhoneClean,
+                    session_status: 'paused_for_human',
+                    paused_at: (latestSession && latestSession.paused_at) ? latestSession.paused_at : hl.updated_at,
+                    current_node_key: latestSession ? latestSession.current_node_key : null,
+                    variables: sVars,
+                    lead_id: hl.lead_id,
+                    customer_name: hl.customer_name,
+                    lead_status: hl.status,
+                    assigned_to: hl.assigned_to,
+                    score: hl.score,
+                    city: hl.city,
+                    last_message: null,
+                    is_call_support: leadIsCallSupport,
+                    call_support_product: sVars.call_support_product || 'SGB Blade Protector',
+                    call_support_requested_at: (latestSession && latestSession.paused_at) ? latestSession.paused_at : hl.updated_at
+                });
+            }
+        }
+
+        // Fill last_message for alerts and verify support callback text
+        for (const [key, alert] of alertsMap) {
+            if (alert.lead_id) {
+                const [cmRows] = await pool.query(
+                    'SELECT message FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id WHERE cs.lead_id = ? ORDER BY cm.chat_id DESC LIMIT 1',
+                    [alert.lead_id]
+                );
+                if (cmRows.length > 0) {
+                    alert.last_message = cmRows[0].message;
+                }
+            }
+            if (!alert.is_call_support && alert.last_message && (
+                alert.last_message.toLowerCase().includes('support callback request') ||
+                alert.last_message.toLowerCase().includes('callback request has been registered')
+            )) {
+                alert.is_call_support = true;
+            }
+        }
+
+        const results = Array.from(alertsMap.values());
+        res.json(results);
     } catch (err) {
         console.error('[GET PENDING HUMAN ALERTS ERROR]', err);
         res.status(500).json({ message: 'Error fetching human handoff alerts' });

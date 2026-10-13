@@ -11,9 +11,11 @@ router.get('/history/:phone', authenticateToken, whatsappController.getHistory);
 router.post('/send', authenticateToken, whatsappController.sendReply);
 router.get('/media/:chatId', authenticateToken, whatsappController.getMedia);
 router.get('/message/:chatId', authenticateToken, whatsappController.getMedia); // just correcting an earlier comment if any, but wait, there was getMedia
+router.get('/meta-media/:mediaId', whatsappController.getMetaMedia);
 router.delete('/message/:chatId', authenticateToken, whatsappController.deleteMessage);
 
 // Payment Verification Endpoints (Blade Protector Flow)
+router.get('/payments/pending-summary', authenticateToken, whatsappController.getPendingPaymentSummary);
 router.post('/payments/verify', authenticateToken, whatsappController.verifyPayment);
 router.post('/payments/reject', authenticateToken, whatsappController.rejectPayment);
 

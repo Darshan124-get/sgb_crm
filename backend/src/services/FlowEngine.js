@@ -51,10 +51,25 @@ class FlowEngine {
             let leadId = typeof sessionOrPhone === 'object' ? sessionOrPhone.lead_id : null;
 
             const phoneTenDigits = (phone || '').replace(/\D/g, '').slice(-10);
+            const isCallSupport = Boolean(reason && (reason.toLowerCase().includes('call support') || reason.toLowerCase().includes('callback')));
 
             // Update chatbot session state
             if (sessionId) {
-                await pool.query('UPDATE chatbot_sessions SET status = "paused_for_human", paused_at = NOW() WHERE session_id = ?', [sessionId]);
+                if (typeof sessionOrPhone === 'object') {
+                    sessionOrPhone.variables = sessionOrPhone.variables || {};
+                    if (isCallSupport) {
+                        sessionOrPhone.variables.is_call_support = true;
+                        sessionOrPhone.variables.call_support_requested = true;
+                        sessionOrPhone.variables.handoff_reason = 'Call Support';
+                    } else {
+                        delete sessionOrPhone.variables.is_call_support;
+                        delete sessionOrPhone.variables.call_support_requested;
+                        sessionOrPhone.variables.handoff_reason = reason;
+                    }
+                    await pool.query('UPDATE chatbot_sessions SET status = "paused_for_human", paused_at = NOW(), variables = ? WHERE session_id = ?', [JSON.stringify(sessionOrPhone.variables), sessionId]);
+                } else {
+                    await pool.query('UPDATE chatbot_sessions SET status = "paused_for_human", paused_at = NOW() WHERE session_id = ?', [sessionId]);
+                }
             } else {
                 await pool.query(
                     'UPDATE chatbot_sessions SET status = "paused_for_human", paused_at = NOW() WHERE (phone = ? OR phone = ? OR phone LIKE ?) AND status = "active"',
@@ -64,6 +79,9 @@ class FlowEngine {
 
             // Get lead information & update lead status to 'human_needed'
             let customerName = 'WhatsApp Lead';
+            const notifType = isCallSupport ? 'call_support' : 'human_takeover';
+            const notifTitle = isCallSupport ? '📞 Customer Requested Call Support' : '🚨 Human Assistance Needed';
+
             if (leadId) {
                 await pool.query('UPDATE leads SET status = "human_needed" WHERE lead_id = ?', [leadId]);
                 const [[leadRow]] = await pool.query('SELECT customer_name, assigned_to FROM leads WHERE lead_id = ?', [leadId]);
@@ -72,9 +90,9 @@ class FlowEngine {
                     if (leadRow.assigned_to) {
                         await notificationService.sendToUser(
                             leadRow.assigned_to,
-                            '🚨 Human Assistance Needed',
-                            `Lead ${customerName} (${phone}) requested human takeover: ${reason}`,
-                            { phone, type: 'human_takeover', sessionId: String(sessionId || '') }
+                            notifTitle,
+                            `Lead ${customerName} (${phone}) requested ${isCallSupport ? 'Call Support' : 'human takeover'}: ${reason}`,
+                            { phone, type: notifType, sessionId: String(sessionId || '') }
                         ).catch(err => console.error('[FCM ERROR]', err.message));
                     }
                 }
@@ -86,17 +104,17 @@ class FlowEngine {
                     if (leadRow.assigned_to) {
                         await notificationService.sendToUser(
                             leadRow.assigned_to,
-                            '🚨 Human Assistance Needed',
-                            `Lead ${customerName} (${phone}) requested human takeover: ${reason}`,
-                            { phone, type: 'human_takeover', sessionId: String(sessionId || '') }
+                            notifTitle,
+                            `Lead ${customerName} (${phone}) requested ${isCallSupport ? 'Call Support' : 'human takeover'}: ${reason}`,
+                            { phone, type: notifType, sessionId: String(sessionId || '') }
                         ).catch(err => console.error('[FCM ERROR]', err.message));
                     }
                 }
             }
 
-            // Send FCM push alerts to admin and whatsapp_manager roles (assigned staff receives via sendToUser above)
-            await notificationService.sendToRole('admin', '🚨 Human Assistance Needed', `Lead ${customerName} (${phone}) needs human takeover: ${reason}`, { phone, type: 'human_takeover' }).catch(() => {});
-            await notificationService.sendToRole('whatsapp_manager', '🚨 Human Assistance Needed', `Lead ${customerName} (${phone}) needs human takeover: ${reason}`, { phone, type: 'human_takeover' }).catch(() => {});
+            // Send FCM push alerts to admin and whatsapp_manager roles
+            await notificationService.sendToRole('admin', notifTitle, `Lead ${customerName} (${phone}) requested ${isCallSupport ? 'Call Support' : 'human takeover'}: ${reason}`, { phone, type: notifType }).catch(() => {});
+            await notificationService.sendToRole('whatsapp_manager', notifTitle, `Lead ${customerName} (${phone}) requested ${isCallSupport ? 'Call Support' : 'human takeover'}: ${reason}`, { phone, type: notifType }).catch(() => {});
 
             // Send WhatsApp handoff notice to customer
             await whatsappService.sendMessage(phone, 'Connecting you to a representative. Please wait, a salesperson will contact you shortly.', null, -1);
@@ -395,10 +413,26 @@ class FlowEngine {
                 if (saveVar) {
                     session.variables[saveVar] = answerValue;
                 }
+                const isCallSupportOption = String(answerValue).toLowerCase().includes('call support') ||
+                                            String(matchedOption.label || '').toLowerCase().includes('call support');
+                if (isCallSupportOption) {
+                    session.variables.is_call_support = true;
+                    session.variables.call_support_requested = true;
+                    session.variables.handoff_reason = 'Call Support';
+                } else {
+                    delete session.variables.is_call_support;
+                    delete session.variables.call_support_requested;
+                    if (session.variables.handoff_reason === 'Call Support') {
+                        delete session.variables.handoff_reason;
+                    }
+                }
             } else {
                 // Track retry attempts
                 const retryCount = (session.variables._retry_count || 0) + 1;
                 session.variables._retry_count = retryCount;
+                delete session.variables.is_call_support;
+                delete session.variables.call_support_requested;
+                session.variables.handoff_reason = 'Unrecognized choice (2 invalid attempts)';
                 await pool.query('UPDATE chatbot_sessions SET variables = ? WHERE session_id = ?', [JSON.stringify(session.variables), session.session_id]);
 
                 if (retryCount >= 2) {
@@ -815,22 +849,47 @@ class FlowEngine {
                         [leadId, callbackRemarks]
                     ).catch(err => console.error('[CALLBACK TASK INSERT ERROR]', err.message));
 
-                    // Immediately alert admin
-                    const notifTitle = 'New Blade Protector Callback Request';
-                    const notifMsg = `Customer ${finalCustomerName} (${session.phone}) requested Call Support for ${config.product || 'SGB Blade Protector'}.`;
+                    // Route to Human Handoff with Call Support flags
+                    session.variables = session.variables || {};
+                    session.variables.is_call_support = true;
+                    session.variables.call_support_requested = true;
+                    session.variables.call_support_product = config.product || 'SGB Blade Protector';
+                    session.variables.call_support_requested_at = new Date().toISOString();
+                    session.variables.handoff_reason = 'Call Support';
+                    session.status = 'paused_for_human';
+                    session.paused_at = new Date();
+
                     await pool.query(
-                        'INSERT INTO notifications (lead_id, type, message, recipient_phone, status, sent_at) VALUES (?, "callback_request", ?, ?, "sent", NOW())',
+                        'UPDATE chatbot_sessions SET status = "paused_for_human", paused_at = NOW(), variables = ? WHERE session_id = ?',
+                        [JSON.stringify(session.variables), session.session_id]
+                    );
+                    await pool.query(
+                        'UPDATE leads SET status = "human_needed" WHERE lead_id = ?',
+                        [leadId]
+                    );
+
+                    // Immediately alert admin & staff
+                    const notifTitle = '📞 Customer Requested Call Support';
+                    const notifMsg = `Customer ${finalCustomerName} (${session.phone}) requested Call Support for ${config.product || 'SGB Blade Protector'}. Handoff active.`;
+                    await pool.query(
+                        'INSERT INTO notifications (lead_id, type, message, recipient_phone, status, sent_at) VALUES (?, "call_support", ?, ?, "sent", NOW())',
                         [leadId, notifMsg, session.phone]
                     ).catch(() => {});
 
                     await notificationService.sendToRole('admin', notifTitle, notifMsg, {
                         phone: session.phone,
-                        type: 'callback_request',
+                        customerName: finalCustomerName,
+                        product: config.product || 'SGB Blade Protector',
+                        type: 'call_support',
+                        sessionId: String(session.session_id),
                         leadId: String(leadId)
                     }).catch(() => {});
                     await notificationService.sendToRole('whatsapp_manager', notifTitle, notifMsg, {
                         phone: session.phone,
-                        type: 'callback_request',
+                        customerName: finalCustomerName,
+                        product: config.product || 'SGB Blade Protector',
+                        type: 'call_support',
+                        sessionId: String(session.session_id),
                         leadId: String(leadId)
                     }).catch(() => {});
                 }
@@ -934,10 +993,10 @@ class FlowEngine {
             else if (node.node_type === 'question' || node.node_type === 'buttons' || node.node_type === 'list' || node.node_type === 'contact_time' || node.node_type === 'text_input' || node.node_type === 'number_input' || (node.node_type === 'message' && config.inputType === 'image')) {
                 // Interactive Node: Send prompt question / options and stop execution loop, pausing at this node waiting for user response
                 await this.sendNodePrompt(session.phone, node, config, session);
-                const newStatus = (session.variables && session.variables.needs_payment_verification) ? 'paused_for_human' : (session.status || 'active');
-                const pausedAtVal = newStatus === 'paused_for_human' ? new Date() : (session.paused_at || null);
+                const newStatus = session.status || 'active';
+                const pausedAtVal = newStatus === 'paused_for_human' ? (session.paused_at || new Date()) : null;
                 await pool.query(
-                    'UPDATE chatbot_sessions SET status = ?, paused_at = COALESCE(paused_at, ?), current_node_key = ?, variables = ? WHERE session_id = ?', 
+                    'UPDATE chatbot_sessions SET status = ?, paused_at = ?, current_node_key = ?, variables = ? WHERE session_id = ?', 
                     [newStatus, pausedAtVal, currentKey, JSON.stringify(session.variables), session.session_id]
                 );
                 await this.syncLeadFromChatbotSession(session);
@@ -946,8 +1005,17 @@ class FlowEngine {
             else if (node.node_type === 'end') {
                 const finalMsg = this.formatTextVariables(config.message || 'Thank you! Our sales team will contact you soon.', session.variables);
                 await whatsappService.sendMessage(session.phone, finalMsg, null, botSenderId);
-                await pool.query('UPDATE chatbot_sessions SET status = "completed", current_node_key = ?, variables = ?, completed_at = NOW() WHERE session_id = ?', 
-                    [currentKey, JSON.stringify(session.variables), session.session_id]);
+
+                const isCallSupportEnd = Boolean(
+                    session.status === 'paused_for_human' || 
+                    session.variables?.is_call_support || 
+                    currentKey === 'node-support-ack'
+                );
+                const endStatus = isCallSupportEnd ? 'paused_for_human' : 'completed';
+                await pool.query(
+                    'UPDATE chatbot_sessions SET status = ?, current_node_key = ?, variables = ?, paused_at = CASE WHEN ? = "paused_for_human" THEN COALESCE(paused_at, NOW()) ELSE paused_at END, completed_at = CASE WHEN ? = "completed" THEN NOW() ELSE completed_at END WHERE session_id = ?', 
+                    [endStatus, currentKey, JSON.stringify(session.variables), endStatus, endStatus, session.session_id]
+                );
                 await this.syncLeadFromChatbotSession(session);
                 return;
             } 
@@ -1401,7 +1469,10 @@ class FlowEngine {
 
             if (existingOrders.length > 0) {
                 orderId = existingOrders[0].order_id;
-                await pool.query('UPDATE orders SET order_status = "in_review" WHERE order_id = ?', [orderId]);
+                await pool.query(
+                    'UPDATE orders SET order_status = "in_review", customer_name = COALESCE(?, customer_name), address = COALESCE(?, address), pincode = COALESCE(?, pincode), updated_at = NOW() WHERE order_id = ?',
+                    [customerName, deliveryAddress, pincode, orderId]
+                );
             } else {
                 const [ordRes] = await pool.query(
                     'INSERT INTO orders (order_source, purchase_source, lead_id, customer_name, phone, address, pincode, total_amount, balance_amount, order_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

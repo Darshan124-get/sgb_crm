@@ -3989,13 +3989,31 @@ window.fetchPendingHumanAlerts = async function() {
 
         if (!res || !res.ok) return;
 
-        const alerts = await res.json();
+        let alerts = await res.json();
         if (!Array.isArray(alerts) || alerts.length === 0) {
             const toast = document.getElementById('telecaller-human-alert-toast');
             if (toast) toast.remove();
+            const callAlert = document.getElementById('floatingCallSupportAlert');
+            if (callAlert) callAlert.remove();
             lastAlertCount = 0;
             return;
         }
+
+        // Telecaller client-side assignment check: only show alerts for leads assigned to this user
+        try {
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const role = String(currentUser.role || '').toLowerCase();
+            const isAdmin = role === 'admin' || role === 'super-admin' || role.includes('admin');
+            const isWm = role === 'whatsapp_manager' || role.includes('whatsapp');
+            if (!isAdmin && !isWm) {
+                const currentUserId = String(currentUser.id || currentUser.user_id || '');
+                if (currentUserId) {
+                    alerts = alerts.filter(a => a.assigned_to && String(a.assigned_to) === currentUserId);
+                } else {
+                    alerts = [];
+                }
+            }
+        } catch (e) {}
 
         const dismissedList = getDismissedAlerts();
         const activeAlerts = alerts.filter(a => 

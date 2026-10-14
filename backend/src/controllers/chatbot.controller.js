@@ -1266,6 +1266,11 @@ exports.getPendingHumanAlerts = async (req, res) => {
         const isAdminUser = role === 'admin' || role === 'super-admin' || role.includes('admin');
         const isWhatsappManager = role === 'whatsapp_manager' || role.includes('whatsapp');
 
+        // If not admin or whatsapp_manager, user must have a valid userId
+        if (!isAdminUser && !isWhatsappManager && !userId) {
+            return res.json([]);
+        }
+
         // 1. Fetch active paused chatbot sessions
         const [pausedSessions] = await pool.query(`
             SELECT cs.session_id, cs.flow_id, cs.lead_id, cs.phone, cs.status as session_status, cs.paused_at, cs.current_node_key, cs.variables
@@ -1283,12 +1288,9 @@ exports.getPendingHumanAlerts = async (req, res) => {
         `;
         const leadParams = [];
         if (!isAdminUser && !isWhatsappManager) {
-            if (userId) {
-                leadSql += ` AND (l.assigned_to = ? OR l.assigned_to IS NULL)`;
-                leadParams.push(userId);
-            } else {
-                return res.json([]);
-            }
+            // ONLY select leads assigned to this telecaller (do not include unassigned leads)
+            leadSql += ` AND l.assigned_to = ?`;
+            leadParams.push(userId);
         }
         leadSql += ` ORDER BY l.updated_at DESC, l.lead_id DESC LIMIT 50`;
         const [humanLeads] = await pool.query(leadSql, leadParams);
@@ -1341,12 +1343,18 @@ exports.getPendingHumanAlerts = async (req, res) => {
                 const [lRows] = await pool.query('SELECT lead_id, customer_name, phone_number, status, assigned_to, score, city FROM leads WHERE phone_number LIKE ? LIMIT 1', [`%${alert.phoneClean}`]);
                 if (lRows.length > 0) lead = lRows[0];
             }
-            if (lead) {
-                // If telecaller/executive, verify assignment
-                if (!isAdminUser && !isWhatsappManager && userId && lead.assigned_to && lead.assigned_to !== userId) {
+
+            // For telecallers/staff (not admin or whatsapp_manager):
+            // The lead MUST exist, MUST be assigned, and MUST match this user's ID.
+            // If lead is unassigned or assigned to someone else, delete the alert immediately.
+            if (!isAdminUser && !isWhatsappManager) {
+                if (!lead || !lead.assigned_to || String(lead.assigned_to) !== String(userId)) {
                     alertsMap.delete(sId);
                     continue;
                 }
+            }
+
+            if (lead) {
                 alert.lead_id = lead.lead_id;
                 alert.customer_name = lead.customer_name;
                 alert.lead_status = lead.status;
@@ -1360,6 +1368,12 @@ exports.getPendingHumanAlerts = async (req, res) => {
 
         // Add human_needed leads that aren't already represented
         for (const hl of humanLeads) {
+            if (!isAdminUser && !isWhatsappManager) {
+                if (!hl.assigned_to || String(hl.assigned_to) !== String(userId)) {
+                    continue;
+                }
+            }
+
             const hlPhoneClean = (hl.phone_number || '').replace(/\D/g, '').slice(-10);
             const exists = Array.from(alertsMap.values()).some(a => a.lead_id === hl.lead_id || (hlPhoneClean && a.phoneClean === hlPhoneClean));
             if (!exists) {
@@ -1426,7 +1440,13 @@ exports.getPendingHumanAlerts = async (req, res) => {
             }
         }
 
-        const results = Array.from(alertsMap.values());
+        let results = Array.from(alertsMap.values());
+
+        // Final strict gate: non-admin and non-whatsapp-manager users only receive alerts for their assigned leads
+        if (!isAdminUser && !isWhatsappManager) {
+            results = results.filter(alert => alert.assigned_to && String(alert.assigned_to) === String(userId));
+        }
+
         res.json(results);
     } catch (err) {
         console.error('[GET PENDING HUMAN ALERTS ERROR]', err);

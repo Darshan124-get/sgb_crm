@@ -761,21 +761,25 @@ class TelephonyService {
                     if (token) {
                         const liveRes = await AcefoneProviderService.fetchLiveCalls(integration.base_url, token, integration.id);
                         if (liveRes.success && Array.isArray(liveRes.live_calls)) {
+                            const custDigits = String(callRecord.customer_phone || '').replace(/\D/g, '').slice(-10);
+                            const agentDigits = String(callRecord.agent_phone || '').replace(/\D/g, '').slice(-10);
+
                             const matched = liveRes.live_calls.find(c => {
                                 if (callRecord.acefone_ref_id && c.ref_id === callRecord.acefone_ref_id) return true;
                                 if (callRecord.acefone_call_id && c.call_id === callRecord.acefone_call_id) return true;
-                                const custDigits = String(callRecord.customer_phone || '').replace(/\D/g, '').slice(-10);
                                 const cPhone = String(c.customer_number || c.customer_no_with_prefix || c.call_to_number || c.destination || c.number || '').replace(/\D/g, '');
                                 if (custDigits && cPhone && cPhone.includes(custDigits)) return true;
+                                const aPhone = String(c.agent_number || c.agent_no || c.agent_phone || c.caller_id || '').replace(/\D/g, '');
+                                if (agentDigits && aPhone && aPhone.includes(agentDigits)) return true;
                                 return false;
                             });
+
+                            const [timeDiffRows] = await pool.query(`SELECT TIMESTAMPDIFF(SECOND, started_at, NOW()) as elapsed FROM telephony_calls WHERE id = ?`, [callId]);
+                            const elapsed = timeDiffRows[0] ? parseInt(timeDiffRows[0].elapsed) : 0;
 
                             if (matched) {
                                 const aceCallId = matched.call_id || callRecord.acefone_call_id;
                                 let newStatus = callRecord.technical_status;
-
-                                const [timeDiffRows] = await pool.query(`SELECT TIMESTAMPDIFF(SECOND, started_at, NOW()) as elapsed FROM telephony_calls WHERE id = ?`, [callId]);
-                                const elapsed = timeDiffRows[0] ? parseInt(timeDiffRows[0].elapsed) : 0;
 
                                 const isCustomerAnswered = (
                                     matched.customer_status === 'Answered' ||
@@ -806,57 +810,82 @@ class TelephonyService {
                                     callRecord.acefone_call_id = aceCallId;
                                 }
                             } else {
-                                // Call is no longer in live_calls (has finished or timed out on Acefone)
-                                const [timeDiffRows] = await pool.query(`SELECT TIMESTAMPDIFF(SECOND, started_at, NOW()) as elapsed FROM telephony_calls WHERE id = ?`, [callId]);
-                                const elapsed = timeDiffRows[0] ? parseInt(timeDiffRows[0].elapsed) : 0;
-
-                                if (callRecord.technical_status === 'CONNECTED') {
-                                    // Call was actively connected with both parties talking
-                                    const duration = Math.max(1, elapsed);
-                                    if (elapsed > 10800) { // Safety max call limit (3 hours)
+                                // Call is not in live_calls:
+                                // During early initiation & ringing, Acefone takes time to set up or live_calls is empty.
+                                // Do NOT prematurely mark as MISSED while elapsed time is within ringing limits!
+                                if (['REQUESTED', 'INITIATING'].includes(callRecord.technical_status)) {
+                                    if (elapsed >= 2 && elapsed < 60) {
+                                        // Update to RINGING_AGENT so UI shows active agent ringing
                                         await pool.query(`
                                             UPDATE telephony_calls
-                                            SET technical_status = 'COMPLETED',
+                                            SET technical_status = 'RINGING_AGENT'
+                                            WHERE id = ?
+                                        `, [callId]);
+                                        callRecord.technical_status = 'RINGING_AGENT';
+                                    } else if (elapsed >= 60) {
+                                        // Timeout: agent phone rang for 60s and was never answered
+                                        await pool.query(`
+                                            UPDATE telephony_calls
+                                            SET technical_status = 'MISSED',
+                                                talk_time_seconds = 0,
                                                 ended_at = COALESCE(ended_at, NOW()),
-                                                duration_seconds = GREATEST(duration_seconds, ?),
-                                                talk_time_seconds = GREATEST(talk_time_seconds, ?),
-                                                hangup_reason = COALESCE(hangup_reason, 'Max call duration limit reached')
+                                                hangup_reason = 'Agent did not answer call (Ringing timeout)'
                                             WHERE id = ?
-                                        `, [duration, duration, callId]);
-
-                                        callRecord.technical_status = 'COMPLETED';
-                                        callRecord.duration_seconds = duration;
-                                        callRecord.talk_time_seconds = duration;
-                                        callRecord.ended_at = new Date();
-                                    } else {
+                                        `, [callId]);
+                                        callRecord.technical_status = 'MISSED';
+                                        callRecord.talk_time_seconds = 0;
+                                        callRecord.hangup_reason = 'Agent did not answer call (Ringing timeout)';
+                                    }
+                                } else if (callRecord.technical_status === 'RINGING_AGENT') {
+                                    if (elapsed >= 60) {
                                         await pool.query(`
                                             UPDATE telephony_calls
-                                            SET duration_seconds = GREATEST(duration_seconds, ?),
-                                                talk_time_seconds = GREATEST(talk_time_seconds, ?)
+                                            SET technical_status = 'MISSED',
+                                                talk_time_seconds = 0,
+                                                ended_at = COALESCE(ended_at, NOW()),
+                                                hangup_reason = 'Agent did not answer call (Ringing timeout)'
                                             WHERE id = ?
-                                        `, [duration, duration, callId]);
-
-                                        callRecord.duration_seconds = Math.max(callRecord.duration_seconds || 0, duration);
-                                        callRecord.talk_time_seconds = Math.max(callRecord.talk_time_seconds || 0, duration);
+                                        `, [callId]);
+                                        callRecord.technical_status = 'MISSED';
+                                        callRecord.talk_time_seconds = 0;
+                                        callRecord.hangup_reason = 'Agent did not answer call (Ringing timeout)';
                                     }
-                                } else if (['CUSTOMER_RINGING', 'AGENT_ANSWERED', 'RINGING_AGENT', 'REQUESTED', 'INITIATING'].includes(callRecord.technical_status)) {
-                                    // Customer never answered (or agent hung up while waiting). It's a MISSED call with 0 talk time!
+                                } else if (['CUSTOMER_RINGING', 'AGENT_ANSWERED'].includes(callRecord.technical_status)) {
+                                    if (elapsed >= 90) {
+                                        await pool.query(`
+                                            UPDATE telephony_calls
+                                            SET technical_status = 'MISSED',
+                                                talk_time_seconds = 0,
+                                                ended_at = COALESCE(ended_at, NOW()),
+                                                hangup_reason = 'Customer did not answer (Ringing timeout)'
+                                            WHERE id = ?
+                                        `, [callId]);
+                                        callRecord.technical_status = 'MISSED';
+                                        callRecord.talk_time_seconds = 0;
+                                        callRecord.hangup_reason = 'Customer did not answer (Ringing timeout)';
+                                    }
+                                } else if (callRecord.technical_status === 'CONNECTED') {
+                                    // Call was previously active/talking and now has exited live_calls -> call finished!
+                                    const duration = Math.max(1, elapsed);
                                     await pool.query(`
                                         UPDATE telephony_calls
-                                        SET technical_status = 'MISSED',
-                                            talk_time_seconds = 0,
+                                        SET technical_status = 'COMPLETED',
                                             ended_at = COALESCE(ended_at, NOW()),
-                                            hangup_reason = 'Customer did not answer (Missed)'
+                                            duration_seconds = GREATEST(duration_seconds, ?),
+                                            talk_time_seconds = GREATEST(talk_time_seconds, ?),
+                                            hangup_reason = COALESCE(hangup_reason, 'Normal call completion')
                                         WHERE id = ?
-                                    `, [callId]);
+                                    `, [duration, duration, callId]);
 
-                                    callRecord.technical_status = 'MISSED';
-                                    callRecord.talk_time_seconds = 0;
-                                    callRecord.hangup_reason = 'Customer did not answer (Missed)';
+                                    callRecord.technical_status = 'COMPLETED';
+                                    callRecord.duration_seconds = duration;
+                                    callRecord.talk_time_seconds = duration;
+                                    callRecord.ended_at = new Date();
                                 }
                             }
                         }
                     }
+
                 }
             } catch (err) {
                 console.warn("[LIVE CALL CHECK NOTICE]", err.message);

@@ -450,7 +450,29 @@ window.updateAcefoneCallHudState = function(state, extraData = {}) {
         waveform.style.display = 'none';
         btnText.textContent = 'Close';
         cancelBtn.style.background = 'linear-gradient(135deg, #475569, #334155)';
+    } else if (state === 'MISSED') {
+        if (window.customerRingingTimeout) {
+            clearTimeout(window.customerRingingTimeout);
+            window.customerRingingTimeout = null;
+        }
+        if (window.hudLiveInterval) {
+            clearInterval(window.hudLiveInterval);
+            window.hudLiveInterval = null;
+        }
+        badge.innerHTML = '<i class="fas fa-phone-slash"></i> Call Missed';
+        badge.style.background = 'rgba(245, 158, 11, 0.25)';
+        badge.style.color = '#fbbf24';
+        agentStatus.textContent = 'Call Not Answered';
+        subtext.textContent = extraData.reason || 'Call was not answered.';
+        dots.style.display = 'none';
+        waveform.style.display = 'none';
+        btnText.textContent = 'Close';
+        cancelBtn.style.background = 'linear-gradient(135deg, #475569, #334155)';
     } else if (state === 'FAILED') {
+        if (window.customerRingingTimeout) {
+            clearTimeout(window.customerRingingTimeout);
+            window.customerRingingTimeout = null;
+        }
         if (window.hudLiveInterval) {
             clearInterval(window.hudLiveInterval);
             window.hudLiveInterval = null;
@@ -458,7 +480,7 @@ window.updateAcefoneCallHudState = function(state, extraData = {}) {
         badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Call Failed';
         badge.style.background = 'rgba(239, 68, 68, 0.25)';
         badge.style.color = '#fca5a5';
-        agentStatus.textContent = 'Connection Rejected';
+        agentStatus.textContent = 'Call Failed';
         subtext.textContent = extraData.reason || 'Call failed at Acefone provider.';
         dots.style.display = 'none';
         waveform.style.display = 'none';
@@ -669,7 +691,7 @@ window.monitorCallStatus = function(callId, destinationPhone, customerName) {
                     const reason = call.technical_status === 'BUSY'
                         ? 'Agent line was busy or call was declined.'
                         : (call.hangup_reason || 'Agent phone rang but call was not answered or was declined.');
-                    window.updateAcefoneCallHudState('FAILED', { reason });
+                    window.updateAcefoneCallHudState('MISSED', { reason });
                     if (window.showAlert) {
                         window.showAlert('Call Missed ⚠️', reason, 'warning');
                     }

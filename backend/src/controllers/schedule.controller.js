@@ -177,7 +177,7 @@ exports.reassign = async (req, res) => {
         if (followup.length === 0) return res.status(404).json({ message: 'Follow-up not found' });
 
         const leadId = followup[0].lead_id;
-        await pool.query('UPDATE leads SET assigned_to = ? WHERE lead_id = ?', [staff_id, leadId]);
+        await pool.query('UPDATE leads SET assigned_to = ?, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?', [staff_id, leadId]);
         
         await pool.query('INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)', 
             [leadId, req.user.id, `Lead reassigned from schedules view to staff ID: ${staff_id}`]);

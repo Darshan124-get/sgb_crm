@@ -1427,6 +1427,10 @@ function initLeadNav() {
             if (filter === 'manual') {
                 await loadComponent(contentArea, `${window.ROOT_PATH}components/manual-lead-form.html`, initManualLeadForm);
             } else {
+                const navUser = window.getCurrentUser ? window.getCurrentUser() : {};
+                const navUserRole = (navUser.role || '').toLowerCase();
+                const isTelecomUser = navUserRole === 'telecaller' || navUserRole === 'telecaller_executive' || (navUserRole.includes('telecaller') && !navUserRole.includes('manager'));
+
                 const filterConfig = {
                     open: { is_open: 'true' },
                     today: { is_today: 'true' },
@@ -1434,7 +1438,7 @@ function initLeadNav() {
                     followup: { status: 'followup' },
                     lost: { status: 'lost,not_interested' },
                     all: {},
-                    new: { status: 'new' }
+                    new: isTelecomUser ? { status: 'new' } : { status: 'new', is_unassigned: 'true' }
                 };
                 await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(filterConfig[filter] || {}));
             }
@@ -1763,13 +1767,46 @@ async function initLeadList(filters = {}, page = 1) {
 
         const currentUser = window.getCurrentUser ? window.getCurrentUser() : {};
         const currentUserRole = (currentUser.role || '').toLowerCase();
-        const isTelecomPanelUser = currentUserRole.includes('telecaller');
+        const isTelecomPanelUser = currentUserRole === 'telecaller' || currentUserRole === 'telecaller_executive' || (currentUserRole.includes('telecaller') && !currentUserRole.includes('manager'));
 
         tbody.innerHTML = leads.map(lead => {
             const rawStatus = (lead.status || '').toLowerCase();
-            const isNewOrAssigned = rawStatus === 'new' || rawStatus === 'assigned' || !rawStatus;
-            const statusClass = isNewOrAssigned ? 'badge-new' : 'badge-state';
-            const displayStatus = isNewOrAssigned ? 'New' : (lead.status || 'New');
+            const hasAssignee = Boolean(lead.assigned_to || (lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'null') || (lead.assigned_staff && lead.assigned_staff !== 'Unassigned') || rawStatus === 'assigned');
+            const isFreshLead = rawStatus === 'new' || rawStatus === 'assigned' || !rawStatus;
+
+            let displayStatus = 'New';
+            let statusClass = 'badge-new';
+
+            if (isTelecomPanelUser) {
+                // Telecaller panel & mobile app: assigned leads appear as 'New'
+                if (isFreshLead) {
+                    displayStatus = 'New';
+                    statusClass = 'badge-new';
+                } else {
+                    displayStatus = lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, ' ')) : 'New';
+                    statusClass = 'badge-state';
+                }
+            } else {
+                // Admin, Sales Manager, WhatsApp Manager, WhatsApp Executive panels:
+                // Assigned leads show 'Assigned'. Only unassigned leads show 'New'.
+                if (hasAssignee || rawStatus === 'assigned') {
+                    if (isFreshLead) {
+                        displayStatus = 'Assigned';
+                        statusClass = 'badge-assigned';
+                    } else {
+                        displayStatus = lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, ' ')) : 'Assigned';
+                        statusClass = 'badge-state';
+                    }
+                } else {
+                    if (isFreshLead) {
+                        displayStatus = 'New';
+                        statusClass = 'badge-new';
+                    } else {
+                        displayStatus = lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, ' ')) : 'New';
+                        statusClass = 'badge-state';
+                    }
+                }
+            }
             const relevantDate = lead.assigned_at || (lead.assigned_to ? lead.updated_at : null) || lead.created_at;
             const _dateObj = new Date(relevantDate);
             const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -2377,6 +2414,24 @@ async function populateLeadDetails(leadId) {
             const lead = await response.json();
             window.currentLeadData = lead; // Store globally for decision engine
 
+            const detailUser = window.getCurrentUser ? window.getCurrentUser() : {};
+            const detailUserRole = (detailUser.role || '').toLowerCase();
+            const isTelecallerDetail = detailUserRole === 'telecaller' || detailUserRole === 'telecaller_executive' || (detailUserRole.includes('telecaller') && !detailUserRole.includes('manager'));
+            const detailRawStatus = (lead.status || '').toLowerCase();
+            const detailHasAssignee = Boolean(lead.assigned_to || (lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'null') || (lead.assigned_staff && lead.assigned_staff !== 'Unassigned') || detailRawStatus === 'assigned');
+            const detailIsFresh = detailRawStatus === 'new' || detailRawStatus === 'assigned' || !detailRawStatus;
+
+            let saleStatusDisplay = 'New';
+            if (isTelecallerDetail) {
+                saleStatusDisplay = detailIsFresh ? 'New' : (lead.status || 'New');
+            } else {
+                if (detailHasAssignee) {
+                    saleStatusDisplay = detailIsFresh ? 'Assigned' : (lead.status || 'Assigned');
+                } else {
+                    saleStatusDisplay = detailIsFresh ? 'New' : (lead.status || 'New');
+                }
+            }
+
             // ── Primary Field Mapping ──
             const fields = {
                 leadDetailName: lead.customer_name,
@@ -2391,7 +2446,7 @@ async function populateLeadDetails(leadId) {
                 leadDetailAssigned: lead.assigned_to_name || 'Unassigned',
                 leadDetailAssignedId: lead.assigned_to || '',
                 topCustomerNameDisplay: lead.first_message || lead.customer_name || (lead.phone_number ? `Lead (${lead.phone_number})` : 'Lead Details'),
-                leadDetailSaleStatus: lead.status || 'New',
+                leadDetailSaleStatus: saleStatusDisplay,
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailScoreSelect: lead.score || 'cold',

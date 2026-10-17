@@ -65,11 +65,13 @@ exports.getLeads = async (req, res) => {
                 query += ` AND l.status IN (${placeholders})`;
                 params.push(...statusList);
             } else if (status === 'new') {
-                if (is_unassigned === 'true') {
+                if (is_unassigned === 'true' || (!isExecutiveView && !assigned_to)) {
                     query += " AND (l.status IN ('new', 'assigned') OR l.status IS NULL OR l.status = '') AND l.assigned_to IS NULL";
                 } else {
                     query += " AND (l.status IN ('new', 'assigned') OR l.status IS NULL OR l.status = '')";
                 }
+            } else if (status === 'assigned') {
+                query += " AND (l.status = 'assigned' OR (l.assigned_to IS NOT NULL AND (l.status = 'new' OR l.status IS NULL OR l.status = '')))";
             } else {
                 query += ' AND l.status = ?';
                 params.push(status);
@@ -742,7 +744,7 @@ exports.updateLead = async (req, res) => {
 exports.assignLead = async (req, res) => {
     const { assigned_to } = req.body;
     try {
-        await pool.query('UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = "new" WHERE lead_id = ?', [assigned_to, req.params.id]);
+        await pool.query('UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?', [assigned_to, req.params.id]);
         
         const [userRows] = await pool.query('SELECT name FROM users WHERE user_id = ?', [assigned_to]);
         const userName = userRows[0] ? userRows[0].name : `user ID ${assigned_to}`;
@@ -987,7 +989,7 @@ exports.bulkAssign = async (req, res) => {
 
         // 1. Bulk Update Leads table
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" OR status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
+            'UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
             [staffId, leadIds]
         );
 

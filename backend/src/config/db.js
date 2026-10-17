@@ -1,7 +1,7 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config({ path: __dirname + '/../../.env' });
 
-const connectionLimit = process.env.DB_CONNECTION_LIMIT ? parseInt(process.env.DB_CONNECTION_LIMIT) : 15;
+const connectionLimit = process.env.DB_CONNECTION_LIMIT ? parseInt(process.env.DB_CONNECTION_LIMIT) : 10;
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -12,11 +12,11 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: connectionLimit,
     queueLimit: 0,
-    connectTimeout: 20000,
+    connectTimeout: 10000,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 1000,
-    maxIdle: Math.min(connectionLimit, 2), // Keep max 2 warm idle connections to avoid keeping dead TCP sockets in pool on Hostinger
-    idleTimeout: 15000, // Gracefully close client-side idle connections after 15s before Hostinger firewall forcibly resets TCP sockets
+    keepAliveInitialDelay: 0,
+    maxIdle: Math.min(connectionLimit, 2), // Keep max 2 warm idle connections
+    idleTimeout: 8000, // Close idle connections after 8s, safely below Hostinger's 20s wait_timeout
     timezone: '+00:00'
 });
 
@@ -64,23 +64,44 @@ pool.on('connection', (connection) => {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_RETRIES = 5;
 
-// Wrap execute, query, and getConnection to auto-retry on connection resets/timeouts
-const originalQuery = pool.query.bind(pool);
-const originalExecute = pool.execute.bind(pool);
+// Save original references
 const originalGetConnection = pool.getConnection.bind(pool);
 
 pool.query = async function (...args) {
     let lastErr;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        let conn;
         try {
-            return await originalQuery(...args);
+            conn = await originalGetConnection();
+            // Validate connection if it has been idle for more than 5s
+            const now = Date.now();
+            if (conn._lastUsed && (now - conn._lastUsed > 5000)) {
+                try {
+                    await conn.ping();
+                } catch (pingErr) {
+                    try { conn.destroy(); } catch (e) {}
+                    conn = null;
+                    throw pingErr;
+                }
+            }
+            const result = await conn.query(...args);
+            conn._lastUsed = Date.now();
+            return result;
         } catch (err) {
             lastErr = err;
+            if (conn) {
+                try { conn.destroy(); } catch (e) {}
+                conn = null;
+            }
             if (isRetryableDbError(err) && attempt < MAX_RETRIES) {
-                console.warn(`[DB] Query failed (attempt ${attempt}/${MAX_RETRIES}) due to connection error (${err.code || err.message}). Retrying in ${200 * attempt}ms...`);
-                await delay(200 * attempt);
+                console.warn(`[DB] Query failed (attempt ${attempt}/${MAX_RETRIES}) due to connection error (${err.code || err.message}). Retrying in ${100 * attempt}ms...`);
+                await delay(100 * attempt);
             } else {
                 throw err;
+            }
+        } finally {
+            if (conn) {
+                try { conn.release(); } catch (e) {}
             }
         }
     }
@@ -90,15 +111,38 @@ pool.query = async function (...args) {
 pool.execute = async function (...args) {
     let lastErr;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        let conn;
         try {
-            return await originalExecute(...args);
+            conn = await originalGetConnection();
+            // Validate connection if it has been idle for more than 5s
+            const now = Date.now();
+            if (conn._lastUsed && (now - conn._lastUsed > 5000)) {
+                try {
+                    await conn.ping();
+                } catch (pingErr) {
+                    try { conn.destroy(); } catch (e) {}
+                    conn = null;
+                    throw pingErr;
+                }
+            }
+            const result = await conn.execute(...args);
+            conn._lastUsed = Date.now();
+            return result;
         } catch (err) {
             lastErr = err;
+            if (conn) {
+                try { conn.destroy(); } catch (e) {}
+                conn = null;
+            }
             if (isRetryableDbError(err) && attempt < MAX_RETRIES) {
-                console.warn(`[DB] Execute failed (attempt ${attempt}/${MAX_RETRIES}) due to connection error (${err.code || err.message}). Retrying in ${200 * attempt}ms...`);
-                await delay(200 * attempt);
+                console.warn(`[DB] Execute failed (attempt ${attempt}/${MAX_RETRIES}) due to connection error (${err.code || err.message}). Retrying in ${100 * attempt}ms...`);
+                await delay(100 * attempt);
             } else {
                 throw err;
+            }
+        } finally {
+            if (conn) {
+                try { conn.release(); } catch (e) {}
             }
         }
     }
@@ -108,26 +152,32 @@ pool.execute = async function (...args) {
 pool.getConnection = async function (...args) {
     let lastErr;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        let conn;
         try {
-            const conn = await originalGetConnection(...args);
-            // Validate connection with a ping before returning it to caller
+            conn = await originalGetConnection(...args);
             try {
                 await conn.ping();
+                conn._lastUsed = Date.now();
                 return conn;
             } catch (pingErr) {
                 try { conn.destroy(); } catch (e) {}
+                conn = null;
                 if (isRetryableDbError(pingErr) && attempt < MAX_RETRIES) {
-                    console.warn(`[DB] Acquired connection failed ping (attempt ${attempt}/${MAX_RETRIES}). Retrying...`);
-                    await delay(200 * attempt);
+                    console.warn(`[DB] Acquired connection failed ping (attempt ${attempt}/${MAX_RETRIES}). Retrying in ${100 * attempt}ms...`);
+                    await delay(100 * attempt);
                     continue;
                 }
                 throw pingErr;
             }
         } catch (err) {
             lastErr = err;
+            if (conn) {
+                try { conn.destroy(); } catch (e) {}
+                conn = null;
+            }
             if (isRetryableDbError(err) && attempt < MAX_RETRIES) {
-                console.warn(`[DB] getConnection failed (attempt ${attempt}/${MAX_RETRIES}) due to connection error (${err.code || err.message}). Retrying in ${200 * attempt}ms...`);
-                await delay(200 * attempt);
+                console.warn(`[DB] getConnection failed (attempt ${attempt}/${MAX_RETRIES}) due to connection error (${err.code || err.message}). Retrying in ${100 * attempt}ms...`);
+                await delay(100 * attempt);
             } else {
                 throw err;
             }
@@ -136,13 +186,13 @@ pool.getConnection = async function (...args) {
     throw lastErr;
 };
 
-// Periodic Database Heartbeat (ping every 10s) to keep active connection alive on Hostinger (wait_timeout)
+// Periodic Database Heartbeat (ping every 5s) to keep warm connection alive on Hostinger
 setInterval(async () => {
     try {
-        await originalQuery('SELECT 1');
+        await pool.query('SELECT 1');
     } catch (err) {
         // Silent catch for heartbeat
     }
-}, 10000);
+}, 5000);
 
 module.exports = pool;

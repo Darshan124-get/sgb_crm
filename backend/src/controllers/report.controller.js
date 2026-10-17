@@ -100,20 +100,38 @@ exports.getDashboardStats = async (req, res) => {
             )
         `);
 
-        // Parse date filter from query
+        // Parse date filter & timeframe from query
         let startDateStr = req.query.start_date;
         let endDateStr = req.query.end_date;
         const isDealerMode = req.query.mode === 'dealer';
+        const timeframe = (req.query.timeframe || '').toLowerCase().trim();
+        const customDate = req.query.date;
 
-        if (!startDateStr || !endDateStr) {
-            // Default to current month range
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            
-            startDateStr = `${year}-${month}-01`;
-            endDateStr = `${year}-${month}-${day}`;
+        const baseDate = customDate ? new Date(customDate) : new Date();
+        const baseYear = baseDate.getFullYear();
+        const baseMonth = String(baseDate.getMonth() + 1).padStart(2, '0');
+        const baseDay = String(baseDate.getDate()).padStart(2, '0');
+        const formattedDate = `${baseYear}-${baseMonth}-${baseDay}`;
+
+        if (timeframe === 'today') {
+            startDateStr = formattedDate;
+            endDateStr = formattedDate;
+        } else if (timeframe === 'this week' || timeframe === 'week') {
+            const dayOfWeek = baseDate.getDay(); // 0 is Sunday
+            const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            const monday = new Date(baseDate);
+            monday.setDate(baseDate.getDate() + diffToMon);
+            startDateStr = monday.toISOString().split('T')[0];
+            endDateStr = formattedDate;
+        } else if (timeframe === 'this month' || timeframe === 'month') {
+            startDateStr = `${baseYear}-${baseMonth}-01`;
+            endDateStr = formattedDate;
+        } else if (customDate && (!startDateStr || !endDateStr)) {
+            startDateStr = customDate;
+            endDateStr = customDate;
+        } else if (!startDateStr || !endDateStr) {
+            startDateStr = `${baseYear}-${baseMonth}-01`;
+            endDateStr = formattedDate;
         }
 
         // Calculate comparison bounds
@@ -225,11 +243,16 @@ exports.getDashboardStats = async (req, res) => {
                     [start, end]
                 );
 
-                // 6. Revenue (MTD)
-                const [[revenue]] = await pool.query(
-                    `SELECT SUM(ap.amount) as total FROM lead_advance_payments ap JOIN leads l ON ap.lead_id = l.lead_id WHERE ap.verified = 'yes' AND ap.payment_date >= ? AND ap.payment_date <= ? AND ${leadFilter}`,
+                // 6. Revenue (Order Values + Advance Payments)
+                const [[orderRev]] = await pool.query(
+                    `SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND o.created_at >= ? AND o.created_at <= ? AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`,
                     [start, end]
                 );
+                const [[advRev]] = await pool.query(
+                    `SELECT COALESCE(SUM(ap.amount), 0) as total FROM lead_advance_payments ap JOIN leads l ON ap.lead_id = l.lead_id WHERE ap.verified = 'yes' AND ap.payment_date >= ? AND ap.payment_date <= ? AND ${leadFilter}`,
+                    [start, end]
+                );
+                const revVal = parseFloat(orderRev.total || 0) > 0 ? parseFloat(orderRev.total) : parseFloat(advRev.total || 0);
 
                 // 7. Outstanding Payments
                 const [[outstanding]] = await pool.query(
@@ -243,7 +266,6 @@ exports.getDashboardStats = async (req, res) => {
                     [start, end]
                 );
 
-                const revVal = parseFloat(revenue.total || 0);
                 const spendVal = parseFloat(campaignSpend.total || 0);
                 const profitVal = revVal > 0 ? (revVal * 0.35 - spendVal * 0.2) : 0;
 
@@ -411,15 +433,15 @@ exports.getDashboardStats = async (req, res) => {
 
         const [[revToday]] = isDealerMode
             ? await pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND DATE(p.created_at) = CURDATE()`)
-            : await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM lead_advance_payments WHERE verified = 'yes' AND DATE(payment_date) = CURDATE()`);
+            : await pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND DATE(o.created_at) = CURDATE() AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`);
 
         const [[revWeek]] = isDealerMode
             ? await pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`)
-            : await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM lead_advance_payments WHERE verified = 'yes' AND payment_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`);
+            : await pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`);
 
         const [[revMonth]] = isDealerMode
             ? await pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND MONTH(p.created_at) = MONTH(CURDATE()) AND YEAR(p.created_at) = YEAR(CURDATE())`)
-            : await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM lead_advance_payments WHERE verified = 'yes' AND MONTH(payment_date) = MONTH(CURDATE()) AND YEAR(payment_date) = YEAR(CURDATE())`);
+            : await pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE()) AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`);
         
         const [[avgOrderValue]] = await pool.query(`SELECT COALESCE(AVG(total_amount), 0) as avg_value FROM orders WHERE order_status != 'cancelled' AND created_at >= ? AND created_at <= ? AND ${isDealerMode ? "order_source = 'dealer'" : "1=1"}`, [start, end]);
 
@@ -530,6 +552,235 @@ exports.getDashboardStats = async (req, res) => {
             LIMIT 10
         `);
 
+        // 14. Real Lead Activity Trends (Day, Week, Month)
+        const targetDate = endDateStr;
+        const [dayCalls] = await pool.query(`
+            SELECT HOUR(started_at) as hr, 
+                   COUNT(DISTINCT COALESCE(NULLIF(customer_phone, ''), CAST(lead_id AS CHAR))) as called,
+                   SUM(CASE WHEN technical_status IN ('CONNECTED', 'ANSWERED', 'COMPLETED') AND talk_time_seconds > 0 THEN 1 ELSE 0 END) as connected
+            FROM telephony_calls
+            WHERE DATE(started_at) = ? AND (${isAdminUser ? '1=1' : `crm_user_id = ${userId}`})
+            GROUP BY HOUR(started_at)
+        `, [targetDate]);
+
+        const [dayLeads] = await pool.query(`
+            SELECT HOUR(created_at) as hr, COUNT(*) as assigned
+            FROM leads
+            WHERE (DATE(assigned_at) = ? OR (assigned_at IS NULL AND DATE(created_at) = ?)) AND ${leadFilter}
+            GROUP BY HOUR(created_at)
+        `, [targetDate, targetDate]);
+
+        const [dayOrders] = await pool.query(`
+            SELECT HOUR(o.created_at) as hr, COUNT(*) as sold
+            FROM orders o
+            LEFT JOIN leads l ON o.lead_id = l.lead_id
+            WHERE DATE(o.created_at) = ? AND o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})
+            GROUP BY HOUR(o.created_at)
+        `, [targetDate]);
+
+        const dayActivityBuckets = [
+            { label: '8 AM', minHr: 0, maxHr: 9, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '10 AM', minHr: 10, maxHr: 11, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '12 PM', minHr: 12, maxHr: 13, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '2 PM', minHr: 14, maxHr: 15, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '4 PM', minHr: 16, maxHr: 17, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '6 PM', minHr: 18, maxHr: 23, assigned: 0, called: 0, connected: 0, sold: 0 }
+        ];
+
+        dayCalls.forEach(r => {
+            const b = dayActivityBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) {
+                b.called += parseInt(r.called || 0, 10);
+                b.connected += parseInt(r.connected || 0, 10);
+            }
+        });
+        dayLeads.forEach(r => {
+            const b = dayActivityBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.assigned += parseInt(r.assigned || 0, 10);
+        });
+        dayOrders.forEach(r => {
+            const b = dayActivityBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.sold += parseInt(r.sold || 0, 10);
+        });
+
+        // Week Activity (Daily for 7 Days)
+        const [weekCalls] = await pool.query(`
+            SELECT DATE(started_at) as dt,
+                   COUNT(DISTINCT COALESCE(NULLIF(customer_phone, ''), CAST(lead_id AS CHAR))) as called,
+                   SUM(CASE WHEN technical_status IN ('CONNECTED', 'ANSWERED', 'COMPLETED') AND talk_time_seconds > 0 THEN 1 ELSE 0 END) as connected
+            FROM telephony_calls
+            WHERE started_at >= DATE_SUB(?, INTERVAL 6 DAY) AND started_at <= CONCAT(?, ' 23:59:59') AND (${isAdminUser ? '1=1' : `crm_user_id = ${userId}`})
+            GROUP BY DATE(started_at)
+        `, [targetDate, targetDate]);
+
+        const [weekLeads] = await pool.query(`
+            SELECT DATE(created_at) as dt, COUNT(*) as assigned
+            FROM leads
+            WHERE created_at >= DATE_SUB(?, INTERVAL 6 DAY) AND created_at <= CONCAT(?, ' 23:59:59') AND ${leadFilter}
+            GROUP BY DATE(created_at)
+        `, [targetDate, targetDate]);
+
+        const [weekOrders] = await pool.query(`
+            SELECT DATE(o.created_at) as dt, COUNT(*) as sold
+            FROM orders o
+            LEFT JOIN leads l ON o.lead_id = l.lead_id
+            WHERE o.created_at >= DATE_SUB(?, INTERVAL 6 DAY) AND o.created_at <= CONCAT(?, ' 23:59:59') AND o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})
+            GROUP BY DATE(o.created_at)
+        `, [targetDate, targetDate]);
+
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const weekActivityBuckets = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(new Date(targetDate).getTime() - i * 86400000);
+            const dtStr = d.toISOString().split('T')[0];
+            const label = dayNames[d.getDay()];
+
+            const callItem = weekCalls.find(c => c.dt && (new Date(c.dt).toISOString().split('T')[0] === dtStr));
+            const leadItem = weekLeads.find(l => l.dt && (new Date(l.dt).toISOString().split('T')[0] === dtStr));
+            const orderItem = weekOrders.find(o => o.dt && (new Date(o.dt).toISOString().split('T')[0] === dtStr));
+
+            weekActivityBuckets.push({
+                label,
+                assigned: parseInt(leadItem?.assigned || 0, 10),
+                called: parseInt(callItem?.called || 0, 10),
+                connected: parseInt(callItem?.connected || 0, 10),
+                sold: parseInt(orderItem?.sold || 0, 10)
+            });
+        }
+
+        // Month Activity (4 Weeks)
+        const monthActivityBuckets = [
+            { label: 'Week 1', assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: 'Week 2', assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: 'Week 3', assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: 'Week 4', assigned: 0, called: 0, connected: 0, sold: 0 }
+        ];
+        const [monthCalls] = await pool.query(`
+            SELECT DAY(started_at) as day_num,
+                   COUNT(DISTINCT COALESCE(NULLIF(customer_phone, ''), CAST(lead_id AS CHAR))) as called,
+                   SUM(CASE WHEN technical_status IN ('CONNECTED', 'ANSWERED', 'COMPLETED') THEN 1 ELSE 0 END) as connected
+            FROM telephony_calls
+            WHERE MONTH(started_at) = MONTH(?) AND YEAR(started_at) = YEAR(?) AND (${isAdminUser ? '1=1' : `crm_user_id = ${userId}`})
+            GROUP BY DAY(started_at)
+        `, [targetDate, targetDate]);
+        const [monthLeads] = await pool.query(`
+            SELECT DAY(created_at) as day_num, COUNT(*) as assigned
+            FROM leads
+            WHERE MONTH(created_at) = MONTH(?) AND YEAR(created_at) = YEAR(?) AND ${leadFilter}
+            GROUP BY DAY(created_at)
+        `, [targetDate, targetDate]);
+        const [monthOrders] = await pool.query(`
+            SELECT DAY(o.created_at) as day_num, COUNT(*) as sold
+            FROM orders o
+            LEFT JOIN leads l ON o.lead_id = l.lead_id
+            WHERE MONTH(o.created_at) = MONTH(?) AND YEAR(o.created_at) = YEAR(?) AND o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})
+            GROUP BY DAY(o.created_at)
+        `, [targetDate, targetDate]);
+
+        const getWeekIdx = (dayNum) => Math.min(3, Math.floor((dayNum - 1) / 7));
+        monthCalls.forEach(r => {
+            const w = monthActivityBuckets[getWeekIdx(r.day_num)];
+            if (w) {
+                w.called += parseInt(r.called || 0, 10);
+                w.connected += parseInt(r.connected || 0, 10);
+            }
+        });
+        monthLeads.forEach(r => {
+            const w = monthActivityBuckets[getWeekIdx(r.day_num)];
+            if (w) w.assigned += parseInt(r.assigned || 0, 10);
+        });
+        monthOrders.forEach(r => {
+            const w = monthActivityBuckets[getWeekIdx(r.day_num)];
+            if (w) w.sold += parseInt(r.sold || 0, 10);
+        });
+
+        // 15. Real Follow-up Trends (Day, Week, Month)
+        const [dayFollowups] = await pool.query(`
+            SELECT HOUR(created_at) as hr, COUNT(*) as created
+            FROM lead_followups
+            WHERE DATE(created_at) = ? AND (${isAdminUser ? '1=1' : `(created_by = ${userId} OR lead_id IN (SELECT lead_id FROM leads WHERE assigned_to = ${userId}))`})
+            GROUP BY HOUR(created_at)
+        `, [targetDate]);
+
+        const dayFollowUpBuckets = [
+            { time: '8 AM', minHr: 0, maxHr: 9, created: 0, converted: 0 },
+            { time: '10 AM', minHr: 10, maxHr: 11, created: 0, converted: 0 },
+            { time: '12 PM', minHr: 12, maxHr: 13, created: 0, converted: 0 },
+            { time: '2 PM', minHr: 14, maxHr: 15, created: 0, converted: 0 },
+            { time: '4 PM', minHr: 16, maxHr: 17, created: 0, converted: 0 },
+            { time: '6 PM', minHr: 18, maxHr: 23, created: 0, converted: 0 }
+        ];
+        dayFollowups.forEach(r => {
+            const b = dayFollowUpBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.created += parseInt(r.created || 0, 10);
+        });
+        dayOrders.forEach(r => {
+            const b = dayFollowUpBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.converted += parseInt(r.sold || 0, 10);
+        });
+
+        const weekFollowUpBuckets = weekActivityBuckets.map(b => ({
+            time: b.label,
+            created: b.assigned,
+            converted: b.sold
+        }));
+        const monthFollowUpBuckets = monthActivityBuckets.map(b => ({
+            time: b.label,
+            created: b.assigned,
+            converted: b.sold
+        }));
+
+        // 16. Real Follow-up Outcomes
+        const [[outcomesRow]] = await pool.query(`
+            SELECT 
+                SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as converted,
+                SUM(CASE WHEN status IN ('followup', 'callback') THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status IN ('new', 'assigned', 'contacted', 'interested') THEN 1 ELSE 0 END) as open_leads,
+                SUM(CASE WHEN status IN ('lost', 'cancelled', 'rejected') THEN 1 ELSE 0 END) as lost,
+                COUNT(*) as total
+            FROM leads
+            WHERE ${leadFilter}
+        `);
+        const totalOutcomes = parseInt(outcomesRow?.total || 0, 10);
+        const convertedOutcomes = parseInt(outcomesRow?.converted || 0, 10);
+        const pendingOutcomes = parseInt(outcomesRow?.pending || 0, 10);
+        const openOutcomes = parseInt(outcomesRow?.open_leads || 0, 10);
+        const lostOutcomes = parseInt(outcomesRow?.lost || 0, 10);
+        const sumOutcomes = convertedOutcomes + pendingOutcomes + openOutcomes + lostOutcomes || 1;
+
+        const outcomesList = [
+            { label: 'Converted', count: convertedOutcomes, percentage: parseFloat((convertedOutcomes / sumOutcomes).toFixed(2)), color: '#10B981' },
+            { label: 'Pending', count: pendingOutcomes, percentage: parseFloat((pendingOutcomes / sumOutcomes).toFixed(2)), color: '#F97316' },
+            { label: 'Open', count: openOutcomes, percentage: parseFloat((openOutcomes / sumOutcomes).toFixed(2)), color: '#2563EB' },
+            { label: 'Lost', count: lostOutcomes, percentage: parseFloat((lostOutcomes / sumOutcomes).toFixed(2)), color: '#EF4444' }
+        ];
+
+        // 17. Conversion Timeline
+        const [timelineRows] = await pool.query(`
+            SELECT DATEDIFF(o.created_at, l.created_at) as diff_days, COUNT(*) as count
+            FROM orders o
+            JOIN leads l ON o.lead_id = l.lead_id
+            WHERE o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})
+            GROUP BY DATEDIFF(o.created_at, l.created_at)
+        `);
+        let sameDay = 0, oneToThree = 0, fourToSeven = 0, eightPlus = 0, totalConvertedTimeline = 0;
+        timelineRows.forEach(r => {
+            const diff = parseInt(r.diff_days || 0, 10);
+            const cnt = parseInt(r.count || 0, 10);
+            totalConvertedTimeline += cnt;
+            if (diff <= 0) sameDay += cnt;
+            else if (diff <= 3) oneToThree += cnt;
+            else if (diff <= 7) fourToSeven += cnt;
+            else eightPlus += cnt;
+        });
+        const safeTimelineTotal = totalConvertedTimeline > 0 ? totalConvertedTimeline : 1;
+        const timelineList = [
+            { duration: 'Same Day', percentage: totalConvertedTimeline > 0 ? parseFloat((sameDay / safeTimelineTotal).toFixed(2)) : 0.50, color: '#0A5844' },
+            { duration: '1 – 3 Days', percentage: totalConvertedTimeline > 0 ? parseFloat((oneToThree / safeTimelineTotal).toFixed(2)) : 0.30, color: '#2563EB' },
+            { duration: '4 – 7 Days', percentage: totalConvertedTimeline > 0 ? parseFloat((fourToSeven / safeTimelineTotal).toFixed(2)) : 0.15, color: '#F97316' },
+            { duration: '8+ Days', percentage: totalConvertedTimeline > 0 ? parseFloat((eightPlus / safeTimelineTotal).toFixed(2)) : 0.05, color: '#EF4444' }
+        ];
+
         // Send aggregated results
         res.json({
             kpis: {
@@ -596,7 +847,21 @@ exports.getDashboardStats = async (req, res) => {
                 orders: dealerStats.dealer_orders || 0,
                 revenue: parseFloat(dealerStats.dealer_revenue || 0)
             },
-            alerts: systemLogs
+            alerts: systemLogs,
+            activityTrend: {
+                day: dayActivityBuckets,
+                week: weekActivityBuckets,
+                month: monthActivityBuckets
+            },
+            followUpTrends: {
+                day: dayFollowUpBuckets,
+                week: weekFollowUpBuckets,
+                month: monthFollowUpBuckets
+            },
+            followUpOutcomes: outcomesList,
+            timelineItems: timelineList,
+            totalFollowUps: totalOutcomes,
+            convertedFollowUps: convertedOutcomes
         });
 
     } catch (error) {
@@ -863,15 +1128,15 @@ exports.getTelecallerPerformance = async (req, res) => {
             JOIN roles r ON u.role_id = r.role_id
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as given_cnt 
-                FROM leads WHERE DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE DATE(COALESCE(assigned_at, created_at)) BETWEEN ? AND ? GROUP BY assigned_to
             ) l_given ON u.user_id = l_given.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as called_cnt 
-                FROM leads WHERE status NOT IN ('new') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE status NOT IN ('new', 'assigned') AND (DATE(updated_at) BETWEEN ? AND ? OR DATE(created_at) BETWEEN ? AND ?) GROUP BY assigned_to
             ) l_called ON u.user_id = l_called.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as conn_cnt 
-                FROM leads WHERE status IN ('contacted', 'callback', 'followup', 'interested', 'advance_paid', 'converted') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE status IN ('contacted', 'callback', 'followup', 'interested', 'advance_paid', 'converted') AND (DATE(updated_at) BETWEEN ? AND ? OR DATE(created_at) BETWEEN ? AND ?) GROUP BY assigned_to
             ) l_conn ON u.user_id = l_conn.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as ni_cnt 
@@ -879,7 +1144,7 @@ exports.getTelecallerPerformance = async (req, res) => {
             ) l_ni ON u.user_id = l_ni.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as rem_cnt 
-                FROM leads WHERE status IN ('new', 'assigned') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE status IN ('new', 'assigned') AND DATE(COALESCE(assigned_at, created_at)) BETWEEN ? AND ? GROUP BY assigned_to
             ) l_rem ON u.user_id = l_rem.assigned_to
             LEFT JOIN (
                 SELECT created_by, COUNT(*) as fol_cnt 
@@ -1161,5 +1426,35 @@ exports.getTelecallerPerformance = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch telecaller performance.' });
     }
 };
+
+const TelecallerReportService = require('../services/telecaller_report.service');
+
+exports.getDailyTelecallerSummary = async (req, res) => {
+    try {
+        const isSupervisor = req.user?.role && (req.user.role.toLowerCase() === 'admin' || req.user.role.toLowerCase() === 'super-admin');
+        const userId = req.query.telecaller_id || (isSupervisor ? null : (req.user?.id || req.user?.user_id));
+        const date = req.query.date || null;
+        const summary = await TelecallerReportService.getDailySummary({ userId, date });
+        res.json({ success: true, ...summary });
+    } catch (error) {
+        console.error('Daily Telecaller Summary Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch daily telecaller report.', error: error.message });
+    }
+};
+
+exports.getDailyTelecallerPdf = async (req, res) => {
+    try {
+        const isSupervisor = req.user?.role && (req.user.role.toLowerCase() === 'admin' || req.user.role.toLowerCase() === 'super-admin');
+        const userId = req.query.telecaller_id || (isSupervisor ? null : (req.user?.id || req.user?.user_id));
+        const date = req.query.date || null;
+        await TelecallerReportService.generateDailyReportPdf(res, { userId, date });
+    } catch (error) {
+        console.error('Daily Telecaller PDF Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Failed to generate PDF report.', error: error.message });
+        }
+    }
+};
+
 
 

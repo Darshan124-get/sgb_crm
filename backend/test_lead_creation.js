@@ -17,6 +17,7 @@ async function testLeadCreation() {
                 password: 'password123'
             })
         });
+        console.log(loginRes);
         const loginData = await loginRes.json();
         
         if (!loginRes.ok) throw new Error('Login failed: ' + loginData.message);

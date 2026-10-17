@@ -118,7 +118,7 @@ const receiveMessage = async (req, res) => {
           } else if (['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type)) {
             const mediaId = msg[msg.type]?.id;
             const caption = msg[msg.type]?.caption || '';
-            inputText = caption || `Sent a ${msg.type}`;
+            inputText = caption || '';
             mimeType = msg[msg.type]?.mime_type || null;
 
             if (mediaId) {
@@ -285,9 +285,10 @@ const sendReply = async (req, res) => {
 
   try {
     // Retrieve the Meta message ID to quote/reply to the message on WhatsApp
+    let cleanReplyToChatId = (reply_to_chat_id && !isNaN(parseInt(reply_to_chat_id))) ? parseInt(reply_to_chat_id) : null;
     let replyToMessageId = null;
-    if (reply_to_chat_id) {
-      const [replyRows] = await pool.query('SELECT message_id FROM chat_messages WHERE chat_id = ?', [reply_to_chat_id]);
+    if (cleanReplyToChatId) {
+      const [replyRows] = await pool.query('SELECT message_id FROM chat_messages WHERE chat_id = ?', [cleanReplyToChatId]);
       if (replyRows.length > 0) {
         replyToMessageId = replyRows[0].message_id;
       }
@@ -315,12 +316,12 @@ const sendReply = async (req, res) => {
       }
 
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId, mediaBuffer, mimeType, qrName);
+      await whatsappService.sendMediaMessage(waPhone, mediaId, category, message, replyToMessageId, staffUserId, mediaBuffer, mimeType, qrName, cleanReplyToChatId);
     }
     // 2. Handle Text Sending
     else if (message) {
       const waPhone = formatForWhatsApp(phone);
-      await whatsappService.sendMessage(waPhone, message, replyToMessageId, staffUserId, qrName);
+      await whatsappService.sendMessage(waPhone, message, replyToMessageId, staffUserId, qrName, cleanReplyToChatId);
     }
 
     // Auto-pause active chatbot session when human agent sends a manual reply

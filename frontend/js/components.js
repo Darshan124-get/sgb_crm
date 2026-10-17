@@ -837,6 +837,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
 
+                // 🔐 Telephony (Acefone) is strictly restricted to Admin only 🔐
+                const isUserAdmin = (role === 'admin' || role === 'super-admin');
+                if (!isUserAdmin) {
+                    const acefoneLinks = sidebarContainer.querySelectorAll('#nav-acefone, a[href*="acefone"]');
+                    acefoneLinks.forEach(link => {
+                        const item = link.closest('.nav-item');
+                        if (item) item.remove();
+                        else link.remove();
+                    });
+                }
+
                 // ── Cleanup Empty Group Titles ──
                 const groups = sidebarContainer.querySelectorAll('.nav-group-title');
                 groups.forEach(group => {
@@ -1733,8 +1744,12 @@ async function initLeadList(filters = {}, page = 1) {
         const isTelecomPanelUser = currentUserRole.includes('telecaller');
 
         tbody.innerHTML = leads.map(lead => {
-            const statusClass = lead.status === 'assigned' ? 'badge-assigned' : (lead.status === 'new' ? 'badge-unassigned' : 'badge-state');
-            const _dateObj = new Date(lead.created_at);
+            const rawStatus = (lead.status || '').toLowerCase();
+            const isNewOrAssigned = rawStatus === 'new' || rawStatus === 'assigned' || !rawStatus;
+            const statusClass = isNewOrAssigned ? 'badge-new' : 'badge-state';
+            const displayStatus = isNewOrAssigned ? 'New' : (lead.status || 'New');
+            const relevantDate = lead.assigned_at || (lead.assigned_to ? lead.updated_at : null) || lead.created_at;
+            const _dateObj = new Date(relevantDate);
             const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const time = _dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
             const nameInitial = lead.customer_name ? lead.customer_name.charAt(0).toUpperCase() : '?';
@@ -1808,7 +1823,7 @@ async function initLeadList(filters = {}, page = 1) {
                         </div>
                     </div>
                 </td>
-                <td><span class="${statusClass}">${lead.status}</span></td>
+                <td><span class="${statusClass}">${displayStatus}</span></td>
                 <td>${scoreBadgeHtml}</td>
                 <td>${priorityBadgeHtml}</td>
                 <td>${lead.state || '-'}</td>
@@ -3989,13 +4004,31 @@ window.fetchPendingHumanAlerts = async function() {
 
         if (!res || !res.ok) return;
 
-        const alerts = await res.json();
+        let alerts = await res.json();
         if (!Array.isArray(alerts) || alerts.length === 0) {
             const toast = document.getElementById('telecaller-human-alert-toast');
             if (toast) toast.remove();
+            const callAlert = document.getElementById('floatingCallSupportAlert');
+            if (callAlert) callAlert.remove();
             lastAlertCount = 0;
             return;
         }
+
+        // Telecaller client-side assignment check: only show alerts for leads assigned to this user
+        try {
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const role = String(currentUser.role || '').toLowerCase();
+            const isAdmin = role === 'admin' || role === 'super-admin' || role.includes('admin');
+            const isWm = role === 'whatsapp_manager' || role.includes('whatsapp');
+            if (!isAdmin && !isWm) {
+                const currentUserId = String(currentUser.id || currentUser.user_id || '');
+                if (currentUserId) {
+                    alerts = alerts.filter(a => a.assigned_to && String(a.assigned_to) === currentUserId);
+                } else {
+                    alerts = [];
+                }
+            }
+        } catch (e) {}
 
         const dismissedList = getDismissedAlerts();
         const activeAlerts = alerts.filter(a => 

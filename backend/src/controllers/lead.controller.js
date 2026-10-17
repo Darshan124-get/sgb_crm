@@ -64,12 +64,15 @@ exports.getLeads = async (req, res) => {
                 const placeholders = statusList.map(() => '?').join(',');
                 query += ` AND l.status IN (${placeholders})`;
                 params.push(...statusList);
+            } else if (status === 'new') {
+                if (is_unassigned === 'true') {
+                    query += " AND (l.status IN ('new', 'assigned') OR l.status IS NULL OR l.status = '') AND l.assigned_to IS NULL";
+                } else {
+                    query += " AND (l.status IN ('new', 'assigned') OR l.status IS NULL OR l.status = '')";
+                }
             } else {
                 query += ' AND l.status = ?';
                 params.push(status);
-                if (status === 'new') {
-                    query += ' AND l.assigned_to IS NULL';
-                }
             }
         }
 
@@ -104,14 +107,14 @@ exports.getLeads = async (req, res) => {
         }
 
         if (is_today === 'true') {
-            query += ' AND DATE(l.created_at) = CURDATE()';
+            query += ' AND (DATE(l.created_at) = CURDATE() OR DATE(l.assigned_at) = CURDATE() OR (l.assigned_to IS NOT NULL AND DATE(l.updated_at) = CURDATE()))';
         } else if (req.query.date) {
             if (req.query.date.includes(' to ')) {
                 const [start, end] = req.query.date.split(' to ');
-                query += ' AND DATE(l.created_at) >= ? AND DATE(l.created_at) <= ?';
+                query += ' AND DATE(COALESCE(l.assigned_at, l.created_at)) >= ? AND DATE(COALESCE(l.assigned_at, l.created_at)) <= ?';
                 params.push(start, end);
             } else {
-                query += ' AND DATE(l.created_at) = ?';
+                query += ' AND DATE(COALESCE(l.assigned_at, l.created_at)) = ?';
                 params.push(req.query.date);
             }
         }
@@ -243,17 +246,21 @@ exports.getLeadById = async (req, res) => {
         );
         lead.next_followup = followups[0] || null;
 
-        // Fetch ALL orders for this customer (via phone) for history
+        // Fetch ALL orders for this customer (via lead_id or normalized phone) for history
+        const cleanLeadPhone = (lead.phone_number || '').replace(/\D/g, '').slice(-10);
         const [allOrders] = await pool.query(
             `SELECT o.*, 
-                (SELECT GROUP_CONCAT(p.name SEPARATOR ", ") 
+                (SELECT GROUP_CONCAT(CONCAT(p.name, " (x", oi.quantity, ")") SEPARATOR ", ") 
                  FROM order_items oi 
                  JOIN products p ON oi.product_id = p.product_id 
-                 WHERE oi.order_id = o.order_id) as items_summary 
+                 WHERE oi.order_id = o.order_id) as items_summary,
+                COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.order_id = o.order_id), 1) as total_units
              FROM orders o 
-             WHERE o.phone = ? 
+             WHERE o.lead_id = ? 
+                OR o.phone = ? 
+                OR (o.phone IS NOT NULL AND ? != '' AND RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(o.phone, ' ', ''), '-', ''), '+', ''), '(', ''), 10) = ?)
              ORDER BY o.created_at DESC`,
-            [lead.phone_number]
+            [lead.lead_id, lead.phone_number, cleanLeadPhone, cleanLeadPhone]
         );
         lead.order = allOrders[0] || null; // Most recent for top summary
         lead.order_history = allOrders; // Full list for history section
@@ -735,7 +742,7 @@ exports.updateLead = async (req, res) => {
 exports.assignLead = async (req, res) => {
     const { assigned_to } = req.body;
     try {
-        await pool.query('UPDATE leads SET assigned_to = ?, status = "assigned" WHERE lead_id = ?', [assigned_to, req.params.id]);
+        await pool.query('UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = "new" WHERE lead_id = ?', [assigned_to, req.params.id]);
         
         const [userRows] = await pool.query('SELECT name FROM users WHERE user_id = ?', [assigned_to]);
         const userName = userRows[0] ? userRows[0].name : `user ID ${assigned_to}`;
@@ -941,12 +948,16 @@ exports.getStats = async (req, res) => {
             params.push(searchVal, searchVal, searchVal);
         }
 
+        const isExecutiveView = (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp');
         const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, [...params]);
-        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, [...params]);
+        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (DATE(created_at) = CURDATE() OR DATE(assigned_at) = CURDATE() OR (assigned_to IS NOT NULL AND DATE(updated_at) = CURDATE()))`, [...params]);
         const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, [...params]);
         const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, [...params]);
         const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, [...params]);
-        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "new" AND assigned_to IS NULL`, [...params]);
+        const newCondition = isExecutiveView 
+            ? 'AND (status IN ("new", "assigned") OR status IS NULL OR status = "")' 
+            : 'AND (status IN ("new", "assigned") OR status IS NULL OR status = "") AND assigned_to IS NULL';
+        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} ${newCondition}`, [...params]);
         const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, [...params]);
 
         res.json({
@@ -976,7 +987,7 @@ exports.bulkAssign = async (req, res) => {
 
         // 1. Bulk Update Leads table
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = ?, status = CASE WHEN status = "new" OR status IS NULL OR status = "" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
+            'UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" OR status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
             [staffId, leadIds]
         );
 

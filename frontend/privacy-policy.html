@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - SGB Connect | SGB Agro Industries</title>
+    <style>
+        :root {
+            --primary: #0A5844;
+            --primary-light: #E6F4EA;
+            --text-dark: #0F172A;
+            --text-muted: #475569;
+            --border: #E2E8F0;
+            --bg: #F8FAFC;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-dark); line-height: 1.6; padding: 20px 16px; }
+        .container { max-width: 860px; margin: 0 auto; background: #ffffff; padding: 40px 32px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.04); }
+        .header { border-bottom: 2px solid var(--primary-light); padding-bottom: 24px; margin-bottom: 28px; }
+        .logo-tag { display: inline-block; background: var(--primary); color: #fff; font-weight: 700; font-size: 13px; padding: 4px 12px; border-radius: 6px; margin-bottom: 12px; letter-spacing: 0.5px; }
+        h1 { font-size: 28px; color: var(--text-dark); margin-bottom: 8px; font-weight: 800; }
+        .effective-date { font-size: 13px; color: var(--text-muted); }
+        h2 { font-size: 19px; color: var(--primary); margin: 28px 0 12px; font-weight: 700; border-left: 4px solid var(--primary); padding-left: 10px; }
+        p, li { font-size: 14.5px; color: var(--text-muted); margin-bottom: 12px; }
+        ul { padding-left: 20px; margin-bottom: 16px; }
+        li { margin-bottom: 8px; }
+        .permission-card { background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+        .permission-card h3 { font-size: 15px; color: var(--text-dark); margin-bottom: 6px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .badge { background: #DCFCE7; color: #166534; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <span class="logo-tag">SGB AGRO INDUSTRIES</span>
+        <h1>Privacy Policy</h1>
+        <p class="effective-date">Last Updated & Effective: October 16, 2026 | App: SGB Connect (Android)</p>
+    </div>
+
+    <p>Welcome to <strong>SGB Connect</strong>, the enterprise mobile telecaller, lead conversion, and customer communication application provided by <strong>SGB Agro Industries</strong> ("Company", "we", "our", or "us"). We are dedicated to safeguarding your personal data and upholding your rights under applicable privacy legislation, including the <strong>Digital Personal Data Protection Act (DPDP Act 2023)</strong> and Google Play Developer Program Policies.</p>
+
+    <h2>1. Information We Collect</h2>
+    <p>SGB Connect collects information strictly required to operate enterprise telecalling, lead pipeline tracking, and customer communication:</p>
+    <ul>
+        <li><strong>Account & Profile Information:</strong> Agent name, authorized staff email ID, mobile phone number, department role (Telecaller, Sales Executive, Admin), and telephony PBX extension.</li>
+        <li><strong>Customer & Prospect Information:</strong> Farmer/customer name, phone number, location (village, district, state), lead source (Meta ad, website, WhatsApp), crop type, and product inquiries.</li>
+        <li><strong>Audio Recordings (Voice Notes):</strong> Real-time voice messages recorded by agents via microphone to send directly to customers via WhatsApp chat.</li>
+        <li><strong>Photos & Media Files:</strong> Images captured or picked by users representing payment receipts (UPI/NEFT/bank screenshots), product catalogue PDFs, and customer documents.</li>
+        <li><strong>Telephony & Call Logs:</strong> Click-to-call initiation metadata (call ID, timestamp, destination phone, call duration, connected/disconnected status via Acefone PBX). Direct SIM phone calls are dispatched through standard Android dialer.</li>
+        <li><strong>Network & Device Diagnostics:</strong> Network connection state, API round-trip status, app version, and crash diagnostic logs to maintain uptime.</li>
+    </ul>
+
+    <h2>2. Device Permissions & Why They Are Requested</h2>
+    <p>In adherence to Google Play policies, SGB Connect requests permissions solely for core runtime features:</p>
+
+    <div class="permission-card">
+        <h3><span>🎤 Microphone</span> <span class="badge">RECORD_AUDIO</span></h3>
+        <p>Enables telecallers to record voice notes in the WhatsApp customer chat window. Audio is captured only while holding or clicking the record button and stopped immediately upon release.</p>
+    </div>
+
+    <div class="permission-card">
+        <h3><span>📷 Camera</span> <span class="badge">CAMERA</span></h3>
+        <p>Used solely when capturing photos of payment receipts, product deliveries, or profile images using the in-app camera tool.</p>
+    </div>
+
+    <div class="permission-card">
+        <h3><span>📁 Storage & Media</span> <span class="badge">READ_MEDIA_IMAGES / AUDIO / VIDEO</span></h3>
+        <p>Permits selecting payment receipts and PDF product catalogues from device gallery to attach in customer chats, as well as storing voice notes temporarily.</p>
+    </div>
+
+    <div class="permission-card">
+        <h3><span>🌐 Internet & Network</span> <span class="badge">INTERNET / ACCESS_NETWORK_STATE</span></h3>
+        <p>Required to securely synchronize leads, orders, WhatsApp conversations, and trigger Acefone cloud telephony click-to-call APIs.</p>
+    </div>
+
+    <h2>3. How We Use Collected Data</h2>
+    <ul>
+        <li>To manage and route incoming agricultural equipment leads to assigned telecallers.</li>
+        <li>To initiate Acefone cloud PBX calls between sales agents and prospects without revealing personal caller SIMs.</li>
+        <li>To verify customer booking payments and confirm dispatch of agricultural machinery & bio-fertilizers.</li>
+        <li>To provide audit trails and performance KPIs (calls connected, orders converted) to company administrators.</li>
+        <li><strong>Zero Data Selling:</strong> We do not sell, rent, or monetize personal or farmer data to third-party advertisers or data brokers under any circumstances.</li>
+    </ul>
+
+    <h2>4. Data Storage & Security Measures</h2>
+    <p>We deploy bank-grade technical and organizational safeguards:</p>
+    <ul>
+        <li><strong>Encryption in Transit:</strong> All communication between SGB Connect and backend servers is encrypted using Transport Layer Security (TLS 1.3 / HTTPS).</li>
+        <li><strong>Authentication:</strong> Strict JSON Web Token (JWT) verification and bcrypt password hashing.</li>
+        <li><strong>Role-Based Access Control (RBAC):</strong> Telecallers are restricted to viewing only leads and chats assigned to their profile.</li>
+        <li><strong>Secure Cloud Media:</strong> Customer receipt media and attachments are stored on secure cloud object storage with time-limited signed access.</li>
+    </ul>
+
+    <h2>5. Data Retention & Account Deletion Requests</h2>
+    <p>Customer and lead logs are retained for as long as required for agricultural order fulfillment and warranty compliance. Authorized users or customers may request data correction or complete deletion by emailing our Data Protection Officer at <a href="mailto:privacy@sgbagro.com">privacy@sgbagro.com</a> or submitting a request through the app's User Profile screen.</p>
+
+    <h2>6. Contact Us</h2>
+    <p>If you have questions, inquiries, or grievances regarding this Privacy Policy:</p>
+    <ul>
+        <li><strong>Entity:</strong> SGB Agro Industries</li>
+        <li><strong>Email:</strong> <a href="mailto:support@sgbagro.com">support@sgbagro.com</a> / <a href="mailto:privacy@sgbagro.com">privacy@sgbagro.com</a></li>
+        <li><strong>Address:</strong> SGB Agro Industries Industrial Complex, Koppa, Karnataka, India</li>
+    </ul>
+
+    <div class="footer">
+        &copy; 2026 SGB Agro Industries. All rights reserved. SGB Connect Enterprise Suite.
+    </div>
+</div>
+</body>
+</html>

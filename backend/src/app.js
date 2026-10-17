@@ -24,6 +24,7 @@ const campaignRoutes = require('./routes/campaign.routes');
 const departmentRoutes = require('./routes/department.routes');
 const productSetRoutes = require('./routes/product-set.routes');
 const chatbotRoutes = require('./routes/chatbot.routes');
+const telephonyRoutes = require('./routes/telephony.routes');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -104,24 +105,127 @@ app.use(express.static(path.join(__dirname, '../../frontend'), {
     etag: true
 }));
 
-// Cloudflare R2 Public Media Streamer Route
+// Cloudflare R2 Public Media Streamer Route with 3-tier Fallback (R2 -> Disk -> DB BLOB)
 const storageService = require('./services/storage.service');
+// On-demand message media streamer (streams binary media from DB BLOB without bloating JSON history payloads)
+app.get('/api/media/message/:chatId', async (req, res) => {
+    try {
+        const chatId = parseInt(req.params.chatId);
+        if (isNaN(chatId)) return res.status(400).send('Invalid chat ID');
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+        const [rows] = await pool.query(
+            'SELECT media_data, mime_type, message_type FROM chat_messages WHERE chat_id = ?',
+            [chatId]
+        );
+        if (rows.length === 0 || !rows[0].media_data) {
+            return res.status(404).send('Media not found');
+        }
+
+        const row = rows[0];
+        let buffer = row.media_data;
+        let mime = row.mime_type || (row.message_type === 'image' ? 'image/jpeg' : (row.message_type === 'video' ? 'video/mp4' : (row.message_type === 'audio' ? 'audio/mpeg' : 'application/octet-stream')));
+
+        if (typeof buffer === 'string') {
+            if (buffer.startsWith('data:')) {
+                const parts = buffer.split(',');
+                const mimeMatch = parts[0].match(/:(.*?);/);
+                if (mimeMatch) mime = mimeMatch[1];
+                buffer = Buffer.from(parts[1], 'base64');
+            } else {
+                buffer = Buffer.from(buffer, 'base64');
+            }
+        }
+
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Content-Length', buffer.length);
+        return res.send(buffer);
+    } catch (err) {
+        console.error('Error streaming message media:', err);
+        return res.status(500).send('Error streaming media');
+    }
+});
+
 app.get('/api/media/*', async (req, res) => {
     const objectKey = req.params[0];
     if (!objectKey) return res.status(400).send('Missing media key');
 
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Tier 1: Cloudflare R2
     try {
         const r2Data = await storageService.downloadObject({ key: objectKey });
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        res.setHeader('Content-Type', r2Data.contentType || 'application/octet-stream');
-        if (r2Data.contentLength) res.setHeader('Content-Length', r2Data.contentLength);
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        return res.send(r2Data.buffer);
+        if (r2Data && r2Data.buffer) {
+            res.setHeader('Content-Type', r2Data.contentType || 'application/octet-stream');
+            if (r2Data.contentLength) res.setHeader('Content-Length', r2Data.contentLength);
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return res.send(r2Data.buffer);
+        }
     } catch (err) {
-        console.warn(`[MEDIA STREAM WARN] Failed to serve object '${objectKey}': ${err.message}`);
-        return res.status(404).send('Media not found');
+        // Fallback to local filesystem
     }
+
+    // Tier 2: Local Disk (uploads directory)
+    try {
+        const localCandidates = [
+            path.join(__dirname, '../uploads', objectKey),
+            path.join(__dirname, '../../uploads', objectKey),
+            path.join(process.cwd(), 'uploads', objectKey),
+            path.join(process.cwd(), objectKey),
+        ];
+        for (const loc of localCandidates) {
+            if (fs.existsSync(loc) && fs.statSync(loc).isFile()) {
+                const ext = path.extname(loc).toLowerCase();
+                let cType = 'application/octet-stream';
+                if (['.jpg', '.jpeg'].includes(ext)) cType = 'image/jpeg';
+                else if (['.png'].includes(ext)) cType = 'image/png';
+                else if (['.webp'].includes(ext)) cType = 'image/webp';
+                else if (['.mp4'].includes(ext)) cType = 'video/mp4';
+                else if (['.pdf'].includes(ext)) cType = 'application/pdf';
+                else if (['.mp3', '.opus', '.ogg', '.m4a'].includes(ext)) cType = 'audio/mpeg';
+
+                res.setHeader('Content-Type', cType);
+                res.setHeader('Cache-Control', 'public, max-age=86400');
+                return res.sendFile(path.resolve(loc));
+            }
+        }
+    } catch (diskErr) {
+        // Fallback to DB
+    }
+
+    // Tier 3: MySQL chat_messages BLOB/DataURI
+    try {
+        const cleanName = objectKey.split('/').pop();
+        const [rows] = await pool.query(
+            `SELECT media_data, mime_type FROM chat_messages 
+             WHERE media_url LIKE ? OR media_url LIKE ? OR (media_data IS NOT NULL AND media_name = ?) 
+             ORDER BY id DESC LIMIT 1`,
+            [`%${objectKey}%`, `%${cleanName}%`, cleanName]
+        );
+        if (rows.length > 0 && rows[0].media_data) {
+            const data = rows[0].media_data;
+            const mime = rows[0].mime_type || 'image/jpeg';
+            if (typeof data === 'string' && data.startsWith('data:')) {
+                const commaIdx = data.indexOf(',');
+                const b64 = commaIdx !== -1 ? data.substring(commaIdx + 1) : data;
+                const buf = Buffer.from(b64, 'base64');
+                res.setHeader('Content-Type', mime);
+                return res.send(buf);
+            } else if (Buffer.isBuffer(data)) {
+                res.setHeader('Content-Type', mime);
+                return res.send(data);
+            }
+        }
+    } catch (dbErr) {
+        console.warn(`[MEDIA DB FALLBACK ERROR] ${dbErr.message}`);
+    }
+
+    console.warn(`[MEDIA 404] Object '${objectKey}' not found in R2, disk, or DB.`);
+    return res.status(404).send('Media not found');
 });
 
 // API Routes
@@ -147,18 +251,27 @@ app.use('/api/campaigns', campaignRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/product-sets', productSetRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/telephony', telephonyRoutes);
+app.use('/api/integrations/acefone/webhook', telephonyRoutes);
 
 console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
 console.log('✅ WhatsApp Webhook: Mounted at /webhook & /api/whatsapp/webhook');
+console.log('✅ Acefone Telephony API: Mounted at /api/telephony');
+console.log('✅ Acefone Webhook: Mounted at /api/integrations/acefone/webhook');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)
 app.all('/api/*', (req, res) => {
     res.status(404).json({ error: 'API endpoint not found' });
 });
 
-// Fallback: All other routes serve index.html (SPA support)
+// Fallback: All other routes serve index.html (SPA support) if available
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+    const indexPath = path.join(__dirname, '../../frontend/index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('Resource not found');
+    }
 });
 
 module.exports = app;

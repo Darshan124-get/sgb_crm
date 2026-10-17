@@ -21,6 +21,10 @@
                     style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; background: white; border: 1px solid #cbd5e1; color: #475569; border-radius: 0.375rem;">
                     <i class="fas fa-arrow-left"></i> Back
                 </button>
+                <button id="callFarmerBtn" onclick="window.initiateLeadClickToCall()" class="login-btn"
+                    style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; background: #2563eb; color: white; border: none; border-radius: 0.375rem; font-weight: 700; cursor: pointer;">
+                    <i class="fas fa-phone-alt"></i> Call Farmer
+                </button>
                 <a id="whatsappBtn" href="#" target="_blank" class="login-btn btn-whatsapp"
                     style="width: auto; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-size: 0.875rem;">
                     <i class="fab fa-whatsapp"></i> WhatsApp
@@ -57,8 +61,18 @@
                     </div>
                     <div class="info-item">
                         <label>Phone Number</label>
-                        <p id="leadDetailPhone" class="view-item">-</p>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.2rem;">
+                            <p id="leadDetailPhone" class="view-item" style="margin: 0; font-weight: 800; font-size: 1.05rem; color: #0f172a;">-</p>
+                            <button id="callFarmerInlineBtn" onclick="window.initiateLeadClickToCall()" class="view-item" style="background: #2563eb; color: white; border: none; border-radius: 6px; padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;" title="Click to Call via Acefone">
+                                <i class="fas fa-phone-alt"></i> Click to Call
+                            </button>
+                        </div>
                         <input type="text" id="editPhone" class="edit-item form-control-premium" style="display:none">
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>Delivery Address</label>
+                        <p id="leadDetailAddress" class="view-item" style="color: #1e293b; font-weight: 600;">-</p>
+                        <input type="text" id="editAddress" class="edit-item form-control-premium" style="display:none" placeholder="Enter full delivery address">
                     </div>
                     <div class="info-item">
                         <label>Village / City</label>
@@ -273,6 +287,21 @@
                 <div id="chatbotSummaryContainer">
                     <p style="font-size: 0.8125rem; color: #94a3b8; text-align: center; margin: 1rem 0;">Checking
                         chatbot responses...</p>
+                </div>
+            </div>
+
+            <!-- Blade Protector Delivery Details Card (Form Address Collection) -->
+            <div id="bladeDeliverySection" class="detail-section" style="margin-top: 1.5rem; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3
+                        style="font-size: 0.75rem; text-transform: uppercase; color: #b45309; letter-spacing: 0.05em; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+                        <i class="fas fa-truck-fast" style="font-size: 0.95rem; color: #d97706;"></i> Blade Protector Delivery Details
+                    </h3>
+                    <span id="bladeDeliveryBadge" class="badge" style="display: none;">-</span>
+                </div>
+
+                <div id="bladeDeliveryContainer">
+                    <!-- Delivery details injected here -->
                 </div>
             </div>
         </div>

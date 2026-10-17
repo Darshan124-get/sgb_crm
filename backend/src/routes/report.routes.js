@@ -9,5 +9,7 @@ router.get('/orders', authenticateToken, reportController.exportOrders);
 router.get('/campaign-analytics', authenticateToken, reportController.getCampaignAnalytics);
 router.get('/telecaller-performance', authenticateToken, reportController.getTelecallerPerformance);
 router.get('/locations', authenticateToken, reportController.getLocations);
+router.get('/telecaller/daily-summary', authenticateToken, reportController.getDailyTelecallerSummary);
+router.get('/telecaller/daily-pdf', authenticateToken, reportController.getDailyTelecallerPdf);
 
 module.exports = router;

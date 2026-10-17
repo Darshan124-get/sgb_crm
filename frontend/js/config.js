@@ -8,7 +8,7 @@ const isLocal = window.location.origin.includes('localhost') ||
                 window.location.origin.includes('127.0.0.1') || 
                 window.location.protocol === 'file:';
 
-const PROD_BACKEND_URL = 'https://paleturquoise-elk-361855.hostingersite.com';
+const PROD_BACKEND_URL = 'https://5439-103-148-39-224.ngrok-free.app';
 
 if (window.location.hostname.includes('ngrok')) {
     window.BASE_URL = window.location.origin.replace(/\/$/, '');

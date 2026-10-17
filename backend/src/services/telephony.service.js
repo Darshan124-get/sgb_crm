@@ -1246,7 +1246,7 @@ class TelephonyService {
     }
 
     /**
-     * Download recording from Acefone and stream to Cloudflare R2
+     * Resilient Asynchronous Worker to offload Acefone call audio recordings to Cloudflare R2
      */
     static async processRecordingAsync(integrationId, callId, recordingUrl, customCallId = null) {
         if (!recordingUrl || !recordingUrl.startsWith('http')) return null;
@@ -1259,11 +1259,59 @@ class TelephonyService {
             const cleanCallRef = String(callRef).replace(/[^a-zA-Z0-9._-]/g, '_');
             const objectKey = `telephony/recordings/${year}/${month}/call_${cleanCallRef}.mp3`;
 
-            const response = await axios.get(recordingUrl, { responseType: 'arraybuffer', timeout: 30000 });
-            const buffer = Buffer.from(response.data);
+            // 1. Immediately store recording record with original Acefone URL so audio is immediately playable in CRM
+            await pool.query(`
+                INSERT INTO telephony_recordings (
+                    call_id, integration_id, acefone_recording_url, r2_bucket, r2_object_key,
+                    file_name, mime_type, upload_status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'audio/mpeg', 'pending', NOW())
+                ON DUPLICATE KEY UPDATE
+                    acefone_recording_url = VALUES(acefone_recording_url)
+            `, [callId, integrationId, recordingUrl, r2Bucket, objectKey, `call_${cleanCallRef}.mp3`]);
 
-            if (buffer.length === 0) {
-                console.warn(`⚠️ Acefone recording buffer empty for Call ${callId}`);
+            await pool.query(`UPDATE telephony_calls SET is_recorded = TRUE WHERE id = ?`, [callId]);
+
+            // 2. Acefone generates recordings asynchronously after call hangup.
+            // When webhook fires, the file on Acefone CDN is often still transcoding (returns 404 for first 5-30s).
+            // We retry with exponential backoff: 5s, 10s, 20s, 30s.
+            let buffer = null;
+            const retryDelays = [5000, 10000, 20000, 30000];
+
+            for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+                if (attempt > 0) {
+                    const delayMs = retryDelays[attempt - 1];
+                    console.log(`[R2 Recording Offload] Call ${callId} audio not ready yet (attempt ${attempt}). Retrying in ${delayMs / 1000}s...`);
+                    await new Promise(r => setTimeout(r, delayMs));
+                }
+
+                try {
+                    const response = await axios.get(recordingUrl, {
+                        responseType: 'arraybuffer',
+                        timeout: 30000,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                    });
+
+                    if (response.status === 200 && response.data && response.data.length > 0) {
+                        buffer = Buffer.from(response.data);
+                        break;
+                    }
+                } catch (fetchErr) {
+                    const status = fetchErr.response ? fetchErr.response.status : fetchErr.message;
+                    // If 404 or 403, file is still processing on Acefone, continue retry loop
+                    if ((status === 404 || status === 403) && attempt < retryDelays.length) {
+                        continue;
+                    }
+                    if (attempt >= retryDelays.length) {
+                        throw fetchErr;
+                    }
+                }
+            }
+
+            if (!buffer || buffer.length === 0) {
+                console.warn(`⚠️ Acefone recording buffer empty or not ready for Call ${callId}`);
+                await pool.query(`UPDATE telephony_recordings SET upload_status = 'pending' WHERE call_id = ?`, [callId]).catch(() => {});
                 return null;
             }
 
@@ -1277,23 +1325,20 @@ class TelephonyService {
             const publicUrl = storageService.getPublicUrl(objectKey, r2Bucket);
 
             await pool.query(`
-                INSERT INTO telephony_recordings (
-                    call_id, integration_id, acefone_recording_url, r2_bucket, r2_object_key,
-                    file_name, mime_type, file_size_bytes, upload_status, uploaded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'audio/mpeg', ?, 'uploaded', NOW())
-                ON DUPLICATE KEY UPDATE
-                    r2_bucket = VALUES(r2_bucket),
-                    r2_object_key = VALUES(r2_object_key),
-                    file_size_bytes = VALUES(file_size_bytes),
+                UPDATE telephony_recordings
+                SET r2_bucket = ?,
+                    r2_object_key = ?,
+                    file_size_bytes = ?,
                     upload_status = 'uploaded',
                     uploaded_at = NOW()
-            `, [callId, integrationId, recordingUrl, r2Bucket, objectKey, `call_${cleanCallRef}.mp3`, buffer.length]);
+                WHERE call_id = ?
+            `, [r2Bucket, objectKey, buffer.length, callId]);
 
-            await pool.query(`UPDATE telephony_calls SET is_recorded = TRUE WHERE id = ?`, [callId]);
-            console.log(`  🎵 Call ${callId} recording offloaded to Cloudflare R2: ${objectKey}`);
+            console.log(`  🎵 Call ${callId} recording successfully offloaded to Cloudflare R2: ${objectKey}`);
             return { objectKey, publicUrl };
         } catch (err) {
             console.error(`❌ Failed R2 Recording Offloading for Call ${callId}:`, err.message);
+            await pool.query(`UPDATE telephony_recordings SET upload_status = 'failed' WHERE call_id = ?`, [callId]).catch(() => {});
             return null;
         }
     }

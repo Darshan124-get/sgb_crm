@@ -29,15 +29,19 @@ window.resolveMediaUrl = function (rawUrl) {
     const trimmed = rawUrl.trim();
     if (!trimmed) return window.SVG_PRODUCT_PLACEHOLDER || '';
 
+    // Direct data URLs or blob URLs
     if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
         return trimmed;
     }
 
+    // Static relative assets (UI illustrations, icons)
     if (trimmed.startsWith('../') || trimmed.includes('assets/images')) {
         return trimmed;
     }
 
     let cleanPath = trimmed;
+
+    // Convert Meta graph media URLs to internal media proxy
     if (cleanPath.includes('graph.facebook.com')) {
         const mediaId = cleanPath.split('/').pop().replace(/\D/g, '');
         if (mediaId) {
@@ -45,10 +49,22 @@ window.resolveMediaUrl = function (rawUrl) {
         }
     }
 
-    if (cleanPath.startsWith('http://127.0.0.1:5000') || cleanPath.startsWith('http://localhost:5000')) {
-        cleanPath = cleanPath.replace(/^http:\/\/(127\.0\.0\.1|localhost):5000/, '');
+    // If it's an internal CRM route (/api/media, /uploads, /api/whatsapp), strip any host/origin prefix (localhost, 127.0.0.1, private IPs, or old domains)
+    const internalRouteMatch = cleanPath.match(/^https?:\/\/[^/]+(\/(?:api\/media|uploads|api\/whatsapp)\/.*)$/i);
+    if (internalRouteMatch) {
+        cleanPath = internalRouteMatch[1];
+    } else if (/^https?:\/\/(?:127\.0\.0\.1|localhost|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?(\/.*)?$/i.test(cleanPath)) {
+        // Any private or localhost IP with or without port
+        const ipMatch = cleanPath.match(/^https?:\/\/[^/]+(\/.*)?$/);
+        cleanPath = (ipMatch && ipMatch[1]) ? ipMatch[1] : '';
     } else if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+        // True external third-party URL (e.g. Unsplash, external CDN)
         return cleanPath;
+    }
+
+    // If path is a bare relative storage key (e.g. "quick-replies/...", "chats/...", "chatbot-media/..."), prefix with /api/media/
+    if (cleanPath.startsWith('quick-replies/') || cleanPath.startsWith('chats/') || cleanPath.startsWith('chatbot-media/') || cleanPath.startsWith('telephony/')) {
+        cleanPath = `/api/media/${cleanPath}`;
     }
 
     const baseUrl = window.BASE_URL || 
@@ -60,6 +76,7 @@ window.resolveMediaUrl = function (rawUrl) {
 
     return `${cleanBase}${cleanPathFormatted}`;
 };
+
 
 window.FCM_VAPID_KEY = 'BCt9SBycqLOQToZjMnZ9sRedn1Etk7-HtrCeCnPxAQEmgqCnMA87QtqPflx6Wi1PAOU2to8Rd6F_AeY1OEhTRE4';
 

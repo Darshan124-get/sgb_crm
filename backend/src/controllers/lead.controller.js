@@ -5,6 +5,7 @@ exports.getLeads = async (req, res) => {
     const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit, module: moduleName, dealer_only } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
+    const isExecutiveView = (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp');
 
     const isDealerModule = moduleName === 'dealer' || dealer_only === 'true';
 
@@ -45,7 +46,7 @@ exports.getLeads = async (req, res) => {
         }
 
         // 🛡️ SECURITY: Role-Based Data Isolation
-        if ((userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp')) {
+        if (isExecutiveView) {
             query += ' AND l.assigned_to = ?';
             params.push(userId);
         } else {

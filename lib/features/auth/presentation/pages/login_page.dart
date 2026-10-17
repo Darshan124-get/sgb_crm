@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../../../core/constants/dark_splash_colors.dart';
 import '../../../../core/network/api_config.dart';
 import '../../../../core/storage/session_storage.dart';
@@ -77,27 +76,6 @@ class _LoginPageState extends State<LoginPage>
     );
 
     _animController.forward();
-    _autoProbeServer();
-  }
-
-  Future<void> _autoProbeServer() async {
-    try {
-      final activeUri = Uri.parse('${ApiConfig.baseUrl}/auth/users');
-      final res = await http.get(activeUri).timeout(const Duration(milliseconds: 1500));
-      if (res.statusCode > 0) return;
-    } catch (_) {
-      for (final host in ApiConfig.candidateHosts) {
-        try {
-          final uri = Uri.parse('$host/auth/users');
-          final res = await http.get(uri).timeout(const Duration(milliseconds: 1500));
-          if (res.statusCode > 0) {
-            await ApiConfig.setBaseUrl(host);
-            if (mounted) setState(() {});
-            break;
-          }
-        } catch (_) {}
-      }
-    }
   }
 
   @override
@@ -106,130 +84,6 @@ class _LoginPageState extends State<LoginPage>
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _openServerConfigDialog() {
-    final textController = TextEditingController(text: ApiConfig.baseUrl);
-    bool testing = false;
-    String? statusMessage;
-    Color? statusColor;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.dns_rounded, color: Color(0xFF38BDF8), size: 22),
-              SizedBox(width: 8),
-              Text('Backend API Server', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Configure the base URL of your modular CRM backend:',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: textController,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Base API URL',
-                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: const Color(0xFF0F172A),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ActionChip(
-                    label: const Text('10.77.194.13 (Wi-Fi)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
-                    backgroundColor: const Color(0xFF0F172A),
-                    onPressed: () => setDialogState(() => textController.text = ApiConfig.currentWifiLanUrl),
-                  ),
-                  ActionChip(
-                    label: const Text('192.168.137.1 (Hotspot)', style: TextStyle(fontSize: 11)),
-                    onPressed: () => setDialogState(() => textController.text = ApiConfig.hotspotLanUrl),
-                  ),
-                  ActionChip(
-                    label: const Text('192.168.1.120 (LAN)', style: TextStyle(fontSize: 11)),
-                    onPressed: () => setDialogState(() => textController.text = ApiConfig.legacyLanUrl),
-                  ),
-                  ActionChip(
-                    label: const Text('10.0.2.2 (Emulator)', style: TextStyle(fontSize: 11)),
-                    onPressed: () => setDialogState(() => textController.text = ApiConfig.androidEmulatorUrl),
-                  ),
-                  ActionChip(
-                    label: const Text('127.0.0.1 (Local)', style: TextStyle(fontSize: 11)),
-                    onPressed: () => setDialogState(() => textController.text = ApiConfig.localhostUrl),
-                  ),
-                ],
-              ),
-              if (statusMessage != null) ...[
-                const SizedBox(height: 10),
-                Text(statusMessage!, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: testing
-                  ? null
-                  : () async {
-                      setDialogState(() {
-                        testing = true;
-                        statusMessage = 'Testing connection...';
-                        statusColor = Colors.amber;
-                      });
-                      try {
-                        final testUrl = textController.text.trim();
-                        final uri = Uri.parse(testUrl.endsWith('/api') ? '$testUrl/auth/users' : '$testUrl/api/auth/users');
-                        final res = await http.get(uri).timeout(const Duration(seconds: 4));
-                        setDialogState(() {
-                          testing = false;
-                          statusMessage = 'Connected! HTTP ${res.statusCode}';
-                          statusColor = const Color(0xFF4ADE80);
-                        });
-                      } catch (e) {
-                        setDialogState(() {
-                          testing = false;
-                          statusMessage = 'Connection failed: ${e.toString()}';
-                          statusColor = const Color(0xFFF87171);
-                        });
-                      }
-                    },
-              child: const Text('Test Connection'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final nav = Navigator.of(ctx);
-                final messenger = ScaffoldMessenger.of(context);
-                await ApiConfig.setBaseUrl(textController.text.trim());
-                nav.pop();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text('API URL set to ${ApiConfig.baseUrl}'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF005AFF)),
-              child: const Text('Save & Apply', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _handleLogin() async {
@@ -284,11 +138,6 @@ class _LoginPageState extends State<LoginPage>
           backgroundColor: const Color(0xFF991B1B),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          action: SnackBarAction(
-            label: 'Server IP',
-            textColor: const Color(0xFF38BDF8),
-            onPressed: _openServerConfigDialog,
-          ),
           content: Row(
             children: [
               const Icon(Icons.error_outline_rounded, color: Colors.white),
@@ -739,20 +588,6 @@ class _LoginPageState extends State<LoginPage>
             ),
           ),
 
-          // 4. Subtle Server Settings Button (top-right)
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 6, right: 10),
-                child: IconButton(
-                  icon: const Icon(Icons.dns_rounded, color: Color(0xFF64748B), size: 20),
-                  tooltip: 'Server Settings',
-                  onPressed: _openServerConfigDialog,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

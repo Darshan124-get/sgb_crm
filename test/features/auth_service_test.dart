@@ -139,7 +139,7 @@ void main() {
       expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
     });
 
-    testWidgets('LoginPage opening server configuration dialog displays presets and updates URL', (WidgetTester tester) async {
+    testWidgets('LoginPage renders production login view without debug server settings button', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.0;
 
@@ -155,19 +155,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap server settings button in top right
-      await tester.tap(find.byTooltip('Server Settings'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Backend API Server'), findsOneWidget);
-      expect(find.text('10.0.2.2 (Emulator)'), findsOneWidget);
-      expect(find.text('192.168.1.120 (LAN)'), findsOneWidget);
-      expect(find.text('127.0.0.1 (Local)'), findsOneWidget);
-
-      // Tap Save & Apply
-      await tester.tap(find.text('Save & Apply'));
-      await tester.pumpAndSettle();
-
+      // Ensure server settings button and dialog are not present in production
+      expect(find.byTooltip('Server Settings'), findsNothing);
       expect(find.text('Backend API Server'), findsNothing);
     });
   });

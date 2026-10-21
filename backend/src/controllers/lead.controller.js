@@ -537,7 +537,7 @@ exports.getLeadById = async (req, res) => {
 };
 
 exports.createLead = async (req, res) => {
-    const { phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, delivery_type } = req.body;
+    const { phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, delivery_type, village, sub_district, taluk } = req.body;
     const connection = await pool.getConnection();
 
     try {
@@ -546,9 +546,11 @@ exports.createLead = async (req, res) => {
 
         const cleanPhone = validationUtils.sanitizePhone(phone_number);
         const cleanName = validationUtils.sanitizeAlphabetOnly(customer_name || '');
-        const cleanCity = validationUtils.sanitizeAlphabetOnly(city || '');
-        const cleanState = validationUtils.sanitizeAlphabetOnly(state || '');
-        const cleanDistrict = validationUtils.sanitizeAlphabetOnly(district || '');
+        const cleanVillage = validationUtils.sanitizeAlphanumeric(village || city || '');
+        const cleanTaluk = validationUtils.sanitizeAlphanumeric(taluk || sub_district || '');
+        const cleanCity = cleanVillage || validationUtils.sanitizeAlphanumeric(city || '');
+        const cleanState = validationUtils.sanitizeAlphanumeric(state || '');
+        const cleanDistrict = validationUtils.sanitizeAlphanumeric(district || '');
         const cleanPincode = validationUtils.sanitizePincode(pincode || '');
 
         // 1. Basic Validation
@@ -600,12 +602,12 @@ exports.createLead = async (req, res) => {
             status = 'new';
         }
 
-        const combinedAddress = [cleanCity, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
+        const combinedAddress = [cleanVillage, cleanTaluk, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
         const finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || null);
 
         const [result] = await connection.query(
-            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type, village, sub_district, taluk) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 cleanPhone,
                 cleanName || null,
@@ -619,7 +621,10 @@ exports.createLead = async (req, res) => {
                 source || 'manual',
                 status,
                 assignedTo,
-                delivery_type || null
+                delivery_type || null,
+                cleanVillage || null,
+                cleanTaluk || null,
+                cleanTaluk || null
             ]
         );
 
@@ -646,7 +651,8 @@ exports.updateLead = async (req, res) => {
     const {
         phone_number, customer_name, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
-        current_crop, acreage, delivery_type, call_count, notes, remarks
+        current_crop, acreage, delivery_type, call_count, notes, remarks,
+        village, sub_district, taluk
     } = req.body;
 
     let connection;
@@ -667,13 +673,17 @@ exports.updateLead = async (req, res) => {
         const finalStatus = status || currentLead.status;
         const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
-        const finalCity = city !== undefined ? validationUtils.sanitizeAlphabetOnly(city) : currentLead.city;
-        const finalState = state !== undefined ? validationUtils.sanitizeAlphabetOnly(state) : currentLead.state;
-        const finalDistrict = district !== undefined ? validationUtils.sanitizeAlphabetOnly(district) : currentLead.district;
+        const finalCity = city !== undefined ? validationUtils.sanitizeAlphanumeric(city) : currentLead.city;
+        const finalVillage = village !== undefined ? validationUtils.sanitizeAlphanumeric(village) : currentLead.village;
+        const finalSubDistrict = (sub_district !== undefined || taluk !== undefined)
+            ? validationUtils.sanitizeAlphanumeric(sub_district || taluk)
+            : (currentLead.taluk || currentLead.sub_district);
+        const finalState = state !== undefined ? validationUtils.sanitizeAlphanumeric(state) : currentLead.state;
+        const finalDistrict = district !== undefined ? validationUtils.sanitizeAlphanumeric(district) : currentLead.district;
         const finalPincode = pincode !== undefined ? validationUtils.sanitizePincode(pincode) : currentLead.pincode;
 
-        const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
-        const finalAddress = address !== undefined ? validationUtils.sanitizeAlphanumeric(address) : combinedAddress;
+        const combinedAddress = [finalVillage, finalSubDistrict, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
+        const finalAddress = address !== undefined ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || currentLead.address);
 
         const cleanFollowupDate = (next_followup_date && String(next_followup_date).trim() !== '') 
             ? next_followup_date 
@@ -686,7 +696,8 @@ exports.updateLead = async (req, res) => {
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
                 address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
-                current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
+                current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?,
+                village = ?, sub_district = ?, taluk = ?
             WHERE lead_id = ?`,
             [
                 cleanPhone,
@@ -694,7 +705,7 @@ exports.updateLead = async (req, res) => {
                 first_message || currentLead.first_message || null,
                 language || currentLead.language || 'EN',
                 finalAddress || null,
-                finalCity || null,
+                finalCity || finalVillage || null,
                 finalState || null,
                 finalDistrict || null,
                 finalPincode || null,
@@ -708,6 +719,9 @@ exports.updateLead = async (req, res) => {
                 acreage || currentLead.acreage || null,
                 delivery_type || currentLead.delivery_type || null,
                 call_count !== undefined ? call_count : currentLead.call_count,
+                finalVillage || null,
+                finalSubDistrict || null,
+                finalSubDistrict || null,
                 req.params.id
             ]
         );
@@ -952,25 +966,34 @@ exports.getStats = async (req, res) => {
         }
 
         const isExecutiveView = (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp');
-        const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, [...params]);
-        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, [...params]);
-        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, [...params]);
-        const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, [...params]);
-        const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, [...params]);
-        const newCondition = isExecutiveView 
-            ? 'AND (status IN ("new", "assigned") OR status IS NULL OR status = "")' 
-            : 'AND (status IN ("new", "assigned") OR status IS NULL OR status = "") AND assigned_to IS NULL';
-        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} ${newCondition}`, [...params]);
-        const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, [...params]);
+        const newCaseCondition = isExecutiveView 
+            ? "(status IN ('new', 'assigned') OR status IS NULL OR status = '')" 
+            : "(status IN ('new', 'assigned') OR status IS NULL OR status = '') AND assigned_to IS NULL";
+
+        // Single optimized aggregation query instead of 7 sequential roundtrips
+        const [statsRows] = await pool.query(`
+            SELECT 
+                COUNT(*) as all_count,
+                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
+                COUNT(CASE WHEN score = 'hot' AND status = 'interested' THEN 1 END) as hot_count,
+                COUNT(CASE WHEN status = 'followup' THEN 1 END) as followup_count,
+                COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
+                COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
+                COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count
+            FROM leads
+            ${baseWhere}
+        `, params);
+
+        const s = statsRows[0] || {};
 
         res.json({
-            all: all[0].count,
-            today: today[0].count,
-            hot: hot[0].count,
-            followup: followup[0].count,
-            lost: lost[0].count,
-            open: open[0].count,
-            new: newCount[0].count
+            all: s.all_count || 0,
+            today: s.today_count || 0,
+            hot: s.hot_count || 0,
+            followup: s.followup_count || 0,
+            lost: s.lost_count || 0,
+            open: s.open_count || 0,
+            new: s.new_count || 0
         });
     } catch (err) {
         console.error('getStats Error:', err);

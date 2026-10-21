@@ -1440,7 +1440,29 @@ function initLeadNav() {
                     all: {},
                     new: isTelecomUser ? { status: 'new' } : { status: 'new', is_unassigned: 'true' }
                 };
-                await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(filterConfig[filter] || {}));
+                const targetFilter = filterConfig[filter] || {};
+                const alreadyMounted = document.getElementById('leadsTableBody');
+                if (alreadyMounted) {
+                    // Fast path: Don't destroy DOM or re-fetch template, just reset secondary dropdowns and fetch leads directly
+                    const statusF = document.getElementById('leadStatusFilter');
+                    const scoreF = document.getElementById('leadScoreFilter');
+                    const priorityF = document.getElementById('leadPriorityFilter');
+                    const staffF = document.getElementById('leadStaffFilter');
+                    const campaignF = document.getElementById('leadCampaignFilter');
+                    const dateF = document.getElementById('leadDateFilter');
+                    if (statusF) statusF.value = 'all';
+                    if (scoreF) scoreF.value = 'all';
+                    if (priorityF) priorityF.value = 'all';
+                    if (staffF) staffF.value = 'all';
+                    if (campaignF) campaignF.value = 'all';
+                    if (dateF) {
+                        dateF.value = '';
+                        if (dateF._flatpickr) dateF._flatpickr.clear();
+                    }
+                    initLeadList(targetFilter);
+                } else {
+                    await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(targetFilter));
+                }
             }
         });
     });
@@ -1642,31 +1664,36 @@ async function initLeadList(filters = {}, page = 1) {
         staffF.dataset.listenerSet = 'true';
         staffF.onchange = () => initLeadList(window.currentBaseFilters);
 
-        // Fetch staff list and populate options
-        (async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/users/sales`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const allUsers = await response.json();
-                    const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name.includes('sales') || u.role_name.includes('manager') || u.role_name.includes('telecaller') || u.role_name.includes('dealer') || u.role_name === 'viewer' || u.role_name === 'sales'));
-
-                    const val = staffF.value;
-                    staffF.innerHTML = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
-                    users.forEach(u => {
-                        const opt = document.createElement('option');
-                        opt.value = u.user_id;
-                        opt.textContent = `${u.name} - ${u.language || 'General'}`;
-                        staffF.appendChild(opt);
+        if (window._cachedStaffHtml) {
+            const val = staffF.value;
+            staffF.innerHTML = window._cachedStaffHtml;
+            staffF.value = val;
+        } else {
+            // Fetch staff list and populate options
+            (async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_URL}/users/sales`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    staffF.value = val;
+                    if (response.ok) {
+                        const allUsers = await response.json();
+                        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name.includes('sales') || u.role_name.includes('manager') || u.role_name.includes('telecaller') || u.role_name.includes('dealer') || u.role_name === 'viewer' || u.role_name === 'sales'));
+
+                        const val = staffF.value;
+                        let html = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
+                        users.forEach(u => {
+                            html += `<option value="${u.user_id}">${u.name} - ${u.language || 'General'}</option>`;
+                        });
+                        window._cachedStaffHtml = html;
+                        staffF.innerHTML = html;
+                        staffF.value = val;
+                    }
+                } catch (err) {
+                    console.error('Failed to load staff list for filter:', err);
                 }
-            } catch (err) {
-                console.error('Failed to load staff list for filter:', err);
-            }
-        })();
+            })();
+        }
     }
 
     const campaignF = document.getElementById('leadCampaignFilter');
@@ -1674,29 +1701,34 @@ async function initLeadList(filters = {}, page = 1) {
         campaignF.dataset.listenerSet = 'true';
         campaignF.onchange = () => initLeadList(window.currentBaseFilters);
 
-        // Fetch campaign list and populate options
-        (async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/campaigns`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const campaigns = await response.json();
-                    const val = campaignF.value;
-                    campaignF.innerHTML = '<option value="all">All Campaigns</option>';
-                    campaigns.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = `${c.campaign_id} - ${c.tag_line.substring(0, 30)}${c.tag_line.length > 30 ? '...' : ''}`;
-                        campaignF.appendChild(opt);
+        if (window._cachedCampaignHtml) {
+            const val = campaignF.value;
+            campaignF.innerHTML = window._cachedCampaignHtml;
+            campaignF.value = val;
+        } else {
+            // Fetch campaign list and populate options
+            (async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_URL}/campaigns`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    campaignF.value = val;
+                    if (response.ok) {
+                        const campaigns = await response.json();
+                        const val = campaignF.value;
+                        let html = '<option value="all">All Campaigns</option>';
+                        campaigns.forEach(c => {
+                            html += `<option value="${c.id}">${c.campaign_id} - ${c.tag_line.substring(0, 30)}${c.tag_line.length > 30 ? '...' : ''}</option>`;
+                        });
+                        window._cachedCampaignHtml = html;
+                        campaignF.innerHTML = html;
+                        campaignF.value = val;
+                    }
+                } catch (err) {
+                    console.error('Failed to load campaigns list for filter:', err);
                 }
-            } catch (err) {
-                console.error('Failed to load campaigns list for filter:', err);
-            }
-        })();
+            })();
+        }
     }
 
     const initDateRangePicker = () => {
@@ -1930,11 +1962,11 @@ async function initLeadList(filters = {}, page = 1) {
             const scoreUpper = (lead.score || 'COLD').toUpperCase();
             let scoreBadgeHtml = '';
             if (scoreUpper === 'HOT') {
-                scoreBadgeHtml = `<span class="badge-score" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:3px 8px; border-radius:999px;">HOT</span>`;
+                scoreBadgeHtml = `<span class="badge-score" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">HOT</span>`;
             } else if (scoreUpper === 'WARM' || scoreUpper === 'MILD') {
-                scoreBadgeHtml = `<span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:3px 8px; border-radius:999px;">MILD</span>`;
+                scoreBadgeHtml = `<span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">MILD</span>`;
             } else {
-                scoreBadgeHtml = `<span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:3px 8px; border-radius:999px;">COLD</span>`;
+                scoreBadgeHtml = `<span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">COLD</span>`;
             }
 
             // 2. Chatbot Priority Badge & Progress Pill
@@ -1943,54 +1975,62 @@ async function initLeadList(filters = {}, page = 1) {
                 const bAns = lead.bot_answered;
                 const bTot = lead.bot_total || 5;
                 if (bAns >= 4) {
-                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-weight:700; padding:3px 8px; border-radius:999px;">HIGH</span><div style="font-size:0.68rem; font-weight:700; color:#10b981; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">HIGH</span><div style="font-size:0.62rem; font-weight:700; color:#10b981; margin-top:2px; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.6rem;"></i> ${bAns}/${bTot}</div></div>`;
                 } else if (bAns >= 2) {
-                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:3px 8px; border-radius:999px;">MEDIUM</span><div style="font-size:0.68rem; font-weight:700; color:#d97706; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">MED</span><div style="font-size:0.62rem; font-weight:700; color:#d97706; margin-top:2px; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.6rem;"></i> ${bAns}/${bTot}</div></div>`;
                 } else {
-                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:3px 8px; border-radius:999px;">LOW</span><div style="font-size:0.68rem; font-weight:700; color:#64748b; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">LOW</span><div style="font-size:0.62rem; font-weight:700; color:#64748b; margin-top:2px; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.6rem;"></i> ${bAns}/${bTot}</div></div>`;
                 }
             } else {
                 priorityBadgeHtml = `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
             }
 
+            const rawName = (lead.customer_name || 'Unknown').replace(/[\r\n]+/g, ' ').trim();
+            const rawMsg = (lead.first_message || '-').replace(/[\r\n]+/g, ' ').trim();
+            const campaignBadgeHtml = lead.campaign_id_code ? (() => {
+                const fullCode = lead.campaign_id_code;
+                const shortCode = fullCode.length > 12 ? fullCode.substring(0, 10) + '...' : fullCode;
+                return `<span class="campaign-tag" title="${fullCode}" style="display: inline-block; background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; font-size: 0.65rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; cursor: help; white-space: nowrap;">📣 ${shortCode}</span>`;
+            })() : '';
+
             return `
             <tr id="lead-row-${lead.lead_id}" onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
-                <td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" ${isChecked} onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
-                <td>
+                <td onclick="event.stopPropagation()" style="text-align: center; width: 38px; padding: 0.5rem 0.25rem;"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" ${isChecked} onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
+                <td title="${rawName}">
                     <div class="name-cell">
                         <div class="name-initial">${nameInitial}</div>
-                        <div>
-                            <div style="font-weight: 600; color: #1e293b;">${lead.customer_name || 'Unknown'} ${callTag}</div>
-                            ${lead.campaign_id_code ? (() => {
-                    const fullCode = lead.campaign_id_code;
-                    const shortCode = fullCode.length > 15 ? fullCode.substring(0, 12) + '...' : fullCode;
-                    return `<span class="campaign-tag" title="${fullCode}" style="display: inline-block; background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; cursor: help;">📣 ${shortCode}</span>`;
-                })() : ''}
+                        <div class="name-content">
+                            <div class="name-title" title="${rawName}">${rawName}</div>
+                            <div class="name-meta">${callTag}${campaignBadgeHtml}</div>
                         </div>
                     </div>
                 </td>
-                <td><span class="${statusClass}">${displayStatus}</span></td>
-                <td>${scoreBadgeHtml}</td>
-                <td>${priorityBadgeHtml}</td>
-                <td>${lead.state || '-'}</td>
-                <td><span class="language-tag">${lead.language || 'EN'}</span></td>
-                <td onclick="event.stopPropagation()">
+                <td style="text-align: center;"><span class="${statusClass}" style="white-space: nowrap; font-size: 0.72rem; padding: 0.2rem 0.5rem;">${displayStatus}</span></td>
+                <td style="text-align: center;">${scoreBadgeHtml}</td>
+                <td style="text-align: center;">${priorityBadgeHtml}</td>
+                <td title="${lead.state || '-'}"><div class="cell-truncate" style="font-size: 0.78rem; color: #475569;">${lead.state || '-'}</div></td>
+                <td style="text-align: center;" title="${lead.language || 'EN'}"><span class="language-tag" style="font-size: 0.75rem; font-weight: 600;">${(lead.language || 'EN').toUpperCase()}</span></td>
+                <td onclick="event.stopPropagation()" style="white-space: nowrap;">
                     ${isTelecomPanelUser ? `
-                        <a href="javascript:void(0)" onclick="window.copyToClipboard('${lead.phone_number || ''}')" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Click to Copy Number">
-                            <i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}
+                        <a href="javascript:void(0)" onclick="window.copyToClipboard('${lead.phone_number || ''}')" style="color:#25d366;font-weight:600;font-size:0.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Click to Copy Number">
+                            <i class="fab fa-whatsapp" style="font-size:0.85rem;"></i>${lead.phone_number || '-'}
                         </a>
                     ` : `
-                        <a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat">
-                            <i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}
+                        <a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;font-size:0.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat">
+                            <i class="fab fa-whatsapp" style="font-size:0.85rem;"></i>${lead.phone_number || '-'}
                         </a>
                     `}
                 </td>
-                <td><div class="msg-trunk" title="${lead.first_message || ''}">${lead.first_message || '-'}</div></td>
-                <td>${dateHtml}</td>
-                <td>${lead.assigned_to_name || 'Unassigned'}</td>
-                <td onclick="event.stopPropagation()" style="text-align: center;">
-                    <button class="btn-table-call" onclick="event.stopPropagation(); window.initiateLeadClickToCall('${lead.phone_number || ''}', ${lead.lead_id})" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25); transition: all 0.2s;" title="Click to Call via Acefone">
-                        <i class="fas fa-phone-alt"></i> Call
+                <td title="${rawMsg}"><div class="msg-trunk" title="${rawMsg}">${rawMsg}</div></td>
+                <td style="white-space: nowrap;">${dateHtml}</td>
+                <td title="${lead.assigned_to_name || 'Unassigned'}">
+                    <div class="cell-truncate" style="font-weight: 600; color: #475569; font-size: 0.78rem;">
+                        ${lead.assigned_to_name || 'Unassigned'}
+                    </div>
+                </td>
+                <td onclick="event.stopPropagation()" style="text-align: center; white-space: nowrap;">
+                    <button class="btn-table-call" onclick="event.stopPropagation(); window.initiateLeadClickToCall('${lead.phone_number || ''}', ${lead.lead_id})" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 0.3rem 0.55rem; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25); transition: all 0.2s;" title="Click to Call via Acefone">
+                        <i class="fas fa-phone-alt" style="font-size:0.68rem;"></i> Call
                     </button>
                 </td>
             </tr>`;
@@ -2524,7 +2564,8 @@ async function populateLeadDetails(leadId) {
                 leadDetailName: lead.customer_name,
                 leadDetailPhone: lead.phone_number,
                 leadDetailAddress: lead.address || (lead.blade_delivery && lead.blade_delivery.delivery_address) || '-',
-                leadDetailVillage: lead.city,
+                leadDetailVillage: lead.village || lead.city || '-',
+                leadDetailTaluk: lead.taluk || lead.sub_district || '-',
                 leadDetailState: lead.state,
                 leadDetailDistrict: lead.district || '-',
                 leadDetailPincode: lead.pincode || (lead.blade_delivery && lead.blade_delivery.pincode) || '-',
@@ -2547,7 +2588,8 @@ async function populateLeadDetails(leadId) {
                 phone_number: lead.phone_number,
                 editPhone: lead.phone_number,
                 editAddress: lead.address || (lead.blade_delivery && lead.blade_delivery.delivery_address) || '',
-                editVillage: lead.city,
+                editVillage: lead.village || lead.city || '',
+                editTaluk: lead.taluk || lead.sub_district || '',
                 editState: lead.state,
                 editDistrict: lead.district,
                 editPincode: lead.pincode || (lead.blade_delivery && lead.blade_delivery.pincode) || '',
@@ -3278,7 +3320,12 @@ window.saveLeadSection = async function (sectionId) {
         payload.phone_number = document.getElementById('editPhone').value;
         const addrEl = document.getElementById('editAddress');
         if (addrEl) payload.address = addrEl.value;
-        payload.city = document.getElementById('editVillage').value;
+        payload.village = document.getElementById('editVillage')?.value || '';
+        payload.city = payload.village || '';
+        if (document.getElementById('editTaluk')) {
+            payload.taluk = document.getElementById('editTaluk').value || '';
+            payload.sub_district = payload.taluk;
+        }
         payload.state = document.getElementById('editState').value;
         payload.district = document.getElementById('editDistrict').value;
         payload.pincode = document.getElementById('editPincode').value;

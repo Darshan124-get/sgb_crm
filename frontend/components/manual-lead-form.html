@@ -283,20 +283,41 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label style="color: #334155; font-weight: 700;">Village / Taluk <span
-                            style="color:red">*</span></label>
-                    <div style="position: relative;">
-                        <i class="fas fa-location-dot"
-                            style="position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
-                        <input type="text" id="m-de-village" class="form-control-premium"
-                            style="padding-left: 3.5rem; font-weight: 600;" placeholder="e.g. Mandya / Maddur">
+                    <label style="color: #334155; font-weight: 700;">State</label>
+                    <div class="searchable-combobox-wrap" id="wrap-m-de-state" style="position:relative;">
+                        <input type="text" id="m-de-state" class="form-control-premium de-combobox-input" placeholder="Select or type State" autocomplete="off" style="color:#000; padding-right:2.2rem;">
+                        <i class="fas fa-chevron-down de-combobox-arrow" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#64748b; font-size:0.75rem;"></i>
+                        <div id="list-m-de-state" class="de-combobox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.15); z-index:99999;"></div>
                     </div>
                 </div>
             </div>
             <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group">
                     <label style="color: #334155; font-weight: 700;">District</label>
-                    <input type="text" id="m-de-district" class="form-control-premium" placeholder="Enter District">
+                    <div class="searchable-combobox-wrap" id="wrap-m-de-district" style="position:relative;">
+                        <input type="text" id="m-de-district" class="form-control-premium de-combobox-input" placeholder="Select or type District" autocomplete="off" style="color:#000; padding-right:2.2rem;">
+                        <i class="fas fa-chevron-down de-combobox-arrow" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#64748b; font-size:0.75rem;"></i>
+                        <div id="list-m-de-district" class="de-combobox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.15); z-index:99999;"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color: #334155; font-weight: 700;">Taluk / Sub-District</label>
+                    <div class="searchable-combobox-wrap" id="wrap-m-de-taluk" style="position:relative;">
+                        <input type="text" id="m-de-taluk" class="form-control-premium de-combobox-input" placeholder="Select or type Taluk" autocomplete="off" style="color:#000; padding-right:2.2rem;">
+                        <i class="fas fa-chevron-down de-combobox-arrow" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#64748b; font-size:0.75rem;"></i>
+                        <div id="list-m-de-taluk" class="de-combobox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.15); z-index:99999;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-grid" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label style="color: #334155; font-weight: 700;">Village</label>
+                    <div style="position: relative;">
+                        <i class="fas fa-location-dot"
+                            style="position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                        <input type="text" id="m-de-village" class="form-control-premium"
+                            style="padding-left: 3.5rem; font-weight: 600;" placeholder="Enter Village">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label style="color: #334155; font-weight: 700;">Pincode</label>
@@ -304,10 +325,6 @@
                 </div>
             </div>
             <div class="form-grid" style="margin-top: 1rem;">
-                <div class="form-group">
-                    <label>State</label>
-                    <input type="text" id="m-de-state" class="form-control-premium" placeholder="Enter State">
-                </div>
                 <div class="form-group">
                     <label>Lead Language</label>
                     <select id="m-de-language" class="form-control-premium">

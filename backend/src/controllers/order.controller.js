@@ -126,10 +126,11 @@ exports.convertLeadToOrder = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, discount, items } = req.body;
+        let { lead_id, customer_name, phone, address, city, state, village, district, pincode, delivery_type, total_amount, advance_amount, discount, items, sub_district, taluk } = req.body;
+        const finalTaluk = taluk || sub_district || '';
         const [resOrder] = await connection.query(
-            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, discount, order_status, created_by) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)",
-            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, ((total_amount || 0) - (discount || 0) - (advance_amount || 0)), discount || 0, req.user ? req.user.id : 1]
+            "INSERT INTO orders (order_source, lead_id, customer_name, phone, address, village, district, pincode, city, state, delivery_type, total_amount, advance_amount, balance_amount, discount, order_status, created_by, sub_district, taluk) VALUES ('lead', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)",
+            [lead_id, customer_name, phone, address || '', village || '', district || '', pincode || '', city || '', state || '', delivery_type || null, total_amount || 0, advance_amount || 0, ((total_amount || 0) - (discount || 0) - (advance_amount || 0)), discount || 0, req.user ? req.user.id : 1, finalTaluk, finalTaluk]
         );
         const orderId = resOrder.insertId;
 

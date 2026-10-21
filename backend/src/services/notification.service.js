@@ -25,11 +25,25 @@ try {
             console.warn(`⚠️ Firebase credentials file not found at: ${fullPath}`);
         }
     } 
-    // 3. Check for default file
-    else {
-        const defaultPath = path.join(__dirname, '../../firebase-service-account.json');
-        if (fs.existsSync(defaultPath)) {
-            serviceAccount = require(defaultPath);
+    
+    // 3. Check for fallback files if not yet loaded
+    if (!serviceAccount) {
+        const candidateFiles = [
+            'firebase-service-account.json.json',
+            'firebase-service-account.json',
+            'firebase-service-account.json1.json'
+        ];
+        for (const fname of candidateFiles) {
+            const candidatePath = path.join(__dirname, '../../', fname);
+            if (fs.existsSync(candidatePath)) {
+                try {
+                    serviceAccount = require(candidatePath);
+                    console.log(`Loaded Firebase service account from fallback file: ${fname}`);
+                    break;
+                } catch (e) {
+                    // try next
+                }
+            }
         }
     }
 

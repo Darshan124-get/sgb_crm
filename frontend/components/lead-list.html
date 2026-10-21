@@ -17,46 +17,60 @@
         width: 100%;
         border-collapse: collapse;
         text-align: left;
+        table-layout: fixed;
     }
 
     .lead-table th {
         background: #f8fafc;
-        padding: 1rem 1.5rem;
-        font-size: 0.75rem;
+        padding: 0.75rem 0.5rem;
+        font-size: 0.7rem;
         font-weight: 700;
         text-transform: uppercase;
         color: #64748b;
-        letter-spacing: 0.05em;
-        border-bottom: 1px solid #f1f5f9;
+        letter-spacing: 0.03em;
+        border-bottom: 1px solid #e2e8f0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .lead-table td {
-        padding: 1.25rem 1.5rem;
+        padding: 0.65rem 0.5rem;
         border-bottom: 1px solid #f1f5f9;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
         color: #1e293b;
         vertical-align: middle;
+        overflow: hidden;
     }
 
     .lead-table tr:hover {
-        background: #fdfdfd;
+        background: #f8fafc;
     }
 
     .lead-table tr:last-child td {
         border-bottom: none;
     }
 
+    .cell-truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        max-width: 100%;
+    }
+
     .name-cell {
-        font-weight: 600;
-        color: #1e293b;
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.5rem;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .name-initial {
-        width: 2rem;
-        height: 2rem;
+        width: 1.85rem;
+        height: 1.85rem;
+        flex-shrink: 0;
         background: #f0fdf4;
         color: #10b981;
         border-radius: 50%;
@@ -65,6 +79,30 @@
         justify-content: center;
         font-size: 0.75rem;
         font-weight: 700;
+    }
+
+    .name-content {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .name-title {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.8125rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .name-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 2px;
+        overflow: hidden;
+        white-space: nowrap;
     }
 
     .badge-state {
@@ -111,12 +149,14 @@
     }
 
     .msg-trunk {
-        max-width: 150px;
+        width: 100%;
+        max-width: 100%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         color: #64748b;
         font-size: 0.75rem;
+        cursor: help;
     }
 
     .btn-action {
@@ -462,16 +502,30 @@
     </div>
     <div class="lead-table-scroll-wrapper">
         <table class="lead-table" id="leadsTable">
+            <colgroup>
+                <col style="width: 38px;">
+                <col style="width: 17%;">
+                <col style="width: 82px;">
+                <col style="width: 65px;">
+                <col style="width: 72px;">
+                <col style="width: 80px;">
+                <col style="width: 60px;">
+                <col style="width: 110px;">
+                <col style="width: 15%;">
+                <col style="width: 100px;">
+                <col style="width: 105px;">
+                <col style="width: 65px;">
+            </colgroup>
             <thead>
                 <tr>
-                    <th style="width: 40px; padding-right: 0;"><input type="checkbox" id="selectAllLeads"
+                    <th style="width: 38px; text-align: center; padding: 0.5rem 0.25rem;"><input type="checkbox" id="selectAllLeads"
                             class="form-checkbox"></th>
                     <th>Farmer Name</th>
-                    <th>Status</th>
-                    <th>Score</th>
-                    <th>Priority</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: center;">Score</th>
+                    <th style="text-align: center;">Priority</th>
                     <th>State</th>
-                    <th>Language</th>
+                    <th style="text-align: center;">Language</th>
                     <th>Phone Number</th>
                     <th>Message</th>
                     <th>Date / Follow-up</th>

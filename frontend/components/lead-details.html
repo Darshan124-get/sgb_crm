@@ -75,9 +75,14 @@
                         <input type="text" id="editAddress" class="edit-item form-control-premium" style="display:none" placeholder="Enter full delivery address">
                     </div>
                     <div class="info-item">
-                        <label>Village / City</label>
+                        <label>Village</label>
                         <p id="leadDetailVillage" class="view-item">-</p>
-                        <input type="text" id="editVillage" class="edit-item form-control-premium" style="display:none">
+                        <input type="text" id="editVillage" class="edit-item form-control-premium" style="display:none" placeholder="Enter village">
+                    </div>
+                    <div class="info-item">
+                        <label>Taluk</label>
+                        <p id="leadDetailTaluk" class="view-item">-</p>
+                        <input type="text" id="editTaluk" class="edit-item form-control-premium" style="display:none" placeholder="Enter taluk">
                     </div>
                     <div class="info-item">
                         <label>State</label>
@@ -371,39 +376,54 @@
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                     <div class="form-group">
-                        <label>Village / Taluk</label>
-                        <input type="text" id="de-village" class="form-control-premium" placeholder="Enter village"
-                            style="color:#000;">
+                        <label>State</label>
+                        <div class="searchable-combobox-wrap" id="wrap-de-state" style="position:relative;">
+                            <input type="text" id="de-state" class="form-control-premium de-combobox-input" placeholder="Select or type State" autocomplete="off" style="color:#000; padding-right:2.2rem;">
+                            <i class="fas fa-chevron-down de-combobox-arrow" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#64748b; font-size:0.75rem;"></i>
+                            <div id="list-de-state" class="de-combobox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.15); z-index:99999;"></div>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>State</label>
-                        <input type="text" id="de-state" class="form-control-premium" placeholder="Enter State"
+                        <label>District</label>
+                        <div class="searchable-combobox-wrap" id="wrap-de-district" style="position:relative;">
+                            <input type="text" id="de-district" class="form-control-premium de-combobox-input" placeholder="Select or type District" autocomplete="off" style="color:#000; padding-right:2.2rem;">
+                            <i class="fas fa-chevron-down de-combobox-arrow" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#64748b; font-size:0.75rem;"></i>
+                            <div id="list-de-district" class="de-combobox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.15); z-index:99999;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                    <div class="form-group">
+                        <label>Taluk / Sub-District</label>
+                        <div class="searchable-combobox-wrap" id="wrap-de-taluk" style="position:relative;">
+                            <input type="text" id="de-taluk" class="form-control-premium de-combobox-input" placeholder="Select or type Taluk" autocomplete="off" style="color:#000; padding-right:2.2rem;">
+                            <i class="fas fa-chevron-down de-combobox-arrow" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#64748b; font-size:0.75rem;"></i>
+                            <div id="list-de-taluk" class="de-combobox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.15); z-index:99999;"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Village</label>
+                        <input type="text" id="de-village" class="form-control-premium" placeholder="Enter village"
                             style="color:#000;">
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                     <div class="form-group">
-                        <label>District</label>
-                        <input type="text" id="de-district" class="form-control-premium" placeholder="Enter District"
-                            style="color:#000;">
-                    </div>
-                    <div class="form-group">
                         <label>Pincode</label>
                         <input type="text" id="de-pincode" class="form-control-premium" placeholder="6-digit Pincode"
                             style="color:#000;">
                     </div>
-                </div>
-                <!-- Added Language Field -->
-                <div class="form-group">
-                    <label>Lead Language</label>
-                    <select id="de-language" class="form-control-premium" style="color:#000;">
-                        <option value="EN">English</option>
-                        <option value="HI">Hindi / North</option>
-                        <option value="KA">Kannada / local</option>
-                        <option value="TN">Tamil</option>
-                        <option value="TE">Telugu</option>
-                        <option value="ML">Malayalam</option>
-                    </select>
+                    <div class="form-group">
+                        <label>Lead Language</label>
+                        <select id="de-language" class="form-control-premium" style="color:#000;">
+                            <option value="EN">English</option>
+                            <option value="HI">Hindi / North</option>
+                            <option value="KA">Kannada / local</option>
+                            <option value="TN">Tamil</option>
+                            <option value="TE">Telugu</option>
+                            <option value="ML">Malayalam</option>
+                        </select>
+                    </div>
                 </div>
                 <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
                     <button onclick="dePrevStep(1)" class="login-btn btn-outline"

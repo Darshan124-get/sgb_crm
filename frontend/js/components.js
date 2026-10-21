@@ -1470,6 +1470,30 @@ window.goBackToLeadsList = async function () {
     }
 };
 
+window.ensureFlatpickr = function (callback) {
+    if (typeof flatpickr !== 'undefined') {
+        if (typeof callback === 'function') callback();
+        return;
+    }
+    if (!document.querySelector('link[href*="flatpickr"]')) {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+        document.head.appendChild(css);
+    }
+    let script = document.querySelector('script[src*="flatpickr"]');
+    if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+        document.head.appendChild(script);
+    }
+    const prevOnload = script.onload;
+    script.onload = function (e) {
+        if (typeof prevOnload === 'function') prevOnload(e);
+        if (typeof callback === 'function') callback();
+    };
+};
+
 window.initLeadList = initLeadList;
 async function initLeadList(filters = {}, page = 1) {
     const tbody = document.getElementById('leadsTableBody');
@@ -1675,18 +1699,81 @@ async function initLeadList(filters = {}, page = 1) {
         })();
     }
 
-    if (dateF && !dateF.dataset.listenerSet) {
-        dateF.dataset.listenerSet = 'true';
+    const initDateRangePicker = () => {
+        if (!dateF) return;
         if (typeof flatpickr !== 'undefined') {
+            if (dateF._flatpickr) return;
+
+            const positionCalendarDirectly = (instance) => {
+                if (!instance || !instance.calendarContainer || !dateF) return;
+                const rect = dateF.getBoundingClientRect();
+                const calendarWidth = instance.calendarContainer.offsetWidth || 308;
+                let leftPos = rect.left;
+                if (leftPos + calendarWidth > window.innerWidth - 16) {
+                    leftPos = Math.max(16, window.innerWidth - calendarWidth - 16);
+                }
+                instance.calendarContainer.style.position = 'fixed';
+                instance.calendarContainer.style.top = `${rect.bottom + 6}px`;
+                instance.calendarContainer.style.left = `${leftPos}px`;
+                instance.calendarContainer.style.right = 'auto';
+                instance.calendarContainer.style.zIndex = '999999';
+                instance.calendarContainer.classList.add('arrowTop', 'arrowLeft');
+                instance.calendarContainer.classList.remove('arrowBottom', 'arrowRight');
+            };
+
             flatpickr(dateF, {
                 mode: "range",
                 dateFormat: "Y-m-d",
+                disableMobile: true,
+                position: "below left",
+                positionElement: dateF,
+                onOpen: function (selectedDates, dateStr, instance) {
+                    positionCalendarDirectly(instance);
+                    requestAnimationFrame(() => positionCalendarDirectly(instance));
+                    setTimeout(() => positionCalendarDirectly(instance), 10);
+                },
+                onChange: function (selectedDates, dateStr, instance) {
+                    if (selectedDates.length === 2) {
+                        instance.close();
+                        initLeadList(window.currentBaseFilters);
+                    }
+                },
                 onClose: function (selectedDates, dateStr, instance) {
-                    initLeadList(window.currentBaseFilters);
+                    if (selectedDates.length === 1) {
+                        initLeadList(window.currentBaseFilters);
+                    }
                 }
             });
-        } else {
-            dateF.onchange = () => initLeadList(window.currentBaseFilters);
+
+            if (!dateF.dataset.scrollBound) {
+                dateF.dataset.scrollBound = 'true';
+                window.addEventListener('scroll', () => {
+                    if (dateF._flatpickr && dateF._flatpickr.isOpen) {
+                        const r = dateF.getBoundingClientRect();
+                        if (r.bottom < 0 || r.top > window.innerHeight) {
+                            dateF._flatpickr.close();
+                        } else {
+                            positionCalendarDirectly(dateF._flatpickr);
+                        }
+                    }
+                }, true);
+            }
+        } else if (window.ensureFlatpickr) {
+            window.ensureFlatpickr(() => {
+                initDateRangePicker();
+            });
+        }
+    };
+
+    if (dateF) {
+        initDateRangePicker();
+        if (!dateF.dataset.listenerSet) {
+            dateF.dataset.listenerSet = 'true';
+            dateF.onchange = () => {
+                if (!dateF._flatpickr) {
+                    initLeadList(window.currentBaseFilters);
+                }
+            };
         }
     }
     if (btnAll && !btnAll.dataset.listenerSet) {
@@ -1807,7 +1894,7 @@ async function initLeadList(filters = {}, page = 1) {
                     }
                 }
             }
-            const relevantDate = lead.assigned_at || (lead.assigned_to ? lead.updated_at : null) || lead.created_at;
+            const relevantDate = lead.created_at;
             const _dateObj = new Date(relevantDate);
             const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const time = _dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });

@@ -236,6 +236,41 @@
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
     }
 
+    #leadDateFilter {
+        cursor: pointer;
+        background: #ffffff !important;
+    }
+
+    .flatpickr-calendar {
+        font-family: 'Inter', sans-serif !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+        border: 1px solid #e2e8f0 !important;
+        z-index: 999999 !important;
+    }
+
+    .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange {
+        background: #10b981 !important;
+        border-color: #10b981 !important;
+        color: #fff !important;
+    }
+
+    .flatpickr-day.inRange {
+        background: #ecfdf5 !important;
+        border-color: #ecfdf5 !important;
+        box-shadow: -5px 0 0 #ecfdf5, 5px 0 0 #ecfdf5 !important;
+        color: #065f46 !important;
+    }
+
+    .flatpickr-day:hover {
+        background: #f1f5f9 !important;
+    }
+
+    .flatpickr-day.selected:hover, .flatpickr-day.startRange:hover, .flatpickr-day.endRange:hover {
+        background: #059669 !important;
+        border-color: #059669 !important;
+    }
+
     .btn-filter-secondary {
         padding: 0.35rem 1rem;
         background: white;
@@ -391,8 +426,8 @@
             </select>
         </div>
         <div class="filter-group">
-            <span class="filter-label"><i class="fa-solid fa-calendar-days"></i> DATE</span>
-            <input type="text" id="leadDateFilter" class="date-input" placeholder="Select date range..." style="min-width: 190px;">
+            <label for="leadDateFilter" class="filter-label" style="cursor: pointer;"><i class="fa-solid fa-calendar-days"></i> DATE</label>
+            <input type="text" id="leadDateFilter" class="date-input" placeholder="Select date range..." readonly style="min-width: 200px; cursor: pointer; background: #fff;">
             <button id="btnFilterAll" class="btn-filter-secondary">ALL</button>
         </div>
         <button id="btnExportExcel" class="btn-filter-secondary" style="background: #10b981; color: white; border-color: #10b981; display: flex; align-items: center; gap: 0.5rem;" onclick="exportLeadsToExcel()">

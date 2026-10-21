@@ -110,14 +110,14 @@ exports.getLeads = async (req, res) => {
         }
 
         if (is_today === 'true') {
-            query += ' AND (DATE(l.created_at) = CURDATE() OR DATE(l.assigned_at) = CURDATE() OR (l.assigned_to IS NOT NULL AND DATE(l.updated_at) = CURDATE()))';
+            query += ' AND DATE(l.created_at) = CURDATE()';
         } else if (req.query.date) {
             if (req.query.date.includes(' to ')) {
                 const [start, end] = req.query.date.split(' to ');
-                query += ' AND DATE(COALESCE(l.assigned_at, l.created_at)) >= ? AND DATE(COALESCE(l.assigned_at, l.created_at)) <= ?';
+                query += ' AND DATE(l.created_at) >= ? AND DATE(l.created_at) <= ?';
                 params.push(start, end);
             } else {
-                query += ' AND DATE(COALESCE(l.assigned_at, l.created_at)) = ?';
+                query += ' AND DATE(l.created_at) = ?';
                 params.push(req.query.date);
             }
         }
@@ -953,7 +953,7 @@ exports.getStats = async (req, res) => {
 
         const isExecutiveView = (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp');
         const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, [...params]);
-        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (DATE(created_at) = CURDATE() OR DATE(assigned_at) = CURDATE() OR (assigned_to IS NOT NULL AND DATE(updated_at) = CURDATE()))`, [...params]);
+        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, [...params]);
         const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, [...params]);
         const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, [...params]);
         const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, [...params]);

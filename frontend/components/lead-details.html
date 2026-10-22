@@ -248,10 +248,16 @@
                         ?
                     </div>
                     <div>
-                        <p id="leadDetailAssigned" style="font-weight: 600; color: var(--text-main); margin: 0;">
-                            Unassigned
-                        </p>
-                        <p style="font-size: 0.75rem; color: #60a5fa; margin: 0;">Current Owner</p>
+                        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+                            <span style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 0.6rem; font-weight: 800; padding: 1px 4px; border-radius: 4px; text-transform: uppercase;">To</span>
+                            <p id="leadDetailAssigned" style="font-weight: 700; color: #166534; margin: 0; font-size: 0.9rem;">
+                                Unassigned
+                            </p>
+                        </div>
+                        <div id="leadDetailAssignedByWrapper" style="display: none; align-items: center; gap: 4px; margin-top: 4px;">
+                            <span style="background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; font-size: 0.6rem; font-weight: 800; padding: 1px 4px; border-radius: 4px; text-transform: uppercase;">By</span>
+                            <span style="font-size: 0.8rem; color: #ea580c; font-weight: 600;" id="leadDetailAssignedBy">-</span>
+                        </div>
                     </div>
                 </div>
                 <button id="changeAssigneeBtn" onclick="changeAssigneeFromDetails()" class="login-btn btn-outline"

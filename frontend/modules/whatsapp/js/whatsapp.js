@@ -1093,6 +1093,10 @@ async function loadCustomers(tabParam = null, searchParam = null) {
         data.forEach(c => existingMap.set(c.phone, c));
         allCustomers = Array.from(existingMap.values());
 
+        if (activeCustomer && existingMap.has(activeCustomer.phone)) {
+            Object.assign(activeCustomer, existingMap.get(activeCustomer.phone));
+        }
+
         updateHandoffCounts();
         updatePaymentCounts();
         renderSidebarTabs(); // update unread and total count
@@ -1205,7 +1209,14 @@ function renderCustomerList(shouldResetLimit = true) {
             }
         }
 
-        if (!searchTerm && !matchesTab) return false;
+        if (!searchTerm && !matchesTab) {
+            // Keep the currently active/opened conversation visible in the sidebar regardless of tab filter
+            if (activeCustomer && activeCustomer.phone === customer.phone) {
+                matchesTab = true;
+            } else {
+                return false;
+            }
+        }
 
         // Apply search filter if search term is provided
         if (searchTerm) {
@@ -1224,8 +1235,15 @@ function renderCustomerList(shouldResetLimit = true) {
         return true;
     });
 
-    // Sort by search relevance first, then by last_message_at DESC
+    // Sort: Keep the currently opened / active conversation pinned at the top so new incoming leads do not push it down!
     filtered.sort((a, b) => {
+        if (!searchTerm && activeCustomer) {
+            const aIsActive = (a.phone === activeCustomer.phone);
+            const bIsActive = (b.phone === activeCustomer.phone);
+            if (aIsActive && !bIsActive) return -1;
+            if (!aIsActive && bIsActive) return 1;
+        }
+
         if (searchTerm) {
             const aName = (a.customer_name || '').toLowerCase();
             const aPhone = (a.phone || '').toLowerCase();
@@ -1386,8 +1404,17 @@ function renderCustomerList(shouldResetLimit = true) {
         fragment.appendChild(item);
     });
 
+    const prevScrollTop = customerListEl ? customerListEl.scrollTop : 0;
     customerListEl.innerHTML = '';
     customerListEl.appendChild(fragment);
+
+    if (customerListEl) {
+        if (window._isSelectingCustomer) {
+            customerListEl.scrollTop = 0;
+        } else if (prevScrollTop > 0) {
+            customerListEl.scrollTop = prevScrollTop;
+        }
+    }
 
     // Infinite scroll listener on sidebar customer list
     if (customerListEl && !customerListEl._hasLazyScroll) {
@@ -1499,6 +1526,9 @@ async function selectCustomer(customer) {
         quickRepliesPopover.style.display = 'none';
     }
     activeCustomer = customer;
+    if (customer && !allCustomers.some(c => c.phone === customer.phone)) {
+        allCustomers.unshift(customer);
+    }
     isScrollLoadingHistory = true;
     window._isSelectingCustomer = true;
 

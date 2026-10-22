@@ -11,13 +11,16 @@ exports.getLeads = async (req, res) => {
 
     try {
         let query = isDealerModule ? `
-            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name
+            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
+                   u_by.name as assigned_by_name
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
             LEFT JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
             WHERE 1=1
         ` : `
             SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
+                   u_by.name as assigned_by_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
                     ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
@@ -28,6 +31,7 @@ exports.getLeads = async (req, res) => {
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
             LEFT JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
             WHERE 1=1
         `;
         let params = [];
@@ -221,12 +225,13 @@ exports.getLeadById = async (req, res) => {
 
     try {
         const [rows] = await pool.query(
-            `SELECT l.*, u.name as assigned_to_name,
+            `SELECT l.*, u.name as assigned_to_name, u_by.name as assigned_by_name,
                     (SELECT c.campaign_id FROM campaigns c 
                      WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
                      LIMIT 1) as campaign_name
              FROM leads l
              LEFT JOIN users u ON l.assigned_to = u.user_id
+             LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
              WHERE l.lead_id = ?`,
             [req.params.id]
         );
@@ -587,6 +592,7 @@ exports.createLead = async (req, res) => {
         );
 
         let assignedTo = null;
+        let assignedBy = null;
         let status = 'new';
 
         const creatorRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : '';
@@ -595,10 +601,12 @@ exports.createLead = async (req, res) => {
         if (isTelecallerOrSales && req.user && req.user.id) {
             // Telecom Panel / Sales Agent: Assign directly to themselves
             assignedTo = req.user.id;
+            assignedBy = req.user.id;
             status = 'assigned';
         } else {
             // Sales Manager Panel and Admin Panel: Leave as Unassigned
             assignedTo = null;
+            assignedBy = null;
             status = 'new';
         }
 
@@ -606,8 +614,8 @@ exports.createLead = async (req, res) => {
         const finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || null);
 
         const [result] = await connection.query(
-            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type, village, sub_district, taluk) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, assigned_by, delivery_type, village, sub_district, taluk) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 cleanPhone,
                 cleanName || null,
@@ -621,6 +629,7 @@ exports.createLead = async (req, res) => {
                 source || 'manual',
                 status,
                 assignedTo,
+                assignedBy,
                 delivery_type || null,
                 cleanVillage || null,
                 cleanTaluk || null,
@@ -691,10 +700,19 @@ exports.updateLead = async (req, res) => {
 
         const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
 
+        let finalAssignedBy = currentLead.assigned_by;
+        if (assigned_to !== undefined) {
+            if (assigned_to && assigned_to !== '' && String(assigned_to) !== String(currentLead.assigned_to)) {
+                finalAssignedBy = actingUserId;
+            } else if (!assigned_to || assigned_to === '') {
+                finalAssignedBy = null;
+            }
+        }
+
         await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
-                address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?,
+                address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?, assigned_by = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
                 current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?,
                 village = ?, sub_district = ?, taluk = ?
@@ -711,6 +729,7 @@ exports.updateLead = async (req, res) => {
                 finalPincode || null,
                 finalStatus,
                 finalAssignedTo || null,
+                finalAssignedBy || null,
                 score || currentLead.score || 'cold',
                 cleanFollowupDate,
                 lost_reason || currentLead.lost_reason || null,
@@ -759,7 +778,8 @@ exports.updateLead = async (req, res) => {
 exports.assignLead = async (req, res) => {
     const { assigned_to } = req.body;
     try {
-        await pool.query('UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?', [assigned_to, req.params.id]);
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+        await pool.query('UPDATE leads SET assigned_to = ?, assigned_by = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?', [assigned_to, actingUserId, req.params.id]);
         
         const [userRows] = await pool.query('SELECT name FROM users WHERE user_id = ?', [assigned_to]);
         const userName = userRows[0] ? userRows[0].name : `user ID ${assigned_to}`;
@@ -901,13 +921,14 @@ exports.transferLead = async (req, res) => {
             targetStatus = 'dealer';
         }
 
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+
         await connection.query(
-            'UPDATE leads SET assigned_to = ?, language = ?, status = CASE WHEN LOWER(status) IN ("dealer", "dealer_converted") THEN status ELSE ? END WHERE lead_id = ?',
-            [targetUser.user_id, finalLanguage, targetStatus, leadId]
+            'UPDATE leads SET assigned_to = ?, assigned_by = ?, language = ?, status = CASE WHEN LOWER(status) IN ("dealer", "dealer_converted") THEN status ELSE ? END WHERE lead_id = ?',
+            [targetUser.user_id, actingUserId, finalLanguage, targetStatus, leadId]
         );
 
         // 4. Log the transfer
-        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
         await connection.query(
             'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
             [leadId, actingUserId, `Lead transferred to ${roleLabel} ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
@@ -1011,10 +1032,12 @@ exports.bulkAssign = async (req, res) => {
     try {
         await connection.beginTransaction();
 
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+
         // 1. Bulk Update Leads table
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
-            [staffId, leadIds]
+            'UPDATE leads SET assigned_to = ?, assigned_by = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
+            [staffId, actingUserId, leadIds]
         );
 
         // 2. Add System Note to each lead
@@ -1061,7 +1084,7 @@ exports.bulkUnassign = async (req, res) => {
 
         // 1. Bulk Update Leads table (set assigned_to = NULL and status = 'new' if status is 'assigned')
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = NULL, status = CASE WHEN status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
+            'UPDATE leads SET assigned_to = NULL, assigned_by = NULL, status = CASE WHEN status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
             [leadIds]
         );
 
@@ -1093,6 +1116,7 @@ exports.autoAssign = async (req, res) => {
 
         let count = 0;
         const assignedMap = {}; // staffId -> { name: string, count: number }
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
 
         for (const leadId of leadIds) {
             // Get Lead Language
@@ -1118,8 +1142,8 @@ exports.autoAssign = async (req, res) => {
                 const staff = staffRows[0];
                 // Assign
                 await connection.query(
-                    'UPDATE leads SET assigned_to = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?',
-                    [staff.user_id, leadId]
+                    'UPDATE leads SET assigned_to = ?, assigned_by = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?',
+                    [staff.user_id, actingUserId, leadId]
                 );
                 // Touch staff to move them to back of round robin
                 await connection.query('UPDATE users SET updated_at = NOW() WHERE user_id = ?', [staff.user_id]);

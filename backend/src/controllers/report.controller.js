@@ -4,7 +4,7 @@ const ExcelJS = require('exceljs');
 exports.exportLeads = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT l.*, u.name as assigned_to_name,
+            SELECT l.*, u.name as assigned_to_name, u_by.name as assigned_by_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
                     ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
@@ -14,6 +14,7 @@ exports.exportLeads = async (req, res) => {
                    (SELECT cs.variables FROM chatbot_sessions cs WHERE cs.lead_id = l.lead_id OR cs.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci ORDER BY cs.session_id DESC LIMIT 1) as bot_variables
             FROM leads l
             LEFT JOIN users u ON l.assigned_to = u.user_id
+            LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
             ORDER BY l.created_at DESC
         `);
 
@@ -50,7 +51,7 @@ exports.exportLeads = async (req, res) => {
 
             const campaignCode = lead.campaign_id_code || lead.first_message || lead.source || 'Direct';
             const farmerName = lead.customer_name || '-';
-            const assignedStaff = lead.assigned_to_name || 'Unassigned';
+            const assignedStaff = lead.assigned_to_name ? `${lead.assigned_to_name}${lead.assigned_by_name ? ` (By: ${lead.assigned_by_name})` : ''}` : 'Unassigned';
             const dateTimeStr = lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-';
 
             worksheet.addRow({

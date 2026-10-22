@@ -1993,6 +1993,28 @@ async function initLeadList(filters = {}, page = 1) {
                 return `<span class="campaign-tag" title="${fullCode}" style="display: inline-block; background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; font-size: 0.65rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; cursor: help; white-space: nowrap;">📣 ${shortCode}</span>`;
             })() : '';
 
+            // Assigned Staff representation: Green for Assigned To, Orange for Assigned By
+            let assignedStaffHtml = '<span style="color: #94a3b8; font-size: 0.78rem; font-weight: 500;">Unassigned</span>';
+            const hasAssigneeTo = Boolean(lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'null');
+            const hasAssigneeBy = Boolean(lead.assigned_by_name && lead.assigned_by_name !== 'null');
+
+            if (hasAssigneeTo) {
+                const toName = lead.assigned_to_name;
+                const byName = hasAssigneeBy ? lead.assigned_by_name : 'System';
+                assignedStaffHtml = `
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem;" title="Assigned To: ${toName} | Assigned By: ${byName}">
+                        <div style="display: inline-flex; align-items: center; gap: 5px;">
+                            <span style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 0.62rem; font-weight: 800; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">To</span>
+                            <span style="color: #166534; font-weight: 700; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${toName}</span>
+                        </div>
+                        <div style="display: inline-flex; align-items: center; gap: 5px;">
+                            <span style="background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; font-size: 0.62rem; font-weight: 800; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">By</span>
+                            <span style="color: #ea580c; font-weight: 600; font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${byName}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
             <tr id="lead-row-${lead.lead_id}" onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
                 <td onclick="event.stopPropagation()" style="text-align: center; width: 38px; padding: 0.5rem 0.25rem;"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" ${isChecked} onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
@@ -2023,10 +2045,8 @@ async function initLeadList(filters = {}, page = 1) {
                 </td>
                 <td title="${rawMsg}"><div class="msg-trunk" title="${rawMsg}">${rawMsg}</div></td>
                 <td style="white-space: nowrap;">${dateHtml}</td>
-                <td title="${lead.assigned_to_name || 'Unassigned'}">
-                    <div class="cell-truncate" style="font-weight: 600; color: #475569; font-size: 0.78rem;">
-                        ${lead.assigned_to_name || 'Unassigned'}
-                    </div>
+                <td style="white-space: nowrap; vertical-align: middle;">
+                    ${assignedStaffHtml}
                 </td>
                 <td onclick="event.stopPropagation()" style="text-align: center; white-space: nowrap;">
                     <button class="btn-table-call" onclick="event.stopPropagation(); window.initiateLeadClickToCall('${lead.phone_number || ''}', ${lead.lead_id})" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 0.3rem 0.55rem; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25); transition: all 0.2s;" title="Click to Call via Acefone">
@@ -2608,6 +2628,17 @@ async function populateLeadDetails(leadId) {
                     else el.textContent = val || '-';
                 }
             });
+
+            const assignedByWrapper = document.getElementById('leadDetailAssignedByWrapper');
+            const assignedByEl = document.getElementById('leadDetailAssignedBy');
+            if (assignedByWrapper && assignedByEl) {
+                if (detailHasAssignee) {
+                    assignedByEl.textContent = lead.assigned_by_name || 'System';
+                    assignedByWrapper.style.display = 'inline-flex';
+                } else {
+                    assignedByWrapper.style.display = 'none';
+                }
+            }
 
             // Style and set Campaign Tag
             const tagEl = document.getElementById('leadCampaignTag');
@@ -4019,7 +4050,7 @@ window.exportLeadsToExcel = async function () {
 
         const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.campaign_tag || lead.first_message || lead.source || 'Direct';
         const farmerName = lead.customer_name || lead.farmer_name || '-';
-        const assignedStaff = lead.assigned_to_name || lead.assigned_name || lead.staff_name || 'Unassigned';
+        const assignedStaff = lead.assigned_to_name ? `${lead.assigned_to_name}${lead.assigned_by_name ? ` (By: ${lead.assigned_by_name})` : ''}` : (lead.assigned_name || lead.staff_name || 'Unassigned');
         const dateTimeStr = lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-';
 
         const row = [

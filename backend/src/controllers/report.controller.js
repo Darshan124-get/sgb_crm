@@ -1085,16 +1085,16 @@ exports.getTelecallerPerformance = async (req, res) => {
 
         let userFilter = '';
         let queryParams = [
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr
+            startDateStr, endDateStr, // 1. l_given (2)
+            startDateStr, endDateStr, startDateStr, endDateStr, // 2. l_called (4)
+            startDateStr, endDateStr, startDateStr, endDateStr, // 3. l_conn (4)
+            startDateStr, endDateStr, // 4. l_ni (2)
+            startDateStr, endDateStr, // 5. l_rem (2)
+            startDateStr, endDateStr, // 6. fol (2)
+            startDateStr, endDateStr, // 7. comp (2)
+            startDateStr, endDateStr, // 8. ord (2)
+            startDateStr, endDateStr, // 9. n (2)
+            startDateStr, endDateStr  // 10. tl (2)
         ];
 
         if (telecaller_id && telecaller_id !== 'all') {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,6 +76,47 @@ void main() {
       await SessionStorage.clearSession();
       expect(SessionStorage.isLoggedIn, isFalse);
       expect(SessionStorage.token, isNull);
+    });
+
+    test('SessionStorage correctly detects expired and valid JWT tokens', () async {
+      final nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final expiredSeconds = nowSeconds - 3600; // 1 hour ago
+      final validSeconds = nowSeconds + 3600; // 1 hour from now
+
+      String makeJwt(int exp) {
+        final h = base64Url.encode(utf8.encode('{"alg":"HS256","typ":"JWT"}'));
+        final p = base64Url.encode(utf8.encode('{"id":1,"name":"Test","exp":$exp}'));
+        return '$h.$p.fakesig';
+      }
+
+      final expiredToken = makeJwt(expiredSeconds);
+      final validToken = makeJwt(validSeconds);
+
+      expect(SessionStorage.isTokenExpired(expiredToken), isTrue);
+      expect(SessionStorage.isTokenExpired(validToken), isFalse);
+
+      final user = UserModel(id: 1, userId: 1, name: 'Test', role: 'admin');
+
+      // Saving an expired access token without a refresh token should keep isLoggedIn false
+      await SessionStorage.saveSession(token: expiredToken, user: user);
+      expect(SessionStorage.isLoggedIn, isFalse);
+
+      // Saving an expired access token WITH a valid refresh token keeps isLoggedIn true (can auto-refresh!)
+      await SessionStorage.saveSession(token: expiredToken, refreshToken: validToken, user: user);
+      expect(SessionStorage.isLoggedIn, isTrue);
+      expect(SessionStorage.hasValidRefreshToken, isTrue);
+
+      // updateToken updates the access token and refreshes credentials
+      await SessionStorage.updateToken(token: validToken);
+      expect(SessionStorage.token, equals(validToken));
+      expect(SessionStorage.isLoggedIn, isTrue);
+
+      // On init with BOTH expired access token and expired refresh token, it automatically clears session
+      await SessionStorage.saveSession(token: expiredToken, refreshToken: expiredToken, user: user);
+      await SessionStorage.init();
+      expect(SessionStorage.token, isNull);
+      expect(SessionStorage.refreshToken, isNull);
+      expect(SessionStorage.isLoggedIn, isFalse);
     });
 
     test('ApiConfig allows switching between emulator, LAN, and custom server', () async {

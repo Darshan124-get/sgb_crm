@@ -14,6 +14,7 @@ import '../../features/whatsapp/presentation/pages/whatsapp_chat_page.dart';
 import '../../features/whatsapp/presentation/pages/whatsapp_conversations_page.dart';
 import '../../features/calls/presentation/pages/calls_page.dart';
 import '../../features/legal/presentation/pages/privacy_policy_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../core/storage/session_storage.dart';
 
 class AppRouter {
@@ -29,6 +30,7 @@ class AppRouter {
   static const String profile = '/profile';
   static const String privacyPolicy = '/privacy-policy';
   static const String calls = '/calls';
+  static const String notifications = '/notifications';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -124,6 +126,11 @@ class AppRouter {
         final initialTab = settings.arguments is int ? settings.arguments as int : 0;
         return MaterialPageRoute(
           builder: (_) => CallsPage(initialTabIndex: initialTab),
+        );
+
+      case notifications:
+        return MaterialPageRoute(
+          builder: (_) => const NotificationsPage(),
         );
 
       default:

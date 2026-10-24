@@ -12,6 +12,9 @@ import '../widgets/lead_skeleton_loader.dart';
 import '../../../whatsapp/whatsapp_navigation_helper.dart';
 import '../../../../core/constants/app_illustrations.dart';
 import '../../../../core/widgets/app_illustration_view.dart';
+import '../../../notifications/data/notifications_storage_service.dart';
+import '../../../notifications/presentation/widgets/notification_modal_sheet.dart';
+import '../widgets/add_lead_bottom_sheet.dart';
 
 class LeadsPage extends StatefulWidget {
   final List<LeadModel>? initialLeads;
@@ -28,6 +31,8 @@ class LeadsPage extends StatefulWidget {
 }
 
 class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
+  static String _savedFilterCategory = 'All';
+
   late bool _isLoading;
   bool _isSilentSyncing = false;
   bool _hasNetworkError = false;
@@ -74,8 +79,18 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _isLoading = widget.startLoading ?? (widget.initialLeads == null);
     _allLeads = widget.initialLeads ?? [];
-    _selectedFilter = 'Today (32)';
-    _dynamicFilters = LeadFilterChips.defaultFilters;
+    if (widget.initialLeads != null) {
+      _selectedFilter = 'Today (32)';
+      _dynamicFilters = LeadFilterChips.defaultFilters;
+    } else {
+      _selectedFilter = _savedFilterCategory;
+      _dynamicFilters = [
+        'Today ($_todayCount)',
+        'New ($_newCount)',
+        'All ($_allCount)',
+        'Follow-up ($_followCount)',
+      ];
+    }
     _applyFilters();
 
     if (widget.startLoading == true) {
@@ -133,23 +148,32 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     ];
 
     if (preserveCategory) {
-      if (currentPrefix.startsWith('hot')) {
+      String prefix = currentPrefix;
+      // UX Fix: If category is 'today' but _todayCount is 0,
+      // and there are leads in the pipeline (_allCount > 0),
+      // automatically switch to 'All' so the user is never stuck on an empty screen!
+      if (prefix == 'today' && _todayCount == 0 && _allCount > 0) {
+        prefix = 'all';
+      }
+
+      if (prefix.startsWith('hot')) {
         _selectedFilter = 'Hot Leads ($_hotCount)';
-      } else if (currentPrefix.startsWith('callback') || currentPrefix.startsWith('call')) {
+      } else if (prefix.startsWith('callback') || prefix.startsWith('call')) {
         _selectedFilter = 'Callback ($_callbackCount)';
-      } else if (currentPrefix.startsWith('lost')) {
+      } else if (prefix.startsWith('lost')) {
         _selectedFilter = 'Lost Leads ($_lostCount)';
-      } else if (currentPrefix.startsWith('open')) {
+      } else if (prefix.startsWith('open')) {
         _selectedFilter = 'Open Leads ($_openCount)';
-      } else if (currentPrefix.startsWith('convert')) {
+      } else if (prefix.startsWith('convert')) {
         _selectedFilter = 'Converted ($_convertedCount)';
       } else {
         final match = _dynamicFilters.firstWhere(
-          (f) => f.toLowerCase().startsWith(currentPrefix),
-          orElse: () => _dynamicFilters[0],
+          (f) => f.toLowerCase().startsWith(prefix),
+          orElse: () => _dynamicFilters[2], // Default to 'All'
         );
         _selectedFilter = match;
       }
+      _savedFilterCategory = _selectedFilter;
     }
   }
 
@@ -230,6 +254,36 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     _searchController.dispose();
     super.dispose();
   }
+
+  Future<void> _openAddLeadSheet() async {
+    final created = await AddLeadBottomSheet.show(context);
+    if (created == true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Lead created successfully!',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF0A5844),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      setState(() {
+        _selectedFilter = 'All';
+        _savedFilterCategory = 'All';
+      });
+      await _loadLeads(forceLoading: true);
+    }
+  }
+
 
   bool _matchesAllCriteria({
     required LeadModel lead,
@@ -1214,41 +1268,77 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
                           ],
                         ),
 
-                        // Notification Bell with Red Dot
-                        IconButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('3 new incoming leads assigned to you'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: const [
-                              Icon(
-                                Icons.notifications_none_rounded,
-                                size: 24,
-                                color: Color(0xFF334155),
-                              ),
-                              Positioned(
-                                right: 1,
-                                top: 1,
-                                child: SizedBox(
-                                  width: 8.5,
-                                  height: 8.5,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Color(0xFFEF4444),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Add Lead Button
+                            IconButton(
+                              onPressed: _openAddLeadSheet,
+                              icon: Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0A5844).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.person_add_alt_1_rounded,
+                                  size: 19,
+                                  color: Color(0xFF0A5844),
                                 ),
                               ),
-                            ],
-                          ),
-                          splashRadius: 22,
+                              tooltip: 'Add Lead',
+                              splashRadius: 22,
+                            ),
+
+                            // Notification Bell with dynamic unread badge and Pop-up Sheet
+                            ValueListenableBuilder<int>(
+                              valueListenable: NotificationsStorageService.unreadCountNotifier,
+                              builder: (context, unreadCount, _) {
+                                return IconButton(
+                                  onPressed: () {
+                                    NotificationModalSheet.show(context);
+                                  },
+                                  icon: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      const Icon(
+                                        Icons.notifications_none_rounded,
+                                        size: 24,
+                                        color: Color(0xFF334155),
+                                      ),
+                                      if (unreadCount > 0)
+                                        Positioned(
+                                          right: -2,
+                                          top: -2,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFEF4444),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 15,
+                                              minHeight: 15,
+                                            ),
+                                            child: Text(
+                                              '$unreadCount',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w800,
+                                                height: 1,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  splashRadius: 22,
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1263,6 +1353,7 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
                     onFilterSelected: (filter) {
                       setState(() {
                         _selectedFilter = filter;
+                        _savedFilterCategory = filter;
                       });
                       _applyFilters();
                     },
@@ -1417,6 +1508,21 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
             ),
           ),
         ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _openAddLeadSheet,
+          backgroundColor: const Color(0xFF0A5844),
+          foregroundColor: Colors.white,
+          elevation: 4,
+          icon: const Icon(Icons.person_add_rounded, size: 20),
+          label: const Text(
+            'Add Lead',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
         bottomNavigationBar: DashboardBottomNav(
           currentIndex: 1, // Leads active tab
           onTabSelected: (index) {
@@ -1487,6 +1593,7 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
         onAction: () {
           setState(() {
             _selectedFilter = 'All';
+            _savedFilterCategory = 'All';
           });
           _applyFilters();
         },
@@ -1494,29 +1601,159 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     }
 
     if (_allLeads.isEmpty) {
-      return AppIllustrationView(
-        imagePath: AppIllustrations.noLeads,
-        title: 'No leads available',
-        subtitle: 'Your lead pipeline is currently empty. New leads from Meta campaigns and WhatsApp will appear here automatically.',
-        actionLabel: 'Refresh Pipeline',
-        fallbackIcon: Icons.people_outline_rounded,
-        onAction: _handleRefresh,
+      return Center(
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5E9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.people_outline_rounded,
+                    size: 38,
+                    color: Color(0xFF0A5844),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'No leads in pipeline',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: const Text(
+                  'Your lead pipeline is currently empty. Start by adding a lead manually or sync from WhatsApp & Meta campaigns.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _openAddLeadSheet,
+                icon: const Icon(Icons.person_add_rounded, size: 18),
+                label: const Text('Add Lead Manually'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A5844),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
-    return AppIllustrationView(
-      imagePath: AppIllustrations.noLeads,
-      title: 'No leads in "$_selectedFilter"',
-      subtitle: 'There are no active leads under this category. Switch filters or clear to see all leads.',
-      actionLabel: 'Reset Filters',
-      fallbackIcon: Icons.filter_alt_off_rounded,
-      onAction: () {
-        setState(() {
-          _selectedFilter = 'All';
-          _searchController.clear();
-        });
-        _applyFilters();
-      },
+    // Filtered empty state (e.g. "Today (0)") when other leads exist in pipeline
+    return Center(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.filter_list_off_rounded,
+                  size: 34,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'No leads in "$_selectedFilter"',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Text(
+                'There are ${_allLeads.length} active leads under "All". Switch filters or add a new lead.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedFilter = 'All ($_allCount)';
+                  _savedFilterCategory = _selectedFilter;
+                  _searchController.clear();
+                });
+                _applyFilters();
+              },
+              icon: const Icon(Icons.people_outline_rounded, size: 18),
+              label: Text('View All Leads (${_allLeads.length})'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A5844),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _openAddLeadSheet,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add Lead Manually'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0A5844),
+                side: const BorderSide(color: Color(0xFF0A5844), width: 1.2),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

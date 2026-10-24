@@ -1,0 +1,6 @@
+# key.properties template for SGB Connect Google Play Release
+# Place this file at android/key.properties (do NOT commit to public Git)
+storePassword=your_keystore_password
+keyPassword=your_key_password
+keyAlias=upload
+storeFile=upload-keystore.jks

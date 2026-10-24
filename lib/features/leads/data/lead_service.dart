@@ -64,4 +64,36 @@ class LeadService {
     );
     return response.isSuccess;
   }
+
+  static Future<ApiResponse<dynamic>> createLead({
+    required String phoneNumber,
+    String? customerName,
+    String? firstMessage,
+    String? state,
+    String? district,
+    String? city,
+  }) async {
+    final body = <String, dynamic>{
+      'phone_number': phoneNumber.trim(),
+      'source': 'manual',
+    };
+    if (customerName != null && customerName.trim().isNotEmpty) {
+      body['customer_name'] = customerName.trim();
+    }
+    if (firstMessage != null && firstMessage.trim().isNotEmpty) {
+      body['first_message'] = firstMessage.trim();
+    }
+    if (state != null && state.trim().isNotEmpty) {
+      body['state'] = state.trim();
+    }
+    if (district != null && district.trim().isNotEmpty) {
+      body['district'] = district.trim();
+    }
+    if (city != null && city.trim().isNotEmpty) {
+      body['city'] = city.trim();
+    }
+
+    return await ApiClient.post('/leads', body: body);
+  }
 }
+

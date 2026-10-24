@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/constants/india_locations.dart';
 import '../../domain/models/lead_model.dart';
 
 class CrmOrderConversionWizard extends StatefulWidget {
@@ -89,6 +90,7 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
   // Step 2: Customer Details
   late final TextEditingController _nameController;
   late final TextEditingController _villageController;
+  late final TextEditingController _talukController;
   late final TextEditingController _stateController;
   late final TextEditingController _districtController;
   late final TextEditingController _pincodeController;
@@ -178,17 +180,22 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
   @override
   void initState() {
     super.initState();
+    final initialLeadState = widget.lead.state.isNotEmpty && widget.lead.state != 'India'
+        ? IndiaLocations.normalizeState(widget.lead.state)
+        : 'Karnataka';
+    final initialLeadDistrict = widget.lead.district.isNotEmpty
+        ? IndiaLocations.normalizeDistrict(initialLeadState, widget.lead.district)
+        : (widget.lead.city != 'Rural' ? IndiaLocations.normalizeDistrict(initialLeadState, widget.lead.city) : '');
+    final initialLeadTaluk = widget.lead.taluk;
+
     _phoneController = TextEditingController(text: widget.lead.phone);
     _nameController = TextEditingController(text: widget.lead.name.replaceFirst(RegExp(r'^Lead #\d+'), ''));
     _villageController = TextEditingController(
       text: widget.lead.village.isNotEmpty ? widget.lead.village : (widget.lead.city != 'Rural' ? widget.lead.city : ''),
     );
-    _stateController = TextEditingController(
-      text: widget.lead.state.isNotEmpty && widget.lead.state != 'India' ? widget.lead.state : 'Karnataka',
-    );
-    _districtController = TextEditingController(
-      text: widget.lead.district.isNotEmpty ? widget.lead.district : (widget.lead.city != 'Rural' ? widget.lead.city : ''),
-    );
+    _stateController = TextEditingController(text: initialLeadState);
+    _districtController = TextEditingController(text: initialLeadDistrict);
+    _talukController = TextEditingController(text: initialLeadTaluk);
     _pincodeController = TextEditingController(text: widget.lead.pincode);
 
     // Initial attempt calculation
@@ -204,6 +211,7 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
     _phoneController.dispose();
     _nameController.dispose();
     _villageController.dispose();
+    _talukController.dispose();
     _stateController.dispose();
     _districtController.dispose();
     _pincodeController.dispose();
@@ -491,15 +499,19 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
             final postOffices = data[0]['PostOffice'] as List?;
             if (postOffices != null && postOffices.isNotEmpty) {
               final po = postOffices[0];
-              final state = po['State']?.toString() ?? '';
-              final dist = po['District']?.toString() ?? '';
+              final rawState = po['State']?.toString() ?? '';
+              final rawDist = po['District']?.toString() ?? '';
+              final rawTaluk = po['Taluk']?.toString() ?? po['Block']?.toString() ?? '';
               if (mounted) {
                 setState(() {
-                  if (_districtController.text.trim().isEmpty && dist.isNotEmpty) {
-                    _districtController.text = dist;
+                  if (rawState.isNotEmpty) {
+                    _stateController.text = IndiaLocations.normalizeState(rawState);
                   }
-                  if (state.isNotEmpty) {
-                    _stateController.text = state;
+                  if (rawDist.isNotEmpty) {
+                    _districtController.text = IndiaLocations.normalizeDistrict(_stateController.text, rawDist);
+                  }
+                  if (rawTaluk.isNotEmpty && rawTaluk != 'NA' && _talukController.text.trim().isEmpty) {
+                    _talukController.text = rawTaluk;
                   }
                 });
               }
@@ -555,6 +567,7 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
       final customerName = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : widget.lead.name;
       final phone = _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : widget.lead.phone;
       final village = _villageController.text.trim();
+      final taluk = _talukController.text.trim();
       final district = _districtController.text.trim();
       final pincode = _pincodeController.text.trim();
       final state = _stateController.text.trim();
@@ -611,8 +624,10 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
       // 3. Update Lead Details
       final Map<String, dynamic> updatePayload = {
         'customer_name': customerName,
-        'city': village,
+        'city': village.isNotEmpty ? village : taluk,
         'village': village,
+        'taluk': taluk,
+        'sub_district': taluk,
         'district': district,
         'pincode': pincode,
         'state': state,
@@ -676,8 +691,10 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
           'lead_id': leadId,
           'customer_name': customerName,
           'phone': phone,
-          'city': village,
+          'city': village.isNotEmpty ? village : taluk,
           'village': village,
+          'taluk': taluk,
+          'sub_district': taluk,
           'district': district,
           'pincode': pincode,
           'state': state,
@@ -1013,9 +1030,23 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFieldLabel('VILLAGE / TALUK'),
+                  _buildFieldLabel('STATE'),
                   const SizedBox(height: 6),
-                  _buildTextInput(controller: _villageController, hint: 'Enter village'),
+                  _buildSearchableCombobox(
+                    controller: _stateController,
+                    hint: 'Select or type State',
+                    title: 'Select State',
+                    options: IndiaLocations.states,
+                    onSelected: (selectedState) {
+                      setState(() {
+                        final availableDistricts = IndiaLocations.getDistricts(selectedState);
+                        if (!availableDistricts.any((d) => d.toLowerCase() == _districtController.text.trim().toLowerCase())) {
+                          _districtController.text = '';
+                          _talukController.text = '';
+                        }
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
@@ -1024,9 +1055,22 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFieldLabel('STATE'),
+                  _buildFieldLabel('DISTRICT'),
                   const SizedBox(height: 6),
-                  _buildTextInput(controller: _stateController, hint: 'State'),
+                  _buildSearchableCombobox(
+                    controller: _districtController,
+                    hint: 'Select or type District',
+                    title: 'Select District (${_stateController.text})',
+                    options: IndiaLocations.getDistricts(_stateController.text),
+                    onSelected: (selectedDistrict) {
+                      setState(() {
+                        final availableTaluks = IndiaLocations.getTaluks(_stateController.text, selectedDistrict);
+                        if (!availableTaluks.any((t) => t.toLowerCase() == _talukController.text.trim().toLowerCase())) {
+                          _talukController.text = '';
+                        }
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
@@ -1040,13 +1084,35 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFieldLabel('DISTRICT'),
+                  _buildFieldLabel('TALUK / SUB-DISTRICT'),
                   const SizedBox(height: 6),
-                  _buildTextInput(controller: _districtController, hint: 'Enter District'),
+                  _buildSearchableCombobox(
+                    controller: _talukController,
+                    hint: 'Select or type Taluk',
+                    title: 'Select Taluk (${_districtController.text.isNotEmpty ? _districtController.text : _stateController.text})',
+                    options: IndiaLocations.getTaluks(_stateController.text, _districtController.text),
+                    onSelected: (_) => setState(() {}),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel('VILLAGE'),
+                  const SizedBox(height: 6),
+                  _buildTextInput(controller: _villageController, hint: 'Enter village'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        Row(
+          children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,30 +1130,36 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
                 ],
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        _buildFieldLabel('LEAD LANGUAGE'),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedLanguage,
-              isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-              items: _languages.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedLanguage = val);
-              },
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel('LEAD LANGUAGE'),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedLanguage,
+                        isExpanded: true,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                        items: _languages.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedLanguage = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
 
         const SizedBox(height: 32),
@@ -2145,6 +2217,204 @@ class _CrmOrderConversionWizardState extends State<CrmOrderConversionWizard> {
           borderSide: const BorderSide(color: Color(0xFF059669), width: 1.5),
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchableCombobox({
+    required TextEditingController controller,
+    required String hint,
+    required String title,
+    required List<String> options,
+    ValueChanged<String>? onSelected,
+  }) {
+    return TextField(
+      controller: controller,
+      readOnly: true,
+      onTap: () {
+        _openSearchablePicker(
+          title: title,
+          hint: hint,
+          options: options,
+          controller: controller,
+          onSelected: onSelected,
+        );
+      },
+      style: const TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF0F172A),
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF059669), width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  void _openSearchablePicker({
+    required String title,
+    required String hint,
+    required List<String> options,
+    required TextEditingController controller,
+    ValueChanged<String>? onSelected,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final q = query.trim().toLowerCase();
+            final filtered = options.where((opt) => opt.toLowerCase().contains(q)).toList();
+            final bool hasExactMatch = options.any((opt) => opt.toLowerCase() == q);
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
+              ),
+              child: SizedBox(
+                height: MediaQuery.of(modalCtx).size.height * 0.65,
+                child: Column(
+                  children: [
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 8),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.of(modalCtx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: TextField(
+                        key: const ValueKey('searchable_picker_field'),
+                        autofocus: true,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                        decoration: InputDecoration(
+                          hintText: 'Search $hint...',
+                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          filled: true,
+                          fillColor: const Color(0xFFF1F5F9),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (val) {
+                          setModalState(() {
+                            query = val;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: filtered.length + (query.trim().isNotEmpty && !hasExactMatch ? 1 : 0),
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (context, index) {
+                          if (query.trim().isNotEmpty && !hasExactMatch && index == 0) {
+                            final customVal = query.trim();
+                            return ListTile(
+                              leading: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF059669)),
+                              title: Text(
+                                'Use "$customVal"',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                              subtitle: const Text('Custom location entry', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              onTap: () {
+                                controller.text = customVal;
+                                onSelected?.call(customVal);
+                                Navigator.of(modalCtx).pop();
+                              },
+                            );
+                          }
+
+                          final itemIndex = (query.trim().isNotEmpty && !hasExactMatch) ? index - 1 : index;
+                          final item = filtered[itemIndex];
+                          final isSelected = controller.text.trim().toLowerCase() == item.toLowerCase();
+
+                          return ListTile(
+                            title: Text(
+                              item,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                color: isSelected ? const Color(0xFF059669) : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 20)
+                                : null,
+                            onTap: () {
+                              controller.text = item;
+                              onSelected?.call(item);
+                              Navigator.of(modalCtx).pop();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

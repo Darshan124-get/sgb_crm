@@ -37,6 +37,87 @@ class ApiResponse<T> {
 
 class ApiClient {
   static final http.Client _client = http.Client();
+  static void Function()? onSessionExpired;
+  static bool _isHandlingSessionExpired = false;
+  static Future<bool>? _refreshFuture;
+
+  static Future<bool> refreshAccessToken() async {
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+    _refreshFuture = _performTokenRefresh();
+    try {
+      return await _refreshFuture!;
+    } finally {
+      _refreshFuture = null;
+    }
+  }
+
+  static Future<bool> _performTokenRefresh() async {
+    final refreshToken = SessionStorage.refreshToken;
+    if (refreshToken == null ||
+        refreshToken.isEmpty ||
+        SessionStorage.isTokenExpired(refreshToken)) {
+      return false;
+    }
+
+    try {
+      final uri = _buildUri(ApiConfig.baseUrl, '/auth/refresh');
+      final response = await _client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final dynamic data = jsonDecode(response.body);
+        if (data is Map<String, dynamic> && data['token'] != null) {
+          final newToken = data['token'].toString();
+          final newRefreshToken = data['refreshToken']?.toString();
+          await SessionStorage.updateToken(
+            token: newToken,
+            refreshToken: newRefreshToken,
+          );
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  static Future<void> _ensureValidToken(String path) async {
+    if (path.contains('/auth/login') ||
+        path.endsWith('/login') ||
+        path.contains('/auth/refresh') ||
+        path.endsWith('/refresh')) {
+      return;
+    }
+
+    final token = SessionStorage.token;
+    final isTokenExpired = token == null || token.isEmpty || SessionStorage.isTokenExpired(token);
+
+    if (isTokenExpired && SessionStorage.hasValidRefreshToken) {
+      await refreshAccessToken();
+    }
+  }
+
+  static void _triggerSessionExpired() {
+    SessionStorage.clearSession();
+    if (!_isHandlingSessionExpired) {
+      _isHandlingSessionExpired = true;
+      Future.microtask(() {
+        onSessionExpired?.call();
+        Future.delayed(const Duration(seconds: 2), () {
+          _isHandlingSessionExpired = false;
+        });
+      });
+    }
+  }
 
   static Map<String, String> _buildHeaders({Map<String, String>? extraHeaders}) {
     final headers = <String, String>{
@@ -77,6 +158,8 @@ class ApiClient {
     Map<String, String>? extraHeaders,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    await _ensureValidToken(path);
+
     final candidateUrls = [
       ApiConfig.baseUrl,
       ...ApiConfig.candidateHosts.where((h) => h != ApiConfig.baseUrl),
@@ -130,6 +213,8 @@ class ApiClient {
     Map<String, String>? extraHeaders,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    await _ensureValidToken(path);
+
     final candidateUrls = [
       ApiConfig.baseUrl,
       ...ApiConfig.candidateHosts.where((h) => h != ApiConfig.baseUrl),
@@ -182,6 +267,8 @@ class ApiClient {
     Map<String, String>? extraHeaders,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    await _ensureValidToken(path);
+
     final candidateUrls = [
       ApiConfig.baseUrl,
       ...ApiConfig.candidateHosts.where((h) => h != ApiConfig.baseUrl),
@@ -235,6 +322,8 @@ class ApiClient {
     Map<String, String>? extraHeaders,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    await _ensureValidToken(path);
+
     final candidateUrls = [
       ApiConfig.baseUrl,
       ...ApiConfig.candidateHosts.where((h) => h != ApiConfig.baseUrl),
@@ -288,6 +377,8 @@ class ApiClient {
     Map<String, String>? extraHeaders,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    await _ensureValidToken(path);
+
     final candidateUrls = [
       ApiConfig.baseUrl,
       ...ApiConfig.candidateHosts.where((h) => h != ApiConfig.baseUrl),
@@ -342,6 +433,8 @@ class ApiClient {
     Map<String, String>? extraHeaders,
     Duration timeout = const Duration(seconds: 30),
   }) async {
+    await _ensureValidToken(path);
+
     final candidateUrls = [
       ApiConfig.baseUrl,
       ...ApiConfig.candidateHosts.where((h) => h != ApiConfig.baseUrl),
@@ -421,6 +514,17 @@ class ApiClient {
       errorMsg = decoded['message']?.toString() ??
           decoded['error']?.toString() ??
           errorMsg;
+    }
+
+    // Auto-detect 401 Unauthorized (excluding direct login/refresh attempts)
+    final requestPath = response.request?.url.path ?? '';
+    final isAuthEndpoint = requestPath.contains('/auth/login') ||
+        requestPath.endsWith('/login') ||
+        requestPath.contains('/auth/refresh') ||
+        requestPath.endsWith('/refresh');
+
+    if (response.statusCode == 401 && !isAuthEndpoint) {
+      _triggerSessionExpired();
     }
 
     return ApiResponse.failure(errorMsg, statusCode: response.statusCode);

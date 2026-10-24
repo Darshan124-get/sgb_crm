@@ -18,7 +18,7 @@ class DashboardHeader extends StatelessWidget {
     required this.agentName,
     required this.subtitle,
     required this.dateText,
-    this.notificationCount = 3,
+    this.notificationCount = 0,
     required this.selectedTimeframe,
     required this.onTimeframeChanged,
     this.onDateTap,

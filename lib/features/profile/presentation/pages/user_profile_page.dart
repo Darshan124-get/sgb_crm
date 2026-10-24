@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/storage/session_storage.dart';
+import '../../../auth/data/auth_service.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../domain/models/user_profile_model.dart';
 
@@ -231,7 +232,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await SessionStorage.clearSession();
+              await AuthService.logout();
               if (!mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginPage()),

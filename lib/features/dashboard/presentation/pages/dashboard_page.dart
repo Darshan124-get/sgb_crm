@@ -12,6 +12,10 @@ import '../widgets/kpi_cards_section.dart';
 import '../widgets/lead_activity_chart.dart';
 import '../widgets/more_options_bottom_sheet.dart';
 import '../../../../app/router/app_router.dart';
+import '../../../notifications/data/notifications_storage_service.dart';
+import '../../../notifications/presentation/widgets/notification_permission_dialog.dart';
+import '../../../notifications/presentation/widgets/notification_modal_sheet.dart';
+import '../../../../core/services/notification_service.dart';
 
 class DashboardPage extends StatefulWidget {
   final DashboardData? initialData;
@@ -72,6 +76,33 @@ class _DashboardPageState extends State<DashboardPage>
       _loadDashboardData(forceLoading: true);
     }
     _startDashboardPolling();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkNotificationPermissionPrompt();
+    });
+  }
+
+  Future<void> _checkNotificationPermissionPrompt() async {
+    final shown = await NotificationsStorageService.hasShownPermissionPrompt();
+    if (!shown && mounted) {
+      await NotificationsStorageService.setPermissionPromptShown();
+      if (!mounted) return;
+      await NotificationPermissionDialog.show(
+        context,
+        onAllow: () async {
+          await NotificationService.requestPermission();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Push notifications enabled for new leads & chats!'),
+                backgroundColor: Color(0xFF0A5844),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+      );
+    }
   }
 
   void _startDashboardPolling() {
@@ -319,28 +350,28 @@ class _DashboardPageState extends State<DashboardPage>
                       child: Column(
                         children: [
                           // 1. Forest Green Header
-                          DashboardHeader(
-                            greeting: _data!.greeting,
-                            agentName: _data!.agentName,
-                            subtitle: _data!.subtitle,
-                            dateText: _data!.dateText,
-                            notificationCount: _data!.notificationsCount,
-                            selectedTimeframe: _selectedTimeframe,
-                            onTimeframeChanged: (tf) {
-                              setState(() => _selectedTimeframe = tf);
-                              _loadDashboardData(timeframe: tf);
-                            },
-                            onDateTap: _pickDate,
-                            onNotificationTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${_data!.notificationsCount} new lead notifications'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
+                          ValueListenableBuilder<int>(
+                            valueListenable: NotificationsStorageService.unreadCountNotifier,
+                            builder: (context, unreadCount, _) {
+                              return DashboardHeader(
+                                greeting: _data!.greeting,
+                                agentName: _data!.agentName,
+                                subtitle: _data!.subtitle,
+                                dateText: _data!.dateText,
+                                notificationCount: unreadCount,
+                                selectedTimeframe: _selectedTimeframe,
+                                onTimeframeChanged: (tf) {
+                                  setState(() => _selectedTimeframe = tf);
+                                  _loadDashboardData(timeframe: tf);
+                                },
+                                onDateTap: _pickDate,
+                                onNotificationTap: () {
+                                  NotificationModalSheet.show(context);
+                                },
+                                onProfileTap: () {
+                                  Navigator.of(context).pushNamed('/profile');
+                                },
                               );
-                            },
-                            onProfileTap: () {
-                              Navigator.of(context).pushNamed('/profile');
                             },
                           ),
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/dark_splash_colors.dart';
-import '../../../../core/network/api_config.dart';
 import '../../../../core/storage/session_storage.dart';
 import '../../data/auth_service.dart';
 

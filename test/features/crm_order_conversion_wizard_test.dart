@@ -87,9 +87,10 @@ void main() {
       expect(find.text('Step 2: Customer Details'), findsOneWidget);
       expect(find.text('FARMER NAME'), findsOneWidget);
       expect(find.text('Aravind koppa'), findsOneWidget);
-      expect(find.text('VILLAGE / TALUK'), findsOneWidget);
       expect(find.text('STATE'), findsOneWidget);
       expect(find.text('DISTRICT'), findsOneWidget);
+      expect(find.text('TALUK / SUB-DISTRICT'), findsOneWidget);
+      expect(find.text('VILLAGE'), findsOneWidget);
       expect(find.text('PINCODE'), findsOneWidget);
       expect(find.text('LEAD LANGUAGE'), findsOneWidget);
     });
@@ -205,5 +206,46 @@ void main() {
       expect(find.text('NEXT CALL DATE *'), findsOneWidget);
       expect(find.text('Save Changes'), findsOneWidget);
     });
+
+    testWidgets('Step 2: Searchable District combobox opens modal, filters on typing, and selects', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.0;
+
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      // Go to Step 2
+      await tester.tap(find.text('RECEIVED'));
+      await tester.pumpAndSettle();
+
+      // Tap on DISTRICT field
+      await tester.tap(find.text('Chikkamagaluru (Chikmagalur)'));
+      await tester.pumpAndSettle();
+
+      // Modal bottom sheet should be open
+      expect(find.text('Select District (Karnataka)'), findsOneWidget);
+
+      // Type "Tu" into search box in the modal
+      final searchBox = find.byKey(const ValueKey('searchable_picker_field'));
+      await tester.enterText(searchBox, 'Tu');
+      await tester.pumpAndSettle();
+
+      // Should find Tumakuru (Tumkur)
+      expect(find.text('Tumakuru (Tumkur)'), findsOneWidget);
+
+      // Tap Tumakuru (Tumkur)
+      await tester.tap(find.text('Tumakuru (Tumkur)'));
+      await tester.pumpAndSettle();
+
+      // Modal closed, District updated to Tumakuru (Tumkur)
+      expect(find.text('Select District (Karnataka)'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Tumakuru (Tumkur)'), findsOneWidget);
+    });
   });
 }
+

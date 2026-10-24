@@ -33,6 +33,7 @@ class LeadModel {
   final String? nextFollowUp;
   final String scoreFraction;
   final String village;
+  final String taluk;
   final String district;
   final String pincode;
   final String language;
@@ -61,6 +62,7 @@ class LeadModel {
     this.nextFollowUp,
     this.scoreFraction = '1/5',
     this.village = '',
+    this.taluk = '',
     this.district = '',
     this.pincode = '',
     this.language = 'English',
@@ -231,6 +233,7 @@ class LeadModel {
         json['next_follow_up']?.toString();
 
     final villageStr = json['village']?.toString() ?? json['city']?.toString() ?? '';
+    final talukStr = json['taluk']?.toString() ?? json['sub_district']?.toString() ?? '';
     final districtStr = json['district']?.toString() ?? '';
     final pincodeStr = json['pincode']?.toString() ?? '';
     final languageStr = json['language']?.toString() ?? 'English';
@@ -259,6 +262,7 @@ class LeadModel {
       nextFollowUp: nextFup,
       scoreFraction: priorityFraction,
       village: villageStr,
+      taluk: talukStr,
       district: districtStr,
       pincode: pincodeStr,
       language: languageStr,
@@ -470,6 +474,7 @@ class LeadModel {
     String? nextFollowUp,
     String? scoreFraction,
     String? village,
+    String? taluk,
     String? district,
     String? pincode,
     String? language,
@@ -498,6 +503,7 @@ class LeadModel {
       nextFollowUp: nextFollowUp ?? this.nextFollowUp,
       scoreFraction: scoreFraction ?? this.scoreFraction,
       village: village ?? this.village,
+      taluk: taluk ?? this.taluk,
       district: district ?? this.district,
       pincode: pincode ?? this.pincode,
       language: language ?? this.language,

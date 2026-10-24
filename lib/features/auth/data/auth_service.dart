@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/storage/session_storage.dart';
 import '../domain/models/user_model.dart';
 
@@ -47,6 +48,7 @@ class AuthService {
     if (response.isSuccess && response.data is Map<String, dynamic>) {
       final data = response.data as Map<String, dynamic>;
       final token = data['token']?.toString() ?? '';
+      final refreshToken = data['refreshToken']?.toString();
       final rawUser = data['user'];
 
       if (token.isEmpty || rawUser == null || rawUser is! Map<String, dynamic>) {
@@ -55,8 +57,15 @@ class AuthService {
 
       final user = UserModel.fromJson(rawUser);
 
-      // Persist session locally
-      await SessionStorage.saveSession(token: token, user: user);
+      // Persist session locally with access token and refresh token
+      await SessionStorage.saveSession(
+        token: token,
+        refreshToken: refreshToken,
+        user: user,
+      );
+
+      // Register device FCM push token with backend
+      NotificationService.registerDeviceToken().catchError((_) {});
 
       return AuthResult.success(user: user, token: token);
     } else {
@@ -67,6 +76,9 @@ class AuthService {
   }
 
   static Future<void> logout() async {
+    try {
+      await NotificationService.unregisterDeviceToken();
+    } catch (_) {}
     await SessionStorage.clearSession();
   }
 

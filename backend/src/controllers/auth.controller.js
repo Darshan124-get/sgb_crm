@@ -90,7 +90,7 @@ exports.login = async (req, res) => {
                 permissions: perms
             }, 
             JWT_SECRET, 
-            { expiresIn: '8h' }
+            { expiresIn: '30d' }
         );
         
         // Log the login activity

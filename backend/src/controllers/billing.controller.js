@@ -386,6 +386,135 @@ const getOrdersByStatus = async (req, res) => {
     }
 };
 
+const getSalesOrders = async (req, res) => {
+    try {
+        const { tab = 'pending_invoice' } = req.query;
+        let statusCondition = "o.order_status IN ('approved', 'so_created')";
+        if (tab === 'invoiced') {
+            statusCondition = "o.order_status IN ('billed', 'packed', 'shipped', 'delivered')";
+        } else if (tab === 'all') {
+            statusCondition = "o.order_status IN ('approved', 'so_created', 'billed', 'packed', 'shipped', 'delivered')";
+        }
+
+        const [rows] = await pool.query(`
+            SELECT o.*, u.name as sales_person_name, l.source as lead_source,
+                   (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.order_id) as item_count,
+                   (COALESCE((SELECT SUM(amount) FROM payments p WHERE p.order_id = o.order_id AND p.payment_status = 'verified'), 0) + o.advance_amount) as advance_paid,
+                   inv.invoice_id, inv.invoice_number
+            FROM orders o
+            LEFT JOIN users u ON o.created_by = u.user_id
+            LEFT JOIN leads l ON o.lead_id = l.lead_id
+            LEFT JOIN invoices inv ON o.order_id = inv.order_id AND inv.invoice_status = 'finalized'
+            WHERE ${statusCondition}
+            ORDER BY COALESCE(o.approved_at, o.created_at) DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching sales orders: ' + err.message });
+    }
+};
+
+const approveOrder = async (req, res) => {
+    const { id } = req.params;
+    const { discount, shipping_charges, extra_charges, zoho_bill_number } = req.body || {};
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ? FOR UPDATE', [id]);
+        if (!orders.length) throw new Error('Order not found');
+        const order = orders[0];
+
+        if (['approved', 'so_created', 'billed', 'packed', 'shipped', 'delivered'].includes(order.order_status)) {
+            throw new Error(`Order is already ${order.order_status}`);
+        }
+
+        // Generate Sales Order Number
+        const soYear = new Date().getFullYear();
+        const salesOrderNumber = order.sales_order_number || `SO-${soYear}-${String(order.order_id).padStart(5, '0')}`;
+
+        // Calculate totals if discount or charges are supplied
+        let totalAmount = order.total_amount;
+        let balanceAmount = order.balance_amount;
+        if (discount !== undefined || shipping_charges !== undefined || extra_charges !== undefined) {
+            const [itemSumRows] = await connection.query('SELECT SUM(total_price) AS total FROM order_items WHERE order_id = ?', [id]);
+            const subtotal = parseFloat(itemSumRows[0]?.total || 0);
+            const disc = discount !== undefined ? parseFloat(discount || 0) : parseFloat(order.discount || 0);
+            const ship = shipping_charges !== undefined ? parseFloat(shipping_charges || 0) : parseFloat(order.shipping_charges || 0);
+            const extra = extra_charges !== undefined ? parseFloat(extra_charges || 0) : parseFloat(order.extra_charges || 0);
+            totalAmount = subtotal - disc + ship + extra;
+            const verifiedTotal = await getVerifiedBalance(connection, id);
+            balanceAmount = Math.max(0, totalAmount - verifiedTotal);
+        }
+
+        await connection.query(`
+            UPDATE orders SET 
+                order_status = 'approved',
+                sales_order_number = ?,
+                approved_at = NOW(),
+                approved_by = ?,
+                total_amount = ?,
+                discount = COALESCE(?, discount),
+                shipping_charges = COALESCE(?, shipping_charges),
+                extra_charges = COALESCE(?, extra_charges),
+                balance_amount = ?,
+                zoho_bill_number = COALESCE(?, zoho_bill_number)
+            WHERE order_id = ?
+        `, [
+            salesOrderNumber, req.user?.id || null, totalAmount,
+            discount !== undefined ? discount : null,
+            shipping_charges !== undefined ? shipping_charges : null,
+            extra_charges !== undefined ? extra_charges : null,
+            balanceAmount,
+            zoho_bill_number || null,
+            id
+        ]);
+
+        await logAudit(connection, {
+            order_id: id,
+            action: 'ORDER_APPROVED_TO_SALES_ORDER',
+            old_value: order.order_status,
+            new_value: 'approved',
+            changed_by: req.user?.id || null
+        });
+
+        await connection.commit();
+        res.json({
+            success: true,
+            message: 'Order approved successfully! Converted to Sales Order.',
+            sales_order_number: salesOrderNumber,
+            order_id: id,
+            order_status: 'approved'
+        });
+    } catch (err) {
+        try { if (connection) await connection.rollback(); } catch (re) { }
+        res.status(500).json({ message: 'Error approving order: ' + err.message });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+const zohoCustomerService = require('../services/zoho/zohoCustomer.service');
+
+const createZohoCustomer = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await zohoCustomerService.createOrSyncCustomer(id, req.body, req.user?.id || 1);
+        res.json({
+            success: true,
+            message: `Customer "${result.contact_name}" successfully created in Zoho Books!`,
+            contact_id: result.contact_id,
+            customer: result.customer
+        });
+    } catch (err) {
+        console.error('Error creating Zoho customer:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+
 const getOrderForBilling = async (req, res) => {
     const { id } = req.params;
     try {
@@ -1173,5 +1302,8 @@ module.exports = {
     updateSettings,
     getPayments,
     printInvoice,
-    getOrdersByStatus
+    getOrdersByStatus,
+    getSalesOrders,
+    approveOrder,
+    createZohoCustomer
 };

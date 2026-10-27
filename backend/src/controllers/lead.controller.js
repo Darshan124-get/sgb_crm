@@ -232,8 +232,8 @@ exports.getLeads = async (req, res) => {
                     SELECT 
                         COUNT(*) as all_count,
                         COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
-                        COUNT(CASE WHEN score = 'hot' OR status = 'interested' THEN 1 END) as hot_count,
-                        COUNT(CASE WHEN status = 'followup' OR (next_followup_date IS NOT NULL AND next_followup_date != '') THEN 1 END) as followup_count,
+                        COUNT(CASE WHEN score = 'hot' AND status = 'interested' THEN 1 END) as hot_count,
+                        COUNT(CASE WHEN status = 'followup' THEN 1 END) as followup_count,
                         COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
                         COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
                         COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count,
@@ -1053,8 +1053,8 @@ exports.getStats = async (req, res) => {
             SELECT 
                 COUNT(*) as all_count,
                 COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
-                COUNT(CASE WHEN score = 'hot' OR status = 'interested' THEN 1 END) as hot_count,
-                COUNT(CASE WHEN status = 'followup' OR (next_followup_date IS NOT NULL AND next_followup_date != '') THEN 1 END) as followup_count,
+                COUNT(CASE WHEN score = 'hot' AND status = 'interested' THEN 1 END) as hot_count,
+                COUNT(CASE WHEN status = 'followup' THEN 1 END) as followup_count,
                 COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
                 COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
                 COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count,

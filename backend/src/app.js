@@ -25,6 +25,7 @@ const departmentRoutes = require('./routes/department.routes');
 const productSetRoutes = require('./routes/product-set.routes');
 const chatbotRoutes = require('./routes/chatbot.routes');
 const telephonyRoutes = require('./routes/telephony.routes');
+const zohoRoutes = require('./routes/zoho.routes');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -253,11 +254,14 @@ app.use('/api/product-sets', productSetRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/telephony', telephonyRoutes);
 app.use('/api/integrations/acefone/webhook', telephonyRoutes);
+app.use('/api/integrations/zoho', zohoRoutes);
+app.use('/api/billing/zoho', zohoRoutes);
 
 console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
 console.log('✅ WhatsApp Webhook: Mounted at /webhook & /api/whatsapp/webhook');
 console.log('✅ Acefone Telephony API: Mounted at /api/telephony');
 console.log('✅ Acefone Webhook: Mounted at /api/integrations/acefone/webhook');
+console.log('✅ Zoho Books API & Webhooks: Mounted at /api/integrations/zoho & /api/billing/zoho');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)
 app.all('/api/*', (req, res) => {

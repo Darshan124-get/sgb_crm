@@ -204,6 +204,62 @@ exports.getLeads = async (req, res) => {
             finalRows = rows.filter(l => l.bot_priority === reqPriority);
         }
 
+        let counts = {};
+        if (pageNum === 1) {
+            try {
+                let statsWhere = 'WHERE 1=1';
+                let statsParams = [];
+                if (isExecutiveView) {
+                    statsWhere += ' AND assigned_to = ?';
+                    statsParams.push(userId);
+                } else if (assigned_to) {
+                    statsWhere += ' AND assigned_to = ?';
+                    statsParams.push(assigned_to);
+                } else if (is_unassigned === 'true') {
+                    statsWhere += ' AND assigned_to IS NULL';
+                }
+                if (search) {
+                    statsWhere += ' AND (customer_name LIKE ? OR phone_number LIKE ? OR first_message LIKE ?)';
+                    const escapedSearch = search.replace(/[%_]/g, '\\$&');
+                    const searchVal = `%${escapedSearch}%`;
+                    statsParams.push(searchVal, searchVal, searchVal);
+                }
+                const newCaseCondition = isExecutiveView 
+                    ? "(status IN ('new', 'assigned') OR status IS NULL OR status = '')" 
+                    : "(status IN ('new', 'assigned') OR status IS NULL OR status = '') AND assigned_to IS NULL";
+
+                const [statsRows] = await pool.query(`
+                    SELECT 
+                        COUNT(*) as all_count,
+                        COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
+                        COUNT(CASE WHEN score = 'hot' OR status = 'interested' THEN 1 END) as hot_count,
+                        COUNT(CASE WHEN status = 'followup' OR (next_followup_date IS NOT NULL AND next_followup_date != '') THEN 1 END) as followup_count,
+                        COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
+                        COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
+                        COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count,
+                        COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_count,
+                        COUNT(CASE WHEN status = 'callback' THEN 1 END) as callback_count
+                    FROM leads
+                    ${statsWhere}
+                `, statsParams);
+
+                const s = statsRows[0] || {};
+                counts = {
+                    all: s.all_count || 0,
+                    today: s.today_count || 0,
+                    hot: s.hot_count || 0,
+                    followup: s.followup_count || 0,
+                    lost: s.lost_count || 0,
+                    open: s.open_count || 0,
+                    new: s.new_count || 0,
+                    converted: s.converted_count || 0,
+                    callback: s.callback_count || 0
+                };
+            } catch (statsErr) {
+                console.error('getLeads counts error:', statsErr.message);
+            }
+        }
+
         const effectiveTotal = (reqPriority && reqPriority !== 'all') ? finalRows.length : totalLeads;
 
         res.json({
@@ -211,7 +267,8 @@ exports.getLeads = async (req, res) => {
             totalLeads: effectiveTotal,
             totalPages: Math.ceil(effectiveTotal / limitNum) || 1,
             currentPage: pageNum,
-            limit: limitNum
+            limit: limitNum,
+            counts
         });
     } catch (err) {
         console.error('getLeads Error:', err);
@@ -996,11 +1053,13 @@ exports.getStats = async (req, res) => {
             SELECT 
                 COUNT(*) as all_count,
                 COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
-                COUNT(CASE WHEN score = 'hot' AND status = 'interested' THEN 1 END) as hot_count,
-                COUNT(CASE WHEN status = 'followup' THEN 1 END) as followup_count,
+                COUNT(CASE WHEN score = 'hot' OR status = 'interested' THEN 1 END) as hot_count,
+                COUNT(CASE WHEN status = 'followup' OR (next_followup_date IS NOT NULL AND next_followup_date != '') THEN 1 END) as followup_count,
                 COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
                 COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
-                COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count
+                COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count,
+                COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_count,
+                COUNT(CASE WHEN status = 'callback' THEN 1 END) as callback_count
             FROM leads
             ${baseWhere}
         `, params);
@@ -1014,7 +1073,9 @@ exports.getStats = async (req, res) => {
             followup: s.followup_count || 0,
             lost: s.lost_count || 0,
             open: s.open_count || 0,
-            new: s.new_count || 0
+            new: s.new_count || 0,
+            converted: s.converted_count || 0,
+            callback: s.callback_count || 0
         });
     } catch (err) {
         console.error('getStats Error:', err);

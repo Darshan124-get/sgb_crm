@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sgbconnect/features/calls/data/calls_service.dart';
 import 'package:sgbconnect/features/calls/domain/models/call_record_model.dart';
 import 'package:sgbconnect/features/calls/presentation/pages/calls_page.dart';
 import 'package:sgbconnect/features/calls/presentation/widgets/call_details_bottom_sheet.dart';
@@ -150,6 +151,24 @@ void main() {
       // Verify buttons
       expect(find.text('Call Back'), findsOneWidget);
       expect(find.text('Copy'), findsOneWidget);
+    });
+
+    test('CallsPaginationResult stores metadata and counts correctly', () {
+      final samples = CallRecordModel.sampleCalls();
+      const result = CallsPaginationResult(
+        calls: [],
+        totalCalls: 413,
+        totalPages: 9,
+        currentPage: 1,
+        counts: {'all': 413, 'connected': 166, 'missed': 247},
+      );
+
+      expect(result.totalCalls, 413);
+      expect(result.totalPages, 9);
+      expect(result.currentPage, 1);
+      expect(result.counts['all'], 413);
+      expect(result.counts['connected'], 166);
+      expect(result.counts['missed'], 247);
     });
   });
 }

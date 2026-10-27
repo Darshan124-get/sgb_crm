@@ -3,15 +3,34 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/services/telephony_service.dart';
 import '../domain/models/call_record_model.dart';
 
+class CallsPaginationResult {
+  final List<CallRecordModel> calls;
+  final int totalCalls;
+  final int totalPages;
+  final int currentPage;
+  final Map<String, int> counts;
+
+  const CallsPaginationResult({
+    required this.calls,
+    required this.totalCalls,
+    required this.totalPages,
+    required this.currentPage,
+    this.counts = const {},
+  });
+}
+
 class CallsService {
-  /// Fetches recent call records from Acefone CDR via backend.
-  static Future<List<CallRecordModel>> fetchRecentCalls({
+  /// Fetches recent call records with pagination and summary counts.
+  static Future<CallsPaginationResult> fetchRecentCallsPaginated({
+    int page = 1,
     int limit = 50,
     String? search,
     String? telecallerId,
+    String? status,
   }) async {
     try {
       final queryParams = <String, dynamic>{
+        'page': page.toString(),
         'limit': limit.toString(),
       };
       if (search != null && search.trim().isNotEmpty) {
@@ -20,26 +39,72 @@ class CallsService {
       if (telecallerId != null && telecallerId.trim().isNotEmpty) {
         queryParams['telecaller_id'] = telecallerId.trim();
       }
+      if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') {
+        queryParams['status'] = status.toLowerCase();
+      }
 
       final response = await ApiClient.get('/telephony/recents', queryParameters: queryParams);
 
       if (response.isSuccess && response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
         final callsList = data['calls'];
+        List<CallRecordModel> calls = [];
         if (callsList is List) {
-          return callsList
+          calls = callsList
               .whereType<Map<String, dynamic>>()
               .map((c) => CallRecordModel.fromJson(c))
               .toList();
         }
+        final totalCalls = (data['totalCalls'] as num?)?.toInt() ?? calls.length;
+        final totalPages = (data['totalPages'] as num?)?.toInt() ?? 1;
+        final currentPage = (data['currentPage'] as num?)?.toInt() ?? page;
+        final counts = <String, int>{};
+        if (data['counts'] is Map) {
+          (data['counts'] as Map).forEach((k, v) {
+            counts[k.toString()] = (v is num) ? v.toInt() : (int.tryParse(v.toString()) ?? 0);
+          });
+        }
+        return CallsPaginationResult(
+          calls: calls,
+          totalCalls: totalCalls,
+          totalPages: totalPages,
+          currentPage: currentPage,
+          counts: counts,
+        );
       }
 
-      // If backend returns empty or non-200 in dev/offline, return fallback sample
-      return CallRecordModel.sampleCalls();
+      final samples = CallRecordModel.sampleCalls();
+      return CallsPaginationResult(
+        calls: samples,
+        totalCalls: samples.length,
+        totalPages: 1,
+        currentPage: 1,
+      );
     } catch (e) {
       debugPrint('Error fetching recent calls: $e');
-      return CallRecordModel.sampleCalls();
+      final samples = CallRecordModel.sampleCalls();
+      return CallsPaginationResult(
+        calls: samples,
+        totalCalls: samples.length,
+        totalPages: 1,
+        currentPage: 1,
+      );
     }
+  }
+
+  /// Legacy helper for unpaginated calls fetching
+  static Future<List<CallRecordModel>> fetchRecentCalls({
+    int limit = 50,
+    String? search,
+    String? telecallerId,
+  }) async {
+    final result = await fetchRecentCallsPaginated(
+      page: 1,
+      limit: limit,
+      search: search,
+      telecallerId: telecallerId,
+    );
+    return result.calls;
   }
 
   /// Fetches single call details by ID.

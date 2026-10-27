@@ -24,6 +24,7 @@ class CallsPage extends StatefulWidget {
 class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   List<CallRecordModel> _calls = [];
   bool _isLoading = true;
@@ -31,6 +32,11 @@ class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMix
   String _searchQuery = '';
   String _statusFilter = 'All'; // 'All', 'Connected', 'Missed'
   bool _adminShowOnlyMine = false;
+
+  int _currentPage = 1;
+  bool _isLoadingMore = false;
+  bool _hasMoreCalls = true;
+  Map<String, int> _callCounts = {'all': 0, 'connected': 0, 'missed': 0};
 
   @override
   void initState() {
@@ -40,43 +46,118 @@ class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMix
       vsync: this,
       initialIndex: widget.initialTabIndex.clamp(0, 1),
     );
+    _scrollController.addListener(_onScroll);
     _loadRecentCalls();
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (currentScroll >= (maxScroll - 250)) {
+      if (!_isLoadingMore && _hasMoreCalls && !_isLoading) {
+        _loadMoreCalls();
+      }
+    }
   }
 
   Future<void> _loadRecentCalls({bool isRefresh = false}) async {
     if (!isRefresh) {
       setState(() => _isLoading = true);
     }
+    _currentPage = 1;
+    _hasMoreCalls = true;
     final isAdmin = SessionStorage.currentUser?.isAdmin == true;
     final telecallerId = (isAdmin && _adminShowOnlyMine)
         ? SessionStorage.currentUser?.userId.toString()
         : null;
 
-    final freshCalls = await CallsService.fetchRecentCalls(
+    final result = await CallsService.fetchRecentCallsPaginated(
+      page: 1,
+      limit: 50,
       search: _searchQuery,
       telecallerId: telecallerId,
+      status: _statusFilter,
     );
     if (!mounted) return;
     setState(() {
-      _calls = freshCalls;
+      _calls = result.calls;
+      if (result.counts.isNotEmpty) {
+        _callCounts = result.counts;
+      }
+      _hasMoreCalls = result.calls.length >= 50;
+      if (result.totalCalls > 50) {
+        _hasMoreCalls = _calls.length < result.totalCalls;
+      }
       _isLoading = false;
     });
   }
 
+  Future<void> _loadMoreCalls() async {
+    if (_isLoadingMore || !_hasMoreCalls || _isLoading) return;
+    setState(() => _isLoadingMore = true);
+
+    final nextPage = _currentPage + 1;
+    final isAdmin = SessionStorage.currentUser?.isAdmin == true;
+    final telecallerId = (isAdmin && _adminShowOnlyMine)
+        ? SessionStorage.currentUser?.userId.toString()
+        : null;
+
+    final result = await CallsService.fetchRecentCallsPaginated(
+      page: nextPage,
+      limit: 50,
+      search: _searchQuery,
+      telecallerId: telecallerId,
+      status: _statusFilter,
+    );
+
+    if (!mounted) return;
+    if (result.calls.isEmpty) {
+      setState(() {
+        _hasMoreCalls = false;
+        _isLoadingMore = false;
+      });
+    } else {
+      setState(() {
+        _currentPage = nextPage;
+        final existingIds = _calls.map((c) => c.id).toSet();
+        final newCalls = result.calls.where((c) => !existingIds.contains(c.id)).toList();
+        if (newCalls.isEmpty) {
+          _hasMoreCalls = false;
+        } else {
+          _calls.addAll(newCalls);
+          _hasMoreCalls = result.calls.length >= 50;
+          if (result.totalCalls > 50) {
+            _hasMoreCalls = _calls.length < result.totalCalls;
+          }
+        }
+        _isLoadingMore = false;
+        if (result.counts.isNotEmpty) {
+          _callCounts = result.counts;
+        }
+      });
+    }
+  }
+
   List<CallRecordModel> get _displayedCalls {
+    // If backend already returned calls filtered by status, _calls is already filtered.
+    // If backend did not filter (e.g. legacy server), fallback to in-memory filter.
     if (_statusFilter == 'All') return _calls;
     if (_statusFilter == 'Connected') {
-      return _calls.where((c) => c.isAnswered).toList();
+      final filtered = _calls.where((c) => c.isAnswered).toList();
+      return filtered.isNotEmpty || _calls.isEmpty ? filtered : _calls;
     }
     if (_statusFilter == 'Missed') {
-      return _calls.where((c) => c.isMissed || c.isBusy).toList();
+      final filtered = _calls.where((c) => c.isMissed || c.isBusy).toList();
+      return filtered.isNotEmpty || _calls.isEmpty ? filtered : _calls;
     }
     return _calls;
   }
@@ -440,16 +521,16 @@ class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMix
                   ),
                 ),
 
-              // Filter Chips: All, Connected, Missed
+              // Filter Chips: All, Connected, Missed with category counts
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildFilterChip('All', _calls.length),
+                    _buildFilterChip('All', count: _callCounts['all']),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Connected', _calls.where((c) => c.isAnswered).length),
+                    _buildFilterChip('Connected', count: _callCounts['connected']),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Missed', _calls.where((c) => c.isMissed || c.isBusy).length),
+                    _buildFilterChip('Missed', count: _callCounts['missed']),
                   ],
                 ),
               ),
@@ -506,10 +587,27 @@ class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMix
                           ],
                         )
                       : ListView.separated(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                          itemCount: _displayedCalls.length,
+                          itemCount: _displayedCalls.length + (_isLoadingMore ? 1 : 0),
                           separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
+                            if (index == _displayedCalls.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A5844)),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
                             final call = _displayedCalls[index];
                             return _buildCallCard(call);
                           },
@@ -520,14 +618,20 @@ class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMix
     );
   }
 
-  Widget _buildFilterChip(String label, int count) {
-    final isSelected = _statusFilter == label;
+  Widget _buildFilterChip(String label, {int? count}) {
+    final isSelected = _statusFilter.toLowerCase() == label.toLowerCase();
+    final countText = (count != null && count > 0) ? ' ($count)' : '';
+    final displayText = '$label$countText';
     return InkWell(
-      onTap: () => setState(() => _statusFilter = label),
+      onTap: () {
+        if (_statusFilter.toLowerCase() == label.toLowerCase()) return;
+        setState(() => _statusFilter = label);
+        _loadRecentCalls(isRefresh: true);
+      },
       borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF0A5844) : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -544,34 +648,13 @@ class _CallsPageState extends State<CallsPage> with SingleTickerProviderStateMix
                 ]
               : null,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                color: isSelected ? Colors.white : const Color(0xFF475569),
-              ),
-            ),
-            const SizedBox(width: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                count.toString(),
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white : const Color(0xFF64748B),
-                ),
-              ),
-            ),
-          ],
+        child: Text(
+          displayText,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
         ),
       ),
     );

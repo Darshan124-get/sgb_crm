@@ -85,7 +85,7 @@ class LeadCard extends StatelessWidget {
                             fontWeight: FontWeight.w400,
                           ),
                         ),
-                        if (lead.hasFollowUp || lead.status == LeadStatus.followUp) ...[
+                        if (lead.hasFollowUp) ...[
                           const SizedBox(height: 5),
                           Row(
                             children: [

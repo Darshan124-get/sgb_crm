@@ -321,11 +321,11 @@ class LeadModel {
       final min = createdAt!.minute.toString().padLeft(2, '0');
       return '$d $m $y, $hour:$min $amPm';
     }
-    return time.isNotEmpty ? time : '20 Jul 2026, 11:22 PM';
+    return time.isNotEmpty ? time : '-';
   }
 
   String get nextFollowUpFormatted {
-    if (nextFollowUp != null && nextFollowUp!.isNotEmpty && nextFollowUp != 'null') {
+    if (nextFollowUp != null && nextFollowUp!.trim().isNotEmpty && nextFollowUp != 'null') {
       try {
         final dt = DateTime.tryParse(nextFollowUp!);
         if (dt != null) {
@@ -341,10 +341,10 @@ class LeadModel {
       } catch (_) {}
       return nextFollowUp!;
     }
-    return '25 Jul 2026, 10:00 AM';
+    return '';
   }
 
-  bool get hasFollowUp => nextFollowUp != null && nextFollowUp!.isNotEmpty && nextFollowUp != 'null';
+  bool get hasFollowUp => nextFollowUp != null && nextFollowUp!.trim().isNotEmpty && nextFollowUp != 'null';
 
   String? get callAttemptTag {
     if (callCount > 0) {

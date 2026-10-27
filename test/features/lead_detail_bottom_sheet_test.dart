@@ -282,5 +282,63 @@ void main() {
       expect(pushedRoute, equals('/lead-details'));
       expect(pushedArgs, equals('lead-tj-1'));
     });
+
+    testWidgets('Shows "Not Scheduled" and neutral icon when lead has no follow-up date', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.0;
+
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final leadWithoutFollowUp = LeadModel(
+        id: 'lead-tj-2',
+        name: 'test lead 2',
+        phone: '9999999999',
+        city: 'Rural',
+        state: 'India',
+        time: '11:22 PM',
+        status: LeadStatus.newLead,
+        isToday: false,
+        notes: 'hi',
+        priority: '1/5',
+        score: 'Low',
+        campaign: '',
+        createdAt: DateTime(2026, 7, 20, 23, 22),
+        firstMessage: 'hi',
+        leadSource: '',
+        productInterest: '',
+        assignedStaff: 'darshan_acefone_test_2',
+        nextFollowUp: null,
+        scoreFraction: '1/5',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => LeadDetailBottomSheet(lead: leadWithoutFollowUp),
+                  );
+                },
+                child: const Text('Open Sheet'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Sheet'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Next Follow-up'), findsOneWidget);
+      expect(find.text('Not Scheduled'), findsOneWidget);
+      expect(find.text('25 Jul 2026, 10:00 AM'), findsNothing);
+    });
   });
 }

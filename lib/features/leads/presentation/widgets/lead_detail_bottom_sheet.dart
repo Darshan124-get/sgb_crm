@@ -36,6 +36,11 @@ class _LeadDetailBottomSheetState extends State<LeadDetailBottomSheet> {
   late String _currentFollowUp;
   late LeadStatus _currentStatus;
 
+  bool get _hasScheduledFollowUp =>
+      _currentFollowUp.trim().isNotEmpty &&
+      _currentFollowUp != 'Not Scheduled' &&
+      _currentFollowUp != '-';
+
   @override
   void initState() {
     super.initState();
@@ -842,7 +847,7 @@ class _LeadDetailBottomSheetState extends State<LeadDetailBottomSheet> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: (_currentStatus == LeadStatus.followUp || _currentFollowUp.isNotEmpty)
+                                  color: _hasScheduledFollowUp
                                       ? const Color(0xFFFEE2E2)
                                       : const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(10),
@@ -850,9 +855,9 @@ class _LeadDetailBottomSheetState extends State<LeadDetailBottomSheet> {
                                 child: Icon(
                                   Icons.calendar_month_outlined,
                                   size: 19,
-                                  color: (_currentStatus == LeadStatus.followUp || _currentFollowUp.isNotEmpty)
+                                  color: _hasScheduledFollowUp
                                       ? const Color(0xFFDC2626)
-                                      : const Color(0xFF475569),
+                                      : const Color(0xFF64748B),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -870,13 +875,13 @@ class _LeadDetailBottomSheetState extends State<LeadDetailBottomSheet> {
                                     ),
                                     const SizedBox(height: 1),
                                     Text(
-                                      _currentFollowUp,
+                                      _hasScheduledFollowUp ? _currentFollowUp : 'Not Scheduled',
                                       style: TextStyle(
-                                        color: (_currentStatus == LeadStatus.followUp || _currentFollowUp.isNotEmpty)
+                                        color: _hasScheduledFollowUp
                                             ? const Color(0xFFDC2626)
-                                            : const Color(0xFF0F172A),
+                                            : const Color(0xFF64748B),
                                         fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: _hasScheduledFollowUp ? FontWeight.w700 : FontWeight.w500,
                                       ),
                                     ),
                                   ],

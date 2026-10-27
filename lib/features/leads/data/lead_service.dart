@@ -2,8 +2,24 @@ import '../../../core/network/api_client.dart';
 import '../domain/models/lead_detail_model.dart';
 import '../domain/models/lead_model.dart';
 
+class LeadPaginationResult {
+  final List<LeadModel> leads;
+  final int totalLeads;
+  final int totalPages;
+  final int currentPage;
+  final Map<String, int> counts;
+
+  const LeadPaginationResult({
+    required this.leads,
+    required this.totalLeads,
+    required this.totalPages,
+    required this.currentPage,
+    this.counts = const {},
+  });
+}
+
 class LeadService {
-  static Future<List<LeadModel>> getLeads({
+  static Future<LeadPaginationResult> getLeadsPaginated({
     String? status,
     String? search,
     int page = 1,
@@ -26,20 +42,85 @@ class LeadService {
     if (response.isSuccess && response.data != null) {
       final data = response.data;
       List<dynamic> list = [];
+      int totalLeads = 0;
+      int totalPages = 1;
+      int currentPage = page;
+      Map<String, int> counts = {};
 
-      if (data is Map<String, dynamic> && data['leads'] is List) {
-        list = data['leads'] as List<dynamic>;
+      if (data is Map<String, dynamic>) {
+        if (data['leads'] is List) {
+          list = data['leads'] as List<dynamic>;
+        }
+        totalLeads = (data['totalLeads'] as num?)?.toInt() ?? 0;
+        totalPages = (data['totalPages'] as num?)?.toInt() ?? 1;
+        currentPage = (data['currentPage'] as num?)?.toInt() ?? page;
+        if (data['counts'] is Map) {
+          final rawCounts = data['counts'] as Map;
+          rawCounts.forEach((k, v) {
+            counts[k.toString()] = (v is num) ? v.toInt() : (int.tryParse(v.toString()) ?? 0);
+          });
+        }
       } else if (data is List) {
         list = data;
+        totalLeads = list.length;
       }
 
-      return list
+      final leads = list
           .whereType<Map<String, dynamic>>()
           .map((item) => LeadModel.fromJson(item))
           .toList();
+
+      return LeadPaginationResult(
+        leads: leads,
+        totalLeads: totalLeads > 0 ? totalLeads : leads.length,
+        totalPages: totalPages,
+        currentPage: currentPage,
+        counts: counts,
+      );
     }
 
-    return [];
+    return LeadPaginationResult(
+      leads: [],
+      totalLeads: 0,
+      totalPages: 1,
+      currentPage: page,
+      counts: {},
+    );
+  }
+
+  static Future<List<LeadModel>> getLeads({
+    String? status,
+    String? search,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final result = await getLeadsPaginated(
+      status: status,
+      search: search,
+      page: page,
+      limit: limit,
+    );
+    return result.leads;
+  }
+
+  static Future<Map<String, int>> getLeadStats({String? search}) async {
+    final queryParams = <String, dynamic>{};
+    if (search != null && search.trim().isNotEmpty) {
+      queryParams['search'] = search.trim();
+    }
+
+    final response = await ApiClient.get('/leads/stats', queryParameters: queryParams);
+
+    if (response.isSuccess && response.data is Map<String, dynamic>) {
+      final data = response.data as Map<String, dynamic>;
+      final counts = <String, int>{};
+      data.forEach((k, v) {
+        counts[k.toString()] = (v is num) ? v.toInt() : (int.tryParse(v.toString()) ?? 0);
+      });
+      return counts;
+    }
+
+    return {};
   }
 
   static Future<LeadDetailModel?> getLeadById(String id) async {

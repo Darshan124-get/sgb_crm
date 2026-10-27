@@ -38,6 +38,14 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
   bool _hasNetworkError = false;
   Timer? _leadsPollTimer;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  int _currentPage = 1;
+  static const int _pageSize = 50;
+  bool _hasMoreLeads = true;
+  bool _isLoadingMore = false;
+  int? _totalServerLeads;
+  Map<String, int>? _backendStats;
 
   String _selectedFilter = 'All';
   List<LeadModel> _allLeads = [];
@@ -77,6 +85,7 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_onScroll);
     _isLoading = widget.startLoading ?? (widget.initialLeads == null);
     _allLeads = widget.initialLeads ?? [];
     if (widget.initialLeads != null) {
@@ -127,15 +136,68 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     }
   }
 
-  int get _todayCount => _allLeads.where((l) => l.isToday).length;
-  int get _newCount => _allLeads.where((l) => l.status == LeadStatus.newLead).length;
-  int get _followCount => _allLeads.where((l) => l.status == LeadStatus.followUp || l.hasFollowUp).length;
-  int get _callbackCount => _allLeads.where((l) => l.status == LeadStatus.callback).length;
-  int get _allCount => _allLeads.length;
-  int get _hotCount => _allLeads.where((l) => l.isHot || l.score.toLowerCase().contains('hot') || l.status == LeadStatus.interested).length;
-  int get _lostCount => _allLeads.where((l) => l.status == LeadStatus.lost || l.notes.toLowerCase().contains('lost')).length;
-  int get _openCount => _allLeads.where((l) => l.status != LeadStatus.lost && l.status != LeadStatus.converted).length;
-  int get _convertedCount => _allLeads.where((l) => l.status == LeadStatus.converted).length;
+  int get _todayCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.isToday).length;
+    final serverCount = _backendStats?['today'];
+    final localCount = _allLeads.where((l) => l.isToday).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _newCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.status == LeadStatus.newLead).length;
+    final serverCount = _backendStats?['new'];
+    final localCount = _allLeads.where((l) => l.status == LeadStatus.newLead).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _followCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.status == LeadStatus.followUp || l.hasFollowUp).length;
+    final serverCount = _backendStats?['followup'];
+    final localCount = _allLeads.where((l) => l.status == LeadStatus.followUp || l.hasFollowUp).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _callbackCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.status == LeadStatus.callback).length;
+    final serverCount = _backendStats?['callback'];
+    final localCount = _allLeads.where((l) => l.status == LeadStatus.callback).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _allCount {
+    if (widget.initialLeads != null) return _allLeads.length;
+    final serverCount = _totalServerLeads ?? _backendStats?['all'];
+    final localCount = _allLeads.length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _hotCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.isHot || l.score.toLowerCase().contains('hot') || l.status == LeadStatus.interested).length;
+    final serverCount = _backendStats?['hot'];
+    final localCount = _allLeads.where((l) => l.isHot || l.score.toLowerCase().contains('hot') || l.status == LeadStatus.interested).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _lostCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.status == LeadStatus.lost || l.notes.toLowerCase().contains('lost')).length;
+    final serverCount = _backendStats?['lost'];
+    final localCount = _allLeads.where((l) => l.status == LeadStatus.lost || l.notes.toLowerCase().contains('lost')).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _openCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.status != LeadStatus.lost && l.status != LeadStatus.converted).length;
+    final serverCount = _backendStats?['open'];
+    final localCount = _allLeads.where((l) => l.status != LeadStatus.lost && l.status != LeadStatus.converted).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
+
+  int get _convertedCount {
+    if (widget.initialLeads != null) return _allLeads.where((l) => l.status == LeadStatus.converted).length;
+    final serverCount = _backendStats?['converted'];
+    final localCount = _allLeads.where((l) => l.status == LeadStatus.converted).length;
+    return (serverCount != null && serverCount >= localCount) ? serverCount : localCount;
+  }
 
   void _updateFilterCounts({bool preserveCategory = true}) {
     final currentPrefix = _selectedFilter.split('(').first.trim().toLowerCase();
@@ -177,15 +239,43 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     }
   }
 
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (currentScroll >= (maxScroll - 250)) {
+      if (!_isLoadingMore && _hasMoreLeads && !_isLoading) {
+        _loadMoreLeads();
+      }
+    }
+  }
+
   Future<void> _loadLeads({bool forceLoading = false}) async {
-    if (forceLoading || _allLeads.isEmpty) {
+    if (forceLoading || (_allLeads.isEmpty && widget.initialLeads == null)) {
       setState(() => _isLoading = true);
     }
+    _currentPage = 1;
+    _hasMoreLeads = true;
     try {
-      final leads = await LeadService.getLeads();
+      final results = await Future.wait([
+        LeadService.getLeadsPaginated(page: 1, limit: _pageSize),
+        LeadService.getLeadStats(),
+      ]);
+
       if (!mounted) return;
+
+      final pagination = results[0] as LeadPaginationResult;
+      final stats = results[1] as Map<String, int>;
+      final mergedStats = <String, int>{...stats, ...pagination.counts};
+
       setState(() {
-        _allLeads = leads;
+        _allLeads = pagination.leads;
+        _totalServerLeads = pagination.totalLeads > 0 ? pagination.totalLeads : null;
+        if (mergedStats.isNotEmpty) {
+          _backendStats = mergedStats;
+        }
+        _hasMoreLeads = pagination.leads.length >= _pageSize &&
+            (pagination.totalLeads == 0 || pagination.leads.length < pagination.totalLeads);
         _isLoading = false;
         _hasNetworkError = false;
         _updateFilterCounts(preserveCategory: _allLeads.isNotEmpty);
@@ -200,12 +290,82 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _loadMoreLeads() async {
+    if (_isLoadingMore || !_hasMoreLeads || _isLoading || widget.initialLeads != null) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = _currentPage + 1;
+      final result = await LeadService.getLeadsPaginated(
+        page: nextPage,
+        limit: _pageSize,
+      );
+
+      if (!mounted) return;
+
+      if (result.leads.isEmpty) {
+        setState(() {
+          _hasMoreLeads = false;
+          _isLoadingMore = false;
+        });
+      } else {
+        setState(() {
+          _currentPage = nextPage;
+          final existingIds = _allLeads.map((l) => l.id).toSet();
+          final newLeads = result.leads.where((l) => !existingIds.contains(l.id)).toList();
+          _allLeads.addAll(newLeads);
+
+          if (result.totalLeads > 0) {
+            _totalServerLeads = result.totalLeads;
+            _hasMoreLeads = _allLeads.length < result.totalLeads;
+          } else {
+            _hasMoreLeads = result.leads.length >= _pageSize;
+          }
+
+          if (result.counts.isNotEmpty) {
+            _backendStats = {...?_backendStats, ...result.counts};
+          }
+
+          _isLoadingMore = false;
+          _updateFilterCounts(preserveCategory: true);
+        });
+        _applyFilters();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
+  }
+
   Future<void> _silentRefreshLeads() async {
-    if (_isSilentSyncing) return;
+    if (_isSilentSyncing || widget.initialLeads != null) return;
     _isSilentSyncing = true;
     try {
-      final leads = await LeadService.getLeads();
+      final syncLimit = _allLeads.length > _pageSize ? _allLeads.length : _pageSize;
+      final results = await Future.wait([
+        LeadService.getLeadsPaginated(page: 1, limit: syncLimit),
+        LeadService.getLeadStats(),
+      ]);
+
       if (!mounted) return;
+
+      final pagination = results[0] as LeadPaginationResult;
+      final stats = results[1] as Map<String, int>;
+      final leads = pagination.leads;
+
+      final mergedStats = <String, int>{...stats, ...pagination.counts};
+      if (mergedStats.isNotEmpty) {
+        _backendStats = mergedStats;
+      }
+      if (pagination.totalLeads > 0) {
+        _totalServerLeads = pagination.totalLeads;
+      }
+
       if (leads.isNotEmpty) {
         final bool changed = _hasLeadsChanged(_allLeads, leads);
         if (changed) {
@@ -221,6 +381,10 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
           if (newCount > wasCount) {
             HapticFeedback.lightImpact();
           }
+        } else {
+          setState(() {
+            _updateFilterCounts(preserveCategory: true);
+          });
         }
       }
     } catch (_) {
@@ -250,6 +414,8 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _stopLeadsPolling();
     _searchController.dispose();
     super.dispose();
@@ -436,7 +602,9 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
   }
 
   Future<void> _handleRefresh() async {
-    await _loadLeads();
+    _currentPage = 1;
+    _hasMoreLeads = true;
+    await _loadLeads(forceLoading: false);
   }
 
   void _handleLeadTap(LeadModel lead) {
@@ -1488,12 +1656,28 @@ class _LeadsPageState extends State<LeadsPage> with WidgetsBindingObserver {
                           : _filteredLeads.isEmpty
                               ? _buildEmptyState()
                               : ListView.builder(
+                                  controller: _scrollController,
                                   physics: const BouncingScrollPhysics(
                                     parent: AlwaysScrollableScrollPhysics(),
                                   ),
                                   padding: const EdgeInsets.only(top: 4, bottom: 20),
-                                  itemCount: _filteredLeads.length,
+                                  itemCount: _filteredLeads.length + (_isLoadingMore ? 1 : 0),
                                   itemBuilder: (context, index) {
+                                    if (index == _filteredLeads.length) {
+                                      return const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 20),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              color: Color(0xFF0A5844),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
                                     final lead = _filteredLeads[index];
                                     return LeadCard(
                                       lead: lead,

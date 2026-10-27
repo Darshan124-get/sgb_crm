@@ -67,7 +67,7 @@ async function migrate() {
                 call_id INT AUTO_INCREMENT PRIMARY KEY,
                 case_id INT NOT NULL,
                 call_type ENUM('INITIAL', 'FOLLOW_UP') NOT NULL DEFAULT 'INITIAL',
-                call_outcome ENUM('answered', 'not_answered', 'callback_required', 'no_assistance_needed') NOT NULL,
+                call_outcome ENUM('answered', 'not_answered', 'switched_off', 'not_reachable', 'busy', 'callback_required', 'no_assistance_needed') NOT NULL,
                 installation_status ENUM('successfully_installed', 'in_progress', 'needs_more_guidance', 'technician_required', 'not_applicable') NULL,
                 guidance_provided TEXT NULL,
                 installation_instructions TEXT NULL,
@@ -144,6 +144,93 @@ async function migrate() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
         console.log("Table 'customer_support_followups' ready.");
+
+        // 8. customer_support_job_cards table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS customer_support_job_cards (
+                job_card_id INT AUTO_INCREMENT PRIMARY KEY,
+                job_card_number VARCHAR(50) UNIQUE NOT NULL,
+                case_id INT NULL,
+                order_id INT NULL,
+                customer_name VARCHAR(150) NOT NULL,
+                customer_phone VARCHAR(50) NOT NULL,
+                customer_address TEXT NULL,
+                product_summary TEXT NULL,
+                job_type ENUM('Installation', 'Service/Repair', 'Inspection', 'Replacement Assessment', 'Other') NOT NULL DEFAULT 'Service/Repair',
+                priority ENUM('Low', 'Medium', 'High', 'Urgent') NOT NULL DEFAULT 'Medium',
+                status ENUM('Open', 'In Progress', 'On Hold', 'Completed', 'Cancelled') NOT NULL DEFAULT 'Open',
+                issue_description TEXT NULL,
+                work_required TEXT NULL,
+                assigned_to INT NULL,
+                due_date DATE NULL,
+                notes TEXT NULL,
+                diagnosis TEXT NULL,
+                work_performed TEXT NULL,
+                service_cost DECIMAL(10,2) DEFAULT 0.00,
+                cancellation_reason TEXT NULL,
+                completed_at DATETIME NULL,
+                cancelled_at DATETIME NULL,
+                created_by INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_case_id (case_id),
+                INDEX idx_order_id (order_id),
+                INDEX idx_status (status),
+                INDEX idx_assigned_to (assigned_to),
+                INDEX idx_due_date (due_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log("Table 'customer_support_job_cards' ready.");
+
+        // 9. customer_support_job_card_parts table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS customer_support_job_card_parts (
+                part_id INT AUTO_INCREMENT PRIMARY KEY,
+                job_card_id INT NOT NULL,
+                part_name VARCHAR(255) NOT NULL,
+                part_number VARCHAR(100) NULL,
+                quantity INT NOT NULL DEFAULT 1,
+                unit_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                total_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                remarks VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_job_card_id (job_card_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log("Table 'customer_support_job_card_parts' ready.");
+
+        // 10. customer_support_job_card_photos table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS customer_support_job_card_photos (
+                photo_id INT AUTO_INCREMENT PRIMARY KEY,
+                job_card_id INT NOT NULL,
+                photo_type ENUM('issue', 'before', 'after', 'other') NOT NULL DEFAULT 'issue',
+                file_url VARCHAR(500) NOT NULL,
+                file_name VARCHAR(255) NOT NULL,
+                file_size INT NULL,
+                uploaded_by INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_job_card_id (job_card_id),
+                INDEX idx_photo_type (photo_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log("Table 'customer_support_job_card_photos' ready.");
+
+        // 11. customer_support_job_card_logs table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS customer_support_job_card_logs (
+                log_id INT AUTO_INCREMENT PRIMARY KEY,
+                job_card_id INT NOT NULL,
+                action VARCHAR(100) NOT NULL,
+                previous_status VARCHAR(50) NULL,
+                new_status VARCHAR(50) NULL,
+                notes TEXT NULL,
+                performed_by INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_job_card_id (job_card_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log("Table 'customer_support_job_card_logs' ready.");
 
         console.log('✅ Customer Support Migration Completed Successfully!');
         process.exit(0);

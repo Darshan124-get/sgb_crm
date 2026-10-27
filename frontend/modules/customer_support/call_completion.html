@@ -81,31 +81,112 @@
                     <div class="pill-selector" id="callOutcomeSelector">
                         <label class="pill-option">
                             <input type="radio" name="call_outcome" value="answered" required checked>
-                            <span><i class="fas fa-check-circle" style="color: #10b981;"></i> Customer Answered</span>
+                            <span><i class="fas fa-phone-volume" style="color: #10b981;"></i> Customer Answered</span>
                         </label>
                         <label class="pill-option">
                             <input type="radio" name="call_outcome" value="not_answered">
-                            <span><i class="fas fa-phone-slash" style="color: #ef4444;"></i> Customer Did Not Answer</span>
+                            <span><i class="fas fa-phone-slash" style="color: #ef4444;"></i> Did Not Answer</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="switched_off">
+                            <span><i class="fas fa-power-off" style="color: #f59e0b;"></i> Switched Off</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="not_reachable">
+                            <span><i class="fas fa-signal" style="color: #dc2626;"></i> Not Reachable</span>
+                        </label>
+                        <label class="pill-option">
+                            <input type="radio" name="call_outcome" value="busy">
+                            <span><i class="fas fa-phone-flip" style="color: #8b5cf6;"></i> Line Busy</span>
                         </label>
                         <label class="pill-option">
                             <input type="radio" name="call_outcome" value="callback_required">
-                            <span><i class="fas fa-clock" style="color: #f59e0b;"></i> Callback Required</span>
+                            <span><i class="fas fa-clock" style="color: #0284c7;"></i> Callback Requested</span>
                         </label>
                         <label class="pill-option">
                             <input type="radio" name="call_outcome" value="no_assistance_needed">
-                            <span><i class="fas fa-thumbs-up" style="color: #6366f1;"></i> Customer Does Not Need Assistance</span>
+                            <span><i class="fas fa-thumbs-up" style="color: #059669;"></i> No Assistance Needed</span>
                         </label>
                     </div>
 
-                    <div id="notAnsweredNotice" style="display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 0.85rem; color: #92400e;">
-                        <i class="fas fa-info-circle"></i> <strong>Note:</strong> If the customer did not answer or requested a callback, support will remain pending. Installation cannot be marked completed.
+                    <!-- Unreachable / Callback Schedule Card -->
+                    <div id="unreachableScheduleSection" style="display: none; background: #fff7ed; border: 2px solid #fed7aa; border-radius: 12px; padding: 1.5rem; margin-top: 1.25rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid #fed7aa; padding-bottom: 0.75rem;">
+                            <div>
+                                <h3 style="font-size: 1.05rem; font-weight: 700; color: #9a3412; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                                    <i class="fas fa-calendar-plus" style="color: #ea580c;"></i> Schedule Follow-Up Call
+                                </h3>
+                                <p style="font-size: 0.825rem; color: #78350f; margin: 0.25rem 0 0 0;">
+                                    Customer did not receive the call. Schedule a follow-up call for tomorrow or any upcoming date to re-attempt contact.
+                                </p>
+                            </div>
+                            <span class="badge" style="background: #ffedd5; color: #c2410c; font-weight: 700; padding: 0.35rem 0.75rem;">
+                                <i class="fas fa-clock"></i> Action Required
+                            </span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 0.4rem;">
+                                    Follow-Up Date <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input type="date" id="followupDateInput" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: #0f172a; background: white;" required>
+                                
+                                <!-- Quick date preset chips -->
+                                <div style="display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline btn-sm" onclick="setQuickFollowupDate(1)" style="font-size: 0.78rem; padding: 0.25rem 0.65rem; border-radius: 999px; background: white;">
+                                        <i class="fas fa-calendar-day" style="color: #ea580c;"></i> Tomorrow
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-sm" onclick="setQuickFollowupDate(2)" style="font-size: 0.78rem; padding: 0.25rem 0.65rem; border-radius: 999px; background: white;">
+                                        +2 Days
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-sm" onclick="setQuickFollowupDate(3)" style="font-size: 0.78rem; padding: 0.25rem 0.65rem; border-radius: 999px; background: white;">
+                                        +3 Days
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-sm" onclick="setQuickFollowupDate(7)" style="font-size: 0.78rem; padding: 0.25rem 0.65rem; border-radius: 999px; background: white;">
+                                        Next Week (+7d)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 0.4rem;">
+                                    Preferred Time Slot (Optional)
+                                </label>
+                                <select id="followupTimeSlot" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; background: white;">
+                                    <option value="">Any Time During Working Hours</option>
+                                    <option value="Morning (09:00 AM - 12:00 PM)">Morning (09:00 AM - 12:00 PM)</option>
+                                    <option value="Afternoon (12:00 PM - 04:00 PM)">Afternoon (12:00 PM - 04:00 PM)</option>
+                                    <option value="Evening (04:00 PM - 07:00 PM)">Evening (04:00 PM - 07:00 PM)</option>
+                                </select>
+                                <span style="font-size: 0.75rem; color: #64748b; margin-top: 0.4rem; display: block;">Select the best window to call the customer.</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1.25rem;">
+                            <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 0.4rem;">
+                                Call Attempt Remarks &amp; Reason
+                            </label>
+                            <textarea id="unreachableRemarks" rows="2" class="form-control" style="width: 100%; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.875rem; font-family: inherit; background: white;" placeholder="e.g. Customer did not answer call. Scheduled follow-up for tomorrow."></textarea>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; align-items: center; border-top: 1px solid #fed7aa; padding-top: 1rem;">
+                            <button type="button" class="btn btn-outline" onclick="history.back()">
+                                Cancel
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btnScheduleFollowupSubmit" style="background: #ea580c; border-color: #ea580c; color: white; padding: 0.75rem 1.75rem; font-weight: 700;">
+                                <i class="fas fa-calendar-plus"></i> Schedule Follow-Up &amp; Save Call Attempt
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.5rem 0;">
+                <!-- Answered / Active Guidance Container (Only shown when customer answered) -->
+                <div id="answeredDetailsContainer">
+                    <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.5rem 0;">
 
-                <!-- Section 2: Installation Status -->
-                <div id="installationSection" style="margin-bottom: 2rem;">
+                    <!-- Section 2: Installation Status -->
+                    <div id="installationSection" style="margin-bottom: 2rem;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
                         <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
                             <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">2</span>
@@ -248,7 +329,7 @@
                             <i class="fas fa-check-circle"></i> Complete Support &amp; Schedule 30-Day Follow-Up
                         </button>
                     </div>
-                </div>
+                </div> <!-- /#answeredDetailsContainer -->
             </form>
         </main>
     </div>

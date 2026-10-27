@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Card Details — Customer Support | SGB CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="css/support.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @media print {
+            body { background: white !important; color: black !important; }
+            #sidebar-container, .support-header .btn, .no-print { display: none !important; }
+            .support-main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+            .detail-card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; }
+            .job-details-grid { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="support-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="support-main">
+            <!-- Breadcrumbs -->
+            <div class="no-print" style="margin-bottom: 0.75rem; font-size: 0.85rem; color: #64748b; display: flex; align-items: center; gap: 0.5rem;">
+                <a href="dashboard.html" style="color: #64748b; text-decoration: none;">Support Dashboard</a>
+                <span>/</span>
+                <a href="job_cards.html" style="color: #64748b; text-decoration: none;">Job Cards</a>
+                <span>/</span>
+                <span id="breadcrumbJobNum" style="font-weight: 700; color: #0f172a;">Loading...</span>
+            </div>
+
+            <!-- Header -->
+            <div class="support-header">
+                <div class="support-title-block">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <h1 id="headerJobCardNum" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-tools" style="color: #0284c7;"></i> <span id="textJobCardNum">JC-Loading...</span>
+                        </h1>
+                        <span id="headerStatusBadge" class="status-pill status-open">Loading</span>
+                        <span id="headerPriorityBadge" class="priority-badge priority-medium">Medium</span>
+                    </div>
+                    <p id="headerSubtitle" style="margin-top: 0.25rem;">Direct B2C Customer Support & Technical Service Card</p>
+                </div>
+                
+                <div class="no-print" style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-outline" onclick="window.print()" title="Print Job Card">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                    <button type="button" id="btnCallCustomerTop" class="btn btn-outline" style="display: none;" title="Call Customer">
+                        <i class="fas fa-phone"></i> Call
+                    </button>
+                    <button type="button" id="btnOpenPhotosModal" class="btn btn-outline" onclick="openUploadPhotosModal()" title="Upload photos">
+                        <i class="fas fa-camera"></i> Add Photos
+                    </button>
+                    <button type="button" id="btnOpenStatusModal" class="btn btn-outline" onclick="openStatusModal()">
+                        <i class="fas fa-sync-alt"></i> Change Status
+                    </button>
+                    <button type="button" id="btnOpenCompleteModal" class="btn btn-primary" onclick="openCompleteModal()" style="background: #059669; border-color: #059669;">
+                        <i class="fas fa-check-circle"></i> Complete Job Card
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Skeleton -->
+            <div id="detailsLoading" style="text-align: center; padding: 4rem 1rem;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--support-primary); margin-bottom: 1rem; display: block;"></i>
+                <p style="color: #64748b; font-weight: 600;">Fetching Job Card details, parts & activity history...</p>
+            </div>
+
+            <!-- Main Job Card Content (hidden while loading) -->
+            <div id="jobCardContent" style="display: none;">
+                
+                <!-- Notice Banner for Completed or Cancelled -->
+                <div id="jobBannerAlert" style="display: none; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; align-items: center; gap: 0.75rem;"></div>
+
+                <div class="job-details-grid">
+                    
+                    <!-- LEFT COLUMN -->
+                    <div class="details-col-main">
+                        
+                        <!-- 1. Customer & Direct Order Details Card -->
+                        <div class="detail-card">
+                            <div class="detail-card-header">
+                                <span class="detail-card-title">
+                                    <i class="fas fa-user-circle" style="color: #0284c7;"></i> Customer & Order Information
+                                </span>
+                                <span style="font-size: 0.8rem; color: #0284c7; font-weight: 700; background: #e0f2fe; padding: 0.2rem 0.6rem; border-radius: 9999px;">
+                                    <i class="fas fa-shield-alt"></i> SGB Direct B2C
+                                </span>
+                            </div>
+                            <div class="detail-prop-grid">
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Customer Name</span>
+                                    <span class="detail-prop-value" id="valCustomerName">—</span>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Contact Phone</span>
+                                    <div class="detail-prop-value" style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <span id="valCustomerPhone">—</span>
+                                        <button type="button" id="btnCallCustomerInline" class="btn-call-mini" title="Call directly">
+                                            <i class="fas fa-phone"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Service Location / Address</span>
+                                    <span class="detail-prop-value" id="valCustomerAddress">—</span>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Direct B2C Order</span>
+                                    <span class="detail-prop-value" id="valOrderInfo">—</span>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Linked Support Case</span>
+                                    <span class="detail-prop-value" id="valCaseInfo">—</span>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Assigned Executive</span>
+                                    <span class="detail-prop-value" id="valAssignedTo">—</span>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Created Date</span>
+                                    <span class="detail-prop-value" id="valCreatedAt">—</span>
+                                </div>
+                                <div class="detail-prop-item">
+                                    <span class="detail-prop-label">Due Date</span>
+                                    <span class="detail-prop-value" id="valDueDate">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Problem & Tasks Description Card -->
+                        <div class="detail-card">
+                            <div class="detail-card-header">
+                                <span class="detail-card-title">
+                                    <i class="fas fa-clipboard-list" style="color: #f59e0b;"></i> Issue & Work Required
+                                </span>
+                                <span id="valJobTypeBadge" class="badge" style="background:#f1f5f9; color:#334155; font-size: 0.78rem;">
+                                    Service/Repair
+                                </span>
+                            </div>
+                            
+                            <div style="margin-bottom: 1.25rem;">
+                                <span class="detail-prop-label">Product / Equipment Details</span>
+                                <div id="valProductSummary" style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">—</div>
+                            </div>
+
+                            <div style="margin-bottom: 1.25rem;">
+                                <span class="detail-prop-label">Customer Reported Issue / Symptom</span>
+                                <div id="valIssueDescription" style="font-size: 0.9rem; color: #334155; margin-top: 0.35rem; line-height: 1.5; background: #f8fafc; padding: 0.85rem; border-radius: 6px; border: 1px solid #e2e8f0; white-space: pre-wrap;">—</div>
+                            </div>
+
+                            <div style="margin-bottom: 1.25rem;">
+                                <span class="detail-prop-label">Work / Tasks Planned</span>
+                                <div id="valWorkRequired" style="font-size: 0.9rem; color: #334155; margin-top: 0.35rem; line-height: 1.5; background: #f8fafc; padding: 0.85rem; border-radius: 6px; border: 1px solid #e2e8f0; white-space: pre-wrap;">—</div>
+                            </div>
+
+                            <div id="notesContainer" style="display: none;">
+                                <span class="detail-prop-label">Internal Remarks & Notes</span>
+                                <div id="valNotes" style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem; white-space: pre-wrap;">—</div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Technical Diagnosis & Resolution (Visible when Completed or has Diagnosis) -->
+                        <div class="detail-card" id="diagnosisCard" style="display: none;">
+                            <div class="detail-card-header">
+                                <span class="detail-card-title" style="color: #059669;">
+                                    <i class="fas fa-stethoscope"></i> Diagnosis & Work Performed
+                                </span>
+                                <span id="valCompletedAt" style="font-size: 0.8rem; color: #059669; font-weight: 700;">—</span>
+                            </div>
+
+                            <div style="margin-bottom: 1.25rem;">
+                                <span class="detail-prop-label">Technical Root Cause / Diagnosis</span>
+                                <div id="valDiagnosis" style="font-size: 0.9rem; color: #1e293b; margin-top: 0.35rem; line-height: 1.5; background: #f0fdf4; padding: 0.85rem; border-radius: 6px; border: 1px solid #bbf7d0; white-space: pre-wrap;">—</div>
+                            </div>
+
+                            <div>
+                                <span class="detail-prop-label">Work Performed & Final Resolution</span>
+                                <div id="valWorkPerformed" style="font-size: 0.9rem; color: #1e293b; margin-top: 0.35rem; line-height: 1.5; background: #f0fdf4; padding: 0.85rem; border-radius: 6px; border: 1px solid #bbf7d0; white-space: pre-wrap;">—</div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Spare Parts Used Card -->
+                        <div class="detail-card">
+                            <div class="detail-card-header">
+                                <span class="detail-card-title">
+                                    <i class="fas fa-cogs" style="color: #6366f1;"></i> Spare Parts Used / Replaced
+                                </span>
+                                <span id="partsCountBadge" style="font-size: 0.8rem; color: #475569; font-weight: 600;">
+                                    0 Parts
+                                </span>
+                            </div>
+
+                            <!-- Parts Table -->
+                            <div style="overflow-x: auto;">
+                                <table class="parts-table" id="partsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Part Name</th>
+                                            <th>Part # / SKU</th>
+                                            <th style="text-align: center;">Qty</th>
+                                            <th>Remarks / Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="partsTableBody">
+                                        <tr>
+                                            <td colspan="4" style="text-align: center; color: #94a3b8; padding: 1.5rem;">
+                                                No spare parts logged for this job.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Billing Team Notice -->
+                            <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                                    <i class="fas fa-file-invoice-dollar" style="color: #0284c7; font-size: 1rem;"></i>
+                                    <span><strong>Billing Notice:</strong> Spare parts pricing, labor charges, and invoicing are handled by the Billing Team.</span>
+                                </div>
+                                <span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 600; font-size: 0.75rem;">
+                                    Billing Team Scope
+                                </span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT COLUMN -->
+                    <div class="details-col-side">
+                        
+                        <!-- 5. Job Card Photos Gallery Card -->
+                        <div class="detail-card">
+                            <div class="detail-card-header">
+                                <span class="detail-card-title">
+                                    <i class="fas fa-camera" style="color: #0284c7;"></i> Job Photos
+                                </span>
+                                <button type="button" class="btn btn-outline btn-sm no-print" onclick="openUploadPhotosModal()" title="Upload photo">
+                                    <i class="fas fa-upload"></i> Upload
+                                </button>
+                            </div>
+                            
+                            <!-- Filter pills for photo types -->
+                            <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                                <button type="button" class="badge photo-filter-btn active" onclick="filterPhotos('all')" style="cursor: pointer; border: 1px solid #cbd5e1; background: #0284c7; color: white;">All</button>
+                                <button type="button" class="badge photo-filter-btn" onclick="filterPhotos('issue')" style="cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;">Issue</button>
+                                <button type="button" class="badge photo-filter-btn" onclick="filterPhotos('before')" style="cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;">Before</button>
+                                <button type="button" class="badge photo-filter-btn" onclick="filterPhotos('after')" style="cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;">After</button>
+                            </div>
+
+                            <div class="photo-gallery-grid" id="photoGallery">
+                                <p style="font-size: 0.85rem; color: #94a3b8; grid-column: 1 / -1; text-align: center; padding: 1.5rem 0;">
+                                    No photos uploaded yet.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 6. Activity Timeline / History Card -->
+                        <div class="detail-card">
+                            <div class="detail-card-header">
+                                <span class="detail-card-title">
+                                    <i class="fas fa-history" style="color: #64748b;"></i> Activity History
+                                </span>
+                            </div>
+
+                            <div class="timeline" id="activityTimeline">
+                                <p style="font-size: 0.85rem; color: #94a3b8; text-align: center;">Loading history...</p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal 1: Update Job Card Status -->
+    <div id="updateStatusModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box" style="max-width: 480px; width: 95%;">
+            <div class="modal-header">
+                <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-sync-alt" style="color: var(--support-primary);"></i> Update Job Status
+                </h3>
+                <button type="button" onclick="closeModal('updateStatusModal')" style="border:none;background:none;cursor:pointer;font-size:1.25rem;color:#64748b;"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="updateStatusForm" onsubmit="handleUpdateStatus(event)">
+                <div class="modal-body" style="padding: 1.25rem 1.5rem;">
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">New Status <span style="color:#ef4444;">*</span></label>
+                        <select id="selectNewStatus" class="filter-select" style="width:100%;" required onchange="onStatusSelectChanged()">
+                            <option value="In Progress">In Progress — Work Started</option>
+                            <option value="On Hold">On Hold — Awaiting Parts / Customer</option>
+                            <option value="Cancelled">Cancelled — Job Aborted</option>
+                        </select>
+                    </div>
+
+                    <!-- Strictly required when Cancelled -->
+                    <div id="cancellationReasonGroup" style="display: none; margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#ef4444;margin-bottom:0.25rem;">
+                            Cancellation Reason <span style="color:#ef4444;">* (Required)</span>
+                        </label>
+                        <textarea id="inputCancellationReason" rows="3" placeholder="Explain why this Job Card is being cancelled..." style="width:100%;padding:0.5rem 0.75rem;border:1px solid #ef4444;border-radius:6px;font-size:0.875rem;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 0.5rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Remarks / Action Note</label>
+                        <textarea id="inputStatusNotes" rows="2" placeholder="Optional internal comment or customer conversation note..." style="width:100%;padding:0.5rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;"></textarea>
+                    </div>
+
+                </div>
+                <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--support-border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('updateStatusModal')">Cancel</button>
+                    <button type="submit" id="btnSubmitStatus" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Complete Job Card Modal -->
+    <div id="completeJobModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box" style="max-width: 820px; width: 95%;">
+            <div class="modal-header">
+                <h3 style="font-size: 1.15rem; font-weight: 800; color: #059669; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-check-circle"></i> Complete Job Card
+                </h3>
+                <button type="button" onclick="closeModal('completeJobModal')" style="border:none;background:none;cursor:pointer;font-size:1.25rem;color:#64748b;"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="completeJobForm" onsubmit="handleCompleteJobCard(event)" style="display: flex; flex-direction: column; overflow: hidden; margin: 0; min-height: 0;">
+                <div class="modal-body" style="max-height: 72vh; overflow-y: auto; overflow-x: hidden; padding: 1.25rem 1.5rem;">
+                    
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: #166534; line-height: 1.45;">
+                        <i class="fas fa-info-circle"></i> <strong>Note:</strong> Marking this job as completed will record parts used, technical diagnosis, and resolution details. Spare parts pricing and customer invoicing are processed by the Billing Team.
+                    </div>
+
+                    <!-- Diagnosis -->
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Technical Diagnosis / Root Cause <span style="color:#ef4444;">*</span></label>
+                        <textarea id="completeDiagnosis" rows="2" required placeholder="What was the actual fault found? (e.g. Motor capacitor damaged, cutter blades misaligned)" style="width:100%;box-sizing:border-box;padding:0.5rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;"></textarea>
+                    </div>
+
+                    <!-- Work Performed -->
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Work Performed / Resolution <span style="color:#ef4444;">*</span></label>
+                        <textarea id="completeWorkPerformed" rows="3" required placeholder="Describe steps taken to resolve the issue, adjustments, testing performed..." style="width:100%;box-sizing:border-box;padding:0.5rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;"></textarea>
+                    </div>
+
+                    <!-- Spare Parts Used Dynamic List -->
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#334155;margin:0;">Spare Parts Used / Replaced</label>
+                                <span style="font-size: 0.75rem; color: #64748b; display: block;">List all parts installed or replaced. Part pricing and customer invoicing are done by the Billing Team.</span>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="addSparePartRow()">
+                                <i class="fas fa-plus"></i> Add Part
+                            </button>
+                        </div>
+
+                        <!-- Header Row for Inputs -->
+                        <div class="spare-parts-header-row">
+                            <span>Part Name <span style="color:#ef4444;">*</span></span>
+                            <span>Part # / SKU</span>
+                            <span style="text-align: center;">Qty</span>
+                            <span>Reason / Remarks</span>
+                            <span></span>
+                        </div>
+                        
+                        <div id="sparePartsRowsContainer" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <!-- Dynamic rows appended here -->
+                        </div>
+                    </div>
+
+                    <!-- After Photos Upload -->
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Completion / After Photos (Optional)</label>
+                        <input type="file" id="completePhotos" multiple accept="image/*" style="font-size:0.85rem;">
+                        <span style="font-size:0.75rem;color:#64748b;display:block;margin-top:0.25rem;">Upload photo proof of completed work or replaced parts.</span>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Completion Remarks / Follow-up Advice</label>
+                        <input type="text" id="completeNotes" placeholder="Customer signature received, machine tested, lubrication recommended, etc." style="width:100%;padding:0.5rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;">
+                    </div>
+
+                </div>
+                <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--support-border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('completeJobModal')">Cancel</button>
+                    <button type="submit" id="btnSubmitComplete" class="btn btn-primary" style="background:#059669; border-color:#059669;">
+                        <i class="fas fa-check"></i> Finalize & Mark Completed
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Upload Photos Modal -->
+    <div id="uploadPhotosModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box" style="max-width: 480px; width: 95%;">
+            <div class="modal-header">
+                <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-camera" style="color: var(--support-primary);"></i> Upload Job Photos
+                </h3>
+                <button type="button" onclick="closeModal('uploadPhotosModal')" style="border:none;background:none;cursor:pointer;font-size:1.25rem;color:#64748b;"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="uploadPhotosForm" onsubmit="handleUploadPhotos(event)">
+                <div class="modal-body" style="padding: 1.25rem 1.5rem;">
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Photo Stage / Type <span style="color:#ef4444;">*</span></label>
+                        <select id="selectPhotoType" class="filter-select" style="width:100%;" required>
+                            <option value="before">Before Service / Work</option>
+                            <option value="after">After Completion</option>
+                            <option value="issue">Issue / Defect</option>
+                            <option value="other">Other / Proof</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display:block;font-size:0.8rem;font-weight:700;color:#334155;margin-bottom:0.25rem;">Select Photos (Images only, max 5) <span style="color:#ef4444;">*</span></label>
+                        <input type="file" id="inputPhotoFiles" multiple accept="image/*" required style="font-size:0.85rem; width:100%;">
+                    </div>
+
+                </div>
+                <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--support-border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('uploadPhotosModal')">Cancel</button>
+                    <button type="submit" id="btnSubmitPhotos" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Upload Photos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 4: Lightbox / Image Preview Modal -->
+    <div id="lightboxModal" class="modal-overlay" style="display: none; background: rgba(0,0,0,0.85); z-index: 10000;" onclick="closeModal('lightboxModal')">
+        <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center;" onclick="event.stopPropagation()">
+            <img id="lightboxImg" src="" alt="Enlarged photo" style="max-width: 90vw; max-height: 82vh; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); object-fit: contain;">
+            <div id="lightboxCaption" style="color: white; margin-top: 0.75rem; font-size: 0.9rem; text-align: center;"></div>
+            <button type="button" onclick="closeModal('lightboxModal')" style="position: absolute; top: -15px; right: -15px; background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/support-common.js"></script>
+    <script src="js/job_card_details.js"></script>
+</body>
+</html>

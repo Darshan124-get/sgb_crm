@@ -51,6 +51,10 @@ async function loadCaseDetails() {
         document.getElementById('headerStatusBadge').innerHTML = window.renderStatusBadge(c.status);
         document.getElementById('btnCompleteGuidance').href = `call_completion.html?case_id=${c.case_id}`;
         document.getElementById('btnLogCallLink').href = `call_completion.html?case_id=${c.case_id}`;
+        const btnJC = document.getElementById('btnCreateJobCard');
+        if (btnJC) {
+            btnJC.href = `job_cards.html?action=create&phone=${encodeURIComponent(c.customer_phone || '')}&order_id=${c.order_id || ''}&case_id=${c.case_id || ''}`;
+        }
 
         // Customer Card
         document.getElementById('custName').textContent = c.customer_name || 'Valued Customer';

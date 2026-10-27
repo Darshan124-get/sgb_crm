@@ -3,25 +3,26 @@
  * Logic for 30-Day Follow-ups & In-Progress / Callbacks tab management
  */
 
-let activeTab = 'followups';
+let activeTab = 'inprogress';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('tab') === 'due') {
         document.getElementById('followupStatusFilter').value = 'DUE';
+        switchTab('followups');
     } else if (urlParams.get('tab') === 'overdue') {
         document.getElementById('followupStatusFilter').value = 'OVERDUE';
-    } else if (urlParams.get('tab') === 'inprogress') {
+        switchTab('followups');
+    } else if (urlParams.get('tab') === 'followups') {
+        switchTab('followups');
+    } else {
         switchTab('inprogress');
     }
 
-    loadFollowups();
-    loadInProgress();
-
     // Tab buttons
-    document.getElementById('tabBtnFollowups').addEventListener('click', () => switchTab('followups'));
     document.getElementById('tabBtnInProgress').addEventListener('click', () => switchTab('inprogress'));
+    document.getElementById('tabBtnFollowups').addEventListener('click', () => switchTab('followups'));
 
     // Follow-ups filter & search
     document.getElementById('followupStatusFilter').addEventListener('change', loadFollowups);
@@ -44,23 +45,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function switchTab(tab) {
     activeTab = tab;
-    const btnFu = document.getElementById('tabBtnFollowups');
     const btnIp = document.getElementById('tabBtnInProgress');
-    const secFu = document.getElementById('sectionFollowups');
+    const btnFu = document.getElementById('tabBtnFollowups');
     const secIp = document.getElementById('sectionInProgress');
+    const secFu = document.getElementById('sectionFollowups');
 
-    if (tab === 'followups') {
-        btnFu.className = 'btn btn-primary';
-        btnIp.className = 'btn btn-outline';
-        secFu.style.display = 'block';
-        secIp.style.display = 'none';
-        loadFollowups();
-    } else {
-        btnFu.className = 'btn btn-outline';
+    if (tab === 'inprogress') {
         btnIp.className = 'btn btn-primary';
-        secFu.style.display = 'none';
+        btnFu.className = 'btn btn-outline';
         secIp.style.display = 'block';
+        secFu.style.display = 'none';
         loadInProgress();
+    } else {
+        btnIp.className = 'btn btn-outline';
+        btnFu.className = 'btn btn-primary';
+        secIp.style.display = 'none';
+        secFu.style.display = 'block';
+        loadFollowups();
     }
 }
 
@@ -72,7 +73,7 @@ async function loadFollowups() {
     const search = document.getElementById('searchFollowupsInput').value.trim();
 
     try {
-        let endpoint = `/followups?limit=50`;
+        let endpoint = `/followups?type=30_DAY_PRODUCT_CHECK&limit=50`;
         if (status) endpoint += `&status=${encodeURIComponent(status)}`;
         if (search) endpoint += `&search=${encodeURIComponent(search)}`;
 
@@ -131,9 +132,6 @@ async function loadFollowups() {
                 </td>
                 <td style="text-align:right;">
                     <div style="display:inline-flex;gap:0.4rem;justify-content:flex-end;">
-                        <button class="btn btn-call btn-sm" onclick="window.callCustomer('${f.customer_phone}', '${escapeHtml(f.customer_name)}')">
-                            <i class="fas fa-phone"></i> Call
-                        </button>
                         <a href="followup_details.html?followup_id=${f.followup_id}" class="btn btn-primary btn-sm" title="Record Feedback / Issue">
                             <i class="fas fa-clipboard-check"></i> Record Call
                         </a>
@@ -208,12 +206,10 @@ async function loadInProgress() {
                 </td>
                 <td>
                     ${window.renderStatusBadge(c.status)}
+                    ${c.followup_date ? `<div style="font-size:0.75rem; color:#d97706; margin-top:3px; font-weight:600;"><i class="fas fa-clock"></i> Next Call: ${window.formatDate(c.followup_date)}</div>` : ''}
                 </td>
                 <td style="text-align:right;">
                     <div style="display:inline-flex;gap:0.4rem;justify-content:flex-end;">
-                        <button class="btn btn-call btn-sm" onclick="window.callCustomer('${c.customer_phone}', '${escapeHtml(c.customer_name)}', ${c.case_id})">
-                            <i class="fas fa-phone"></i> Call
-                        </button>
                         <a href="call_completion.html?case_id=${c.case_id}" class="btn btn-primary btn-sm" title="Continue Guidance / Complete">
                             <i class="fas fa-check"></i> Complete Support
                         </a>

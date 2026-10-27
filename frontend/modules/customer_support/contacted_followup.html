@@ -29,16 +29,62 @@
 
             <!-- Tab Switcher Navigation -->
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--support-border); padding-bottom: 0.5rem;">
-                <button class="btn btn-primary" id="tabBtnFollowups" style="border-radius: 999px;">
-                    <i class="fas fa-calendar-check"></i> 30-Day Product Follow-ups
-                </button>
-                <button class="btn btn-outline" id="tabBtnInProgress" style="border-radius: 999px;">
+                <button class="btn btn-primary" id="tabBtnInProgress" style="border-radius: 999px;">
                     <i class="fas fa-tools"></i> Installation In-Progress / Callbacks
+                </button>
+                <button class="btn btn-outline" id="tabBtnFollowups" style="border-radius: 999px;">
+                    <i class="fas fa-calendar-check"></i> 30-Day Product Follow-ups
                 </button>
             </div>
 
-            <!-- 1. FOLLOW-UPS SECTION -->
-            <div id="sectionFollowups">
+            <!-- 1. IN-PROGRESS / CALLBACKS SECTION -->
+            <div id="sectionInProgress">
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <i class="fas fa-search" style="color: #94a3b8;"></i>
+                        <input type="text" id="searchInProgressInput" placeholder="Search case #, customer, phone...">
+                    </div>
+                    <div class="filter-actions">
+                        <select id="inProgressStatusFilter" class="filter-select">
+                            <option value="contacted_followup">All In-Progress & Callbacks</option>
+                            <option value="pending_contact">Callback Required</option>
+                            <option value="guidance_in_progress">Guidance In Progress</option>
+                        </select>
+                        <button class="btn btn-primary" id="btnRefreshInProgress">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div style="overflow-x: auto;">
+                        <table class="support-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer & Case</th>
+                                    <th>Mobile Number</th>
+                                    <th>Product Summary</th>
+                                    <th>Order #</th>
+                                    <th>Delivery Date</th>
+                                    <th>Assigned Executive</th>
+                                    <th>Current Stage</th>
+                                    <th style="text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inProgressTableBody">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                                        Loading in-progress cases...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. FOLLOW-UPS SECTION -->
+            <div id="sectionFollowups" style="display: none;">
                 <div class="filter-bar">
                     <div class="search-box">
                         <i class="fas fa-search" style="color: #94a3b8;"></i>
@@ -77,52 +123,6 @@
                                     <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
                                         <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
                                         Loading follow-ups...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. IN-PROGRESS / CALLBACKS SECTION -->
-            <div id="sectionInProgress" style="display: none;">
-                <div class="filter-bar">
-                    <div class="search-box">
-                        <i class="fas fa-search" style="color: #94a3b8;"></i>
-                        <input type="text" id="searchInProgressInput" placeholder="Search case #, customer, phone...">
-                    </div>
-                    <div class="filter-actions">
-                        <select id="inProgressStatusFilter" class="filter-select">
-                            <option value="contacted_followup">All In-Progress & Callbacks</option>
-                            <option value="pending_contact">Callback Required</option>
-                            <option value="guidance_in_progress">Guidance In Progress</option>
-                        </select>
-                        <button class="btn btn-primary" id="btnRefreshInProgress">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </div>
-                </div>
-
-                <div class="table-card">
-                    <div style="overflow-x: auto;">
-                        <table class="support-table">
-                            <thead>
-                                <tr>
-                                    <th>Customer & Case</th>
-                                    <th>Mobile Number</th>
-                                    <th>Product Summary</th>
-                                    <th>Order #</th>
-                                    <th>Delivery Date</th>
-                                    <th>Assigned Executive</th>
-                                    <th>Current Stage</th>
-                                    <th style="text-align: right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="inProgressTableBody">
-                                <tr>
-                                    <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
-                                        Loading in-progress cases...
                                     </td>
                                 </tr>
                             </tbody>

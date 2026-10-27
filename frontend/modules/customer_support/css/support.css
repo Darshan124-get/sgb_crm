@@ -577,6 +577,14 @@ html, body {
 .modal-body {
     padding: 1.5rem;
     overflow-y: auto;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
+.modal-body textarea,
+.modal-body input {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
 }
 
 .modal-footer {
@@ -618,4 +626,1018 @@ html, body {
 @keyframes slideUp {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================================
+   Customer Support — Job Cards Scoped Styles
+   ======================================================== */
+
+/* Tabs Bar */
+.job-tabs {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.job-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: -2px;
+    white-space: nowrap;
+}
+
+.job-tab:hover {
+    color: var(--support-primary);
+}
+
+.job-tab.active {
+    color: var(--support-primary);
+    border-bottom-color: var(--support-primary);
+    font-weight: 700;
+}
+
+.job-tab .tab-badge {
+    background: #e2e8f0;
+    color: #475569;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.job-tab.active .tab-badge {
+    background: var(--support-primary-light);
+    color: var(--support-primary-dark);
+}
+
+/* Status Badges for Job Cards */
+.badge-open { background: #e0f2fe; color: #0284c7; }
+.badge-in-progress { background: #fef3c7; color: #b45309; }
+.badge-on-hold { background: #ede9fe; color: #7c3aed; }
+.badge-completed { background: #dcfce7; color: #15803d; }
+.badge-cancelled { background: #f1f5f9; color: #64748b; }
+
+/* Priority Badges */
+.badge-priority-low { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.badge-priority-medium { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.badge-priority-high { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+.badge-priority-urgent { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-weight: 800; animation: pulse 2s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Job Details Layout */
+.job-details-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .job-details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.detail-card {
+    background: white;
+    border-radius: var(--support-radius);
+    border: 1px solid var(--support-border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.detail-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--support-border);
+    padding-bottom: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.detail-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.detail-prop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.detail-prop-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-prop-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.detail-prop-value {
+    font-size: 0.925rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Parts Table inside Details */
+.parts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.75rem;
+}
+
+.parts-table th, .parts-table td {
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--support-border);
+    font-size: 0.85rem;
+}
+
+.parts-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+}
+
+/* Photos Gallery */
+.photo-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.photo-thumb-card {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--support-border);
+    background: #f8fafc;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.photo-thumb-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.photo-thumb-card img:hover {
+    transform: scale(1.05);
+}
+
+.photo-tag-pill {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background: rgba(15, 23, 42, 0.75);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+/* Timeline / Activity Logs */
+.timeline {
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    left: 6px;
+    width: 2px;
+    background: #e2e8f0;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.25rem;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -1.5rem;
+    top: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--support-primary);
+    border: 3px solid white;
+    box-shadow: 0 0 0 2px var(--support-primary-light);
+}
+
+.timeline-content {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+}
+
+.timeline-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+/* Spare Parts Dynamic Input Form in Complete Modal */
+.spare-parts-header-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) 65px minmax(0, 2fr) 34px;
+    gap: 0.5rem;
+    padding: 0 0.5rem 0.35rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    box-sizing: border-box;
+}
+
+.spare-part-input-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) 65px minmax(0, 2fr) 34px;
+    gap: 0.5rem;
+    align-items: center;
+    background: #ffffff;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+}
+
+.spare-part-input-row:hover {
+    border-color: #cbd5e1;
+}
+
+.spare-part-input-row input {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding: 0.45rem 0.6rem !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 5px !important;
+    font-size: 0.825rem !important;
+    font-family: inherit;
+    transition: border-color 0.15s ease;
+}
+
+.spare-part-input-row input:focus {
+    border-color: #0284c7 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+.spare-part-del-btn {
+    border: none;
+    background: #fee2e2;
+    color: #ef4444;
+    border-radius: 5px;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.spare-part-del-btn:hover {
+    background: #fecaca;
+    color: #dc2626;
+}
+
+/* ========================================================
+   Customer Support — Comprehensive Mobile Responsiveness
+   Enables seamless support workflow on mobile devices (<= 768px)
+   ======================================================== */
+
+/* Mobile Topbar & Drawer Components (Hidden on Desktop) */
+.support-mobile-topbar {
+    display: none;
+}
+
+.sidebar-close-btn {
+    display: none;
+}
+
+.support-mobile-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 99998;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.support-mobile-backdrop.active {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.btn-call-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.btn-call-mini:hover,
+.btn-call-mini:active {
+    background: #10b981;
+    color: white;
+    border-color: #059669;
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    /* 1. Base Layout & Viewport Lock */
+    html, body {
+        height: 100%;
+        overflow-x: hidden;
+    }
+
+    .support-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        position: relative !important;
+    }
+
+    /* 2. Off-Canvas Sidebar Drawer */
+    #sidebar-container {
+        position: fixed !important;
+        left: -300px !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: 280px !important;
+        max-width: 82vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        z-index: 100000 !important;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: none !important;
+        background: #0f172a !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    #sidebar-container.mobile-open,
+    #sidebar-container.mobile-active {
+        left: 0 !important;
+        box-shadow: 14px 0 40px rgba(0, 0, 0, 0.45) !important;
+    }
+
+    #sidebar-container .sidebar {
+        position: relative !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        min-height: 100% !important;
+        height: auto !important;
+        box-shadow: none !important;
+        padding-bottom: 2.5rem !important;
+    }
+
+    .sidebar-close-btn {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #94a3b8;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-left: auto;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .sidebar-close-btn:hover,
+    .sidebar-close-btn:active {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+    }
+
+    /* 3. Main Content Container */
+    .support-main {
+        flex: 1 !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        padding: 0.85rem 0.85rem 3.5rem 0.85rem !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* 4. Native-Feeling Mobile Topbar */
+    .support-mobile-topbar {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid var(--support-border) !important;
+        padding: 0.65rem 0.85rem !important;
+        margin: -0.85rem -0.85rem 1rem -0.85rem !important;
+        position: sticky !important;
+        top: -0.85rem !important;
+        z-index: 1000 !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .support-mobile-left {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+
+    .support-mobile-hamburger {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        cursor: pointer;
+        transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .support-mobile-hamburger:active {
+        transform: scale(0.95);
+        background: #e2e8f0;
+    }
+
+    .support-mobile-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .support-mobile-logo {
+        height: 26px;
+        width: auto;
+        object-fit: contain;
+    }
+
+    .support-mobile-brand-name {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+        display: block;
+    }
+
+    .support-mobile-brand-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #0284c7;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        line-height: 1;
+        display: block;
+    }
+
+    .support-mobile-right {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .support-mobile-quick-btn {
+        background: #f8fafc;
+        border: 1px solid var(--support-border);
+        color: #334155;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+
+    .support-mobile-quick-btn:active {
+        background: var(--support-primary-light);
+        color: var(--support-primary);
+        border-color: #bae6fd;
+    }
+
+    /* 5. Page Header & Action Buttons */
+    .support-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        margin-bottom: 1.25rem !important;
+        gap: 0.85rem !important;
+    }
+
+    .support-title-block {
+        width: 100% !important;
+    }
+
+    .support-title-block h1 {
+        font-size: 1.35rem !important;
+        line-height: 1.3 !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+
+    .support-title-block p {
+        font-size: 0.825rem !important;
+        line-height: 1.4 !important;
+        margin-top: 0.25rem !important;
+    }
+
+    .support-header > div:last-child {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.5rem !important;
+    }
+
+    .support-header .btn,
+    .support-header button,
+    .support-header a.btn {
+        width: 100% !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 0.65rem 1rem !important;
+        font-size: 0.875rem !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 6. KPI Grid: Compact 2-Column on Mobile */
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.65rem !important;
+        margin-bottom: 1.25rem !important;
+    }
+
+    .kpi-card {
+        padding: 0.85rem 0.9rem !important;
+    }
+
+    .kpi-card-header {
+        margin-bottom: 0.35rem !important;
+    }
+
+    .kpi-card-title {
+        font-size: 0.7rem !important;
+        letter-spacing: 0.02em !important;
+        line-height: 1.2 !important;
+    }
+
+    .kpi-card-icon {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 0.85rem !important;
+    }
+
+    .kpi-card-value {
+        font-size: 1.35rem !important;
+        margin-bottom: 0.35rem !important;
+    }
+
+    .kpi-card-link {
+        font-size: 0.725rem !important;
+    }
+
+    /* 7. Tabs Bar — Horizontal Touch Scrolling */
+    .job-tabs {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 0.35rem !important;
+        padding-bottom: 0.4rem !important;
+        margin-bottom: 1rem !important;
+        scrollbar-width: none !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+    }
+
+    .job-tabs::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .job-tab {
+        flex-shrink: 0 !important;
+        padding: 0.55rem 0.85rem !important;
+        font-size: 0.8rem !important;
+        white-space: nowrap !important;
+    }
+
+    /* 8. Filter Bar & Search */
+    .filter-bar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.6rem !important;
+        margin-bottom: 1rem !important;
+        width: 100% !important;
+    }
+
+    .search-box {
+        width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .search-box input {
+        width: 100% !important;
+        font-size: 16px !important;
+        padding: 0.65rem 0.75rem 0.65rem 2.25rem !important;
+        box-sizing: border-box !important;
+    }
+
+    .filter-actions {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        width: 100% !important;
+        gap: 0.5rem !important;
+    }
+
+    .filter-bar select,
+    .filter-bar input[type="date"],
+    .filter-actions select,
+    .filter-actions input[type="date"] {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        padding: 0.65rem 0.75rem !important;
+        font-size: 16px !important;
+    }
+
+    .filter-bar .btn,
+    .filter-actions .btn {
+        flex: 1 1 auto !important;
+        min-width: 80px !important;
+        box-sizing: border-box !important;
+        padding: 0.65rem 0.75rem !important;
+        font-size: 0.875rem !important;
+        justify-content: center !important;
+    }
+
+    /* Form Inputs on Mobile — Prevent iOS Safari Auto-Zoom (requires min 16px font) */
+    .support-main input[type="text"],
+    .support-main input[type="tel"],
+    .support-main input[type="number"],
+    .support-main input[type="date"],
+    .support-main input[type="search"],
+    .support-main select,
+    .support-main textarea,
+    .modal-box input,
+    .modal-box select,
+    .modal-box textarea {
+        font-size: 16px !important;
+    }
+
+    .btn-call-mini {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* 9. Tables & Table Cards — Smooth Touch Horiz Scroll */
+    .table-card,
+    .data-table-container,
+    .table-responsive {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-radius: 10px !important;
+        margin-bottom: 1.25rem !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .table-card table,
+    .data-table-container table,
+    .table-responsive table,
+    .support-table {
+        min-width: 620px !important;
+        width: 100% !important;
+    }
+
+    .table-card th,
+    .table-card td,
+    .support-table th,
+    .support-table td {
+        padding: 0.65rem 0.75rem !important;
+        font-size: 0.825rem !important;
+    }
+
+    .parts-table {
+        min-width: 480px !important;
+        width: 100% !important;
+    }
+
+    .table-card > div:first-child[style*="display: flex"],
+    .table-card > div:first-child[style*="display:flex"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.5rem !important;
+        padding: 0.85rem 1rem !important;
+    }
+
+    /* Pagination Bar */
+    #paginationBar,
+    .pagination-bar {
+        flex-direction: column !important;
+        gap: 0.75rem !important;
+        align-items: center !important;
+        padding: 0.75rem 1rem !important;
+        text-align: center !important;
+    }
+
+    /* 10. Collapse All Multi-Column Grids */
+    .job-details-grid,
+    .support-main div[style*="grid-template-columns: 360px 1fr"],
+    .support-main div[style*="grid-template-columns: 1fr 1fr"],
+    .support-main div[style*="grid-template-columns: 2fr 1fr"],
+    .support-main div[style*="grid-template-columns: 1fr 1fr 1fr"],
+    .support-main div[style*="grid-template-columns:1fr 1fr"],
+    .support-main div[style*="grid-template-columns:1fr 1fr 1fr"],
+    .support-main div[style*="grid-template-columns: 2fr 1.2fr"],
+    .modal-box div[style*="grid-template-columns: 2fr 1fr"],
+    .modal-box div[style*="grid-template-columns: 1fr 1fr 1fr"],
+    .modal-box div[style*="grid-template-columns: 1fr 1fr"],
+    .modal-box div[style*="grid-template-columns:1fr 1fr"],
+    .modal-box div[style*="grid-template-columns:1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+        gap: 0.85rem !important;
+    }
+
+    /* 11. Detail Cards & Context Bars */
+    .detail-card {
+        padding: 1rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .detail-card-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.5rem !important;
+        padding-bottom: 0.75rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .detail-card-title {
+        font-size: 0.95rem !important;
+    }
+
+    .detail-prop-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem !important;
+    }
+
+    .detail-prop-item {
+        padding: 0.5rem 0 !important;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .premium-card {
+        padding: 1rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    /* Context Bar in Call Completion */
+    .support-main .premium-card[style*="justify-content: space-between"] > div[style*="display: flex"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+        width: 100% !important;
+    }
+
+    .support-main .premium-card[style*="justify-content: space-between"] div[style*="border-left"] {
+        border-left: none !important;
+        padding-left: 0 !important;
+        border-top: 1px solid #e2e8f0 !important;
+        padding-top: 0.5rem !important;
+        width: 100% !important;
+    }
+
+    /* Notification Banner */
+    .notification-banner {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+        padding: 0.85rem 1rem !important;
+    }
+
+    .notification-banner-content {
+        gap: 0.75rem !important;
+    }
+
+    /* 12. Pill Selectors (Touch-Friendly) */
+    .pill-selector {
+        gap: 0.4rem !important;
+    }
+
+    .pill-option span {
+        padding: 0.55rem 0.85rem !important;
+        font-size: 0.825rem !important;
+    }
+
+    /* 13. Modals on Mobile */
+    .modal-overlay {
+        padding: 0.5rem !important;
+    }
+
+    .modal-box {
+        width: 96% !important;
+        max-width: 96vw !important;
+        max-height: 92vh !important;
+        max-height: 92dvh !important;
+        margin: 0 auto !important;
+        border-radius: 14px !important;
+    }
+
+    .modal-header {
+        padding: 0.85rem 1rem !important;
+    }
+
+    .modal-header h3 {
+        font-size: 1.05rem !important;
+    }
+
+    .modal-body {
+        padding: 1rem !important;
+    }
+
+    .modal-footer {
+        flex-direction: column-reverse !important;
+        align-items: stretch !important;
+        padding: 0.75rem 1rem !important;
+        gap: 0.5rem !important;
+    }
+
+    .modal-footer > div {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+    }
+
+    .modal-footer .btn,
+    .modal-footer button {
+        width: 100% !important;
+        justify-content: center !important;
+        padding: 0.65rem 1rem !important;
+    }
+
+    /* 14. Spare Parts Dynamic Rows on Mobile Cards */
+    .spare-parts-header-row {
+        display: none !important;
+    }
+
+    .spare-part-input-row {
+        display: grid !important;
+        grid-template-columns: 1fr auto !important;
+        grid-template-areas:
+            "name delete"
+            "sku  sku"
+            "qty  qty"
+            "rem  rem" !important;
+        gap: 0.45rem !important;
+        padding: 0.75rem !important;
+        background: #f8fafc !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        margin-bottom: 0.65rem !important;
+    }
+
+    .spare-part-input-row .part-name-input {
+        grid-area: name !important;
+    }
+
+    .spare-part-input-row .spare-part-del-btn {
+        grid-area: delete !important;
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    .spare-part-input-row .part-sku-input {
+        grid-area: sku !important;
+    }
+
+    .spare-part-input-row .part-qty-input {
+        grid-area: qty !important;
+        text-align: left !important;
+    }
+
+    .spare-part-input-row .part-remarks-input {
+        grid-area: rem !important;
+    }
+
+    /* 15. Photo Upload & Dropzone */
+    .photo-upload-dropzone {
+        padding: 1.25rem 0.75rem !important;
+    }
+
+    .photo-upload-dropzone i {
+        font-size: 2rem !important;
+    }
+
+    .photo-upload-dropzone h4 {
+        font-size: 0.9rem !important;
+    }
+
+    .photo-previews,
+    .job-photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)) !important;
+        gap: 0.5rem !important;
+    }
+
+    /* 16. Support Toast Positioning */
+    .support-toast {
+        left: 1rem !important;
+        right: 1rem !important;
+        bottom: 1rem !important;
+        width: auto !important;
+        font-size: 0.85rem !important;
+        padding: 0.75rem 1rem !important;
+    }
+}
+
+@media (max-width: 420px) {
+    /* Narrow mobile screens (< 420px) */
+    .kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .support-title-block h1 {
+        font-size: 1.2rem !important;
+    }
 }

@@ -105,6 +105,15 @@ function setupEventListeners() {
     // Action buttons
     document.getElementById('btnSaveCallOnly').addEventListener('click', handleSaveCallOnly);
     document.getElementById('callCompletionForm').addEventListener('submit', handleCompleteSupport);
+
+    // Schedule Follow-Up button for unreachable customers
+    const btnSchedule = document.getElementById('btnScheduleFollowupSubmit');
+    if (btnSchedule) {
+        btnSchedule.addEventListener('click', handleScheduleFollowup);
+    }
+
+    // Initialize quick follow-up date (defaults to tomorrow)
+    window.setQuickFollowupDate(1);
 }
 
 // ── VIDEO CALL HANDLER ──
@@ -121,34 +130,121 @@ function handleVideoCall() {
     }
 }
 
+// ── QUICK FOLLOW-UP DATE PRESET HELPER ──
+window.setQuickFollowupDate = function (daysFromNow = 1) {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(daysFromNow));
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const input = document.getElementById('followupDateInput');
+    if (input) {
+        input.value = dateStr;
+        input.min = new Date().toISOString().split('T')[0];
+    }
+};
+
 // ── OUTCOME CHANGE LISTENER ──
 function handleOutcomeChange(e) {
     const outcome = e.target.value;
-    const notAnsweredNotice = document.getElementById('notAnsweredNotice');
-    const installSection = document.getElementById('installationSection');
-    const guidanceSection = document.getElementById('guidanceFieldsSection');
-    const btnCompleteSupport = document.getElementById('btnCompleteSupport');
+    const unreachableSection = document.getElementById('unreachableScheduleSection');
+    const answeredContainer = document.getElementById('answeredDetailsContainer');
 
-    if (outcome === 'not_answered' || outcome === 'callback_required') {
-        notAnsweredNotice.style.display = 'block';
-        installSection.style.opacity = '0.4';
-        installSection.style.pointerEvents = 'none';
-        guidanceSection.style.opacity = '0.4';
-        guidanceSection.style.pointerEvents = 'none';
+    const isUnreachable = ['not_answered', 'switched_off', 'not_reachable', 'busy', 'callback_required'].includes(outcome);
 
-        btnCompleteSupport.disabled = true;
-        btnCompleteSupport.style.opacity = '0.5';
-        btnCompleteSupport.title = 'Cannot complete support when customer is unreachable. Use "Save Call Log Only".';
+    if (isUnreachable) {
+        // Customer did not answer / switched off / not reachable:
+        // HIDE information taking, guidance, and photo upload
+        // SHOW schedule follow-up date picker & remarks
+        if (unreachableSection) unreachableSection.style.display = 'block';
+        if (answeredContainer) answeredContainer.style.display = 'none';
+
+        const dateInput = document.getElementById('followupDateInput');
+        if (dateInput && !dateInput.value) {
+            window.setQuickFollowupDate(1);
+        }
+        if (dateInput) {
+            dateInput.min = new Date().toISOString().split('T')[0];
+        }
+
+        const remarksInput = document.getElementById('unreachableRemarks');
+        if (remarksInput) {
+            const suggestions = {
+                not_answered: 'Customer did not answer call. Scheduled follow-up to re-attempt contact.',
+                switched_off: 'Customer phone was switched off. Scheduled follow-up to re-attempt contact.',
+                not_reachable: 'Customer phone not reachable / network issue. Scheduled follow-up to re-attempt contact.',
+                busy: 'Customer line was busy. Scheduled follow-up to re-attempt contact.',
+                callback_required: 'Customer requested a callback at a later time.'
+            };
+            remarksInput.value = suggestions[outcome] || 'Customer was unreachable. Scheduled follow-up.';
+        }
     } else {
-        notAnsweredNotice.style.display = 'none';
-        installSection.style.opacity = '1';
-        installSection.style.pointerEvents = 'auto';
-        guidanceSection.style.opacity = '1';
-        guidanceSection.style.pointerEvents = 'auto';
+        // Customer answered / received call:
+        // HIDE schedule follow-up card
+        // SHOW guidance information and photo upload
+        if (unreachableSection) unreachableSection.style.display = 'none';
+        if (answeredContainer) answeredContainer.style.display = 'block';
+    }
+}
 
-        btnCompleteSupport.disabled = false;
-        btnCompleteSupport.style.opacity = '1';
-        btnCompleteSupport.title = '';
+// ── HANDLE SCHEDULE FOLLOW-UP (CUSTOMER UNREACHABLE) ──
+async function handleScheduleFollowup() {
+    const outcomeRadio = document.querySelector('input[name="call_outcome"]:checked');
+    if (!outcomeRadio) {
+        window.showToast('Please select a Call Outcome', 'error');
+        return;
+    }
+    const outcome = outcomeRadio.value;
+
+    const dateInput = document.getElementById('followupDateInput');
+    const scheduledDate = dateInput ? dateInput.value : '';
+    if (!scheduledDate) {
+        window.showToast('Please select a Follow-Up Date', 'error');
+        if (dateInput) dateInput.focus();
+        return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (scheduledDate < todayStr) {
+        window.showToast('Follow-up date cannot be in the past', 'error');
+        return;
+    }
+
+    const timeSlot = document.getElementById('followupTimeSlot')?.value || '';
+    const remarks = document.getElementById('unreachableRemarks')?.value.trim() || '';
+
+    const submitBtn = document.getElementById('btnScheduleFollowupSubmit');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scheduling Follow-Up...';
+
+    try {
+        const res = await window.supportFetch(`/cases/${currentCaseId}/calls`, {
+            method: 'POST',
+            body: JSON.stringify({
+                call_type: 'INITIAL',
+                call_outcome: outcome,
+                scheduled_date: scheduledDate,
+                preferred_time_slot: timeSlot,
+                remarks: remarks
+            })
+        });
+
+        if (!res || !res.success) {
+            throw new Error(res ? res.message : 'Failed to schedule follow-up');
+        }
+
+        window.showToast(`Follow-up scheduled for ${window.formatDate(scheduledDate)}! Call attempt saved.`, 'success');
+
+        setTimeout(() => {
+            window.location.href = `customer_details.html?case_id=${currentCaseId}`;
+        }, 1200);
+
+    } catch (err) {
+        console.error('Error scheduling follow-up:', err);
+        window.showToast(err.message || 'Error scheduling follow-up', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-calendar-plus"></i> Schedule Follow-Up &amp; Save Call Attempt';
     }
 }
 

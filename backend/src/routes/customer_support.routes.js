@@ -37,5 +37,14 @@ router.post('/followups/:id/call', controller.recordFollowupCall);
 // Settings & Staff Roster
 router.get('/settings', controller.getSettings);
 
+// Job Cards management
+router.get('/job-cards', controller.getJobCards);
+router.post('/job-cards', upload.array('photos', 5), controller.createJobCard);
+router.get('/job-cards/:id', controller.getJobCardDetails);
+router.patch('/job-cards/:id/status', controller.updateJobCardStatus);
+router.put('/job-cards/:id/status', controller.updateJobCardStatus);
+router.post('/job-cards/:id/photos', upload.array('photos', 10), controller.uploadJobCardPhotos);
+router.post('/job-cards/:id/complete', upload.array('photos', 10), controller.completeJobCard);
+
 module.exports = router;
 

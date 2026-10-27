@@ -112,11 +112,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (sidebarLabel) {
                     const normRole = role.replace(/[-_]/g, ' ').toLowerCase();
                     const isManager = user.is_manager || normRole.includes('manager');
+                    const currentPath = window.location.pathname.toLowerCase();
+                    const isSupportPage = currentPath.includes('customer_support');
+                    const hasSupportPerm = userPermissions.some(p => typeof p === 'string' && (p.includes('support') || p.includes('customer_support')));
 
                     if (role === 'super-admin' || role === 'super_admin') {
                         sidebarLabel.textContent = 'SUPER ADMIN PORTAL';
                     } else if (role === 'admin') {
                         sidebarLabel.textContent = 'ADMIN PANEL';
+                    } else if (isSupportPage || normRole.includes('support') || hasSupportPerm) {
+                        if (normRole.includes('customer support manager') || normRole.includes('support manager') || (isManager && normRole.includes('support'))) {
+                            sidebarLabel.textContent = 'CUSTOMER SUPPORT MANAGER';
+                        } else if (normRole.includes('customer support executive') || normRole.includes('support executive')) {
+                            sidebarLabel.textContent = 'CUSTOMER SUPPORT EXECUTIVE';
+                        } else if (normRole.includes('viewer')) {
+                            sidebarLabel.textContent = 'CUSTOMER SUPPORT VIEWER';
+                        } else {
+                            sidebarLabel.textContent = 'CUSTOMER SUPPORT';
+                        }
                     } else if (normRole.includes('sales manager') || (isManager && normRole.includes('sales')) || (role === 'manager' && userPermissions.includes('sales_dashboard'))) {
                         sidebarLabel.textContent = 'SALES MANAGER PANEL';
                         if (dashboardLabel) dashboardLabel.textContent = 'Sales Manager Dashboard';
@@ -158,14 +171,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else if (normRole.includes('viewer')) {
                         sidebarLabel.textContent = 'VIEWER PANEL';
                         if (dashboardLabel) dashboardLabel.textContent = 'Viewer Dashboard';
-                    } else if (normRole.includes('customer support executive') || normRole.includes('support executive')) {
-                        sidebarLabel.textContent = 'CUSTOMER SUPPORT EXECUTIVE';
-                    } else if (normRole.includes('customer support manager') || normRole.includes('support manager')) {
-                        sidebarLabel.textContent = 'CUSTOMER SUPPORT MANAGER';
-                    } else if (normRole.includes('support')) {
-                        sidebarLabel.textContent = 'CUSTOMER SUPPORT PANEL';
+                    } else if (currentPath.includes('/sales/')) {
+                        sidebarLabel.textContent = isManager ? 'SALES MANAGER PANEL' : 'SALES EXECUTIVE PANEL';
+                    } else if (currentPath.includes('/billing/')) {
+                        sidebarLabel.textContent = isManager ? 'BILLING MANAGER PANEL' : 'BILLING PANEL';
+                    } else if (currentPath.includes('/shipping/')) {
+                        sidebarLabel.textContent = isManager ? 'SHIPPING MANAGER PANEL' : 'SHIPPING PANEL';
+                    } else if (currentPath.includes('/packing/')) {
+                        sidebarLabel.textContent = isManager ? 'PACKING MANAGER PANEL' : 'PACKING PANEL';
+                    } else if (currentPath.includes('/dealer/')) {
+                        sidebarLabel.textContent = isManager ? 'DEALER MANAGER PANEL' : 'DEALER PANEL';
+                    } else if (currentPath.includes('/whatsapp/')) {
+                        sidebarLabel.textContent = isManager ? 'WHATSAPP MANAGER PANEL' : 'WHATSAPP EXECUTIVE PANEL';
+                    } else if (currentPath.includes('/admin/')) {
+                        sidebarLabel.textContent = 'ADMIN PANEL';
                     } else if (role) {
                         sidebarLabel.textContent = normRole.toUpperCase() + ' PANEL';
+                    } else {
+                        sidebarLabel.textContent = 'CUSTOMER SUPPORT';
                     }
                 }
 
@@ -351,59 +374,118 @@ async function loadComponent(placeholder, url, callback) {
 
 // ─── Sidebar Logic ───────────────────────────────────────────
 function initSidebar(links) {
-    const currentPath = window.location.pathname;
+    const currentLoc = window.location;
+    const cleanCurrentPath = currentLoc.pathname.replace(/\/+$/, '').toLowerCase();
+    const effectiveCurrentHash = (currentLoc.hash || '').toLowerCase();
+    const directoryDashboard = cleanCurrentPath.endsWith('/')
+        ? cleanCurrentPath + 'dashboard.html'
+        : cleanCurrentPath + '/dashboard.html';
 
+    // ── 1. Smart Path Resolution ──
+    // Resolve all relative links against frontend root (ROOT_PATH)
     links.forEach(link => {
         const href = link.getAttribute('href');
-        if (!href || href === '#' || href.startsWith('http') || href.startsWith('javascript:')) return;
+        if (!href || href === '#' || href.startsWith('javascript:') || href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) return;
 
-        // ── Smart Path Resolution ──
-        // Resolve the link relative to the frontend root (ROOT_PATH)
         try {
-            // Create a base URL pointing to the frontend root
             const rootUrl = new URL(window.ROOT_PATH, window.location.href).href;
-            // Resolve the href against that root
             const resolvedUrl = new URL(href, rootUrl).href;
             link.href = resolvedUrl;
         } catch (e) {
             console.error('Path resolution failed for:', href, e);
-            // Fallback to simple concatenation if URL API fails
             if (!href.startsWith('/') && !href.startsWith('.') && !href.includes('://')) {
                 link.href = `${window.ROOT_PATH}${href}`;
             }
         }
+    });
 
-        // Highlight active link
-        // Use full URL comparison & filename fallback for reliability
+    // ── 2. Accurate Active Link Detection ──
+    // Clear any previous active highlights
+    document.querySelectorAll('.sidebar .nav-link, .sidebar .nav-item').forEach(el => el.classList.remove('active'));
+
+    // Count how many links in this sidebar belong to each module directory
+    const moduleCounts = {};
+    links.forEach(link => {
         try {
-            const linkUrl = new URL(link.href);
-            const currentFilename = currentPath.split('/').pop() || 'dashboard.html';
-            const linkFilename = linkUrl.pathname.split('/').pop();
+            const url = new URL(link.href, currentLoc.href);
+            const pathParts = url.pathname.replace(/\/+$/, '').toLowerCase().split('/').filter(Boolean);
+            if (pathParts[0] === 'modules' && pathParts[1]) {
+                const mod = pathParts[1];
+                moduleCounts[mod] = (moduleCounts[mod] || 0) + 1;
+            }
+        } catch (e) { }
+    });
 
-            if (currentPath === linkUrl.pathname || (linkFilename && currentFilename === linkFilename)) {
-                // Hash-aware matching
-                const currentHash = window.location.hash || '#dashboard';
-                const linkHash = linkUrl.hash || '#dashboard';
-                if (linkUrl.hash && currentHash !== linkHash) {
-                    return;
+    let bestLink = null;
+    let highestScore = 0;
+
+    links.forEach(link => {
+        const hrefAttr = link.getAttribute('href');
+        if (!hrefAttr || hrefAttr === '#' || hrefAttr.startsWith('javascript:')) return;
+
+        try {
+            const linkUrl = new URL(link.href, currentLoc.href);
+            const cleanLinkPath = linkUrl.pathname.replace(/\/+$/, '').toLowerCase();
+            const linkHash = (linkUrl.hash || '').toLowerCase();
+
+            let score = 0;
+
+            // Score 100: Exact path AND exact matching non-empty hash (e.g. shipping.html#completed)
+            if (cleanLinkPath === cleanCurrentPath && effectiveCurrentHash && linkHash && linkHash === effectiveCurrentHash) {
+                score = 100;
+            }
+            // Score 95: Default hash tab (#dashboard or #overview) when page opened with no hash
+            else if (cleanLinkPath === cleanCurrentPath && !effectiveCurrentHash && (linkHash === '#dashboard' || linkHash === '#overview')) {
+                score = 95;
+            }
+            // Score 90: Exact path match without specific hash requirement
+            else if (cleanLinkPath === cleanCurrentPath && !linkHash) {
+                score = 90;
+            }
+            // Score 85: Exact path match where page has a hash but link doesn't specify one
+            else if (cleanLinkPath === cleanCurrentPath && effectiveCurrentHash && !linkHash) {
+                score = 85;
+            }
+            // Score 80: Directory index fallback (e.g. browsing /modules/admin/ matches /modules/admin/dashboard.html)
+            else if (cleanLinkPath === directoryDashboard && !linkHash) {
+                score = 80;
+            }
+            // Score 50: Single module section entry point match
+            // e.g. sidebar-admin has only ONE link for customer_support, and user is on customer_support/orders_delivered.html
+            else {
+                const currentParts = cleanCurrentPath.split('/').filter(Boolean);
+                const linkParts = cleanLinkPath.split('/').filter(Boolean);
+                if (currentParts[0] === 'modules' && linkParts[0] === 'modules' &&
+                    currentParts[1] && currentParts[1] === linkParts[1]) {
+                    const mod = currentParts[1];
+                    if (moduleCounts[mod] === 1) {
+                        score = 50;
+                    }
                 }
-                document.querySelectorAll('.sidebar .nav-link, .sidebar .nav-item').forEach(el => el.classList.remove('active'));
-                link.classList.add('active');
-                const navItem = link.closest('.nav-item');
-                if (navItem) navItem.classList.add('active');
+            }
+
+            if (score > highestScore) {
+                highestScore = score;
+                bestLink = link;
             }
         } catch (e) {
-            if (currentPath.includes(href)) {
-                link.classList.add('active');
-            }
+            console.warn('Sidebar link evaluation failed:', link, e);
         }
     });
+
+    if (bestLink) {
+        bestLink.classList.add('active');
+        const navItem = bestLink.closest('.nav-item');
+        if (navItem) navItem.classList.add('active');
+    }
 
     // ── Dropdown Menu Toggling ──
     const sidebarElement = document.querySelector('.sidebar');
     if (sidebarElement) {
         const dropdownToggles = sidebarElement.querySelectorAll('.dropdown-toggle');
         dropdownToggles.forEach(toggle => {
+            if (toggle.dataset.dropdownInitialized) return;
+            toggle.dataset.dropdownInitialized = 'true';
             toggle.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -441,6 +523,17 @@ function initSidebar(links) {
         logoutBtn.addEventListener('click', window._logoutHandler);
     }
 
+    // ── Hash Change Listener for Single-Page Tabs ──
+    if (!window._sidebarHashHandlerAttached) {
+        window._sidebarHashHandlerAttached = true;
+        window.addEventListener('hashchange', () => {
+            const container = document.getElementById('sidebar-container');
+            if (container) {
+                initSidebar(container.querySelectorAll('a'));
+            }
+        });
+    }
+
     // ── Mobile Sidebar Logic ──
     const sidebar = document.querySelector('.sidebar');
     let overlay = document.getElementById('sidebar-overlay');
@@ -462,10 +555,12 @@ function initSidebar(links) {
 
     // Close on link click
     links.forEach(link => {
+        if (link.dataset.mobileClickBound) return;
+        link.dataset.mobileClickBound = 'true';
         link.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
+            if (window.innerWidth <= 768 && sidebar) {
                 sidebar.classList.remove('mobile-active');
-                overlay.classList.remove('active');
+                if (overlay) overlay.classList.remove('active');
             }
         });
     });
@@ -1366,10 +1461,10 @@ window.openBulkAssignModal = async function () {
 
         let warningHtml = '';
         if (alreadyAssigned.length > 0) {
-            const listItems = alreadyAssigned.map(l => 
+            const listItems = alreadyAssigned.map(l =>
                 `<li style="margin-bottom: 4px;">• <strong>${l.customer_name || 'Lead'}</strong> (${l.phone_number || '-'}) is already assigned to <strong>${l.assigned_to_name}</strong></li>`
             ).join('');
-            
+
             warningHtml = `
                 <div style="margin-bottom: 1.25rem; padding: 0.85rem 1rem; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; font-size: 0.85rem; color: #9a3412;">
                     <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.4rem; color: #c2410c;">
@@ -1853,11 +1948,11 @@ function renderChatbotSummaryCard(chatbotSummary) {
 
     chatbotSummary.steps.forEach(step => {
         const isDone = step.answered;
-        const icon = isDone 
+        const icon = isDone
             ? `<div style="width: 22px; height: 22px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0;"><i class="fas fa-check"></i></div>`
             : `<div style="width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0;">${step.step_number}</div>`;
 
-        const valDisplay = isDone 
+        const valDisplay = isDone
             ? `<span style="font-weight: 700; color: #0f172a; font-size: 0.8125rem;">${step.answer_value}</span>`
             : `<span style="color: #94a3b8; font-size: 0.75rem; font-style: italic;">Pending response</span>`;
 
@@ -2554,7 +2649,7 @@ window.exportLeadsToExcel = async function () {
             try {
                 const vars = typeof lead.bot_variables === 'string' ? JSON.parse(lead.bot_variables) : lead.bot_variables;
                 prodName = vars.product_interest || vars.product || vars.barrow_type || '';
-            } catch(e) {}
+            } catch (e) { }
         }
         if (!prodName) prodName = '-';
 
@@ -2633,7 +2728,7 @@ function markAlertAsDismissed(identifier) {
     }
 }
 
-window.retriggerBotFlow = async function(sessionIdOrPhone) {
+window.retriggerBotFlow = async function (sessionIdOrPhone) {
     if (!sessionIdOrPhone) return;
     const token = localStorage.getItem('token');
     try {
@@ -2649,7 +2744,7 @@ window.retriggerBotFlow = async function(sessionIdOrPhone) {
         if (!res.ok) throw new Error(data.message || 'Failed to re-trigger flow');
 
         window.showAlert('Flow Re-Triggered', 'Chatbot flow resumed and prompt sent to customer on WhatsApp!', 'success');
-        
+
         // Remove toast if active
         const toast = document.getElementById('telecaller-human-alert-toast');
         if (toast) toast.remove();
@@ -2662,7 +2757,7 @@ window.retriggerBotFlow = async function(sessionIdOrPhone) {
     }
 };
 
-window.takeoverBotFlow = async function(sessionIdOrPhone) {
+window.takeoverBotFlow = async function (sessionIdOrPhone) {
     if (!sessionIdOrPhone) return;
     const token = localStorage.getItem('token');
     try {
@@ -2687,7 +2782,7 @@ window.takeoverBotFlow = async function(sessionIdOrPhone) {
     }
 };
 
-window.openTelecallerChat = function(phone, sessionId) {
+window.openTelecallerChat = function (phone, sessionId) {
     if (!phone) return;
     markAlertAsDismissed(phone);
     if (sessionId) markAlertAsDismissed(sessionId);
@@ -2696,7 +2791,7 @@ window.openTelecallerChat = function(phone, sessionId) {
     window.location.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${encodeURIComponent(phone)}`;
 };
 
-window.dismissHumanAlertToast = function(identifier) {
+window.dismissHumanAlertToast = function (identifier) {
     if (identifier) {
         markAlertAsDismissed(identifier);
     } else if (window._currentActiveAlertId) {
@@ -2707,7 +2802,7 @@ window.dismissHumanAlertToast = function(identifier) {
 };
 
 let lastAlertCount = 0;
-window.fetchPendingHumanAlerts = async function() {
+window.fetchPendingHumanAlerts = async function () {
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -2749,8 +2844,8 @@ window.fetchPendingHumanAlerts = async function() {
         }
 
         const dismissedList = getDismissedAlerts();
-        const activeAlerts = alerts.filter(a => 
-            !dismissedList.includes(String(a.session_id)) && 
+        const activeAlerts = alerts.filter(a =>
+            !dismissedList.includes(String(a.session_id)) &&
             !dismissedList.includes(String(a.phone))
         );
 
@@ -2768,8 +2863,8 @@ window.fetchPendingHumanAlerts = async function() {
         if (activeAlerts.length > lastAlertCount && !soundMuted) {
             try {
                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                audio.play().catch(() => {});
-            } catch (e) {}
+                audio.play().catch(() => { });
+            } catch (e) { }
         }
         lastAlertCount = activeAlerts.length;
 
@@ -2843,7 +2938,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global protection: Prevent mouse wheel scroll from incrementing/decrementing number inputs
-document.addEventListener('wheel', function(e) {
+document.addEventListener('wheel', function (e) {
     if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
         document.activeElement.blur();
     }
@@ -2852,7 +2947,7 @@ document.addEventListener('wheel', function(e) {
 // ============================================================
 // Global OTP Reset / Change Password Modal
 // ============================================================
-window.openPasswordResetOtpModal = function(options = {}) {
+window.openPasswordResetOtpModal = function (options = {}) {
     const targetUserId = options.targetUserId || null;
     const targetUserEmail = options.targetUserEmail || null;
 
@@ -2998,13 +3093,13 @@ window.openPasswordResetOtpModal = function(options = {}) {
     }
 
     // Toggle Password Visibility
-    document.getElementById('toggleNewPwdEye').addEventListener('click', function() {
+    document.getElementById('toggleNewPwdEye').addEventListener('click', function () {
         const type = newPwdInput.type === 'password' ? 'text' : 'password';
         newPwdInput.type = type;
         this.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
     });
 
-    document.getElementById('toggleConfirmPwdEye').addEventListener('click', function() {
+    document.getElementById('toggleConfirmPwdEye').addEventListener('click', function () {
         const type = confirmPwdInput.type === 'password' ? 'text' : 'password';
         confirmPwdInput.type = type;
         this.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
@@ -3090,7 +3185,7 @@ window.openPasswordResetOtpModal = function(options = {}) {
 
         let left = lockSeconds;
         showAlert(`🔒 Maximum 4 OTP attempts exceeded. Locked for <strong id="lockTimerSec">${Math.floor(left / 60)}m ${left % 60}s</strong>.`, true);
-        
+
         if (lockTimer) clearInterval(lockTimer);
         lockTimer = setInterval(() => {
             left--;

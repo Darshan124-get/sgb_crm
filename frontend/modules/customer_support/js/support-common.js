@@ -486,13 +486,163 @@
         }
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+
+    // 10. Mobile Responsive Drawer & Navigation
+    function initSupportMobileNav() {
+        if (document.getElementById('supportMobileTopbar')) return;
+
+        const supportMain = document.querySelector('.support-main');
+        if (!supportMain) return;
+
+        // Build native-feeling sticky mobile topbar
+        const topbar = document.createElement('div');
+        topbar.id = 'supportMobileTopbar';
+        topbar.className = 'support-mobile-topbar';
+
+        const currentPath = window.location.pathname.toLowerCase();
+        const isJobCards = currentPath.includes('job_card');
+        const isDashboard = currentPath.includes('dashboard');
+
+        topbar.innerHTML = `
+            <div class="support-mobile-left">
+                <button type="button" class="support-mobile-hamburger" id="supportMobileHamburger" aria-label="Open CRM Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="support-mobile-brand">
+                    <img src="../../assets/logo.png" alt="SGB Agro" class="support-mobile-logo" onerror="this.style.display='none'">
+                    <div>
+                        <span class="support-mobile-brand-name">SGB CRM</span>
+                        <span class="support-mobile-brand-badge">SUPPORT</span>
+                    </div>
+                </div>
+            </div>
+            <div class="support-mobile-right">
+                ${!isDashboard ? `
+                    <a href="dashboard.html" class="support-mobile-quick-btn" title="Dashboard">
+                        <i class="fas fa-home"></i>
+                    </a>
+                ` : ''}
+                ${!isJobCards ? `
+                    <a href="job_cards.html" class="support-mobile-quick-btn" title="Job Cards">
+                        <i class="fas fa-tools"></i>
+                    </a>
+                ` : ''}
+                <button type="button" class="support-mobile-quick-btn" id="supportMobileNewCaseBtn" title="New Case / Call" onclick="if(typeof window.openManualCaseModal==='function') window.openManualCaseModal();">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        `;
+
+        supportMain.prepend(topbar);
+
+        // Backdrop
+        let backdrop = document.getElementById('supportMobileBackdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.id = 'supportMobileBackdrop';
+            backdrop.className = 'support-mobile-backdrop';
+            document.body.appendChild(backdrop);
+        }
+
+        const sidebarContainer = document.getElementById('sidebar-container');
+        const hamburgerBtn = document.getElementById('supportMobileHamburger');
+
+        const toggleDrawer = (open) => {
+            if (!sidebarContainer) return;
+            const isOpen = typeof open === 'boolean' ? open : !sidebarContainer.classList.contains('mobile-open');
+            if (isOpen) {
+                sidebarContainer.classList.add('mobile-open');
+                sidebarContainer.classList.add('mobile-active');
+                backdrop.classList.add('active');
+                const sb = document.querySelector('.sidebar');
+                if (sb) sb.classList.add('mobile-active');
+                document.body.style.overflow = 'hidden';
+            } else {
+                sidebarContainer.classList.remove('mobile-open');
+                sidebarContainer.classList.remove('mobile-active');
+                backdrop.classList.remove('active');
+                const sb = document.querySelector('.sidebar');
+                if (sb) sb.classList.remove('mobile-active');
+                document.body.style.overflow = '';
+            }
+        };
+
+        if (hamburgerBtn) {
+            hamburgerBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDrawer();
+            });
+        }
+
+        backdrop.addEventListener('click', () => toggleDrawer(false));
+
+        // Inject close button inside sidebar once injected
+        const ensureSidebarCloseBtn = () => {
+            const logo = document.querySelector('#sidebar-container .sidebar-logo');
+            if (logo && !logo.querySelector('.sidebar-close-btn')) {
+                const closeBtn = document.createElement('button');
+                closeBtn.type = 'button';
+                closeBtn.className = 'sidebar-close-btn';
+                closeBtn.setAttribute('aria-label', 'Close menu');
+                closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleDrawer(false);
+                };
+                logo.appendChild(closeBtn);
+            }
+        };
+
+        ensureSidebarCloseBtn();
+        if (sidebarContainer) {
+            const observer = new MutationObserver(() => ensureSidebarCloseBtn());
+            observer.observe(sidebarContainer, { childList: true, subtree: true });
+        }
+
+        // Close drawer when any sidebar link is clicked on mobile
+        document.addEventListener('click', (e) => {
+            const navLink = e.target.closest('#sidebar-container .nav-link, #sidebar-container a');
+            if (navLink && window.innerWidth <= 768) {
+                toggleDrawer(false);
+            }
+        });
+
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && sidebarContainer && sidebarContainer.classList.contains('mobile-open')) {
+                toggleDrawer(false);
+            }
+        });
+
+        // Close on window resize if larger than tablet
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768 && sidebarContainer && sidebarContainer.classList.contains('mobile-open')) {
+                toggleDrawer(false);
+            }
+        });
+
+        // Hook global toggleMobileSidebar if components.js invokes it
+        const origToggle = window.toggleMobileSidebar;
+        window.toggleMobileSidebar = () => {
+            if (typeof origToggle === 'function') {
+                try { origToggle(); } catch (err) {}
+            }
+            toggleDrawer();
+        };
+    }
+
+    // 11. Initializer Wire-Up
+    const initAll = () => {
+        initSupportMobileNav();
+
         if (typeof window.initSupportNotifications === 'function') {
             window.initSupportNotifications();
         }
 
         // Auto-wire any buttons intended to trigger the manual case modal
         document.querySelectorAll('#btnOpenManualCase, #btnOpenManualCaseModal, [data-action="open-manual-case"]').forEach(btn => {
+            if (btn.dataset.manualCaseBound) return;
+            btn.dataset.manualCaseBound = 'true';
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (typeof window.openManualCaseModal === 'function') {
@@ -500,7 +650,13 @@
                 }
             });
         });
-    });
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAll);
+    } else {
+        initAll();
+    }
 
 })();
 

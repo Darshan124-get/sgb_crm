@@ -73,8 +73,8 @@ exports.getCases = async (req, res) => {
                    (SELECT COUNT(*) FROM customer_support_calls WHERE case_id = c.case_id) as call_count,
                    (SELECT COUNT(*) FROM customer_support_notes WHERE case_id = c.case_id) as note_count,
                    (SELECT COUNT(*) FROM customer_support_photos WHERE case_id = c.case_id) as photo_count,
-                   (SELECT scheduled_date FROM customer_support_followups WHERE case_id = c.case_id LIMIT 1) as followup_date,
-                   (SELECT status FROM customer_support_followups WHERE case_id = c.case_id LIMIT 1) as followup_status
+                   (SELECT scheduled_date FROM customer_support_followups WHERE case_id = c.case_id AND status != 'COMPLETED' ORDER BY scheduled_date ASC LIMIT 1) as followup_date,
+                   (SELECT status FROM customer_support_followups WHERE case_id = c.case_id AND status != 'COMPLETED' ORDER BY scheduled_date ASC LIMIT 1) as followup_status
             FROM customer_support_cases c
             LEFT JOIN users u ON c.assigned_to = u.user_id
             LEFT JOIN orders o ON c.order_id = o.order_id
@@ -197,17 +197,26 @@ exports.recordCall = async (req, res) => {
             customer_questions,
             reported_problems,
             feedback,
-            remarks
+            remarks,
+            scheduled_date,
+            preferred_time_slot
         } = req.body;
 
         if (!call_outcome) {
             return res.status(400).json({ success: false, message: 'Call outcome is required' });
         }
 
-        const validOutcomes = ['answered', 'not_answered', 'callback_required', 'no_assistance_needed'];
+        const validOutcomes = ['answered', 'not_answered', 'switched_off', 'not_reachable', 'busy', 'callback_required', 'no_assistance_needed'];
         if (!validOutcomes.includes(call_outcome)) {
             return res.status(400).json({ success: false, message: 'Invalid call outcome' });
         }
+
+        // Fetch case details for customer & order context
+        const [cases] = await db.query('SELECT * FROM customer_support_cases WHERE case_id = ?', [id]);
+        if (cases.length === 0) {
+            return res.status(404).json({ success: false, message: 'Case not found' });
+        }
+        const supportCase = cases[0];
 
         // Insert call
         const [callResult] = await db.query(`
@@ -235,7 +244,7 @@ exports.recordCall = async (req, res) => {
         let newCaseStatus = 'pending_contact';
         if (call_outcome === 'answered') {
             newCaseStatus = (installation_status === 'successfully_installed') ? 'contacted' : 'guidance_in_progress';
-        } else if (call_outcome === 'callback_required') {
+        } else if (['not_answered', 'switched_off', 'not_reachable', 'busy', 'callback_required'].includes(call_outcome)) {
             newCaseStatus = 'pending_contact';
         } else if (call_outcome === 'no_assistance_needed') {
             newCaseStatus = 'contacted';
@@ -247,21 +256,104 @@ exports.recordCall = async (req, res) => {
             WHERE case_id = ?
         `, [newCaseStatus, installation_status || null, id]);
 
+        // If customer was unreachable or callback required and scheduled_date is provided, create/update follow-up
+        let followupId = null;
+        const isUnreachable = ['not_answered', 'switched_off', 'not_reachable', 'busy', 'callback_required'].includes(call_outcome);
+        if (scheduled_date && isUnreachable) {
+            const scheduledDateObj = new Date(scheduled_date);
+            const todayObj = new Date(new Date().toDateString());
+            const fuStatus = (scheduledDateObj <= todayObj) ? 'DUE' : 'UPCOMING';
+
+            const combinedRemarks = [
+                preferred_time_slot ? `Slot: ${preferred_time_slot}` : '',
+                remarks ? remarks.trim() : ''
+            ].filter(Boolean).join(' | ');
+
+            const [fuResult] = await db.query(`
+                INSERT INTO customer_support_followups
+                (case_id, order_id, customer_name, customer_phone, assigned_to, followup_type, scheduled_date, status, remarks)
+                VALUES (?, ?, ?, ?, ?, 'CALLBACK', ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    scheduled_date = VALUES(scheduled_date),
+                    status = VALUES(status),
+                    remarks = VALUES(remarks),
+                    assigned_to = VALUES(assigned_to),
+                    notification_sent = 0,
+                    updated_at = NOW()
+            `, [
+                id,
+                supportCase.order_id,
+                supportCase.customer_name,
+                supportCase.customer_phone,
+                supportCase.assigned_to || req.user.id,
+                scheduled_date,
+                fuStatus,
+                combinedRemarks || `Follow-up after ${call_outcome.replace(/_/g, ' ')}`
+            ]);
+
+            followupId = fuResult.insertId || null;
+
+            // In-app notification for executive
+            const executiveId = supportCase.assigned_to || req.user.id;
+            const notifTitle = 'Follow-Up Call Scheduled';
+            const notifMsg = `Follow-up call for Customer ${supportCase.customer_name} (Order #${supportCase.order_id || 'Manual'}) scheduled for ${new Date(scheduled_date).toLocaleDateString('en-IN')}${preferred_time_slot ? ' [' + preferred_time_slot + ']' : ''}. Reason: ${call_outcome.replace(/_/g, ' ')}.`;
+            const notifLink = `modules/customer_support/customer_details.html?case_id=${id}`;
+
+            try {
+                await db.query(`
+                    INSERT INTO notifications (order_id, user_id, title, message, type, link, data, status)
+                    VALUES (?, ?, ?, ?, 'customer_support', ?, ?, 'unread')
+                `, [
+                    supportCase.order_id || null,
+                    executiveId,
+                    notifTitle,
+                    notifMsg,
+                    notifLink,
+                    JSON.stringify({ caseId: String(id), followupId: String(followupId), scheduledDate: scheduled_date })
+                ]);
+            } catch (notifErr) {
+                console.warn('Failed to insert followup notification:', notifErr.message);
+            }
+        }
+
         // Auto note
+        const outcomeLabels = {
+            answered: 'Customer Answered',
+            not_answered: 'Customer Did Not Answer',
+            switched_off: 'Phone Switched Off',
+            not_reachable: 'Not Reachable / Network Issue',
+            busy: 'Line Busy / Call Declined',
+            callback_required: 'Customer Requested Callback',
+            no_assistance_needed: 'Customer Does Not Need Assistance'
+        };
+        const outcomeText = outcomeLabels[call_outcome] || call_outcome;
+
+        let noteText = `Call logged [${call_type}]: Outcome was "${outcomeText}".`;
+        if (scheduled_date) {
+            noteText += ` Follow-up scheduled for ${scheduled_date}${preferred_time_slot ? ' (' + preferred_time_slot + ')' : ''}.`;
+        }
+        if (installation_status) {
+            noteText += ` Installation status: ${installation_status.replace(/_/g, ' ')}.`;
+        }
+        if (remarks) {
+            noteText += ` Remarks: ${remarks}`;
+        }
+
         await db.query(`
             INSERT INTO customer_support_notes (case_id, call_id, note, created_by)
             VALUES (?, ?, ?, ?)
         `, [
             id,
             callId,
-            `Call logged [${call_type}]: Outcome was "${call_outcome}". Installation status: ${installation_status || 'N/A'}. ${remarks ? 'Remarks: ' + remarks : ''}`,
+            noteText,
             req.user.id || req.user.user_id
         ]);
 
         res.json({
             success: true,
-            message: 'Call recorded successfully',
+            message: scheduled_date ? `Call logged & follow-up scheduled for ${scheduled_date}` : 'Call recorded successfully',
             call_id: callId,
+            followup_id: followupId,
             new_status: newCaseStatus
         });
     } catch (err) {
@@ -349,10 +441,10 @@ exports.completeSupport = async (req, res) => {
         if (!call_outcome) {
             return res.status(400).json({ success: false, message: 'Call outcome is required to complete support' });
         }
-        if (call_outcome === 'not_answered' || call_outcome === 'callback_required') {
+        if (['not_answered', 'switched_off', 'not_reachable', 'busy', 'callback_required'].includes(call_outcome)) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot mark support complete while customer is not answered or callback is required. Please retain case open.'
+                message: 'Cannot mark support complete while customer is unreachable. Please schedule a follow-up or retain case open.'
             });
         }
         if (!installation_status) {
@@ -473,14 +565,23 @@ exports.completeSupport = async (req, res) => {
 // ── GET FOLLOW-UPS LIST ──
 exports.getFollowups = async (req, res) => {
     try {
-        const { status, search, page = 1, limit = 20 } = req.query;
+        const { status, search, page = 1, limit = 20, type } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
         // Process due follow-ups to ensure status is up to date
         await customerSupportService.processDueFollowups().catch(e => console.warn(e.message));
 
-        let whereClauses = ['1=1'];
+        let whereClauses = [];
         let params = [];
+
+        // 30-Day Product Follow-ups display only completed cases with 30_DAY_PRODUCT_CHECK
+        if (type && type !== '30_DAY_PRODUCT_CHECK') {
+            whereClauses.push('f.followup_type = ?');
+            params.push(type);
+        } else {
+            whereClauses.push('f.followup_type = "30_DAY_PRODUCT_CHECK"');
+            whereClauses.push('c.status = "completed"');
+        }
 
         // Role-based visibility
         const role = (req.user.role || '').toLowerCase();
@@ -973,6 +1074,620 @@ exports.createManualCase = async (req, res) => {
     } catch (err) {
         console.error('Error in createManualCase:', err);
         res.status(500).json({ success: false, message: err.message || 'Failed to create manual support case' });
+    }
+};
+
+// ============================================================
+// ── JOB CARDS MANAGEMENT ──
+// ============================================================
+
+// ── GET JOB CARDS (Paginated with tabs & filters) ──
+exports.getJobCards = async (req, res) => {
+    try {
+        const {
+            status,
+            job_type,
+            priority,
+            search,
+            page = 1,
+            limit = 20
+        } = req.query;
+
+        const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+        let whereClauses = ['1=1'];
+        let params = [];
+
+        // Status tab filtering
+        if (status && status !== 'all' && status !== 'All') {
+            const normalizedStatus = status.toLowerCase().replace(/[-_]/g, ' ');
+            if (normalizedStatus === 'open') {
+                whereClauses.push("jc.status = 'Open'");
+            } else if (normalizedStatus === 'in progress') {
+                whereClauses.push("jc.status = 'In Progress'");
+            } else if (normalizedStatus === 'on hold') {
+                whereClauses.push("jc.status = 'On Hold'");
+            } else if (normalizedStatus === 'completed') {
+                whereClauses.push("jc.status = 'Completed'");
+            } else if (normalizedStatus === 'cancelled') {
+                whereClauses.push("jc.status = 'Cancelled'");
+            } else {
+                whereClauses.push('jc.status = ?');
+                params.push(status);
+            }
+        }
+
+        // Job type filtering
+        if (job_type && job_type !== 'all' && job_type !== 'All') {
+            whereClauses.push('jc.job_type = ?');
+            params.push(job_type);
+        }
+
+        // Priority filtering
+        if (priority && priority !== 'all' && priority !== 'All') {
+            whereClauses.push('jc.priority = ?');
+            params.push(priority);
+        }
+
+        // Search query
+        if (search && search.trim()) {
+            const q = `%${search.trim()}%`;
+            whereClauses.push('(jc.job_card_number LIKE ? OR jc.customer_name LIKE ? OR jc.customer_phone LIKE ? OR jc.product_summary LIKE ? OR CAST(jc.order_id AS CHAR) LIKE ?)');
+            params.push(q, q, q, q, q);
+        }
+
+        const whereSql = whereClauses.join(' AND ');
+
+        // Total count for current filter
+        const [[countRow]] = await db.query(`
+            SELECT COUNT(*) as total
+            FROM customer_support_job_cards jc
+            WHERE ${whereSql}
+        `, params);
+
+        // Status counts across all cards (for UI badge tabs)
+        const [[statusCounts]] = await db.query(`
+            SELECT 
+                COUNT(*) as all_count,
+                SUM(CASE WHEN status = 'Open' THEN 1 ELSE 0 END) as open_count,
+                SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress_count,
+                SUM(CASE WHEN status = 'On Hold' THEN 1 ELSE 0 END) as on_hold_count,
+                SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_count,
+                SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END) as cancelled_count
+            FROM customer_support_job_cards
+        `);
+
+        // Query job cards
+        const [jobCards] = await db.query(`
+            SELECT jc.*,
+                   u.name as assigned_to_name,
+                   creator.name as created_by_name,
+                   (SELECT COUNT(*) FROM customer_support_job_card_photos WHERE job_card_id = jc.job_card_id) as photo_count,
+                   (SELECT COUNT(*) FROM customer_support_job_card_parts WHERE job_card_id = jc.job_card_id) as part_count
+            FROM customer_support_job_cards jc
+            LEFT JOIN users u ON jc.assigned_to = u.user_id
+            LEFT JOIN users creator ON jc.created_by = creator.user_id
+            WHERE ${whereSql}
+            ORDER BY jc.created_at DESC
+            LIMIT ? OFFSET ?
+        `, [...params, parseInt(limit, 10), offset]);
+
+        res.json({
+            success: true,
+            job_cards: jobCards,
+            data: jobCards,
+            counts: {
+                all: statusCounts ? (statusCounts.all_count || 0) : 0,
+                open: statusCounts ? (statusCounts.open_count || 0) : 0,
+                in_progress: statusCounts ? (statusCounts.in_progress_count || 0) : 0,
+                on_hold: statusCounts ? (statusCounts.on_hold_count || 0) : 0,
+                completed: statusCounts ? (statusCounts.completed_count || 0) : 0,
+                cancelled: statusCounts ? (statusCounts.cancelled_count || 0) : 0
+            },
+            statusCounts: {
+                all: statusCounts ? (statusCounts.all_count || 0) : 0,
+                open: statusCounts ? (statusCounts.open_count || 0) : 0,
+                'in progress': statusCounts ? (statusCounts.in_progress_count || 0) : 0,
+                'on hold': statusCounts ? (statusCounts.on_hold_count || 0) : 0,
+                completed: statusCounts ? (statusCounts.completed_count || 0) : 0,
+                cancelled: statusCounts ? (statusCounts.cancelled_count || 0) : 0
+            },
+            pagination: {
+                total: countRow ? (countRow.total || 0) : 0,
+                page: parseInt(page, 10),
+                limit: parseInt(limit, 10),
+                totalPages: Math.ceil((countRow ? countRow.total : 0) / parseInt(limit, 10)) || 1
+            }
+        });
+    } catch (err) {
+        console.error('Error in getJobCards:', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch job cards' });
+    }
+};
+
+// ── CREATE NEW JOB CARD ──
+exports.createJobCard = async (req, res) => {
+    try {
+        const {
+            case_id,
+            order_id,
+            customer_name,
+            customer_phone,
+            customer_address,
+            product_summary,
+            job_type = 'Service/Repair',
+            priority = 'Medium',
+            issue_description,
+            work_required,
+            assigned_to,
+            due_date,
+            notes
+        } = req.body;
+
+        if (!customer_name || !customer_name.trim()) {
+            return res.status(400).json({ success: false, message: 'Customer name is required' });
+        }
+        if (!customer_phone || !customer_phone.trim()) {
+            return res.status(400).json({ success: false, message: 'Customer phone number is required' });
+        }
+        if (!issue_description || !issue_description.trim()) {
+            return res.status(400).json({ success: false, message: 'Issue description is required' });
+        }
+
+        const cleanPhone = customer_phone.trim();
+        const parsedOrderId = order_id ? parseInt(order_id, 10) : null;
+        const parsedCaseId = case_id ? parseInt(case_id, 10) : null;
+
+        // Restriction check: Only eligible SGB Direct B2C purchases
+        if (parsedOrderId) {
+            const [[orderRow]] = await db.query(
+                'SELECT order_id, purchase_source, order_source, dealer_id FROM orders WHERE order_id = ?',
+                [parsedOrderId]
+            );
+            if (orderRow && (orderRow.dealer_id || orderRow.purchase_source === 'Dealer' || orderRow.order_source === 'dealer')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Job Cards can only be created for SGB Direct B2C purchases. B2B dealer orders are not eligible.'
+                });
+            }
+        }
+
+        // Duplicate prevention: prevent duplicate open Job Cards for the same customer issue
+        const [duplicateCheck] = await db.query(`
+            SELECT job_card_id, job_card_number, status, issue_description, job_type
+            FROM customer_support_job_cards
+            WHERE customer_phone = ? AND status IN ('Open', 'In Progress', 'On Hold')
+              AND (
+                (? IS NOT NULL AND case_id = ?)
+                OR LOWER(TRIM(issue_description)) = LOWER(TRIM(?))
+                OR (job_type = ? AND ? IS NOT NULL AND order_id = ?)
+              )
+            LIMIT 1
+        `, [
+            cleanPhone,
+            parsedCaseId, parsedCaseId,
+            issue_description.trim(),
+            job_type,
+            parsedOrderId, parsedOrderId
+        ]);
+
+        if (duplicateCheck.length > 0) {
+            const dup = duplicateCheck[0];
+            return res.status(400).json({
+                success: false,
+                message: `An active Job Card (${dup.job_card_number}) is already ${dup.status} for this customer. Please update the existing Job Card instead of creating a duplicate.`,
+                existing_job_card_id: dup.job_card_id,
+                existing_job_card_number: dup.job_card_number
+            });
+        }
+
+        // Auto-generate unique Job Card Number: JC-YYYYMMDD-XXXX
+        const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const [[countRow]] = await db.query(
+            'SELECT COUNT(*) as cnt FROM customer_support_job_cards WHERE job_card_number LIKE ?',
+            [`JC-${todayStr}-%`]
+        );
+        const seq = (((countRow && countRow.cnt) || 0) + 1).toString().padStart(4, '0');
+        const jobCardNumber = `JC-${todayStr}-${seq}`;
+
+        const assignedUserId = assigned_to ? parseInt(assigned_to, 10) : (req.user.id || req.user.user_id);
+        const currentUserId = req.user.id || req.user.user_id;
+
+        const [insertRes] = await db.query(`
+            INSERT INTO customer_support_job_cards
+            (job_card_number, case_id, order_id, customer_name, customer_phone, customer_address, product_summary, job_type, priority, status, issue_description, work_required, assigned_to, due_date, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?, ?, ?, ?, ?)
+        `, [
+            jobCardNumber,
+            parsedCaseId,
+            parsedOrderId,
+            customer_name.trim(),
+            cleanPhone,
+            customer_address ? customer_address.trim() : null,
+            product_summary ? product_summary.trim() : null,
+            job_type,
+            priority,
+            issue_description.trim(),
+            work_required ? work_required.trim() : null,
+            assignedUserId,
+            due_date || null,
+            notes ? notes.trim() : null,
+            currentUserId
+        ]);
+
+        const newJobCardId = insertRes.insertId;
+
+        // Save uploaded photos if any
+        const files = req.files || [];
+        for (const file of files) {
+            const fileUrl = `/uploads/${file.filename}`;
+            await db.query(`
+                INSERT INTO customer_support_job_card_photos
+                (job_card_id, photo_type, file_url, file_name, file_size, uploaded_by)
+                VALUES (?, 'issue', ?, ?, ?, ?)
+            `, [newJobCardId, fileUrl, file.originalname, file.size, currentUserId]);
+        }
+
+        // Add initial activity log
+        await db.query(`
+            INSERT INTO customer_support_job_card_logs
+            (job_card_id, action, previous_status, new_status, notes, performed_by)
+            VALUES (?, 'CREATED', NULL, 'Open', ?, ?)
+        `, [newJobCardId, `Job Card created for ${job_type}: ${issue_description.trim()}`, currentUserId]);
+
+        res.json({
+            success: true,
+            message: 'Job Card created successfully',
+            job_card_id: newJobCardId,
+            job_card_number: jobCardNumber
+        });
+    } catch (err) {
+        console.error('Error in createJobCard:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to create job card' });
+    }
+};
+
+// ── GET SINGLE JOB CARD DETAILS ──
+exports.getJobCardDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [rows] = await db.query(`
+            SELECT jc.*,
+                   u.name as assigned_to_name, u.email as assigned_to_email, u.phone as assigned_to_phone,
+                   creator.name as created_by_name,
+                   c.case_number, c.status as case_status,
+                   o.total_amount as order_total_amount, o.order_status, o.address as order_address
+            FROM customer_support_job_cards jc
+            LEFT JOIN users u ON jc.assigned_to = u.user_id
+            LEFT JOIN users creator ON jc.created_by = creator.user_id
+            LEFT JOIN customer_support_cases c ON jc.case_id = c.case_id
+            LEFT JOIN orders o ON jc.order_id = o.order_id
+            WHERE jc.job_card_id = ?
+        `, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Job Card not found' });
+        }
+
+        const jobCard = rows[0];
+
+        // Fetch spare parts
+        const [parts] = await db.query(`
+            SELECT * FROM customer_support_job_card_parts
+            WHERE job_card_id = ?
+            ORDER BY part_id ASC
+        `, [id]);
+
+        // Fetch photos
+        const [photos] = await db.query(`
+            SELECT p.*, u.name as uploaded_by_name
+            FROM customer_support_job_card_photos p
+            LEFT JOIN users u ON p.uploaded_by = u.user_id
+            WHERE p.job_card_id = ?
+            ORDER BY p.created_at ASC
+        `, [id]);
+
+        // Fetch activity logs
+        const [logs] = await db.query(`
+            SELECT l.*, u.name as performed_by_name
+            FROM customer_support_job_card_logs l
+            LEFT JOIN users u ON l.performed_by = u.user_id
+            WHERE l.job_card_id = ?
+            ORDER BY l.created_at ASC
+        `, [id]);
+
+        const partsTotal = parts.reduce((sum, p) => sum + (parseFloat(p.total_cost) || 0), 0);
+        const serviceCost = parseFloat(jobCard.service_cost) || 0;
+        const grandTotal = partsTotal + serviceCost;
+
+        res.json({
+            success: true,
+            job_card: jobCard,
+            parts,
+            photos,
+            logs,
+            parts_total: partsTotal,
+            grand_total: grandTotal
+        });
+    } catch (err) {
+        console.error('Error in getJobCardDetails:', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch job card details' });
+    }
+};
+
+// ── UPDATE JOB CARD STATUS (Open, In Progress, On Hold, Cancelled) ──
+exports.updateJobCardStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, cancellation_reason, notes } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ success: false, message: 'Status is required' });
+        }
+
+        const validStatuses = ['Open', 'In Progress', 'On Hold', 'Cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+        }
+
+        // Fetch existing job card
+        const [[jobCard]] = await db.query(
+            'SELECT job_card_id, job_card_number, status FROM customer_support_job_cards WHERE job_card_id = ?',
+            [id]
+        );
+        if (!jobCard) {
+            return res.status(404).json({ success: false, message: 'Job Card not found' });
+        }
+
+        if (jobCard.status === 'Completed') {
+            return res.status(400).json({ success: false, message: 'Cannot modify a Job Card that is already Completed' });
+        }
+        if (jobCard.status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: 'Cannot modify a Job Card that has been Cancelled' });
+        }
+
+        // Strict requirement: cancellation reason when cancelling
+        if (status === 'Cancelled') {
+            if (!cancellation_reason || !cancellation_reason.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cancellation reason is strictly required when cancelling a Job Card'
+                });
+            }
+        }
+
+        const currentUserId = req.user.id || req.user.user_id;
+        const isCancelling = status === 'Cancelled';
+
+        await db.query(`
+            UPDATE customer_support_job_cards
+            SET status = ?,
+                cancellation_reason = CASE WHEN ? THEN ? ELSE cancellation_reason END,
+                cancelled_at = CASE WHEN ? THEN NOW() ELSE cancelled_at END
+            WHERE job_card_id = ?
+        `, [
+            status,
+            isCancelling,
+            isCancelling ? cancellation_reason.trim() : null,
+            isCancelling,
+            id
+        ]);
+
+        // Insert activity log
+        const logNotes = isCancelling
+            ? `Cancelled: ${cancellation_reason.trim()}`
+            : (notes ? notes.trim() : `Status transitioned from ${jobCard.status} to ${status}`);
+
+        await db.query(`
+            INSERT INTO customer_support_job_card_logs
+            (job_card_id, action, previous_status, new_status, notes, performed_by)
+            VALUES (?, 'STATUS_CHANGED', ?, ?, ?, ?)
+        `, [id, jobCard.status, status, logNotes, currentUserId]);
+
+        res.json({
+            success: true,
+            message: `Job Card status updated to ${status}`,
+            job_card_id: id,
+            new_status: status
+        });
+    } catch (err) {
+        console.error('Error in updateJobCardStatus:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to update job card status' });
+    }
+};
+
+// ── UPLOAD JOB CARD PHOTOS (Before / After / Issue / Other) ──
+exports.uploadJobCardPhotos = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { photo_type = 'other' } = req.body;
+        const files = req.files || [];
+
+        if (files.length === 0) {
+            return res.status(400).json({ success: false, message: 'No photos provided for upload' });
+        }
+
+        const validTypes = ['issue', 'before', 'after', 'other'];
+        const type = validTypes.includes(photo_type) ? photo_type : 'other';
+        const currentUserId = req.user.id || req.user.user_id;
+
+        const uploadedPhotos = [];
+        for (const file of files) {
+            const fileUrl = `/uploads/${file.filename}`;
+            const [result] = await db.query(`
+                INSERT INTO customer_support_job_card_photos
+                (job_card_id, photo_type, file_url, file_name, file_size, uploaded_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [id, type, fileUrl, file.originalname, file.size, currentUserId]);
+
+            uploadedPhotos.push({
+                photo_id: result.insertId,
+                photo_type: type,
+                file_url: fileUrl,
+                file_name: file.originalname
+            });
+        }
+
+        // Add log
+        await db.query(`
+            INSERT INTO customer_support_job_card_logs
+            (job_card_id, action, previous_status, new_status, notes, performed_by)
+            VALUES (?, 'PHOTO_UPLOADED', NULL, NULL, ?, ?)
+        `, [id, `Uploaded ${files.length} photo(s) (${type})`, currentUserId]);
+
+        res.json({
+            success: true,
+            message: `${files.length} photo(s) uploaded successfully`,
+            photos: uploadedPhotos
+        });
+    } catch (err) {
+        console.error('Error in uploadJobCardPhotos:', err);
+        res.status(500).json({ success: false, message: 'Failed to upload job card photos' });
+    }
+};
+
+// ── COMPLETE JOB CARD ──
+exports.completeJobCard = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            diagnosis,
+            work_performed,
+            service_cost = 0,
+            completion_notes,
+            parts
+        } = req.body;
+
+        if (!diagnosis || !diagnosis.trim()) {
+            return res.status(400).json({ success: false, message: 'Diagnosis description is required for completion' });
+        }
+        if (!work_performed || !work_performed.trim()) {
+            return res.status(400).json({ success: false, message: 'Work performed details are required for completion' });
+        }
+
+        const [[jobCard]] = await db.query(
+            'SELECT * FROM customer_support_job_cards WHERE job_card_id = ?',
+            [id]
+        );
+        if (!jobCard) {
+            return res.status(404).json({ success: false, message: 'Job Card not found' });
+        }
+        if (jobCard.status === 'Completed') {
+            return res.status(400).json({ success: false, message: 'This Job Card is already marked as Completed' });
+        }
+        if (jobCard.status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: 'Cannot complete a cancelled Job Card' });
+        }
+
+        const currentUserId = req.user.id || req.user.user_id;
+        const connection = await db.getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            // 1. Process spare parts if provided
+            let parsedParts = [];
+            if (parts) {
+                if (typeof parts === 'string') {
+                    try { parsedParts = JSON.parse(parts); } catch (e) { parsedParts = []; }
+                } else if (Array.isArray(parts)) {
+                    parsedParts = parts;
+                }
+            }
+
+            for (const item of parsedParts) {
+                if (item && item.part_name && item.part_name.trim()) {
+                    const qty = parseInt(item.quantity, 10) || 1;
+                    const unitCost = parseFloat(item.unit_cost) || 0.00;
+                    const totalCost = qty * unitCost;
+                    const remarks = item.remarks ? item.remarks.trim() : null;
+                    await connection.query(`
+                        INSERT INTO customer_support_job_card_parts
+                        (job_card_id, part_name, part_number, quantity, unit_cost, total_cost, remarks)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    `, [id, item.part_name.trim(), item.part_number || null, qty, unitCost, totalCost, remarks]);
+                }
+            }
+
+            // 2. Upload completion photos if any ('after' photos)
+            const files = req.files || [];
+            for (const file of files) {
+                const fileUrl = `/uploads/${file.filename}`;
+                await connection.query(`
+                    INSERT INTO customer_support_job_card_photos
+                    (job_card_id, photo_type, file_url, file_name, file_size, uploaded_by)
+                    VALUES (?, 'after', ?, ?, ?, ?)
+                `, [id, fileUrl, file.originalname, file.size, currentUserId]);
+            }
+
+            // 3. Update Job Card status to Completed
+            const parsedServiceCost = parseFloat(service_cost) || 0.00;
+            const updatedNotes = completion_notes && completion_notes.trim()
+                ? (jobCard.notes ? `${jobCard.notes}\n[Completion Note]: ${completion_notes.trim()}` : `[Completion Note]: ${completion_notes.trim()}`)
+                : jobCard.notes;
+
+            await connection.query(`
+                UPDATE customer_support_job_cards
+                SET status = 'Completed',
+                    diagnosis = ?,
+                    work_performed = ?,
+                    service_cost = ?,
+                    notes = ?,
+                    completed_at = NOW()
+                WHERE job_card_id = ?
+            `, [
+                diagnosis.trim(),
+                work_performed.trim(),
+                parsedServiceCost,
+                updatedNotes,
+                id
+            ]);
+
+            // 4. Activity Log
+            const partsListDesc = parsedParts.length > 0
+                ? `${parsedParts.length} spare part(s) recorded for Billing Team`
+                : 'No spare parts used';
+            await connection.query(`
+                INSERT INTO customer_support_job_card_logs
+                (job_card_id, action, previous_status, new_status, notes, performed_by)
+                VALUES (?, 'COMPLETED', ?, 'Completed', ?, ?)
+            `, [
+                id,
+                jobCard.status,
+                `Work completed. Diagnosis: ${diagnosis.trim()}. Work performed: ${work_performed.trim()}. ${partsListDesc}.`,
+                currentUserId
+            ]);
+
+            // 5. Update linked support case note if case_id exists
+            // (Strict rule: do NOT automatically close the case so customer support can verify resolution)
+            if (jobCard.case_id) {
+                const partsSummary = parsedParts.length > 0
+                    ? ` Parts listed: ${parsedParts.map(p => `${p.part_name} (x${p.quantity || 1})`).join(', ')}. Parts list sent to Billing Team for invoice.`
+                    : ' No spare parts used.';
+                const caseNote = `[Job Card ${jobCard.job_card_number} Completed]: Diagnosis: ${diagnosis.trim()}. Work Performed: ${work_performed.trim()}.${partsSummary}`;
+                await connection.query(`
+                    INSERT INTO customer_support_notes (case_id, note, created_by)
+                    VALUES (?, ?, ?)
+                `, [jobCard.case_id, caseNote, currentUserId]);
+            }
+
+            await connection.commit();
+
+            res.json({
+                success: true,
+                message: 'Job Card marked as completed successfully',
+                job_card_id: id,
+                job_card_number: jobCard.job_card_number
+            });
+        } catch (trxErr) {
+            await connection.rollback();
+            throw trxErr;
+        } finally {
+            connection.release();
+        }
+    } catch (err) {
+        console.error('Error in completeJobCard:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to complete job card' });
     }
 };
 

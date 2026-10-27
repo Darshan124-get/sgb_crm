@@ -124,9 +124,9 @@ async function loadDeliveredOrders() {
                 </td>
                 <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 0.4rem; justify-content: flex-end;">
-                        <button class="btn btn-call btn-sm" onclick="window.callCustomer('${c.customer_phone}', '${escapeHtml(c.customer_name)}', ${c.case_id})">
-                            <i class="fas fa-phone"></i> Call
-                        </button>
+                        <a href="job_cards.html?action=create&phone=${encodeURIComponent(c.customer_phone || '')}&order_id=${c.order_id || ''}&case_id=${c.case_id || ''}" class="btn btn-outline btn-sm" title="Create Job Card for this Order">
+                            <i class="fas fa-wrench"></i>
+                        </a>
                         <a href="call_completion.html?case_id=${c.case_id}" class="btn btn-primary btn-sm" title="Log Call & Guide Installation">
                             <i class="fas fa-tools"></i> Guide Installation
                         </a>

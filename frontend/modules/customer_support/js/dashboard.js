@@ -151,9 +151,6 @@ async function loadCases() {
                 </td>
                 <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 0.4rem; justify-content: flex-end;">
-                        <button class="btn btn-call btn-sm" onclick="window.callCustomer('${c.customer_phone}', '${escapeHtml(c.customer_name)}', ${c.case_id})" title="Call Customer">
-                            <i class="fas fa-phone"></i> Call
-                        </button>
                         <a href="customer_details.html?case_id=${c.case_id}" class="btn btn-outline btn-sm" title="View Details">
                             <i class="fas fa-eye"></i> Details
                         </a>

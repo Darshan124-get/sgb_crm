@@ -194,7 +194,10 @@ class CustomerSupportService {
                 SUM(CASE WHEN f.status = 'DUE' OR (f.status = 'UPCOMING' AND f.scheduled_date <= CURDATE()) THEN 1 ELSE 0 END) as followups_due,
                 SUM(CASE WHEN f.status = 'OVERDUE' OR (f.status != 'COMPLETED' AND f.scheduled_date < CURDATE()) THEN 1 ELSE 0 END) as followups_overdue
             FROM customer_support_followups f
-            WHERE f.status != 'COMPLETED' ${fuUserFilter}
+            JOIN customer_support_cases c ON f.case_id = c.case_id
+            WHERE f.status != 'COMPLETED' 
+              AND f.followup_type = '30_DAY_PRODUCT_CHECK' 
+              AND c.status = 'completed' ${fuUserFilter}
         `, fuParams);
 
         return {
@@ -218,6 +221,8 @@ class CustomerSupportService {
                 FROM customer_support_followups f
                 JOIN customer_support_cases c ON f.case_id = c.case_id
                 WHERE f.status IN ('UPCOMING', 'DUE')
+                  AND f.followup_type = '30_DAY_PRODUCT_CHECK'
+                  AND c.status = 'completed'
                   AND f.scheduled_date <= CURDATE()
             `);
 

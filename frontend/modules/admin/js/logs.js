@@ -1,10 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.requireAuth(['admin'])) return;
     
-    // Initialize Sidebar
-    if (window.loadComponent) {
-        window.loadComponent('sidebar-container', '../../components/sidebar-admin.html');
-    }
 
     const user = window.getCurrentUser();
     const el = document.getElementById('profileName');

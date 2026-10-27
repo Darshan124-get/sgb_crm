@@ -92,6 +92,11 @@
                         <span>My Handoffs</span>
                         <span id="top-my-handoff-count" style="background: #ef4444; color: #ffffff; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800; min-width: 18px; text-align: center;">0</span>
                     </button>
+                    <button id="btn-top-payment" onclick="window.switchToPaymentTab()" title="View Pending Payment Verifications" style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; border: 1px solid #10b981; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 13px; color: #065f46; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+                        <i class="fa-solid fa-file-invoice-dollar" style="color: #059669; font-size: 13px;"></i>
+                        <span>Payment Verification</span>
+                        <span id="top-payment-count" style="background: #059669; color: #ffffff; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800; min-width: 18px; text-align: center;">0</span>
+                    </button>
                 </div>
                 <div class="profile-section">
                     <span class="profile-name" id="profileName">User</span>
@@ -210,6 +215,41 @@
                         </div>
                     </div>
                     <div class="header-actions">
+                        <div id="payment-header-actions" style="display: none; align-items: center; gap: 8px; margin-right: 12px;">
+                            <button id="btn-verify-payment" onclick="window.verifyCurrentPayment()" style="
+                                background: #10b981;
+                                color: #ffffff;
+                                border: none;
+                                padding: 7px 15px;
+                                border-radius: 6px;
+                                font-weight: 700;
+                                font-size: 0.85rem;
+                                cursor: pointer;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 6px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                                transition: background 0.2s;
+                            " title="Verify Payment & Confirm Order">
+                                <i class="fa-solid fa-check"></i> Verify Payment
+                            </button>
+                            <button id="btn-reject-payment" onclick="window.rejectCurrentPayment()" style="
+                                background: #ffffff;
+                                color: #ef4444;
+                                border: 1px solid #fca5a5;
+                                padding: 7px 15px;
+                                border-radius: 6px;
+                                font-weight: 700;
+                                font-size: 0.85rem;
+                                cursor: pointer;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 6px;
+                                transition: all 0.2s;
+                            " title="Reject Payment Screenshot">
+                                <i class="fa-solid fa-times-circle"></i> Reject
+                            </button>
+                        </div>
                         <button type="button" id="toggle-right-sidebar" onclick="window.toggleRightSidebar()" class="action-link-btn" title="Toggle Details Panel" style="margin-right: 10px;">
                             <i class="fas fa-info-circle"></i> Details
                         </button>

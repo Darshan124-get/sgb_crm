@@ -13,7 +13,7 @@ const getPhoneId = () => process.env.PHONE_NUMBER_ID;
 /**
  * Sends a text message to a WhatsApp recipient
  */
-const sendMessage = async (to, text, replyToMessageId = null, senderId = null, quickReplyName = null) => {
+const sendMessage = async (to, text, replyToMessageId = null, senderId = null, quickReplyName = null, replyToChatId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     const data = {
@@ -24,7 +24,7 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null, q
       text: { body: text },
     };
 
-    if (replyToMessageId) {
+    if (replyToMessageId && typeof replyToMessageId === 'string' && replyToMessageId.startsWith('wamid.')) {
       data.context = { message_id: replyToMessageId };
     }
 
@@ -36,7 +36,7 @@ const sendMessage = async (to, text, replyToMessageId = null, senderId = null, q
     });
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
-    await messageService.logChatMessage(to, 'outgoing', 'text', text, null, null, senderId, metaMsgId, 'sent', null, 0, quickReplyName).catch(err => logger.error('Error logging outgoing bot message:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', 'text', text, null, null, senderId, metaMsgId, 'sent', replyToChatId, 0, quickReplyName).catch(err => logger.error('Error logging outgoing bot message:', err.message));
 
     logger.info(`Text message sent to ${to}: ${response.status}`);
     return response.data;
@@ -197,7 +197,7 @@ const getOrCreateMetaMediaId = async (urlOrKey, type) => {
 /**
  * Sends a media message using a media_id or pre-uploaded URL/key
  */
-const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null, senderId = null, mediaBuffer = null, customMimeType = null, quickReplyName = null) => {
+const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageId = null, senderId = null, mediaBuffer = null, customMimeType = null, quickReplyName = null, replyToChatId = null) => {
   try {
     const recipient = formatForWhatsApp(to);
     let resolvedMediaId = mediaId;
@@ -229,7 +229,7 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
       [type]: mediaObj,
     };
 
-    if (replyToMessageId) {
+    if (replyToMessageId && typeof replyToMessageId === 'string' && replyToMessageId.startsWith('wamid.')) {
       data.context = { message_id: replyToMessageId };
     }
 
@@ -261,7 +261,7 @@ const sendMediaMessage = async (to, mediaId, type, caption = '', replyToMessageI
 
     const metaMsgId = response.data?.messages?.[0]?.id || null;
     const mimeType = customMimeType || (type === 'image' ? 'image/jpeg' : (type === 'video' ? 'video/mp4' : (type === 'audio' ? 'audio/mpeg' : 'application/pdf')));
-    await messageService.logChatMessage(to, 'outgoing', type, caption || '', mediaBuffer || (isUrlOrKey ? mediaId : null), mimeType, senderId, metaMsgId, 'sent', null, 0, quickReplyName).catch(err => logger.error('Error logging outgoing bot media message:', err.message));
+    await messageService.logChatMessage(to, 'outgoing', type, caption || '', mediaBuffer || (isUrlOrKey ? mediaId : null), mimeType, senderId, metaMsgId, 'sent', replyToChatId, 0, quickReplyName).catch(err => logger.error('Error logging outgoing bot media message:', err.message));
 
     return response.data;
   } catch (err) {
@@ -434,6 +434,64 @@ const sendList = async (to, text, buttonLabel, rows, senderId = null) => {
 };
 
 /**
+ * Sends a Native WhatsApp Flow (In-App Form) message
+ */
+const sendFlow = async (to, headerText, bodyText, buttonText, flowId, screenId = 'DELIVERY_DETAILS', flowToken = 'flow_token', senderId = null) => {
+  try {
+    const recipient = formatForWhatsApp(to);
+    const data = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        header: {
+          type: 'text',
+          text: headerText || 'Blade Protector Order'
+        },
+        body: {
+          text: bodyText || 'Please tap below to fill your delivery details.'
+        },
+        footer: {
+          text: 'SGB Agro Industries'
+        },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_token: flowToken,
+            flow_id: String(flowId),
+            flow_cta: buttonText || 'Fill Delivery Details',
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen: screenId
+            }
+          }
+        }
+      }
+    };
+
+    const response = await axios.post(`${BASE_URL}/${getPhoneId()}/messages`, data, {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const metaMsgId = response.data?.messages?.[0]?.id || null;
+    const logText = `[WhatsApp Flow] ${headerText} - ${bodyText}`;
+    await messageService.logChatMessage(to, 'outgoing', 'interactive', logText, null, null, senderId, metaMsgId, 'sent').catch(() => {});
+
+    logger.info(`WhatsApp Flow sent to ${to}: ${response.status}`);
+    return response.data;
+  } catch (err) {
+    logger.error('Error sending WhatsApp Flow:', err.response ? JSON.stringify(err.response.data) : err.message);
+    throw err;
+  }
+};
+
+/**
  * Revokes/Deletes a sent WhatsApp message for everyone via Meta Cloud API
  */
 const deleteMessageForEveryone = async (messageId) => {
@@ -461,6 +519,7 @@ module.exports = {
   sendMessage,
   sendButtons,
   sendList,
+  sendFlow,
   uploadMedia,
   getOrCreateMetaMediaId,
   sendMediaMessage,

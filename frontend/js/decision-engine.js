@@ -46,6 +46,64 @@ window.applyFlatpickrToFields = function() {
 // Initialize flatpickr script on load
 window.initFlatpickrForDecisionEngine();
 
+// Ensure Location Service & India Location Data is available
+if (typeof window.LocationService === 'undefined') {
+    const locScript = document.createElement('script');
+    locScript.src = (window.ROOT_PATH || '') + 'js/location-data.js';
+    document.head.appendChild(locScript);
+}
+
+window.initDecisionEngineLocationComboboxes = function(initialState = 'Karnataka', initialDistrict = '', initialTaluk = '') {
+    if (typeof window.initSearchableCombobox !== 'function') {
+        setTimeout(() => window.initDecisionEngineLocationComboboxes(initialState, initialDistrict, initialTaluk), 80);
+        return;
+    }
+
+    const stateInput = document.getElementById('de-state');
+    const districtInput = document.getElementById('de-district');
+    const talukInput = document.getElementById('de-taluk');
+
+    if (!stateInput || !districtInput || !talukInput) return;
+
+    if (initialState) stateInput.value = initialState;
+    if (initialDistrict) districtInput.value = initialDistrict;
+    if (initialTaluk) talukInput.value = initialTaluk;
+
+    // 1. State Combobox
+    window.initSearchableCombobox('de-state', 'list-de-state', () => {
+        return window.LocationService ? window.LocationService.getStates() : ['Karnataka'];
+    }, (selectedState) => {
+        const curDist = (districtInput.value || '').trim();
+        const availableDistricts = window.LocationService ? window.LocationService.getDistricts(selectedState) : [];
+        if (curDist && !availableDistricts.some(d => d.toLowerCase().includes(curDist.toLowerCase()) || curDist.toLowerCase().includes(d.toLowerCase()))) {
+            districtInput.value = '';
+            talukInput.value = '';
+        }
+    });
+
+    // 2. District Combobox
+    window.initSearchableCombobox('de-district', 'list-de-district', () => {
+        const curState = stateInput.value || 'Karnataka';
+        return window.LocationService ? window.LocationService.getDistricts(curState) : [];
+    }, (selectedDistrict) => {
+        const curState = stateInput.value || 'Karnataka';
+        const curTaluk = (talukInput.value || '').trim();
+        const availableTaluks = window.LocationService ? window.LocationService.getTaluks(curState, selectedDistrict) : [];
+        if (curTaluk && !availableTaluks.some(t => t.toLowerCase() === curTaluk.toLowerCase())) {
+            talukInput.value = '';
+        }
+    });
+
+    // 3. Taluk Combobox
+    window.initSearchableCombobox('de-taluk', 'list-de-taluk', () => {
+        const curState = stateInput.value || 'Karnataka';
+        const curDist = districtInput.value || '';
+        return window.LocationService ? window.LocationService.getTaluks(curState, curDist) : [];
+    }, (selectedTaluk) => {
+        // Taluk selected
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // We bind events later because modal might be loaded dynamically via components.js
     // We'll rely on an observer or simple delegation for static listeners.
@@ -475,15 +533,34 @@ window.handleLeadConversionModal = function () {
     // 2. Auto-fill available details from the View
     const leadPhone = document.getElementById('leadDetailPhone')?.textContent || '';
     const leadName = document.getElementById('leadDetailName')?.textContent || '';
-    const leadVillage = document.getElementById('leadDetailVillage')?.textContent || '';
-    const leadDistrict = document.getElementById('leadDetailDistrict')?.textContent || '';
-    const leadPincode = document.getElementById('leadDetailPincode')?.textContent || '';
-    const leadState = document.getElementById('leadDetailState')?.textContent || '';
-    const leadLanguage = document.getElementById('leadDetailLanguage')?.textContent || 'EN';
+    
+    // Fill village from lead.village (or fallback to city)
+    const rawVillage = window.currentLeadData?.village || 
+                       (window.currentLeadData?.city && window.currentLeadData.city !== '-' ? window.currentLeadData.city : '') || 
+                       (document.getElementById('leadDetailVillage')?.textContent !== '-' ? document.getElementById('leadDetailVillage')?.textContent : '');
+    const leadVillage = (rawVillage && rawVillage !== '-') ? rawVillage : '';
+
+    // Fill taluk from lead.taluk or lead.sub_district
+    const rawTaluk = window.currentLeadData?.taluk || 
+                     window.currentLeadData?.sub_district || 
+                     (document.getElementById('leadDetailTaluk')?.textContent !== '-' ? document.getElementById('leadDetailTaluk')?.textContent : '');
+    const leadTaluk = (rawTaluk && rawTaluk !== '-') ? rawTaluk : '';
+
+    const rawDistrict = window.currentLeadData?.district || (document.getElementById('leadDetailDistrict')?.textContent !== '-' ? document.getElementById('leadDetailDistrict')?.textContent : '');
+    const leadDistrict = (rawDistrict && rawDistrict !== '-') ? rawDistrict : '';
+
+    const rawPincode = window.currentLeadData?.pincode || (document.getElementById('leadDetailPincode')?.textContent !== '-' ? document.getElementById('leadDetailPincode')?.textContent : '');
+    const leadPincode = (rawPincode && rawPincode !== '-') ? rawPincode : '';
+
+    const rawState = window.currentLeadData?.state || (document.getElementById('leadDetailState')?.textContent !== '-' ? document.getElementById('leadDetailState')?.textContent : 'Karnataka');
+    const leadState = (rawState && rawState !== '-') ? rawState : 'Karnataka';
+
+    const leadLanguage = window.currentLeadData?.language || document.getElementById('leadDetailLanguage')?.textContent || 'EN';
 
     const phoneInput = document.getElementById('de-phone');
     const nameInput = document.getElementById('de-customer-name');
     const villageInput = document.getElementById('de-village');
+    const talukInput = document.getElementById('de-taluk');
     const districtInput = document.getElementById('de-district');
     const pincodeInput = document.getElementById('de-pincode');
     const stateInput = document.getElementById('de-state');
@@ -492,13 +569,22 @@ window.handleLeadConversionModal = function () {
     if (phoneInput) phoneInput.value = leadPhone;
     if (nameInput) nameInput.value = leadName;
 
-    if (villageInput && leadVillage && leadVillage !== '-') {
-        villageInput.value = leadVillage;
-    }
+    const cleanVillage = (leadVillage && leadVillage !== '-') ? leadVillage : '';
+    if (villageInput) villageInput.value = cleanVillage;
 
-    if (districtInput && leadDistrict && leadDistrict !== '-') {
-        districtInput.value = leadDistrict;
-    }
+    const cleanState = (leadState && leadState !== '-') ? leadState : 'Karnataka';
+    const normalizedState = window.LocationService ? window.LocationService.normalizeState(cleanState) : cleanState;
+
+    const cleanDistrict = (leadDistrict && leadDistrict !== '-') ? leadDistrict : '';
+    const normalizedDistrict = window.LocationService ? window.LocationService.normalizeDistrict(normalizedState, cleanDistrict) : cleanDistrict;
+
+    const cleanTaluk = (leadTaluk && leadTaluk !== '-') ? leadTaluk : '';
+
+    if (stateInput) stateInput.value = normalizedState || 'Karnataka';
+    if (districtInput) districtInput.value = normalizedDistrict;
+    if (talukInput) talukInput.value = cleanTaluk;
+
+    window.initDecisionEngineLocationComboboxes(normalizedState, normalizedDistrict, cleanTaluk);
 
     if (pincodeInput && leadPincode && leadPincode !== '-') {
         pincodeInput.value = leadPincode;
@@ -508,12 +594,7 @@ window.handleLeadConversionModal = function () {
         }
     }
 
-    if (stateInput && leadState && leadState !== '-') {
-        stateInput.value = leadState;
-    }
-
     if (langInput && leadLanguage && leadLanguage !== '-') {
-        // Handle common text variants if needed, or just set it
         const cleanLang = (leadLanguage === 'Language') ? 'EN' : leadLanguage;
         langInput.value = cleanLang;
     }
@@ -850,6 +931,7 @@ async function saveDecisionEngineState() {
             fields: {
                 'de-customer-name': document.getElementById('de-customer-name')?.value,
                 'de-village': document.getElementById('de-village')?.value,
+                'de-taluk': document.getElementById('de-taluk')?.value,
                 'de-district': document.getElementById('de-district')?.value,
                 'de-pincode': document.getElementById('de-pincode')?.value,
                 'de-state': document.getElementById('de-state')?.value,
@@ -900,6 +982,12 @@ function restoreDecisionEngineState(state) {
     }
     
     // We explicitly do not restore de-call-status because they MUST click it fresh on step 1.
+    const restoredState = document.getElementById('de-state')?.value || 'Karnataka';
+    const restoredDistrict = document.getElementById('de-district')?.value || '';
+    const restoredTaluk = document.getElementById('de-taluk')?.value || '';
+    if (typeof window.initDecisionEngineLocationComboboxes === 'function') {
+        window.initDecisionEngineLocationComboboxes(restoredState, restoredDistrict, restoredTaluk);
+    }
     return state.lastStep;
 }
 
@@ -916,9 +1004,13 @@ function resetDecisionEngine() {
     // Clear Customer Details
     document.getElementById('de-customer-name').value = '';
     document.getElementById('de-village').value = '';
+    if (document.getElementById('de-taluk')) document.getElementById('de-taluk').value = '';
     document.getElementById('de-district').value = '';
     document.getElementById('de-pincode').value = '';
     document.getElementById('de-state').value = 'Karnataka'; // default
+    if (typeof window.initDecisionEngineLocationComboboxes === 'function') {
+        window.initDecisionEngineLocationComboboxes('Karnataka', '', '');
+    }
 
     // Clear product selections
     const productSelect = document.getElementById('de-products');
@@ -1003,10 +1095,11 @@ async function submitDecisionEngine() {
         const salesStatus = document.getElementById('de-sales-status').value;
         const customerName = document.getElementById('de-customer-name').value;
         const phone = document.getElementById('de-phone').value;
-        const village = document.getElementById('de-village').value;
-        const district = document.getElementById('de-district').value;
-        const pincode = document.getElementById('de-pincode').value;
-        const state = document.getElementById('de-state').value;
+        const village = (document.getElementById('de-village')?.value || '').trim();
+        const taluk = (document.getElementById('de-taluk')?.value || '').trim();
+        const district = (document.getElementById('de-district')?.value || '').trim();
+        const pincode = (document.getElementById('de-pincode')?.value || '').trim();
+        const state = (document.getElementById('de-state')?.value || '').trim();
 
         if ((salesStatus === 'Ordered' || salesStatus === 'converted') && leadPath !== 'not_connected') {
             const items = getSelectedProducts('');
@@ -1087,7 +1180,10 @@ async function submitDecisionEngine() {
 
         const updatePayload = {
             customer_name: customerName || (window.currentLeadData ? window.currentLeadData.customer_name : ''),
-            city: village || (window.currentLeadData ? window.currentLeadData.city : ''),
+            village: village || (window.currentLeadData ? window.currentLeadData.village : ''),
+            taluk: taluk || (window.currentLeadData ? window.currentLeadData.taluk : ''),
+            sub_district: taluk || (window.currentLeadData ? window.currentLeadData.sub_district : ''),
+            city: village || taluk || (window.currentLeadData ? window.currentLeadData.city : ''),
             district: district || (window.currentLeadData ? window.currentLeadData.district : ''),
             pincode: pincode || (window.currentLeadData ? window.currentLeadData.pincode : ''),
             state: state || (window.currentLeadData ? window.currentLeadData.state : ''),
@@ -1153,11 +1249,13 @@ async function submitDecisionEngine() {
             formData.append('lead_id', leadId);
             formData.append('customer_name', customerName);
             formData.append('phone', phone);
-            formData.append('city', village);
-            formData.append('village', village);
-            formData.append('district', district);
-            formData.append('pincode', pincode);
-            formData.append('state', state);
+            formData.append('city', village || taluk || '');
+            formData.append('village', village || '');
+            formData.append('taluk', taluk || '');
+            formData.append('sub_district', taluk || '');
+            formData.append('district', district || '');
+            formData.append('pincode', pincode || '');
+            formData.append('state', state || '');
             formData.append('delivery_type', deliveryType);
             formData.append('total_amount', totalAmt);
             formData.append('advance_amount', advAmt);
@@ -1384,7 +1482,30 @@ function mGoToStep(step) {
     mCurrentStep = step;
 
     // Auto-calculate for manual wizard
-    if (step === 4) {
+    if (step === 2) {
+        if (typeof window.initSearchableCombobox === 'function') {
+            const mState = document.getElementById('m-de-state');
+            const mDist = document.getElementById('m-de-district');
+            const mTaluk = document.getElementById('m-de-taluk');
+            if (mState && !mState.value) mState.value = 'Karnataka';
+            if (mState && mDist && mTaluk) {
+                window.initSearchableCombobox('m-de-state', 'list-m-de-state', () => {
+                    return window.LocationService ? window.LocationService.getStates() : ['Karnataka'];
+                }, (s) => {
+                    mDist.value = '';
+                    mTaluk.value = '';
+                });
+                window.initSearchableCombobox('m-de-district', 'list-m-de-district', () => {
+                    return window.LocationService ? window.LocationService.getDistricts(mState.value || 'Karnataka') : [];
+                }, (d) => {
+                    mTaluk.value = '';
+                });
+                window.initSearchableCombobox('m-de-taluk', 'list-m-de-taluk', () => {
+                    return window.LocationService ? window.LocationService.getTaluks(mState.value || 'Karnataka', mDist.value || '') : [];
+                });
+            }
+        }
+    } else if (step === 4) {
         const salesStatus = document.getElementById('m-de-sales-status')?.value;
         if (salesStatus === 'Ordered') {
             calculateOrderAmounts('m-');
@@ -1409,11 +1530,12 @@ async function submitManualLeadWizard() {
     try {
         const phone = document.getElementById('m-de-phone').value;
         const name = document.getElementById('m-de-customer-name').value;
-        const village = document.getElementById('m-de-village').value;
-        const district = document.getElementById('m-de-district').value;
-        const pincode = document.getElementById('m-de-pincode').value;
-        const state = document.getElementById('m-de-state').value;
-        const lang = document.getElementById('m-de-language').value;
+        const village = (document.getElementById('m-de-village')?.value || '').trim();
+        const taluk = (document.getElementById('m-de-taluk')?.value || '').trim();
+        const district = (document.getElementById('m-de-district')?.value || '').trim();
+        const pincode = (document.getElementById('m-de-pincode')?.value || '').trim();
+        const state = (document.getElementById('m-de-state')?.value || '').trim();
+        const lang = document.getElementById('m-de-language')?.value || 'EN';
         const callStatus = document.getElementById('m-de-call-status').value;
         const salesStatus = document.getElementById('m-de-sales-status').value;
 
@@ -1429,7 +1551,10 @@ async function submitManualLeadWizard() {
         const createPayload = {
             phone_number: phone,
             customer_name: name,
-            city: village,
+            village: village,
+            taluk: taluk,
+            sub_district: taluk,
+            city: village || taluk,
             district: district,
             pincode: pincode,
             state: state,
@@ -1485,11 +1610,18 @@ async function submitManualLeadWizard() {
             formData.append('lead_id', leadId);
             formData.append('customer_name', name);
             formData.append('phone', phone);
-            formData.append('city', village);
-            formData.append('village', village);
-            formData.append('district', district);
-            formData.append('pincode', pincode);
-            formData.append('state', state);
+            formData.append('city', village || taluk || '');
+            formData.append('village', village || '');
+            formData.append('taluk', taluk || '');
+            formData.append('sub_district', taluk || '');
+            formData.append('district', district || '');
+            formData.append('pincode', pincode || '');
+            formData.append('state', state || '');
+            formData.append('delivery_type', deliveryType);
+            formData.append('total_amount', document.getElementById('m-de-order-total').value);
+            formData.append('advance_amount', document.getElementById('m-de-order-advance').value);
+            formData.append('discount', document.getElementById('m-de-order-discount').value || 0);
+            formData.append('items', JSON.stringify(items));
             formData.append('delivery_type', deliveryType);
             formData.append('total_amount', document.getElementById('m-de-order-total').value);
             formData.append('advance_amount', document.getElementById('m-de-order-advance').value);

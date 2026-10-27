@@ -157,7 +157,7 @@ function renderTable(data) {
                     <div class="action-btn-group">
                         <button class="btn-icon-premium view" title="View Details" onclick="openLeadDrawer(${item.lead_id})"><i class="fa-solid fa-eye"></i></button>
                         ${item.status === 'pending' ? `
-                            <button class="btn-icon-premium call" title="Call Lead" onclick="window.location.href='tel:${item.phone_number}'"><i class="fa-solid fa-phone"></i></button>
+                            <button class="btn-icon-premium call" title="Call Lead" onclick="window.initiateLeadClickToCall('${item.phone_number}', ${item.lead_id})"><i class="fa-solid fa-phone"></i></button>
                             <button class="btn-icon-premium check" title="Mark Done" onclick="updateFollowupStatus(${item.followup_id}, 'completed')"><i class="fa-solid fa-check"></i></button>
                         ` : ''}
                     </div>

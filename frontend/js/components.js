@@ -24,7 +24,780 @@ window.copyToClipboard = function (text) {
     });
 };
 
+// ─── Inject Acefone Global Call HUD Styles ─────────────────────────
+(function injectAcefoneHudStyles() {
+    if (document.getElementById('acefoneHudStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'acefoneHudStyles';
+    style.textContent = `
+        .acefone-call-hud {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 360px;
+            background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.6), 0 0 30px rgba(37, 99, 235, 0.25);
+            color: #ffffff;
+            font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+            z-index: 999999;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(16px);
+        }
+        .acefone-call-hud.hud-minimized {
+            width: 280px;
+            height: 64px;
+            overflow: hidden;
+            border-radius: 32px;
+        }
+        .acefone-call-hud.hud-minimized .hud-body,
+        .acefone-call-hud.hud-minimized .hud-footer {
+            display: none !important;
+        }
+        .acefone-call-hud .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.85rem 1.15rem;
+            background: rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .acefone-call-hud .hud-agent-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .acefone-call-hud .hud-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 14px rgba(37, 99, 235, 0.6);
+            flex-shrink: 0;
+        }
+        .acefone-call-hud .hud-agent-name {
+            font-weight: 700;
+            font-size: 0.92rem;
+            color: #f8fafc;
+            line-height: 1.2;
+        }
+        .acefone-call-hud .hud-agent-status {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            margin-top: 0.15rem;
+        }
+        .acefone-call-hud .hud-window-controls {
+            display: flex;
+            gap: 0.35rem;
+        }
+        .acefone-call-hud .hud-window-controls button {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #cbd5e1;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: background 0.2s, color 0.2s;
+        }
+        .acefone-call-hud .hud-window-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        .acefone-call-hud .hud-body {
+            padding: 1.25rem 1.15rem;
+            text-align: center;
+        }
+        .acefone-call-hud .hud-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.8rem;
+            border-radius: 9999px;
+            background: rgba(37, 99, 235, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.75rem;
+        }
+        .acefone-call-hud .hud-customer-phone {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 0.02em;
+            margin: 0.35rem 0 0.15rem 0;
+        }
+        .acefone-call-hud .hud-customer-subtext {
+            font-size: 0.78rem;
+            color: #94a3b8;
+        }
+        .acefone-call-hud .hud-dots {
+            display: flex;
+            justify-content: center;
+            gap: 0.35rem;
+            margin: 0.75rem 0;
+        }
+        .acefone-call-hud .hud-dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #3b82f6;
+            animation: hudDotPulse 1.4s infinite ease-in-out both;
+        }
+        .acefone-call-hud .hud-dots span:nth-child(1) { animation-delay: 0s; }
+        .acefone-call-hud .hud-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .acefone-call-hud .hud-dots span:nth-child(3) { animation-delay: 0.4s; }
+        .acefone-call-hud .hud-dots span:nth-child(4) { animation-delay: 0.6s; }
+
+        @keyframes hudDotPulse {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1.3); opacity: 1; background: #10b981; }
+        }
+
+        .acefone-call-hud .hud-waveform {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.3rem;
+            height: 28px;
+            margin: 0.75rem 0;
+        }
+        .acefone-call-hud .hud-waveform .wave-bar {
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, #10b981, #059669);
+            border-radius: 9999px;
+            animation: hudWave 1.2s infinite ease-in-out;
+        }
+        .acefone-call-hud .hud-waveform .wave-bar:nth-child(1) { animation-delay: 0.1s; }
+        .acefone-call-hud .hud-waveform .wave-bar:nth-child(2) { animation-delay: 0.3s; }
+        .acefone-call-hud .hud-waveform .wave-bar:nth-child(3) { animation-delay: 0.5s; }
+        .acefone-call-hud .hud-waveform .wave-bar:nth-child(4) { animation-delay: 0.2s; }
+        .acefone-call-hud .hud-waveform .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+        .acefone-call-hud .hud-waveform .wave-bar:nth-child(6) { animation-delay: 0.6s; }
+
+        @keyframes hudWave {
+            0%, 100% { height: 6px; }
+            50% { height: 26px; }
+        }
+
+        .acefone-call-hud .hud-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.85rem 1.15rem;
+            background: rgba(0, 0, 0, 0.25);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .acefone-call-hud .hud-timer {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #10b981;
+            letter-spacing: 0.05em;
+        }
+        .acefone-call-hud .hud-btn-cancel {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #ffffff;
+            border: none;
+            border-radius: 9999px;
+            padding: 0.45rem 1.2rem;
+            font-weight: 700;
+            font-size: 0.82rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .acefone-call-hud .hud-btn-cancel:hover {
+            transform: scale(1.04);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+window.initAcefoneCallHud = function() {
+    let hud = document.getElementById('acefoneGlobalCallHud');
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'acefoneGlobalCallHud';
+        hud.className = 'acefone-call-hud';
+        hud.style.display = 'none';
+        hud.innerHTML = `
+            <div class="hud-header">
+                <div class="hud-agent-info">
+                    <div class="hud-avatar" id="hudAgentAvatar">DK</div>
+                    <div>
+                        <div class="hud-agent-name" id="hudAgentName">Darshan Kumar</div>
+                        <div class="hud-agent-status" id="hudAgentStatus">Calling Agent...</div>
+                    </div>
+                </div>
+                <div class="hud-window-controls">
+                    <button class="hud-btn-min" onclick="window.toggleAcefoneHudMinimize()" title="Minimize"><i class="fas fa-minus"></i></button>
+                    <button class="hud-btn-close" onclick="window.closeAcefoneHud()" title="Close"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="hud-body">
+                <div class="hud-status-badge" id="hudStatusBadge">
+                    <i class="fas fa-spinner fa-spin"></i> 1. Initiating Call
+                </div>
+                <div class="hud-dots" id="hudDots">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+                <div class="hud-customer-info">
+                    <div class="hud-customer-phone" id="hudCustomerPhone">+91 00000 00000</div>
+                    <div class="hud-customer-subtext" id="hudCustomerSubtext">Connecting call request...</div>
+                </div>
+                <div class="hud-waveform" id="hudWaveform" style="display: none;">
+                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                </div>
+            </div>
+            <div class="hud-footer">
+                <div class="hud-timer" id="hudCallTimer">00:00:00</div>
+                <button class="hud-btn-cancel" id="hudCancelBtn" onclick="window.cancelAcefoneHudCall()">
+                    <i class="fas fa-phone-slash"></i> <span id="hudCancelBtnText">End Call</span>
+                </button>
+            </div>
+        `;
+        document.body.appendChild(hud);
+    }
+    return hud;
+};
+
+window.currentHudCallId = null;
+window.hudLiveInterval = null;
+window.hudLiveSeconds = 0;
+
+window.showAcefoneCallHud = function({ callId, agentName, customerPhone, customerName }) {
+    window.initAcefoneCallHud();
+    const hud = document.getElementById('acefoneGlobalCallHud');
+    if (!hud) return;
+
+    window.currentHudCallId = callId;
+    window.hudLiveSeconds = 0;
+    if (window.hudLiveInterval) {
+        clearInterval(window.hudLiveInterval);
+        window.hudLiveInterval = null;
+    }
+
+    hud.classList.remove('hud-minimized');
+    hud.style.display = 'block';
+
+    const user = window.getCurrentUser ? window.getCurrentUser() : {};
+    const resolvedAgentName = agentName || (user ? user.name : '') || 'Telecaller';
+    const initials = resolvedAgentName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'DA';
+
+    document.getElementById('hudAgentAvatar').textContent = initials;
+    document.getElementById('hudAgentName').textContent = resolvedAgentName;
+    document.getElementById('hudCustomerPhone').textContent = customerPhone || 'Farmer';
+    document.getElementById('hudCallTimer').textContent = '00:00:00';
+
+    window.hudCurrentStageIndex = 1;
+    window.updateAcefoneCallHudState('AGENT_RINGING');
+};
+
+window.hudCurrentStageIndex = 0;
+
+window.setAcefoneCallHudStateProgressive = function(targetState, extraData = {}) {
+    const stageMap = {
+        'INITIATING': 1,
+        'AGENT_RINGING': 1,
+        'AGENT_ANSWERED': 2,
+        'CUSTOMER_RINGING': 3,
+        'CONNECTED': 4,
+        'ENDED': 5,
+        'COMPLETED': 5,
+        'FAILED': 5
+    };
+
+    const targetIndex = stageMap[targetState] || 1;
+    if (!window.hudCurrentStageIndex) window.hudCurrentStageIndex = 1;
+
+    if (targetIndex >= 5 || targetIndex <= window.hudCurrentStageIndex) {
+        window.hudCurrentStageIndex = targetIndex;
+        window.updateAcefoneCallHudState(targetState, extraData);
+        return;
+    }
+
+    let stepIndex = window.hudCurrentStageIndex + 1;
+    window.hudCurrentStageIndex = targetIndex;
+
+    const stepInterval = setInterval(() => {
+        if (stepIndex >= targetIndex) {
+            clearInterval(stepInterval);
+            window.updateAcefoneCallHudState(targetState, extraData);
+        } else {
+            const indexToState = { 1: 'AGENT_RINGING', 2: 'AGENT_ANSWERED', 3: 'CUSTOMER_RINGING', 4: 'CONNECTED' };
+            window.updateAcefoneCallHudState(indexToState[stepIndex], extraData);
+            stepIndex++;
+        }
+    }, 400);
+};
+
+window.updateAcefoneCallHudState = function(state, extraData = {}) {
+    const hud = document.getElementById('acefoneGlobalCallHud');
+    if (!hud) return;
+
+    hud.style.display = 'block';
+    hud.classList.remove('hud-minimized');
+
+    const badge = document.getElementById('hudStatusBadge');
+    const agentStatus = document.getElementById('hudAgentStatus');
+    const subtext = document.getElementById('hudCustomerSubtext');
+    const dots = document.getElementById('hudDots');
+    const waveform = document.getElementById('hudWaveform');
+    const btnText = document.getElementById('hudCancelBtnText');
+    const cancelBtn = document.getElementById('hudCancelBtn');
+
+    if (state === 'INITIATING' || state === 'AGENT_RINGING') {
+        badge.innerHTML = '<i class="fas fa-phone-volume"></i> 1. Agent Ringing';
+        badge.style.background = 'rgba(249, 115, 22, 0.2)';
+        badge.style.color = '#fb923c';
+        agentStatus.textContent = 'Ringing agent phone...';
+        subtext.textContent = 'Please pick up your phone / extension';
+        dots.style.display = 'flex';
+        waveform.style.display = 'none';
+        btnText.textContent = 'End Call';
+        cancelBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+    } else if (state === 'AGENT_ANSWERED') {
+        badge.innerHTML = '<i class="fas fa-user-check"></i> 2. Agent Answered';
+        badge.style.background = 'rgba(16, 185, 129, 0.2)';
+        badge.style.color = '#34d399';
+        agentStatus.textContent = 'Agent connected!';
+        subtext.textContent = 'Now dialing customer phone...';
+        dots.style.display = 'flex';
+        waveform.style.display = 'none';
+        btnText.textContent = 'End Call';
+        cancelBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+    } else if (state === 'CUSTOMER_RINGING') {
+        badge.innerHTML = '<i class="fas fa-mobile-alt"></i> 3. Calling Customer';
+        badge.style.background = 'rgba(99, 102, 241, 0.2)';
+        badge.style.color = '#818cf8';
+        agentStatus.textContent = 'Dialing customer...';
+        subtext.textContent = 'Customer phone is ringing...';
+        dots.style.display = 'flex';
+        waveform.style.display = 'none';
+        btnText.textContent = 'End Call';
+        cancelBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+
+        if (window.customerRingingTimeout) clearTimeout(window.customerRingingTimeout);
+        window.customerRingingTimeout = setTimeout(() => {
+            if (window.hudCurrentStageIndex === 3) {
+                window.setAcefoneCallHudStateProgressive('CONNECTED');
+            }
+        }, 2500);
+    } else if (state === 'CONNECTED') {
+        if (window.customerRingingTimeout) {
+            clearTimeout(window.customerRingingTimeout);
+            window.customerRingingTimeout = null;
+        }
+        badge.innerHTML = '<i class="fas fa-circle" style="color: #10b981; font-size: 0.55rem;"></i> 4. Connected';
+        badge.style.background = 'rgba(16, 185, 129, 0.25)';
+        badge.style.color = '#34d399';
+        agentStatus.textContent = 'Live Call Connected';
+        subtext.textContent = 'Live conversation with agent & customer';
+        dots.style.display = 'none';
+        waveform.style.display = 'flex';
+        btnText.textContent = 'End Call';
+        cancelBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+
+        if (extraData.startSeconds && window.hudLiveSeconds === 0) {
+            window.hudLiveSeconds = extraData.startSeconds;
+        }
+
+        // Start live 1-sec duration timer
+        if (!window.hudLiveInterval) {
+            window.hudLiveInterval = setInterval(() => {
+                window.hudLiveSeconds++;
+                const mins = String(Math.floor(window.hudLiveSeconds / 60)).padStart(2, '0');
+                const secs = String(window.hudLiveSeconds % 60).padStart(2, '0');
+                document.getElementById('hudCallTimer').textContent = `00:${mins}:${secs}`;
+            }, 1000);
+        }
+    } else if (state === 'ENDED' || state === 'COMPLETED') {
+        if (window.customerRingingTimeout) {
+            clearTimeout(window.customerRingingTimeout);
+            window.customerRingingTimeout = null;
+        }
+        if (window.hudLiveInterval) {
+            clearInterval(window.hudLiveInterval);
+            window.hudLiveInterval = null;
+        }
+        badge.innerHTML = '<i class="fas fa-check-circle"></i> 5. Call Ended';
+        badge.style.background = 'rgba(100, 116, 139, 0.25)';
+        badge.style.color = '#cbd5e1';
+        agentStatus.textContent = 'Call Finished';
+        subtext.textContent = extraData.durationText ? `Total Duration: ${extraData.durationText}` : 'Call session completed.';
+        dots.style.display = 'none';
+        waveform.style.display = 'none';
+        btnText.textContent = 'Close';
+        cancelBtn.style.background = 'linear-gradient(135deg, #475569, #334155)';
+    } else if (state === 'MISSED') {
+        if (window.customerRingingTimeout) {
+            clearTimeout(window.customerRingingTimeout);
+            window.customerRingingTimeout = null;
+        }
+        if (window.hudLiveInterval) {
+            clearInterval(window.hudLiveInterval);
+            window.hudLiveInterval = null;
+        }
+        badge.innerHTML = '<i class="fas fa-phone-slash"></i> Call Missed';
+        badge.style.background = 'rgba(245, 158, 11, 0.25)';
+        badge.style.color = '#fbbf24';
+        agentStatus.textContent = 'Call Not Answered';
+        subtext.textContent = extraData.reason || 'Call was not answered.';
+        dots.style.display = 'none';
+        waveform.style.display = 'none';
+        btnText.textContent = 'Close';
+        cancelBtn.style.background = 'linear-gradient(135deg, #475569, #334155)';
+    } else if (state === 'FAILED') {
+        if (window.customerRingingTimeout) {
+            clearTimeout(window.customerRingingTimeout);
+            window.customerRingingTimeout = null;
+        }
+        if (window.hudLiveInterval) {
+            clearInterval(window.hudLiveInterval);
+            window.hudLiveInterval = null;
+        }
+        badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Call Failed';
+        badge.style.background = 'rgba(239, 68, 68, 0.25)';
+        badge.style.color = '#fca5a5';
+        agentStatus.textContent = 'Call Failed';
+        subtext.textContent = extraData.reason || 'Call failed at Acefone provider.';
+        dots.style.display = 'none';
+        waveform.style.display = 'none';
+        btnText.textContent = 'Close';
+        cancelBtn.style.background = 'linear-gradient(135deg, #475569, #334155)';
+    }
+};
+
+window.toggleAcefoneHudMinimize = function() {
+    const hud = document.getElementById('acefoneGlobalCallHud');
+    if (hud) hud.classList.toggle('hud-minimized');
+};
+
+window.closeAcefoneHud = function() {
+    sessionStorage.removeItem('acefone_active_call');
+    const hud = document.getElementById('acefoneGlobalCallHud');
+    if (hud) hud.style.display = 'none';
+    if (window.hudLiveInterval) {
+        clearInterval(window.hudLiveInterval);
+        window.hudLiveInterval = null;
+    }
+};
+
+window.cancelAcefoneHudCall = async function() {
+    const btnText = document.getElementById('hudCancelBtnText');
+    const cancelBtn = document.getElementById('hudCancelBtn');
+
+    if (btnText && btnText.textContent === 'Close') {
+        window.closeAcefoneHud();
+        return;
+    }
+
+    const callId = window.currentHudCallId;
+    if (cancelBtn) cancelBtn.disabled = true;
+    if (btnText) btnText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ending Call...';
+
+    let hangupSuccess = false;
+
+    try {
+        if (callId) {
+            const token = localStorage.getItem('token');
+            const baseUrl = window.API_URL || 'http://127.0.0.1:5000/api';
+            const response = await fetch(`${baseUrl}/telephony/calls/${callId}/hangup`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const data = await response.json();
+            if (data.success && data.provider_result && data.provider_result.success !== false) {
+                hangupSuccess = true;
+            } else {
+                const failMsg = (data.provider_result && data.provider_result.message) || data.message || "Acefone line hangup pending";
+                console.warn("⚠️ Acefone Line Hangup Notice:", failMsg);
+                if (window.showAlert) {
+                    window.showAlert("Hangup Notice ⚠️", `Line disconnection pending at Acefone (${failMsg}). Live monitoring remains active.`, "warning");
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("Hangup request error:", err);
+    } finally {
+        if (cancelBtn) cancelBtn.disabled = false;
+
+        if (hangupSuccess) {
+            // Acefone provider confirmed telecom line termination -> Safely mark HUD state as ENDED & stop polling
+            if (window.currentCallPollInterval) {
+                clearInterval(window.currentCallPollInterval);
+                window.currentCallPollInterval = null;
+            }
+            sessionStorage.removeItem('acefone_active_call');
+            window.updateAcefoneCallHudState('ENDED', { durationText: document.getElementById('hudCallTimer').textContent });
+            if (window.currentViewingLeadId && typeof window.loadLeadTimeline === 'function') {
+                window.loadLeadTimeline(window.currentViewingLeadId);
+            }
+        } else {
+            // Acefone line not yet disconnected -> Keep live monitoring active so CRM tracks when agent answers!
+            if (btnText) btnText.innerHTML = '<i class="fas fa-phone-slash"></i> End Call';
+        }
+    }
+};
+
+window.playCallRecordingMock = function(callId) {
+    if (window.showAlert) {
+        window.showAlert("Playing Call Recording 🎵", `Streaming call recording audio for Call #${callId}...`, "info");
+    } else {
+        alert(`Streaming call recording audio for Call #${callId}...`);
+    }
+};
+
+window.restoreAcefoneActiveCallSession = async function() {
+    try {
+        const savedCallStr = sessionStorage.getItem('acefone_active_call');
+        if (!savedCallStr) return;
+        const activeCall = JSON.parse(savedCallStr);
+        if (!activeCall || !activeCall.callId) return;
+
+        const token = localStorage.getItem('token');
+        const baseUrl = window.API_URL || 'http://127.0.0.1:5000/api';
+        const res = await fetch(`${baseUrl}/telephony/calls/${activeCall.callId}/status`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && data.call) {
+            const status = data.call.technical_status;
+            if (status === 'REQUESTED' || status === 'CONNECTED') {
+                window.monitorCallStatus(activeCall.callId, activeCall.destinationPhone || data.call.customer_phone, activeCall.customerName);
+            } else {
+                sessionStorage.removeItem('acefone_active_call');
+            }
+        }
+    } catch (err) {
+        console.warn("Failed to restore Acefone active call session:", err);
+    }
+};
+
+// Global Call Status Monitor to capture asynchronous webhook updates & drive Global HUD
+window.monitorCallStatus = function(callId, destinationPhone, customerName) {
+    if (!callId) return;
+
+    window.currentHudCallId = callId;
+    const targetPhone = destinationPhone || '';
+    const targetName = customerName || '';
+
+    sessionStorage.setItem('acefone_active_call', JSON.stringify({
+        callId,
+        destinationPhone: targetPhone,
+        customerName: targetName,
+        startedAt: Date.now()
+    }));
+
+    window.showAcefoneCallHud({ callId, customerPhone: targetPhone, customerName: targetName });
+
+    if (window.currentCallPollInterval) {
+        clearInterval(window.currentCallPollInterval);
+    }
+
+    let attempts = 0;
+    const maxAttempts = 7200; // Allow calls up to 3 hours (7200 attempts at 1.5s poll) without stopping UI monitoring
+    let hasConnected = false;
+
+    window.currentCallPollInterval = setInterval(async () => {
+        attempts++;
+        try {
+            const token = localStorage.getItem('token');
+            const baseUrl = window.API_URL || 'http://127.0.0.1:5000/api';
+            const res = await fetch(`${baseUrl}/telephony/calls/${callId}/status`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success && data.call) {
+                const call = data.call;
+
+                // Dynamically update customer phone if missing
+                if (call.customer_phone) {
+                    const custEl = document.getElementById('hudCustomerPhone');
+                    if (custEl && (!custEl.textContent || custEl.textContent === 'Farmer' || custEl.textContent === '+91 00000 00000')) {
+                        custEl.textContent = call.customer_phone;
+                    }
+                }
+
+                if (call.technical_status === 'REQUESTED' || call.technical_status === 'INITIATING') {
+                    window.setAcefoneCallHudStateProgressive('AGENT_RINGING');
+                } else if (call.technical_status === 'RINGING_AGENT') {
+                    window.setAcefoneCallHudStateProgressive('AGENT_RINGING');
+                } else if (call.technical_status === 'AGENT_ANSWERED') {
+                    window.setAcefoneCallHudStateProgressive('AGENT_ANSWERED');
+                } else if (call.technical_status === 'CUSTOMER_RINGING') {
+                    window.setAcefoneCallHudStateProgressive('CUSTOMER_RINGING');
+                } else if (call.technical_status === 'CONNECTED') {
+                    if (!hasConnected) {
+                        hasConnected = true;
+                        window.setAcefoneCallHudStateProgressive('CONNECTED', { startSeconds: parseInt(call.duration_seconds || attempts * 2) });
+                    }
+                } else if (call.technical_status === 'COMPLETED') {
+                    sessionStorage.removeItem('acefone_active_call');
+                    if (window.currentCallPollInterval) {
+                        clearInterval(window.currentCallPollInterval);
+                        window.currentCallPollInterval = null;
+                    }
+                    const durSec = parseInt(call.duration_seconds || call.talk_time_seconds || 0);
+                    const mins = String(Math.floor(durSec / 60)).padStart(2, '0');
+                    const secs = String(durSec % 60).padStart(2, '0');
+                    const durationText = `00:${mins}:${secs}`;
+                    window.updateAcefoneCallHudState('ENDED', { durationText });
+
+                    if (window.currentViewingLeadId && typeof window.loadLeadTimeline === 'function') {
+                        window.loadLeadTimeline(window.currentViewingLeadId);
+                    }
+                } else if (call.technical_status === 'FAILED') {
+                    sessionStorage.removeItem('acefone_active_call');
+                    if (window.currentCallPollInterval) {
+                        clearInterval(window.currentCallPollInterval);
+                        window.currentCallPollInterval = null;
+                    }
+                    const reason = call.hangup_reason || 'Call failed to connect to agent phone.';
+                    window.updateAcefoneCallHudState('FAILED', { reason });
+                    if (window.showAlert) {
+                        window.showAlert('Call Failed ❌', reason, 'error');
+                    }
+                } else if (call.technical_status === 'MISSED' || call.technical_status === 'BUSY') {
+                    sessionStorage.removeItem('acefone_active_call');
+                    if (window.currentCallPollInterval) {
+                        clearInterval(window.currentCallPollInterval);
+                        window.currentCallPollInterval = null;
+                    }
+                    const reason = call.technical_status === 'BUSY'
+                        ? 'Agent line was busy or call was declined.'
+                        : (call.hangup_reason || 'Agent phone rang but call was not answered or was declined.');
+                    window.updateAcefoneCallHudState('MISSED', { reason });
+                    if (window.showAlert) {
+                        window.showAlert('Call Missed ⚠️', reason, 'warning');
+                    }
+                    if (window.currentViewingLeadId && typeof window.loadLeadTimeline === 'function') {
+                        window.loadLeadTimeline(window.currentViewingLeadId);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Call status monitoring error:", err);
+        }
+        if (attempts >= maxAttempts) {
+            clearInterval(window.currentCallPollInterval);
+            window.currentCallPollInterval = null;
+        }
+    }, 1000);
+};
+
+// Global Click to Call function accessible from anywhere in the CRM (leads.html, lead-details.html, etc.)
+window.initiateLeadClickToCall = async function (customPhone, customLeadId) {
+    const leadData = window.currentLeadData || {};
+    const leadId = customLeadId || leadData.lead_id || null;
+    const phoneEl = document.getElementById('leadDetailPhone');
+    const destinationPhone = customPhone || (phoneEl ? phoneEl.textContent.trim() : '') || leadData.phone_number;
+
+    if (!destinationPhone || destinationPhone === '-' || destinationPhone === 'Loading...') {
+        if (window.showAlert) window.showAlert('Missing Phone Number', 'No valid farmer phone number found.', 'error');
+        else alert('No valid farmer phone number found.');
+        return;
+    }
+
+    // Visual loading state on call buttons if present
+    const btnHeader = document.getElementById('callFarmerBtn');
+    const btnInline = document.getElementById('callFarmerInlineBtn');
+    const origHeaderHtml = btnHeader ? btnHeader.innerHTML : '';
+    const origInlineHtml = btnInline ? btnInline.innerHTML : '';
+
+    if (btnHeader) {
+        btnHeader.disabled = true;
+        btnHeader.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Dialing...';
+    }
+    if (btnInline) {
+        btnInline.disabled = true;
+        btnInline.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calling...';
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const baseUrl = window.API_URL || 'http://127.0.0.1:5000/api';
+        const res = await fetch(`${baseUrl}/telephony/click-to-call`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                lead_id: leadId,
+                destination_phone: destinationPhone
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            const messageText = data.message || `📞 Acefone is ringing your agent extension/mobile now! Once answered, it will connect to ${destinationPhone}.`;
+            if (window.showAlert) {
+                window.showAlert('Click-to-Call Initiated! 📞', messageText, 'success');
+            } else {
+                alert(`📞 Click-to-Call Initiated!\n\n${messageText}`);
+            }
+            if (data.call_id) {
+                window.monitorCallStatus(data.call_id, destinationPhone);
+            }
+        } else {
+            const errMsg = data.error || 'Failed to initiate click to call.';
+            if (window.showAlert) {
+                window.showAlert('Call Failed ❌', errMsg, 'error');
+            } else {
+                alert(`❌ Call Failed: ${errMsg}`);
+            }
+        }
+    } catch (err) {
+        console.error("Click to call error:", err);
+        if (window.showAlert) {
+            window.showAlert('Network Error', err.message, 'error');
+        } else {
+            alert(`❌ Network Error: ${err.message}`);
+        }
+    } finally {
+        if (btnHeader) {
+            btnHeader.disabled = false;
+            btnHeader.innerHTML = origHeaderHtml;
+        }
+        if (btnInline) {
+            btnInline.disabled = false;
+            btnInline.innerHTML = origInlineHtml;
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // ── Restore Active Call HUD Session across Page Navigations ──
+    if (typeof window.restoreAcefoneActiveCallSession === 'function') {
+        window.restoreAcefoneActiveCallSession();
+    }
+
     const user = window.getCurrentUser();
     const role = (user.role || '').toLowerCase();
 
@@ -87,6 +860,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                         item.remove(); // Remove unauthorized module link
                     }
                 });
+
+                // 🔐 Telephony (Acefone) is strictly restricted to Admin only 🔐
+                const isUserAdmin = (role === 'admin' || role === 'super-admin');
+                if (!isUserAdmin) {
+                    const acefoneLinks = sidebarContainer.querySelectorAll('#nav-acefone, a[href*="acefone"]');
+                    acefoneLinks.forEach(link => {
+                        const item = link.closest('.nav-item');
+                        if (item) item.remove();
+                        else link.remove();
+                    });
+                }
 
                 // ── Cleanup Empty Group Titles ──
                 const groups = sidebarContainer.querySelectorAll('.nav-group-title');
@@ -746,6 +1530,10 @@ function initLeadNav() {
             if (filter === 'manual') {
                 await loadComponent(contentArea, `${window.ROOT_PATH}components/manual-lead-form.html`, initManualLeadForm);
             } else {
+                const navUser = window.getCurrentUser ? window.getCurrentUser() : {};
+                const navUserRole = (navUser.role || '').toLowerCase();
+                const isTelecomUser = navUserRole === 'telecaller' || navUserRole === 'telecaller_executive' || (navUserRole.includes('telecaller') && !navUserRole.includes('manager'));
+
                 const filterConfig = {
                     open: { is_open: 'true' },
                     today: { is_today: 'true' },
@@ -753,9 +1541,31 @@ function initLeadNav() {
                     followup: { status: 'followup' },
                     lost: { status: 'lost,not_interested' },
                     all: {},
-                    new: { status: 'new' }
+                    new: isTelecomUser ? { status: 'new' } : { status: 'new', is_unassigned: 'true' }
                 };
-                await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(filterConfig[filter] || {}));
+                const targetFilter = filterConfig[filter] || {};
+                const alreadyMounted = document.getElementById('leadsTableBody');
+                if (alreadyMounted) {
+                    // Fast path: Don't destroy DOM or re-fetch template, just reset secondary dropdowns and fetch leads directly
+                    const statusF = document.getElementById('leadStatusFilter');
+                    const scoreF = document.getElementById('leadScoreFilter');
+                    const priorityF = document.getElementById('leadPriorityFilter');
+                    const staffF = document.getElementById('leadStaffFilter');
+                    const campaignF = document.getElementById('leadCampaignFilter');
+                    const dateF = document.getElementById('leadDateFilter');
+                    if (statusF) statusF.value = 'all';
+                    if (scoreF) scoreF.value = 'all';
+                    if (priorityF) priorityF.value = 'all';
+                    if (staffF) staffF.value = 'all';
+                    if (campaignF) campaignF.value = 'all';
+                    if (dateF) {
+                        dateF.value = '';
+                        if (dateF._flatpickr) dateF._flatpickr.clear();
+                    }
+                    initLeadList(targetFilter);
+                } else {
+                    await loadComponent(contentArea, `${window.ROOT_PATH}components/lead-list.html`, () => initLeadList(targetFilter));
+                }
             }
         });
     });
@@ -783,6 +1593,30 @@ window.goBackToLeadsList = async function () {
             initLeadList(window.currentBaseFilters || {});
         });
     }
+};
+
+window.ensureFlatpickr = function (callback) {
+    if (typeof flatpickr !== 'undefined') {
+        if (typeof callback === 'function') callback();
+        return;
+    }
+    if (!document.querySelector('link[href*="flatpickr"]')) {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+        document.head.appendChild(css);
+    }
+    let script = document.querySelector('script[src*="flatpickr"]');
+    if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+        document.head.appendChild(script);
+    }
+    const prevOnload = script.onload;
+    script.onload = function (e) {
+        if (typeof prevOnload === 'function') prevOnload(e);
+        if (typeof callback === 'function') callback();
+    };
 };
 
 window.initLeadList = initLeadList;
@@ -933,31 +1767,36 @@ async function initLeadList(filters = {}, page = 1) {
         staffF.dataset.listenerSet = 'true';
         staffF.onchange = () => initLeadList(window.currentBaseFilters);
 
-        // Fetch staff list and populate options
-        (async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/users/sales`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const allUsers = await response.json();
-                    const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
-
-                    const val = staffF.value;
-                    staffF.innerHTML = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
-                    users.forEach(u => {
-                        const opt = document.createElement('option');
-                        opt.value = u.user_id;
-                        opt.textContent = `${u.name} - ${u.language || 'General'}`;
-                        staffF.appendChild(opt);
+        if (window._cachedStaffHtml) {
+            const val = staffF.value;
+            staffF.innerHTML = window._cachedStaffHtml;
+            staffF.value = val;
+        } else {
+            // Fetch staff list and populate options
+            (async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_URL}/users/sales`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    staffF.value = val;
+                    if (response.ok) {
+                        const allUsers = await response.json();
+                        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name.includes('sales') || u.role_name.includes('manager') || u.role_name.includes('telecaller') || u.role_name.includes('dealer') || u.role_name === 'viewer' || u.role_name === 'sales'));
+
+                        const val = staffF.value;
+                        let html = '<option value="all">All Staff</option><option value="unassigned">Unassigned</option>';
+                        users.forEach(u => {
+                            html += `<option value="${u.user_id}">${u.name} - ${u.language || 'General'}</option>`;
+                        });
+                        window._cachedStaffHtml = html;
+                        staffF.innerHTML = html;
+                        staffF.value = val;
+                    }
+                } catch (err) {
+                    console.error('Failed to load staff list for filter:', err);
                 }
-            } catch (err) {
-                console.error('Failed to load staff list for filter:', err);
-            }
-        })();
+            })();
+        }
     }
 
     const campaignF = document.getElementById('leadCampaignFilter');
@@ -965,43 +1804,111 @@ async function initLeadList(filters = {}, page = 1) {
         campaignF.dataset.listenerSet = 'true';
         campaignF.onchange = () => initLeadList(window.currentBaseFilters);
 
-        // Fetch campaign list and populate options
-        (async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/campaigns`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const campaigns = await response.json();
-                    const val = campaignF.value;
-                    campaignF.innerHTML = '<option value="all">All Campaigns</option>';
-                    campaigns.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = `${c.campaign_id} - ${c.tag_line.substring(0, 30)}${c.tag_line.length > 30 ? '...' : ''}`;
-                        campaignF.appendChild(opt);
+        if (window._cachedCampaignHtml) {
+            const val = campaignF.value;
+            campaignF.innerHTML = window._cachedCampaignHtml;
+            campaignF.value = val;
+        } else {
+            // Fetch campaign list and populate options
+            (async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_URL}/campaigns`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    campaignF.value = val;
+                    if (response.ok) {
+                        const campaigns = await response.json();
+                        const val = campaignF.value;
+                        let html = '<option value="all">All Campaigns</option>';
+                        campaigns.forEach(c => {
+                            html += `<option value="${c.id}">${c.campaign_id} - ${c.tag_line.substring(0, 30)}${c.tag_line.length > 30 ? '...' : ''}</option>`;
+                        });
+                        window._cachedCampaignHtml = html;
+                        campaignF.innerHTML = html;
+                        campaignF.value = val;
+                    }
+                } catch (err) {
+                    console.error('Failed to load campaigns list for filter:', err);
                 }
-            } catch (err) {
-                console.error('Failed to load campaigns list for filter:', err);
-            }
-        })();
+            })();
+        }
     }
 
-    if (dateF && !dateF.dataset.listenerSet) {
-        dateF.dataset.listenerSet = 'true';
+    const initDateRangePicker = () => {
+        if (!dateF) return;
         if (typeof flatpickr !== 'undefined') {
+            if (dateF._flatpickr) return;
+
+            const positionCalendarDirectly = (instance) => {
+                if (!instance || !instance.calendarContainer || !dateF) return;
+                const rect = dateF.getBoundingClientRect();
+                const calendarWidth = instance.calendarContainer.offsetWidth || 308;
+                let leftPos = rect.left;
+                if (leftPos + calendarWidth > window.innerWidth - 16) {
+                    leftPos = Math.max(16, window.innerWidth - calendarWidth - 16);
+                }
+                instance.calendarContainer.style.position = 'fixed';
+                instance.calendarContainer.style.top = `${rect.bottom + 6}px`;
+                instance.calendarContainer.style.left = `${leftPos}px`;
+                instance.calendarContainer.style.right = 'auto';
+                instance.calendarContainer.style.zIndex = '999999';
+                instance.calendarContainer.classList.add('arrowTop', 'arrowLeft');
+                instance.calendarContainer.classList.remove('arrowBottom', 'arrowRight');
+            };
+
             flatpickr(dateF, {
                 mode: "range",
                 dateFormat: "Y-m-d",
+                disableMobile: true,
+                position: "below left",
+                positionElement: dateF,
+                onOpen: function (selectedDates, dateStr, instance) {
+                    positionCalendarDirectly(instance);
+                    requestAnimationFrame(() => positionCalendarDirectly(instance));
+                    setTimeout(() => positionCalendarDirectly(instance), 10);
+                },
+                onChange: function (selectedDates, dateStr, instance) {
+                    if (selectedDates.length === 2) {
+                        instance.close();
+                        initLeadList(window.currentBaseFilters);
+                    }
+                },
                 onClose: function (selectedDates, dateStr, instance) {
-                    initLeadList(window.currentBaseFilters);
+                    if (selectedDates.length === 1) {
+                        initLeadList(window.currentBaseFilters);
+                    }
                 }
             });
-        } else {
-            dateF.onchange = () => initLeadList(window.currentBaseFilters);
+
+            if (!dateF.dataset.scrollBound) {
+                dateF.dataset.scrollBound = 'true';
+                window.addEventListener('scroll', () => {
+                    if (dateF._flatpickr && dateF._flatpickr.isOpen) {
+                        const r = dateF.getBoundingClientRect();
+                        if (r.bottom < 0 || r.top > window.innerHeight) {
+                            dateF._flatpickr.close();
+                        } else {
+                            positionCalendarDirectly(dateF._flatpickr);
+                        }
+                    }
+                }, true);
+            }
+        } else if (window.ensureFlatpickr) {
+            window.ensureFlatpickr(() => {
+                initDateRangePicker();
+            });
+        }
+    };
+
+    if (dateF) {
+        initDateRangePicker();
+        if (!dateF.dataset.listenerSet) {
+            dateF.dataset.listenerSet = 'true';
+            dateF.onchange = () => {
+                if (!dateF._flatpickr) {
+                    initLeadList(window.currentBaseFilters);
+                }
+            };
         }
     }
     if (btnAll && !btnAll.dataset.listenerSet) {
@@ -1029,7 +1936,7 @@ async function initLeadList(filters = {}, page = 1) {
         };
     }
 
-    tbody.innerHTML = '<tr><td colspan="11" class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading leads...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading leads...</td></tr>';
 
     window.currentBaseFilters = filters; // Original context (e.g. {assigned_to: NULL})
     window.currentLeadsPage = page;
@@ -1073,7 +1980,7 @@ async function initLeadList(filters = {}, page = 1) {
         window.currentLeadsList = leads; // For export
 
         if (!leads || leads.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No leads available.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No leads available.</td></tr>';
             // Clear pagination controls if empty
             const pagContainer = document.getElementById('leadsPagination');
             if (pagContainer) pagContainer.style.display = 'none';
@@ -1082,11 +1989,48 @@ async function initLeadList(filters = {}, page = 1) {
 
         const currentUser = window.getCurrentUser ? window.getCurrentUser() : {};
         const currentUserRole = (currentUser.role || '').toLowerCase();
-        const isTelecomPanelUser = currentUserRole.includes('telecaller');
+        const isTelecomPanelUser = currentUserRole === 'telecaller' || currentUserRole === 'telecaller_executive' || (currentUserRole.includes('telecaller') && !currentUserRole.includes('manager'));
 
         tbody.innerHTML = leads.map(lead => {
-            const statusClass = lead.status === 'assigned' ? 'badge-assigned' : (lead.status === 'new' ? 'badge-unassigned' : 'badge-state');
-            const _dateObj = new Date(lead.created_at);
+            const rawStatus = (lead.status || '').toLowerCase();
+            const hasAssignee = Boolean(lead.assigned_to || (lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'null') || (lead.assigned_staff && lead.assigned_staff !== 'Unassigned') || rawStatus === 'assigned');
+            const isFreshLead = rawStatus === 'new' || rawStatus === 'assigned' || !rawStatus;
+
+            let displayStatus = 'New';
+            let statusClass = 'badge-new';
+
+            if (isTelecomPanelUser) {
+                // Telecaller panel & mobile app: assigned leads appear as 'New'
+                if (isFreshLead) {
+                    displayStatus = 'New';
+                    statusClass = 'badge-new';
+                } else {
+                    displayStatus = lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, ' ')) : 'New';
+                    statusClass = 'badge-state';
+                }
+            } else {
+                // Admin, Sales Manager, WhatsApp Manager, WhatsApp Executive panels:
+                // Assigned leads show 'Assigned'. Only unassigned leads show 'New'.
+                if (hasAssignee || rawStatus === 'assigned') {
+                    if (isFreshLead) {
+                        displayStatus = 'Assigned';
+                        statusClass = 'badge-assigned';
+                    } else {
+                        displayStatus = lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, ' ')) : 'Assigned';
+                        statusClass = 'badge-state';
+                    }
+                } else {
+                    if (isFreshLead) {
+                        displayStatus = 'New';
+                        statusClass = 'badge-new';
+                    } else {
+                        displayStatus = lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, ' ')) : 'New';
+                        statusClass = 'badge-state';
+                    }
+                }
+            }
+            const relevantDate = lead.created_at;
+            const _dateObj = new Date(relevantDate);
             const date = _dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const time = _dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
             const nameInitial = lead.customer_name ? lead.customer_name.charAt(0).toUpperCase() : '?';
@@ -1121,11 +2065,11 @@ async function initLeadList(filters = {}, page = 1) {
             const scoreUpper = (lead.score || 'COLD').toUpperCase();
             let scoreBadgeHtml = '';
             if (scoreUpper === 'HOT') {
-                scoreBadgeHtml = `<span class="badge-score" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:3px 8px; border-radius:999px;">HOT</span>`;
+                scoreBadgeHtml = `<span class="badge-score" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">HOT</span>`;
             } else if (scoreUpper === 'WARM' || scoreUpper === 'MILD') {
-                scoreBadgeHtml = `<span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:3px 8px; border-radius:999px;">MILD</span>`;
+                scoreBadgeHtml = `<span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">MILD</span>`;
             } else {
-                scoreBadgeHtml = `<span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:3px 8px; border-radius:999px;">COLD</span>`;
+                scoreBadgeHtml = `<span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">COLD</span>`;
             }
 
             // 2. Chatbot Priority Badge & Progress Pill
@@ -1134,51 +2078,84 @@ async function initLeadList(filters = {}, page = 1) {
                 const bAns = lead.bot_answered;
                 const bTot = lead.bot_total || 5;
                 if (bAns >= 4) {
-                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-weight:700; padding:3px 8px; border-radius:999px;">HIGH</span><div style="font-size:0.68rem; font-weight:700; color:#10b981; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">HIGH</span><div style="font-size:0.62rem; font-weight:700; color:#10b981; margin-top:2px; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.6rem;"></i> ${bAns}/${bTot}</div></div>`;
                 } else if (bAns >= 2) {
-                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:3px 8px; border-radius:999px;">MEDIUM</span><div style="font-size:0.68rem; font-weight:700; color:#d97706; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">MED</span><div style="font-size:0.62rem; font-weight:700; color:#d97706; margin-top:2px; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.6rem;"></i> ${bAns}/${bTot}</div></div>`;
                 } else {
-                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:3px 8px; border-radius:999px;">LOW</span><div style="font-size:0.68rem; font-weight:700; color:#64748b; margin-top:3px; display:inline-flex; align-items:center; gap:3px;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.65rem;"></i> ${bAns}/${bTot}</div></div>`;
+                    priorityBadgeHtml = `<div style="display:flex; flex-direction:column; align-items:center;"><span class="badge-score" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-weight:700; padding:2px 6px; border-radius:999px; font-size:0.68rem; white-space:nowrap;">LOW</span><div style="font-size:0.62rem; font-weight:700; color:#64748b; margin-top:2px; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="${bAns} of ${bTot} Chatbot questions answered"><i class="fas fa-robot" style="font-size:0.6rem;"></i> ${bAns}/${bTot}</div></div>`;
                 }
             } else {
                 priorityBadgeHtml = `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
             }
 
+            const rawName = (lead.customer_name || 'Unknown').replace(/[\r\n]+/g, ' ').trim();
+            const rawMsg = (lead.first_message || '-').replace(/[\r\n]+/g, ' ').trim();
+            const campaignBadgeHtml = lead.campaign_id_code ? (() => {
+                const fullCode = lead.campaign_id_code;
+                const shortCode = fullCode.length > 12 ? fullCode.substring(0, 10) + '...' : fullCode;
+                return `<span class="campaign-tag" title="${fullCode}" style="display: inline-block; background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; font-size: 0.65rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; cursor: help; white-space: nowrap;">📣 ${shortCode}</span>`;
+            })() : '';
+
+            // Assigned Staff representation: Green for Assigned To, Orange for Assigned By
+            let assignedStaffHtml = '<span style="color: #94a3b8; font-size: 0.78rem; font-weight: 500;">Unassigned</span>';
+            const hasAssigneeTo = Boolean(lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'null');
+            const hasAssigneeBy = Boolean(lead.assigned_by_name && lead.assigned_by_name !== 'null');
+
+            if (hasAssigneeTo) {
+                const toName = lead.assigned_to_name;
+                const byName = hasAssigneeBy ? lead.assigned_by_name : 'System';
+                assignedStaffHtml = `
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem;" title="Assigned To: ${toName} | Assigned By: ${byName}">
+                        <div style="display: inline-flex; align-items: center; gap: 5px;">
+                            <span style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 0.62rem; font-weight: 800; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">To</span>
+                            <span style="color: #166534; font-weight: 700; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${toName}</span>
+                        </div>
+                        <div style="display: inline-flex; align-items: center; gap: 5px;">
+                            <span style="background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; font-size: 0.62rem; font-weight: 800; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">By</span>
+                            <span style="color: #ea580c; font-weight: 600; font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${byName}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
             <tr id="lead-row-${lead.lead_id}" onclick="viewLeadDetails(${lead.lead_id})" style="cursor:pointer;">
-                <td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" ${isChecked} onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
-                <td>
+                <td onclick="event.stopPropagation()" style="text-align: center; width: 38px; padding: 0.5rem 0.25rem;"><input type="checkbox" class="lead-checkbox" data-id="${lead.lead_id}" ${isChecked} onclick="event.stopPropagation(); toggleLeadSelection(this)"></td>
+                <td title="${rawName}">
                     <div class="name-cell">
                         <div class="name-initial">${nameInitial}</div>
-                        <div>
-                            <div style="font-weight: 600; color: #1e293b;">${lead.customer_name || 'Unknown'} ${callTag}</div>
-                            ${lead.campaign_id_code ? (() => {
-                    const fullCode = lead.campaign_id_code;
-                    const shortCode = fullCode.length > 15 ? fullCode.substring(0, 12) + '...' : fullCode;
-                    return `<span class="campaign-tag" title="${fullCode}" style="display: inline-block; background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; cursor: help;">📣 ${shortCode}</span>`;
-                })() : ''}
+                        <div class="name-content">
+                            <div class="name-title" title="${rawName}">${rawName}</div>
+                            <div class="name-meta">${callTag}${campaignBadgeHtml}</div>
                         </div>
                     </div>
                 </td>
-                <td><span class="${statusClass}">${lead.status}</span></td>
-                <td>${scoreBadgeHtml}</td>
-                <td>${priorityBadgeHtml}</td>
-                <td>${lead.state || '-'}</td>
-                <td><span class="language-tag">${lead.language || 'EN'}</span></td>
-                <td onclick="event.stopPropagation()">
+                <td style="text-align: center;"><span class="${statusClass}" style="white-space: nowrap; font-size: 0.72rem; padding: 0.2rem 0.5rem;">${displayStatus}</span></td>
+                <td style="text-align: center;">${scoreBadgeHtml}</td>
+                <td style="text-align: center;">${priorityBadgeHtml}</td>
+                <td title="${lead.state || '-'}"><div class="cell-truncate" style="font-size: 0.78rem; color: #475569;">${lead.state || '-'}</div></td>
+                <td style="text-align: center;" title="${lead.language || 'EN'}"><span class="language-tag" style="font-size: 0.75rem; font-weight: 600;">${(lead.language || 'EN').toUpperCase()}</span></td>
+                <td onclick="event.stopPropagation()" style="white-space: nowrap;">
                     ${isTelecomPanelUser ? `
-                        <a href="javascript:void(0)" onclick="window.copyToClipboard('${lead.phone_number || ''}')" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Click to Copy Number">
-                            <i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}
+                        <a href="javascript:void(0)" onclick="window.copyToClipboard('${lead.phone_number || ''}')" style="color:#25d366;font-weight:600;font-size:0.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Click to Copy Number">
+                            <i class="fab fa-whatsapp" style="font-size:0.85rem;"></i>${lead.phone_number || '-'}
                         </a>
                     ` : `
-                        <a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat">
-                            <i class="fab fa-whatsapp" style="font-size:1rem;"></i>${lead.phone_number || '-'}
+                        <a href="${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${lead.phone_number || ''}" target="_self" style="color:#25d366;font-weight:600;font-size:0.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Open WhatsApp Chat">
+                            <i class="fab fa-whatsapp" style="font-size:0.85rem;"></i>${lead.phone_number || '-'}
                         </a>
                     `}
                 </td>
-                <td><div class="msg-trunk" title="${lead.first_message || ''}">${lead.first_message || '-'}</div></td>
-                <td>${dateHtml}</td>
-                <td>${lead.assigned_to_name || 'Unassigned'}</td>
+                <td title="${rawMsg}"><div class="msg-trunk" title="${rawMsg}">${rawMsg}</div></td>
+                <td style="white-space: nowrap;">${dateHtml}</td>
+                <td style="white-space: nowrap; vertical-align: middle;">
+                    ${assignedStaffHtml}
+                </td>
+                <td onclick="event.stopPropagation()" style="text-align: center; white-space: nowrap;">
+                    <button class="btn-table-call" onclick="event.stopPropagation(); window.initiateLeadClickToCall('${lead.phone_number || ''}', ${lead.lead_id})" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 0.3rem 0.55rem; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25); transition: all 0.2s;" title="Click to Call via Acefone">
+                        <i class="fas fa-phone-alt" style="font-size:0.68rem;"></i> Call
+                    </button>
+                </td>
             </tr>`;
         }).join('');
 
@@ -1422,7 +2399,8 @@ window.updateBulkActionsBar = function () {
     if (!bar) return;
 
     const user = window.getCurrentUser();
-    const canManageBulk = ['admin', 'super-admin', 'sales', 'manager'].includes((user.role || '').toLowerCase());
+    const role = (user.role || '').toLowerCase();
+    const canManageBulk = ['admin', 'super-admin', 'sales', 'manager', 'sales_manager', 'telecaller_manager', 'whatsapp_manager', 'sales_executive'].includes(role) || role.includes('manager') || role.includes('admin') || role.includes('sales') || !!user.is_manager;
 
     if (window.currentSelectedLeadIds.length > 0 && canManageBulk) {
         bar.style.display = 'flex';
@@ -1457,7 +2435,7 @@ window.openBulkAssignModal = async function () {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const allUsers = await response.json();
-        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name === 'sales' || u.role_name === 'viewer' || u.role_name === 'manager'));
+        const users = allUsers.filter(u => u.role_name && (u.role_name.includes('executive') || u.role_name.includes('sales') || u.role_name.includes('manager') || u.role_name.includes('telecaller') || u.role_name.includes('dealer') || u.role_name === 'viewer' || u.role_name === 'sales'));
 
         let warningHtml = '';
         if (alreadyAssigned.length > 0) {
@@ -1686,20 +2664,40 @@ async function populateLeadDetails(leadId) {
             const lead = await response.json();
             window.currentLeadData = lead; // Store globally for decision engine
 
+            const detailUser = window.getCurrentUser ? window.getCurrentUser() : {};
+            const detailUserRole = (detailUser.role || '').toLowerCase();
+            const isTelecallerDetail = detailUserRole === 'telecaller' || detailUserRole === 'telecaller_executive' || (detailUserRole.includes('telecaller') && !detailUserRole.includes('manager'));
+            const detailRawStatus = (lead.status || '').toLowerCase();
+            const detailHasAssignee = Boolean(lead.assigned_to || (lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'null') || (lead.assigned_staff && lead.assigned_staff !== 'Unassigned') || detailRawStatus === 'assigned');
+            const detailIsFresh = detailRawStatus === 'new' || detailRawStatus === 'assigned' || !detailRawStatus;
+
+            let saleStatusDisplay = 'New';
+            if (isTelecallerDetail) {
+                saleStatusDisplay = detailIsFresh ? 'New' : (lead.status || 'New');
+            } else {
+                if (detailHasAssignee) {
+                    saleStatusDisplay = detailIsFresh ? 'Assigned' : (lead.status || 'Assigned');
+                } else {
+                    saleStatusDisplay = detailIsFresh ? 'New' : (lead.status || 'New');
+                }
+            }
+
             // ── Primary Field Mapping ──
             const fields = {
                 leadDetailName: lead.customer_name,
                 leadDetailPhone: lead.phone_number,
-                leadDetailVillage: lead.city,
+                leadDetailAddress: lead.address || (lead.blade_delivery && lead.blade_delivery.delivery_address) || '-',
+                leadDetailVillage: lead.village || lead.city || '-',
+                leadDetailTaluk: lead.taluk || lead.sub_district || '-',
                 leadDetailState: lead.state,
                 leadDetailDistrict: lead.district || '-',
-                leadDetailPincode: lead.pincode || '-',
+                leadDetailPincode: lead.pincode || (lead.blade_delivery && lead.blade_delivery.pincode) || '-',
                 leadDetailLanguage: lead.language || 'EN',
                 leadDetailLanguageInfo: lead.language || 'English',
                 leadDetailAssigned: lead.assigned_to_name || 'Unassigned',
                 leadDetailAssignedId: lead.assigned_to || '',
                 topCustomerNameDisplay: lead.first_message || lead.customer_name || (lead.phone_number ? `Lead (${lead.phone_number})` : 'Lead Details'),
-                leadDetailSaleStatus: lead.status || 'New',
+                leadDetailSaleStatus: saleStatusDisplay,
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailStatusSelect: lead.status || 'new',
                 leadDetailScoreSelect: lead.score || 'cold',
@@ -1712,10 +2710,12 @@ async function populateLeadDetails(leadId) {
                 editName: lead.customer_name,
                 phone_number: lead.phone_number,
                 editPhone: lead.phone_number,
-                editVillage: lead.city,
+                editAddress: lead.address || (lead.blade_delivery && lead.blade_delivery.delivery_address) || '',
+                editVillage: lead.village || lead.city || '',
+                editTaluk: lead.taluk || lead.sub_district || '',
                 editState: lead.state,
                 editDistrict: lead.district,
-                editPincode: lead.pincode,
+                editPincode: lead.pincode || (lead.blade_delivery && lead.blade_delivery.pincode) || '',
                 editLanguage: lead.language || 'EN',
                 editCrop: lead.current_crop,
                 editAcreage: lead.acreage,
@@ -1731,6 +2731,17 @@ async function populateLeadDetails(leadId) {
                     else el.textContent = val || '-';
                 }
             });
+
+            const assignedByWrapper = document.getElementById('leadDetailAssignedByWrapper');
+            const assignedByEl = document.getElementById('leadDetailAssignedBy');
+            if (assignedByWrapper && assignedByEl) {
+                if (detailHasAssignee) {
+                    assignedByEl.textContent = lead.assigned_by_name || 'System';
+                    assignedByWrapper.style.display = 'inline-flex';
+                } else {
+                    assignedByWrapper.style.display = 'none';
+                }
+            }
 
             // Style and set Campaign Tag
             const tagEl = document.getElementById('leadCampaignTag');
@@ -1804,6 +2815,87 @@ async function populateLeadDetails(leadId) {
                 waBtn.onclick = null; // Remove any old handlers
             }
 
+            // ── Global Lead Click-to-Call Handler ──
+            window.initiateLeadClickToCall = async function(customPhone, customLeadId) {
+                const leadData = window.currentLeadData || {};
+                const leadId = customLeadId || leadData.lead_id || null;
+                const phoneEl = document.getElementById('leadDetailPhone');
+                const destinationPhone = customPhone || (phoneEl ? phoneEl.textContent.trim() : '') || leadData.phone_number;
+
+                if (!destinationPhone || destinationPhone === '-' || destinationPhone === 'Loading...') {
+                    if (window.showAlert) window.showAlert('Missing Phone Number', 'No valid farmer phone number found.', 'error');
+                    else alert('No valid farmer phone number found.');
+                    return;
+                }
+
+                // Visual loading state on call buttons
+                const btnHeader = document.getElementById('callFarmerBtn');
+                const btnInline = document.getElementById('callFarmerInlineBtn');
+                const origHeaderHtml = btnHeader ? btnHeader.innerHTML : '';
+                const origInlineHtml = btnInline ? btnInline.innerHTML : '';
+
+                if (btnHeader) {
+                    btnHeader.disabled = true;
+                    btnHeader.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Dialing...';
+                }
+                if (btnInline) {
+                    btnInline.disabled = true;
+                    btnInline.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calling...';
+                }
+
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${API_URL}/telephony/click-to-call`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            lead_id: leadId,
+                            destination_phone: destinationPhone
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        const messageText = data.message || `📞 Acefone is ringing your agent extension/mobile now! Once answered, it will connect to ${destinationPhone}.`;
+                        if (window.showAlert) {
+                            window.showAlert('Click-to-Call Initiated! 📞', messageText, 'success');
+                        } else {
+                            alert(`📞 Click-to-Call Initiated!\n\n${messageText}`);
+                        }
+                        if (data.call_id) {
+                            window.monitorCallStatus(data.call_id, destinationPhone);
+                        }
+                    } else {
+                        const errMsg = data.error || 'Failed to initiate click to call.';
+                        if (window.showAlert) {
+                            window.showAlert('Call Failed ❌', errMsg, 'error');
+                        } else {
+                            alert(`❌ Call Failed: ${errMsg}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Click to call error:", err);
+                    if (window.showAlert) {
+                        window.showAlert('Network Error', err.message, 'error');
+                    } else {
+                        alert(`❌ Network Error: ${err.message}`);
+                    }
+                } finally {
+                    if (btnHeader) {
+                        btnHeader.disabled = false;
+                        btnHeader.innerHTML = origHeaderHtml;
+                    }
+                    if (btnInline) {
+                        btnInline.disabled = false;
+                        btnInline.innerHTML = origInlineHtml;
+                    }
+                }
+            };
+
             // ── Purchase History ──
             const historyContainer = document.getElementById('purchaseHistoryContainer');
             if (historyContainer) {
@@ -1866,6 +2958,9 @@ async function populateLeadDetails(leadId) {
 
             // ── Render Chatbot Summary Card ──
             renderChatbotSummaryCard(lead.chatbot_summary);
+
+            // ── Render Blade Protector Delivery Details Card ──
+            renderBladeDeliveryCard(lead.blade_delivery, lead);
 
             // ── Hide Change Assignee for Telecaller Role ──
             const user = window.getCurrentUser();
@@ -2001,6 +3096,298 @@ function renderChatbotSummaryCard(chatbotSummary) {
     containerEl.innerHTML = html;
 }
 
+// ─── Blade Protector Delivery Details Renderer ──────────────────
+function renderBladeDeliveryCard(bladeDelivery, lead) {
+    const sectionEl = document.getElementById('bladeDeliverySection');
+    const badgeEl = document.getElementById('bladeDeliveryBadge');
+    const containerEl = document.getElementById('bladeDeliveryContainer');
+    if (!sectionEl || !containerEl) return;
+
+    // Check if this lead has Blade Protector context or delivery address
+    const isBladeContext = Boolean(
+        (bladeDelivery && bladeDelivery.is_blade_protector) ||
+        (lead && lead.first_message && lead.first_message.toLowerCase().includes('blade')) ||
+        (lead && lead.campaign_name && lead.campaign_name.toLowerCase().includes('blade')) ||
+        (lead && lead.interests && lead.interests.some(i => i.product_name && i.product_name.toLowerCase().includes('blade'))) ||
+        (bladeDelivery && bladeDelivery.has_address) ||
+        (lead && lead.address && String(lead.address).trim() !== '')
+    );
+
+    if (!isBladeContext) {
+        sectionEl.style.display = 'none';
+        return;
+    }
+
+    sectionEl.style.display = 'block';
+
+    const hasAddress = Boolean(bladeDelivery && bladeDelivery.has_address && bladeDelivery.delivery_address && bladeDelivery.delivery_address.trim() !== '') || Boolean(lead && lead.address && lead.address.trim() !== '');
+    const phone = (lead && lead.phone_number) || (bladeDelivery ? bladeDelivery.phone : '') || '';
+    const recipientName = (bladeDelivery && bladeDelivery.recipient_name) || (lead && lead.customer_name) || 'Customer';
+    const deliveryAddress = (bladeDelivery && bladeDelivery.delivery_address) || (lead && lead.address) || '';
+    const pincode = (bladeDelivery && bladeDelivery.pincode) || (lead && lead.pincode) || '-';
+    const amount = (bladeDelivery && bladeDelivery.payable_amount) || 600;
+    const orderId = (bladeDelivery && bladeDelivery.order_id) || (lead && lead.order ? lead.order.order_id : null);
+    const paymentStatus = (bladeDelivery && bladeDelivery.payment_status) || (lead && lead.order ? lead.order.order_status : 'Pending');
+    const screenshotUrl = (bladeDelivery && bladeDelivery.payment_screenshot_url) || null;
+
+    let submittedTime = '';
+    if (bladeDelivery && bladeDelivery.submitted_at) {
+        try {
+            submittedTime = new Date(bladeDelivery.submitted_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        } catch (e) {
+            submittedTime = String(bladeDelivery.submitted_at);
+        }
+    }
+
+    // Update Badge
+    if (badgeEl) {
+        badgeEl.style.display = 'inline-flex';
+        if (hasAddress) {
+            badgeEl.className = 'badge';
+            badgeEl.style.cssText = 'background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 9999px;';
+            badgeEl.innerHTML = '<i class="fas fa-check-circle" style="margin-right: 4px;"></i> Address Collected';
+        } else {
+            badgeEl.className = 'badge';
+            badgeEl.style.cssText = 'background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 9999px;';
+            badgeEl.innerHTML = '<i class="fas fa-clock" style="margin-right: 4px;"></i> Awaiting Address';
+        }
+    }
+
+    if (hasAddress) {
+        const fullAddressText = `Name: ${recipientName}\nPhone: ${phone}\nAddress: ${deliveryAddress}\nPIN Code: ${pincode}\nProduct: SGB Blade Protector (₹${amount})`;
+        const encodedAddress = encodeURIComponent(fullAddressText);
+
+        containerEl.innerHTML = `
+            <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1.5px solid #fcd34d; border-radius: 0.75rem; padding: 1rem; margin-bottom: 0.5rem; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.65rem; border-bottom: 1px solid #fde68a; padding-bottom: 0.55rem;">
+                    <div>
+                        <span style="font-size: 0.68rem; text-transform: uppercase; color: #92400e; font-weight: 800; letter-spacing: 0.04em;">Recipient / Contact</span>
+                        <h4 style="font-size: 0.95rem; font-weight: 800; color: #451a03; margin: 0.1rem 0 0 0;">
+                            <i class="fas fa-user-circle mr-1" style="color: #d97706;"></i> ${escapeHtml(recipientName)}
+                        </h4>
+                        <p style="font-size: 0.78rem; color: #78350f; margin: 0.15rem 0 0 0; font-weight: 600;">
+                            <i class="fas fa-phone-alt mr-1" style="font-size: 0.7rem;"></i> ${escapeHtml(phone)}
+                        </p>
+                    </div>
+                    <span style="background: #fef08a; color: #854d0e; border: 1px solid #fde047; font-weight: 800; font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 6px;">
+                        ₹${amount} · COD/QR
+                    </span>
+                </div>
+
+                <!-- Highlighted Delivery Address Box -->
+                <div style="background: #ffffff; border: 1px solid #fde68a; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 0.65rem;">
+                    <div style="font-size: 0.68rem; text-transform: uppercase; color: #78350f; font-weight: 700; margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: space-between;">
+                        <span><i class="fas fa-location-dot mr-1" style="color: #ea580c;"></i> Delivery Address</span>
+                        <span style="font-size: 0.68rem; color: #15803d; font-weight: 700;"><i class="fas fa-check-double mr-1"></i> WhatsApp Form</span>
+                    </div>
+                    <div id="bladeDeliveryAddressText" style="font-size: 0.875rem; color: #1e293b; font-weight: 700; line-height: 1.45; word-break: break-word;">
+                        ${escapeHtml(deliveryAddress)}
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #f1f5f9; flex-wrap: wrap; gap: 0.4rem;">
+                        <span style="background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 800; font-size: 0.75rem;">
+                            📮 PIN: <strong>${escapeHtml(pincode)}</strong>
+                        </span>
+                        <span style="color: #15803d; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-circle-check"></i> Confirmed by Farmer
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Product & Order Summary -->
+                <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.72rem; color: #78350f; margin-bottom: 0.75rem; background: rgba(254, 243, 199, 0.6); padding: 0.5rem 0.65rem; border-radius: 6px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Product:</span>
+                        <strong style="color: #451a03;">SGB Blade Protector (₹${amount})</strong>
+                    </div>
+                    ${orderId ? `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>CRM Order:</span>
+                        <strong style="color: #047857; background: #ecfdf5; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid #a7f3d0;">#SGB-${orderId} (${escapeHtml(paymentStatus)})</strong>
+                    </div>` : ''}
+                    ${submittedTime ? `
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Captured At:</span>
+                        <span>${submittedTime}</span>
+                    </div>` : ''}
+                    ${screenshotUrl ? `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.25rem; border-top: 1px dashed rgba(245, 158, 11, 0.3);">
+                        <span>Payment Evidence:</span>
+                        <button type="button" onclick="window.viewBladePaymentScreenshot('${encodeURIComponent(screenshotUrl)}', '${encodeURIComponent(recipientName)}', '${orderId || ''}', '${phone}', '${amount}')" style="background: none; border: none; padding: 0; color: #059669; font-weight: 700; text-decoration: underline; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem;">
+                            <i class="fas fa-image mr-1"></i> View Screenshot
+                        </button>
+                    </div>` : ''}
+                </div>
+
+                <!-- Actions Grid -->
+                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                    <button onclick="window.copyBladeDeliveryAddress('${encodedAddress}')" class="login-btn" style="flex: 1; min-width: 120px; padding: 0.45rem 0.5rem; font-size: 0.75rem; background: #d97706; color: white; border: none; border-radius: 0.375rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.35rem; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);">
+                        <i class="fas fa-copy"></i> Copy Address
+                    </button>
+                    <button onclick="window.openLeadWhatsAppChat('${phone}')" class="login-btn btn-outline" style="flex: 1; min-width: 120px; padding: 0.45rem 0.5rem; font-size: 0.75rem; background: white; border: 1px solid #25d366; color: #166534; border-radius: 0.375rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                        <i class="fab fa-whatsapp" style="color: #25d366;"></i> WhatsApp Chat
+                    </button>
+                    <button onclick="window.toggleBladeAddressEdit()" class="login-btn btn-outline" style="width: 100%; margin-top: 0.25rem; padding: 0.35rem 0.5rem; font-size: 0.72rem; background: transparent; border: 1px dashed #d97706; color: #b45309; border-radius: 0.375rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                        <i class="fas fa-edit"></i> Edit Delivery Address
+                    </button>
+                </div>
+
+                <!-- Inline Edit Form (Hidden by default) -->
+                <div id="bladeAddressEditBox" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #fcd34d;">
+                    <div style="font-size: 0.7rem; font-weight: 700; color: #78350f; margin-bottom: 0.35rem;">Edit Delivery Address:</div>
+                    <textarea id="bladeEditAddressInput" class="form-control-premium" rows="2" style="font-size: 0.78rem; width: 100%; box-sizing: border-box; margin-bottom: 0.4rem;" placeholder="Enter full delivery address">${escapeHtml(deliveryAddress)}</textarea>
+                    <div style="display: flex; gap: 0.4rem; margin-bottom: 0.4rem;">
+                        <input id="bladeEditPincodeInput" type="text" class="form-control-premium" style="flex: 1; font-size: 0.78rem;" placeholder="PIN code (e.g. 572101)" value="${escapeHtml(pincode !== '-' ? pincode : '')}">
+                        <input id="bladeEditNameInput" type="text" class="form-control-premium" style="flex: 1.2; font-size: 0.78rem;" placeholder="Recipient name" value="${escapeHtml(recipientName)}">
+                    </div>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button onclick="window.saveBladeAddressEdit('${lead.lead_id}')" class="login-btn btn-sm" style="flex: 1; font-size: 0.72rem; background: #059669; border: none; padding: 0.35rem; color: white; cursor: pointer; border-radius: 4px; font-weight: 700;">Save Changes</button>
+                        <button onclick="window.toggleBladeAddressEdit()" class="login-btn btn-outline btn-sm" style="flex: 1; font-size: 0.72rem; padding: 0.35rem; cursor: pointer; border-radius: 4px;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        containerEl.innerHTML = `
+            <div style="background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 0.75rem; padding: 1rem; text-align: center;">
+                <i class="fas fa-map-location-dot" style="font-size: 1.75rem; color: #d97706; margin-bottom: 0.4rem; display: block;"></i>
+                <h4 style="font-size: 0.85rem; font-weight: 700; color: #92400e; margin: 0 0 0.25rem 0;">Delivery Address Not Submitted Yet</h4>
+                <p style="font-size: 0.75rem; color: #b45309; margin: 0 0 0.75rem 0; line-height: 1.4;">Customer is in the SGB Blade Protector sales flow, but has not submitted the delivery address form yet.</p>
+                <div style="display: flex; gap: 0.45rem; justify-content: center; flex-wrap: wrap;">
+                    <button onclick="window.openLeadWhatsAppChat('${phone}')" class="login-btn" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; background: #25d366; color: white; border: none; border-radius: 0.375rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <i class="fab fa-whatsapp"></i> Chat on WhatsApp
+                    </button>
+                    <button onclick="window.toggleBladeAddressEdit()" class="login-btn btn-outline" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; background: white; border: 1px solid #d97706; color: #92400e; border-radius: 0.375rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <i class="fas fa-plus"></i> Enter Address Manually
+                    </button>
+                </div>
+                <!-- Inline manual entry box if agent takes it over phone -->
+                <div id="bladeAddressEditBox" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #fcd34d; text-align: left;">
+                    <div style="font-size: 0.7rem; font-weight: 700; color: #78350f; margin-bottom: 0.35rem;">Enter Delivery Address Taken on Call:</div>
+                    <textarea id="bladeEditAddressInput" class="form-control-premium" rows="2" style="font-size: 0.78rem; width: 100%; box-sizing: border-box; margin-bottom: 0.4rem;" placeholder="Full delivery address"></textarea>
+                    <div style="display: flex; gap: 0.4rem; margin-bottom: 0.4rem;">
+                        <input id="bladeEditPincodeInput" type="text" class="form-control-premium" style="flex: 1; font-size: 0.78rem;" placeholder="PIN code (e.g. 572101)">
+                        <input id="bladeEditNameInput" type="text" class="form-control-premium" style="flex: 1.2; font-size: 0.78rem;" placeholder="Customer name" value="${escapeHtml(recipientName)}">
+                    </div>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button onclick="window.saveBladeAddressEdit('${lead.lead_id}')" class="login-btn btn-sm" style="flex: 1; font-size: 0.72rem; background: #059669; border: none; padding: 0.35rem; color: white; cursor: pointer; border-radius: 4px; font-weight: 700;">Save Delivery Address</button>
+                        <button onclick="window.toggleBladeAddressEdit()" class="login-btn btn-outline btn-sm" style="flex: 1; font-size: 0.72rem; padding: 0.35rem; cursor: pointer; border-radius: 4px;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// ─── Blade Address Action Helpers ──────────────────────────────
+window.viewBladePaymentScreenshot = function (encodedUrl, encodedName, orderId, phone, amount) {
+    const rawUrl = decodeURIComponent(encodedUrl || '');
+    const customerName = decodeURIComponent(encodedName || 'WhatsApp Customer');
+    const resolvedUrl = (typeof window.resolveMediaUrl === 'function') ? window.resolveMediaUrl(rawUrl) : rawUrl;
+
+    const modalData = {
+        order_id: orderId || '',
+        order_number: orderId ? `SGB-${orderId}` : '',
+        customer_name: customerName,
+        phone: phone || '',
+        total_amount: parseFloat(amount) || 600
+    };
+
+    if (typeof window.viewPaymentScreenshotModal === 'function') {
+        window.viewPaymentScreenshotModal(resolvedUrl, encodeURIComponent(JSON.stringify(modalData)));
+    } else if (resolvedUrl) {
+        window.open(resolvedUrl, '_blank');
+    }
+};
+
+window.copyBladeDeliveryAddress = function (encodedStr) {
+    try {
+        const text = decodeURIComponent(encodedStr);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert('Copied! 📋', 'Blade Protector delivery address copied to clipboard.', 'success');
+                } else {
+                    alert('Delivery address copied to clipboard!');
+                }
+            }).catch(() => fallbackCopy(text));
+        } else {
+            fallbackCopy(text);
+        }
+    } catch (e) {
+        console.error('Failed to copy address:', e);
+    }
+
+    function fallbackCopy(str) {
+        const textarea = document.createElement('textarea');
+        textarea.value = str;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Copied! 📋', 'Blade Protector delivery address copied to clipboard.', 'success');
+        } else {
+            alert('Delivery address copied to clipboard!');
+        }
+    }
+};
+
+window.toggleBladeAddressEdit = function () {
+    const box = document.getElementById('bladeAddressEditBox');
+    if (box) {
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+};
+
+window.saveBladeAddressEdit = async function (leadId) {
+    const address = document.getElementById('bladeEditAddressInput')?.value?.trim();
+    const pincode = document.getElementById('bladeEditPincodeInput')?.value?.trim();
+    const customerName = document.getElementById('bladeEditNameInput')?.value?.trim();
+
+    if (!address) {
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Missing Address', 'Please enter a delivery address.', 'error');
+        } else {
+            alert('Please enter a delivery address.');
+        }
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/leads/${leadId}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                address: address,
+                pincode: pincode,
+                customer_name: customerName
+            })
+        });
+
+        if (res.ok) {
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('Saved! ✓', 'Delivery address updated successfully.', 'success');
+            }
+            populateLeadDetails(leadId);
+        } else {
+            const err = await res.json();
+            alert('Failed to update address: ' + (err.message || 'Error'));
+        }
+    } catch (err) {
+        console.error('Error saving address:', err);
+        alert('Network error while saving address.');
+    }
+};
+
+window.openLeadWhatsAppChat = function (phone) {
+    if (!phone) return;
+    const cleanPhone = phone.replace(/[^\d]/g, '');
+    window.location.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${encodeURIComponent(cleanPhone)}`;
+};
+
 // ─── Lead Helpers ─────────────────────────────────────────────
 function getScoreFromStatus(status) {
     const hotStatus = ['converted', 'interested'];
@@ -2065,7 +3452,14 @@ window.saveLeadSection = async function (sectionId) {
     if (sectionId === 'farmerInfoSection') {
         payload.customer_name = document.getElementById('editName').value;
         payload.phone_number = document.getElementById('editPhone').value;
-        payload.city = document.getElementById('editVillage').value;
+        const addrEl = document.getElementById('editAddress');
+        if (addrEl) payload.address = addrEl.value;
+        payload.village = document.getElementById('editVillage')?.value || '';
+        payload.city = payload.village || '';
+        if (document.getElementById('editTaluk')) {
+            payload.taluk = document.getElementById('editTaluk').value || '';
+            payload.sub_district = payload.taluk;
+        }
         payload.state = document.getElementById('editState').value;
         payload.district = document.getElementById('editDistrict').value;
         payload.pincode = document.getElementById('editPincode').value;
@@ -2205,48 +3599,152 @@ async function loadLeadTimeline(leadId) {
 
     try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/leads/${leadId}/notes`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const notes = await res.json();
 
-        if (!notes || notes.length === 0) {
-            container.innerHTML = '<p style="color: #94a3b8; font-size: 0.8125rem; text-align: center; padding: 2rem;">No interaction history found.</p>';
+        // Fetch notes & calls in parallel
+        const [notesRes, callsRes] = await Promise.all([
+            fetch(`${API_URL}/leads/${leadId}/notes`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_URL}/telephony/calls?lead_id=${leadId}&limit=50`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
+        const notes = notesRes.ok ? await notesRes.json() : [];
+        const callsData = callsRes.ok ? await callsRes.json() : {};
+        const calls = callsData.calls || [];
+
+        // Build unified items array
+        const mergedItems = [];
+
+        if (Array.isArray(notes)) {
+            notes.forEach(note => {
+                mergedItems.push({
+                    type: 'note',
+                    timestamp: new Date(note.created_at).getTime(),
+                    data: note
+                });
+            });
+        }
+
+        if (Array.isArray(calls)) {
+            calls.forEach(call => {
+                mergedItems.push({
+                    type: 'call',
+                    timestamp: new Date(call.started_at || call.created_at).getTime(),
+                    data: call
+                });
+            });
+        }
+
+        // Sort descending by timestamp
+        mergedItems.sort((a, b) => b.timestamp - a.timestamp);
+
+        if (mergedItems.length === 0) {
+            container.innerHTML = '<p style="color: #94a3b8; font-size: 0.8125rem; text-align: center; padding: 2rem;">No interaction history found for this lead.</p>';
             return;
         }
 
-        const originalCount = notes.length;
-        let displayNotes = notes;
+        const originalCount = mergedItems.length;
+        let displayItems = mergedItems;
         const limit = 5;
 
         if (!window.timelineShowAll && originalCount > limit) {
-            displayNotes = notes.slice(0, limit);
+            displayItems = mergedItems.slice(0, limit);
         }
 
-        let html = displayNotes.map(note => {
-            const date = new Date(note.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-            let icon = 'fa-comment-dots';
-            let color = '#64748b';
+        let html = displayItems.map(item => {
+            if (item.type === 'note') {
+                const note = item.data;
+                const date = new Date(note.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+                let icon = 'fa-comment-dots';
+                let color = '#64748b';
 
-            if (note.note.includes('converted')) { icon = 'fa-shopping-cart'; color = '#10b981'; }
-            else if (note.note.includes('assigned')) { icon = 'fa-user-check'; color = '#3b82f6'; }
-            else if (note.note.includes('rescheduled')) { icon = 'fa-calendar-alt'; color = '#f59e0b'; }
-            else if (note.note.includes('System:')) { icon = 'fa-robot'; color = '#94a3b8'; }
+                if (note.note.includes('converted')) { icon = 'fa-shopping-cart'; color = '#10b981'; }
+                else if (note.note.includes('assigned')) { icon = 'fa-user-check'; color = '#3b82f6'; }
+                else if (note.note.includes('rescheduled')) { icon = 'fa-calendar-alt'; color = '#f59e0b'; }
+                else if (note.note.includes('System:')) { icon = 'fa-robot'; color = '#94a3b8'; }
 
-            return `
-                <div class="timeline-item" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; position: relative;">
-                    <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}20; color: ${color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1;">
-                        <i class="fas ${icon}" style="font-size: 0.875rem;"></i>
-                    </div>
-                    <div style="flex-grow: 1;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                            <span style="font-weight: 700; font-size: 0.8125rem; color: #1e293b;">${note.user_name || 'System'}</span>
-                            <span style="font-size: 0.75rem; color: #94a3b8;">${date}</span>
+                return `
+                    <div class="timeline-item" style="display: flex; gap: 1rem; margin-bottom: 1.25rem; position: relative;">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}20; color: ${color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1;">
+                            <i class="fas ${icon}" style="font-size: 0.875rem;"></i>
                         </div>
-                        <p style="font-size: 0.875rem; color: #475569; line-height: 1.4; margin: 0;">${note.note}</p>
+                        <div style="flex-grow: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 700; font-size: 0.8125rem; color: #1e293b;">${note.user_name || 'System'}</span>
+                                <span style="font-size: 0.75rem; color: #94a3b8;">${date}</span>
+                            </div>
+                            <p style="font-size: 0.875rem; color: #475569; line-height: 1.4; margin: 0;">${note.note}</p>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Call entry
+                const call = item.data;
+                const date = new Date(call.started_at || call.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+                const durSec = parseInt(call.duration_seconds || call.talk_time_seconds || 0);
+                const hrs = Math.floor(durSec / 3600);
+                const mins = Math.floor((durSec % 3600) / 60);
+                const secs = durSec % 60;
+                const formattedDuration = hrs > 0 
+                    ? `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`
+                    : `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+
+                let statusBg = '#dcfce7';
+                let statusFg = '#166534';
+                let statusText = 'Completed';
+                let callColor = '#10b981';
+
+                if (call.technical_status === 'MISSED' || call.technical_status === 'FAILED') {
+                    statusBg = '#fee2e2';
+                    statusFg = '#991b1b';
+                    statusText = call.technical_status;
+                    callColor = '#ef4444';
+                } else if (call.technical_status === 'REQUESTED' || call.technical_status === 'CONNECTED') {
+                    statusBg = '#dbeafe';
+                    statusFg = '#1e40af';
+                    statusText = 'In Progress';
+                    callColor = '#2563eb';
+                }
+
+                return `
+                    <div class="timeline-item call-timeline-card" style="display: flex; gap: 1rem; margin-bottom: 1.25rem; position: relative; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.85rem 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="width: 34px; height: 34px; border-radius: 50%; background: ${callColor}15; color: ${callColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem;">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.35rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-weight: 800; font-size: 0.85rem; color: #0f172a;">Outbound Call</span>
+                                    <span style="background: ${statusBg}; color: ${statusFg}; font-size: 0.65rem; font-weight: 800; border-radius: 9999px; padding: 0.15rem 0.55rem; text-transform: uppercase;">${statusText}</span>
+                                </div>
+                                <span style="font-size: 0.73rem; color: #64748b; font-weight: 600;"><i class="far fa-clock mr-1"></i> ${date}</span>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.4rem; font-size: 0.76rem; color: #475569; background: #f8fafc; padding: 0.5rem 0.75rem; border-radius: 8px; margin-top: 0.35rem; border: 1px solid #f1f5f9;">
+                                <div><strong style="color: #1e293b;">Agent:</strong> ${call.crm_user_name || call.agent_phone || 'Telecaller'}</div>
+                                <div><strong style="color: #1e293b;">DID:</strong> ${call.did_number || '-'}</div>
+                                <div><strong style="color: #1e293b;">Duration:</strong> <span style="font-family: monospace; font-weight: 700; color: #059669;">${formattedDuration}</span></div>
+                            </div>
+
+                            ${call.technical_status === 'COMPLETED' ? `
+                                <div style="margin-top: 0.5rem; background: #0f172a; border-radius: 8px; padding: 0.45rem 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; color: white;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <button onclick="window.playCallRecordingMock('${call.id}')" style="width: 26px; height: 26px; border-radius: 50%; background: #2563eb; border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Play Call Recording">
+                                            <i class="fas fa-play" style="font-size: 0.65rem; margin-left: 2px;"></i>
+                                        </button>
+                                        <span style="font-size: 0.73rem; font-weight: 600; color: #cbd5e1;">Call Recording (${formattedDuration})</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.2rem;">
+                                        <div style="height: 10px; width: 3px; background: #10b981; border-radius: 2px;"></div>
+                                        <div style="height: 16px; width: 3px; background: #10b981; border-radius: 2px;"></div>
+                                        <div style="height: 8px; width: 3px; background: #10b981; border-radius: 2px;"></div>
+                                        <div style="height: 14px; width: 3px; background: #3b82f6; border-radius: 2px;"></div>
+                                        <div style="height: 18px; width: 3px; background: #3b82f6; border-radius: 2px;"></div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
         }).join('');
 
         // Add Toggle Button if needed
@@ -2655,7 +4153,7 @@ window.exportLeadsToExcel = async function () {
 
         const campaignCode = lead.campaign_id_code || lead.campaign_name || lead.campaign_tag || lead.first_message || lead.source || 'Direct';
         const farmerName = lead.customer_name || lead.farmer_name || '-';
-        const assignedStaff = lead.assigned_to_name || lead.assigned_name || lead.staff_name || 'Unassigned';
+        const assignedStaff = lead.assigned_to_name ? `${lead.assigned_to_name}${lead.assigned_by_name ? ` (By: ${lead.assigned_by_name})` : ''}` : (lead.assigned_name || lead.staff_name || 'Unassigned');
         const dateTimeStr = lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-';
 
         const row = [
@@ -2709,24 +4207,47 @@ function initGlobalSearch() {
     });
 }
 
-// Helper to manage dismissed human alert IDs in session storage
+// Clear legacy permanent session dismissal blacklist keys so alerts aren't blocked
+try {
+    sessionStorage.removeItem('dismissed_human_alerts');
+    sessionStorage.removeItem('dismissed_payment_order_ids');
+    sessionStorage.removeItem('dismissed_payment_order_id');
+} catch (e) {}
+
+// Helper to manage temporary snoozed human alert IDs (45s default snooze)
 function getDismissedAlerts() {
     try {
-        return JSON.parse(sessionStorage.getItem('dismissed_human_alerts') || '[]');
+        const snoozed = JSON.parse(sessionStorage.getItem('snoozed_human_alerts') || '{}');
+        const now = Date.now();
+        const activeSnoozes = [];
+        for (const [id, exp] of Object.entries(snoozed)) {
+            if (exp && now < exp) {
+                activeSnoozes.push(String(id));
+            }
+        }
+        return activeSnoozes;
     } catch (e) {
         return [];
     }
 }
 
-function markAlertAsDismissed(identifier) {
+function markAlertAsDismissed(identifier, durationMs = 45000) {
     if (!identifier) return;
-    const list = getDismissedAlerts();
-    const str = String(identifier);
-    if (!list.includes(str)) {
-        list.push(str);
-        sessionStorage.setItem('dismissed_human_alerts', JSON.stringify(list));
-    }
+    try {
+        const snoozed = JSON.parse(sessionStorage.getItem('snoozed_human_alerts') || '{}');
+        snoozed[String(identifier)] = Date.now() + durationMs;
+        sessionStorage.setItem('snoozed_human_alerts', JSON.stringify(snoozed));
+    } catch (e) {}
 }
+
+window.unmarkAlertAsDismissed = function(identifier) {
+    if (!identifier) return;
+    try {
+        const snoozed = JSON.parse(sessionStorage.getItem('snoozed_human_alerts') || '{}');
+        delete snoozed[String(identifier)];
+        sessionStorage.setItem('snoozed_human_alerts', JSON.stringify(snoozed));
+    } catch (e) {}
+};
 
 window.retriggerBotFlow = async function (sessionIdOrPhone) {
     if (!sessionIdOrPhone) return;
@@ -2809,15 +4330,8 @@ window.fetchPendingHumanAlerts = async function () {
     // Skip polling if browser network IO is suspended or offline
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-    // Check Notification settings
-    const notifEnabled = localStorage.getItem('notifications_enabled') !== 'false';
-    const soundMuted = localStorage.getItem('notification_sound_muted') === 'true';
-
-    if (!notifEnabled) {
-        const toast = document.getElementById('telecaller-human-alert-toast');
-        if (toast) toast.remove();
-        return;
-    }
+    // Notifications sound check (sound muted if disabled, but in-app banners always render)
+    const soundMuted = localStorage.getItem('notification_sound_muted') === 'true' || localStorage.getItem('notifications_enabled') === 'false';
 
     try {
         const controller = new AbortController();
@@ -2835,13 +4349,31 @@ window.fetchPendingHumanAlerts = async function () {
 
         if (!res || !res.ok) return;
 
-        const alerts = await res.json();
+        let alerts = await res.json();
         if (!Array.isArray(alerts) || alerts.length === 0) {
             const toast = document.getElementById('telecaller-human-alert-toast');
             if (toast) toast.remove();
+            const callAlert = document.getElementById('floatingCallSupportAlert');
+            if (callAlert) callAlert.remove();
             lastAlertCount = 0;
             return;
         }
+
+        // Telecaller client-side assignment check: only show alerts for leads assigned to this user
+        try {
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const role = String(currentUser.role || '').toLowerCase();
+            const isAdmin = role === 'admin' || role === 'super-admin' || role.includes('admin');
+            const isWm = role === 'whatsapp_manager' || role.includes('whatsapp');
+            if (!isAdmin && !isWm) {
+                const currentUserId = String(currentUser.id || currentUser.user_id || '');
+                if (currentUserId) {
+                    alerts = alerts.filter(a => a.assigned_to && String(a.assigned_to) === currentUserId);
+                } else {
+                    alerts = [];
+                }
+            }
+        } catch (e) {}
 
         const dismissedList = getDismissedAlerts();
         const activeAlerts = alerts.filter(a =>
@@ -2852,8 +4384,23 @@ window.fetchPendingHumanAlerts = async function () {
         if (activeAlerts.length === 0) {
             const toast = document.getElementById('telecaller-human-alert-toast');
             if (toast) toast.remove();
+            const callAlert = document.getElementById('floatingCallSupportAlert');
+            if (callAlert) callAlert.remove();
             lastAlertCount = 0;
             return;
+        }
+
+        const callSupportAlerts = activeAlerts.filter(a => a.is_call_support);
+        const nonSupportAlerts = activeAlerts.filter(a => !a.is_call_support);
+
+        // 1. Show Yellow Floating Alert for Call Support
+        if (callSupportAlerts.length > 0) {
+            if (typeof window.showCallSupportAlert === 'function') {
+                window.showCallSupportAlert(callSupportAlerts[0], callSupportAlerts.length);
+            }
+        } else {
+            const callAlert = document.getElementById('floatingCallSupportAlert');
+            if (callAlert) callAlert.remove();
         }
 
         const firstAlert = activeAlerts[0];
@@ -2861,66 +4408,78 @@ window.fetchPendingHumanAlerts = async function () {
 
         // Play alert chime sound if new alert arrives AND sound is not muted
         if (activeAlerts.length > lastAlertCount && !soundMuted) {
-            try {
-                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                audio.play().catch(() => { });
-            } catch (e) { }
+            if (typeof window.playPaymentNotificationSound === 'function') {
+                window.playPaymentNotificationSound();
+            } else {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.play().catch(() => { });
+                } catch (e) { }
+            }
         }
         lastAlertCount = activeAlerts.length;
 
-        let toast = document.getElementById('telecaller-human-alert-toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'telecaller-human-alert-toast';
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 24px;
-                right: 24px;
-                background: #0f172a;
-                color: #ffffff;
-                padding: 16px 20px;
-                border-radius: 14px;
-                box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.2);
-                border-left: 5px solid #ef4444;
-                z-index: 99999;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                max-width: 380px;
-                font-family: 'Inter', sans-serif;
-                animation: fcmSlideIn 0.35s ease-out;
+        // 2. Show Red Bottom Toast ONLY for Standard Non-Support Human Takeovers
+        if (nonSupportAlerts.length === 0) {
+            const toast = document.getElementById('telecaller-human-alert-toast');
+            if (toast) toast.remove();
+        } else {
+            let toast = document.getElementById('telecaller-human-alert-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'telecaller-human-alert-toast';
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 24px;
+                    right: 24px;
+                    background: #0f172a;
+                    color: #ffffff;
+                    padding: 16px 20px;
+                    border-radius: 14px;
+                    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.2);
+                    border-left: 5px solid #ef4444;
+                    z-index: 99999;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    max-width: 380px;
+                    font-family: 'Inter', sans-serif;
+                    animation: fcmSlideIn 0.35s ease-out;
+                `;
+                document.body.appendChild(toast);
+            }
+
+            const alertItem = nonSupportAlerts[0];
+            const custName = alertItem.customer_name || 'WhatsApp Customer';
+            const phone = alertItem.phone || alertItem.phone_number || '';
+            const sessionId = alertItem.session_id || phone;
+            const msgSnippet = alertItem.last_message ? `"${alertItem.last_message.slice(0, 45)}..."` : 'Requested human agent takeover';
+
+            toast.style.borderLeft = '5px solid #ef4444';
+            toast.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:700; font-size:13.5px; color:#f87171; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size:15px;"></i>
+                        🚨 Human Assistance Needed (${nonSupportAlerts.length})
+                    </span>
+                    <button onclick="window.dismissHumanAlertToast('${sessionId}')" style="background:transparent; border:none; color:#94a3b8; cursor:pointer; font-size:14px;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div style="display:flex; font-size:12.5px; color:#cbd5e1; line-height:1.4;">
+                    Customer <strong>${escapeHtml(custName)}</strong> (${escapeHtml(phone)})<br>
+                    <span style="font-size:11.5px; color:#94a3b8; font-style:italic;">${escapeHtml(msgSnippet)}</span>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                    <button onclick="window.openTelecallerChat('${phone}', '${sessionId}')" style="background:#ef4444; color:#fff; border:none; padding:7px 12px; border-radius:7px; font-weight:700; font-size:12px; cursor:pointer; flex:1;">
+                        <i class="fa-solid fa-headset"></i> Takeover Chat
+                    </button>
+                    <button onclick="window.retriggerBotFlow('${sessionId}')" style="background:#3b82f6; color:#fff; border:none; padding:7px 12px; border-radius:7px; font-weight:700; font-size:12px; cursor:pointer; flex:1;">
+                        <i class="fa-solid fa-rotate-right"></i> Re-Trigger Flow
+                    </button>
+                </div>
             `;
-            document.body.appendChild(toast);
         }
-
-        const custName = firstAlert.customer_name || 'WhatsApp Customer';
-        const phone = firstAlert.phone || firstAlert.phone_number || '';
-        const sessionId = firstAlert.session_id || phone;
-        const msgSnippet = firstAlert.last_message ? `"${firstAlert.last_message.slice(0, 45)}..."` : 'Requested human agent takeover';
-
-        toast.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:700; font-size:13.5px; color:#f87171; display:flex; align-items:center; gap:6px;">
-                    <i class="fa-solid fa-triangle-exclamation" style="font-size:15px;"></i>
-                    🚨 Human Assistance Needed (${activeAlerts.length})
-                </span>
-                <button onclick="window.dismissHumanAlertToast('${sessionId}')" style="background:transparent; border:none; color:#94a3b8; cursor:pointer; font-size:14px;">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div style="font-size:12.5px; color:#cbd5e1; line-height:1.4;">
-                Customer <strong>${escapeHtml(custName)}</strong> (${escapeHtml(phone)})<br>
-                <span style="font-size:11.5px; color:#94a3b8; font-style:italic;">${escapeHtml(msgSnippet)}</span>
-            </div>
-            <div style="display:flex; gap:8px; margin-top:4px;">
-                <button onclick="window.openTelecallerChat('${phone}', '${sessionId}')" style="background:#ef4444; color:#fff; border:none; padding:7px 12px; border-radius:7px; font-weight:700; font-size:12px; cursor:pointer; flex:1;">
-                    <i class="fa-solid fa-headset"></i> Takeover Chat
-                </button>
-                <button onclick="window.retriggerBotFlow('${sessionId}')" style="background:#3b82f6; color:#fff; border:none; padding:7px 12px; border-radius:7px; font-weight:700; font-size:12px; cursor:pointer; flex:1;">
-                    <i class="fa-solid fa-rotate-right"></i> Re-Trigger Flow
-                </button>
-            </div>
-        `;
     } catch (err) {
         // Silently swallow network polling errors
     }
@@ -2931,11 +4490,20 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Start polling pending human handoff alerts every 12 seconds
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(window.fetchPendingHumanAlerts, 2000);
-    setInterval(window.fetchPendingHumanAlerts, 12000);
-});
+// Start polling pending human handoff alerts every 6 seconds
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(window.fetchPendingHumanAlerts, 500);
+        setInterval(() => {
+            if (!document.hidden) window.fetchPendingHumanAlerts();
+        }, 6000);
+    });
+} else {
+    setTimeout(window.fetchPendingHumanAlerts, 500);
+    setInterval(() => {
+        if (!document.hidden) window.fetchPendingHumanAlerts();
+    }, 6000);
+}
 
 // Global protection: Prevent mouse wheel scroll from incrementing/decrementing number inputs
 document.addEventListener('wheel', function (e) {
@@ -3355,4 +4923,1598 @@ window.openPasswordResetOtpModal = function (options = {}) {
         }
     });
 };
+
+// Helper function to make dialer modal smoothly draggable across screen
+window.makeDialerDraggable = function(modalEl, handleEl) {
+    if (!modalEl || !handleEl) return;
+    let isDragging = false;
+    let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+
+    handleEl.style.cursor = 'move';
+
+    function onDragStart(e) {
+        if (e.target.closest('.dialer-close-btn')) return;
+
+        isDragging = true;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const rect = modalEl.getBoundingClientRect();
+        startX = clientX;
+        startY = clientY;
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        modalEl.style.right = 'auto';
+        modalEl.style.bottom = 'auto';
+        modalEl.style.left = `${initialLeft}px`;
+        modalEl.style.top = `${initialTop}px`;
+        modalEl.style.userSelect = 'none';
+
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+    }
+
+    function onDragMove(e) {
+        if (!isDragging) return;
+        if (e.cancelable) e.preventDefault();
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        const maxLeft = window.innerWidth - modalEl.offsetWidth - 10;
+        const maxTop = window.innerHeight - modalEl.offsetHeight - 10;
+
+        newLeft = Math.max(10, Math.min(newLeft, maxLeft));
+        newTop = Math.max(10, Math.min(newTop, maxTop));
+
+        modalEl.style.left = `${newLeft}px`;
+        modalEl.style.top = `${newTop}px`;
+    }
+
+    function onDragEnd() {
+        isDragging = false;
+        modalEl.style.userSelect = 'auto';
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('touchend', onDragEnd);
+    }
+
+    handleEl.addEventListener('mousedown', onDragStart);
+    handleEl.addEventListener('touchstart', onDragStart, { passive: true });
+};
+
+// ============================================================
+// GLOBAL CLICK-TO-CALL PHONE DIALER WIDGET
+// ============================================================
+window.initGlobalPhoneDialer = function() {
+    if (document.getElementById('globalPhoneDialerModal')) return;
+
+    // 0. Inject Dialing CSS Styles dynamically into head
+    if (!document.getElementById('globalDialerStyles')) {
+        const style = document.createElement('style');
+        style.id = 'globalDialerStyles';
+        style.innerHTML = `
+            .global-dialer-floating-btn {
+                position: fixed !important;
+                bottom: 24px !important;
+                right: 24px !important;
+                width: 52px !important;
+                height: 52px !important;
+                border-radius: 50% !important;
+                background: linear-gradient(135deg, #10b981, #059669) !important;
+                color: #ffffff !important;
+                border: none !important;
+                box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+                cursor: pointer !important;
+                z-index: 99990 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 1.35rem !important;
+                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+            }
+            .global-dialer-floating-btn:hover {
+                transform: scale(1.1) rotate(5deg) !important;
+                box-shadow: 0 14px 28px -4px rgba(16, 185, 129, 0.5) !important;
+            }
+            .global-dialer-modal {
+                position: fixed !important;
+                top: 56px !important;
+                bottom: auto !important;
+                right: 24px !important;
+                width: 310px !important;
+                background: #ffffff !important;
+                border-radius: 16px !important;
+                box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(15, 23, 42, 0.1) !important;
+                z-index: 99999 !important;
+                display: none;
+                flex-direction: column !important;
+                overflow: hidden !important;
+                animation: dialerPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+                font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+            }
+            @keyframes dialerPopIn {
+                from { opacity: 0; transform: translateY(20px) scale(0.95); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .dialer-header {
+                background: #0f172a !important;
+                color: #ffffff !important;
+                padding: 0.85rem 1rem !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+            }
+            .dialer-title {
+                font-size: 0.85rem !important;
+                font-weight: 800 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+                letter-spacing: 0.02em !important;
+                color: #ffffff !important;
+            }
+            .dialer-status-dot {
+                width: 8px !important;
+                height: 8px !important;
+                border-radius: 50% !important;
+                background: #10b981 !important;
+                box-shadow: 0 0 8px #10b981 !important;
+                display: inline-block !important;
+            }
+            .dialer-close-btn {
+                background: transparent !important;
+                border: none !important;
+                color: #94a3b8 !important;
+                font-size: 1.25rem !important;
+                cursor: pointer !important;
+                line-height: 1 !important;
+            }
+            .dialer-close-btn:hover { color: #ffffff !important; }
+            .dialer-screen {
+                padding: 0.85rem !important;
+                background: #f8fafc !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+            }
+            .dialer-input-wrapper {
+                position: relative !important;
+                display: flex !important;
+                align-items: center !important;
+            }
+            .dialer-input {
+                width: 100% !important;
+                height: 44px !important;
+                padding: 0 2.5rem 0 0.85rem !important;
+                font-size: 1.2rem !important;
+                font-weight: 800 !important;
+                letter-spacing: 0.06em !important;
+                font-family: monospace, sans-serif !important;
+                color: #0f172a !important;
+                background: #ffffff !important;
+                border: 1.5px solid #cbd5e1 !important;
+                border-radius: 10px !important;
+                outline: none !important;
+                box-sizing: border-box !important;
+            }
+            .dialer-input:focus {
+                border-color: #2563eb !important;
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+            }
+            .dialer-backspace-btn {
+                position: absolute !important;
+                right: 0.5rem !important;
+                background: transparent !important;
+                border: none !important;
+                color: #64748b !important;
+                font-size: 1.1rem !important;
+                cursor: pointer !important;
+            }
+            .dialer-keypad {
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 0.5rem !important;
+                padding: 0.85rem !important;
+                background: #ffffff !important;
+            }
+            .keypad-btn {
+                height: 48px !important;
+                border-radius: 10px !important;
+                border: 1px solid #e2e8f0 !important;
+                background: #f8fafc !important;
+                color: #0f172a !important;
+                font-size: 1.2rem !important;
+                font-weight: 800 !important;
+                cursor: pointer !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                user-select: none !important;
+                line-height: 1 !important;
+            }
+            .keypad-btn span.sub {
+                font-size: 0.52rem !important;
+                font-weight: 700 !important;
+                color: #94a3b8 !important;
+                margin-top: 1px !important;
+            }
+            .keypad-btn:hover {
+                background: #eff6ff !important;
+                border-color: #bfdbfe !important;
+                color: #2563eb !important;
+            }
+            .dialer-action-bar {
+                padding: 0.5rem 0.85rem 0.85rem 0.85rem !important;
+                background: #ffffff !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+            }
+            .btn-dialer-call {
+                flex: 1 !important;
+                height: 46px !important;
+                border-radius: 10px !important;
+                background: linear-gradient(135deg, #10b981, #059669) !important;
+                color: #ffffff !important;
+                border: none !important;
+                font-weight: 800 !important;
+                font-size: 0.95rem !important;
+                cursor: pointer !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 0.5rem !important;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+            }
+            .btn-dialer-hangup {
+                width: 46px !important;
+                height: 46px !important;
+                border-radius: 10px !important;
+                background: #fef2f2 !important;
+                color: #ef4444 !important;
+                border: 1px solid #fecaca !important;
+                font-size: 1.1rem !important;
+                cursor: pointer !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .dialer-status-banner {
+                padding: 0.6rem 0.85rem !important;
+                background: #eff6ff !important;
+                border-top: 1px solid #dbeafe !important;
+                font-size: 0.75rem !important;
+                font-weight: 700 !important;
+                color: #1e40af !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Remove any existing floating button if present
+    const existingFloatBtn = document.getElementById('globalDialerFloatingBtn');
+    if (existingFloatBtn) existingFloatBtn.remove();
+
+    // 2. Inject Topbar Phone Icon if topbar exists
+    const profileSection = document.querySelector('.profile-section');
+    if (profileSection && !document.getElementById('topbarDialerBtn')) {
+        const topbarBtn = document.createElement('button');
+        topbarBtn.id = 'topbarDialerBtn';
+        topbarBtn.title = 'Open Phone Dialer';
+        topbarBtn.style.cssText = 'background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;';
+        topbarBtn.innerHTML = '<i class="fas fa-phone-alt"></i>';
+        topbarBtn.onclick = (e) => {
+            e.stopPropagation();
+            window.toggleGlobalDialer();
+        };
+        profileSection.insertBefore(topbarBtn, profileSection.firstChild);
+    }
+
+    // 3. Inject Dialer Modal HTML
+    const modal = document.createElement('div');
+    modal.className = 'global-dialer-modal';
+    modal.id = 'globalPhoneDialerModal';
+    modal.innerHTML = `
+        <div class="dialer-header" id="globalDialerHeader" style="cursor: move;" title="Drag to move dialer anywhere on screen">
+            <div class="dialer-title">
+                <i class="fas fa-arrows-alt" style="font-size: 0.75rem; opacity: 0.7; margin-right: 2px;"></i>
+                <span class="dialer-status-dot"></span>
+                <span>Acefone Web Dialer</span>
+            </div>
+            <button class="dialer-close-btn" onclick="window.toggleGlobalDialer()">&times;</button>
+        </div>
+
+        <div class="dialer-screen">
+            <div class="dialer-input-wrapper">
+                <input type="text" id="globalDialerNumberInput" class="dialer-input" placeholder="Enter phone..." autocomplete="off">
+                <button class="dialer-backspace-btn" onclick="window.dialerPressBackspace()" title="Backspace"><i class="fas fa-backspace"></i></button>
+            </div>
+        </div>
+
+        <div class="dialer-keypad">
+            <button class="keypad-btn" onclick="window.dialerPressDigit('1')">1<span class="sub">&nbsp;</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('2')">2<span class="sub">ABC</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('3')">3<span class="sub">DEF</span></button>
+
+            <button class="keypad-btn" onclick="window.dialerPressDigit('4')">4<span class="sub">GHI</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('5')">5<span class="sub">JKL</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('6')">6<span class="sub">MNO</span></button>
+
+            <button class="keypad-btn" onclick="window.dialerPressDigit('7')">7<span class="sub">PQRS</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('8')">8<span class="sub">TUV</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('9')">9<span class="sub">WXYZ</span></button>
+
+            <button class="keypad-btn" onclick="window.dialerPressDigit('*')">*<span class="sub">&nbsp;</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('0')">0<span class="sub">+</span></button>
+            <button class="keypad-btn" onclick="window.dialerPressDigit('#')">#<span class="sub">&nbsp;</span></button>
+        </div>
+
+        <div class="dialer-action-bar">
+            <button class="btn-dialer-call" id="btnGlobalDialerCall" onclick="window.triggerGlobalDialerCall()">
+                <i class="fas fa-phone-alt"></i> Call
+            </button>
+            <button class="btn-dialer-hangup" onclick="window.resetGlobalDialerCall()" title="Clear / Reset">
+                <i class="fas fa-phone-slash"></i>
+            </button>
+        </div>
+
+        <div class="dialer-status-banner" id="globalDialerStatusBanner" style="display: none;">
+            <i class="fas fa-spinner fa-spin" id="globalDialerStatusSpinner"></i>
+            <span id="globalDialerStatusText">Ready</span>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Make modal draggable by header
+    const headerEl = document.getElementById('globalDialerHeader');
+    if (headerEl && window.makeDialerDraggable) {
+        window.makeDialerDraggable(modal, headerEl);
+    }
+
+    // Keyboard enter key listener
+    const numInput = document.getElementById('globalDialerNumberInput');
+    if (numInput) {
+        numInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.triggerGlobalDialerCall();
+            }
+        });
+    }
+};
+
+// Toggle Dialer Modal
+window.toggleGlobalDialer = function(phoneToPreload) {
+    const modal = document.getElementById('globalPhoneDialerModal');
+    if (!modal) {
+        window.initGlobalPhoneDialer();
+        return window.toggleGlobalDialer(phoneToPreload);
+    }
+
+    const isVisible = modal.style.display === 'flex';
+    if (isVisible && !phoneToPreload) {
+        modal.style.display = 'none';
+    } else {
+        modal.style.display = 'flex';
+        const numInput = document.getElementById('globalDialerNumberInput');
+        if (numInput) {
+            if (phoneToPreload) numInput.value = phoneToPreload;
+            numInput.focus();
+        }
+    }
+};
+
+// Keypad digit press
+window.dialerPressDigit = function(digit) {
+    const numInput = document.getElementById('globalDialerNumberInput');
+    if (!numInput) return;
+    numInput.value += digit;
+    numInput.focus();
+};
+
+// Backspace
+window.dialerPressBackspace = function() {
+    const numInput = document.getElementById('globalDialerNumberInput');
+    if (!numInput) return;
+    numInput.value = numInput.value.slice(0, -1);
+    numInput.focus();
+};
+
+// Reset dialer UI
+window.resetGlobalDialerCall = function() {
+    const numInput = document.getElementById('globalDialerNumberInput');
+    if (numInput) numInput.value = '';
+    const banner = document.getElementById('globalDialerStatusBanner');
+    if (banner) banner.style.display = 'none';
+    const callBtn = document.getElementById('btnGlobalDialerCall');
+    if (callBtn) {
+        callBtn.disabled = false;
+        callBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Call';
+    }
+};
+
+// Trigger Call
+window.triggerGlobalDialerCall = async function() {
+    const numInput = document.getElementById('globalDialerNumberInput');
+    const phone = numInput ? numInput.value.trim() : '';
+
+    if (!phone) {
+        if (window.showAlert) window.showAlert('Empty Number', 'Please enter a phone number to dial.', 'error');
+        else alert('Please enter a phone number to dial.');
+        return;
+    }
+
+    const banner = document.getElementById('globalDialerStatusBanner');
+    const bannerText = document.getElementById('globalDialerStatusText');
+    const bannerSpinner = document.getElementById('globalDialerStatusSpinner');
+    const callBtn = document.getElementById('btnGlobalDialerCall');
+
+    if (banner) banner.style.display = 'flex';
+    if (bannerText) bannerText.textContent = `Dialing Acefone Agent first...`;
+    if (bannerSpinner) bannerSpinner.className = 'fas fa-spinner fa-spin';
+    if (callBtn) {
+        callBtn.disabled = true;
+        callBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Dialing...';
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const baseUrl = window.API_URL || 'http://127.0.0.1:5000/api';
+        const res = await fetch(`${baseUrl}/telephony/click-to-call`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                destination_phone: phone
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            if (bannerText) bannerText.textContent = `Ringing agent... Once picked, connecting ${phone}`;
+            if (bannerSpinner) bannerSpinner.className = 'fas fa-phone-volume fa-pulse';
+            if (window.showAlert) {
+                window.showAlert('Click-to-Call Initiated! 📞', data.message || `Ringing your extension/mobile. Connecting to ${phone}`, 'success');
+            }
+            if (data.call_id) {
+                window.monitorCallStatus(data.call_id, phone);
+            }
+        } else {
+            if (bannerText) bannerText.textContent = `Call Failed: ${data.error || 'Failed'}`;
+            if (bannerSpinner) bannerSpinner.className = 'fas fa-exclamation-circle';
+            if (window.showAlert) {
+                window.showAlert('Call Error', data.error || 'Failed to initiate click to call', 'error');
+            }
+        }
+    } catch (err) {
+        if (bannerText) bannerText.textContent = `Network Error: ${err.message}`;
+        if (bannerSpinner) bannerSpinner.className = 'fas fa-exclamation-triangle';
+        if (window.showAlert) window.showAlert('Network Error', err.message, 'error');
+    } finally {
+        if (callBtn) {
+            callBtn.disabled = false;
+            callBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Call';
+        }
+    }
+};
+
+// Auto-initialize global dialer on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(window.initGlobalPhoneDialer, 300));
+} else {
+    setTimeout(window.initGlobalPhoneDialer, 300);
+}
+
+// ============================================================================
+// Payment Verification Floating Alert & Lightbox Modal (Blade Protector Flow)
+// ============================================================================
+(function initPaymentVerificationModule() {
+    // 1. Inject Styles
+    if (!document.getElementById('paymentVerificationAlertStyles')) {
+        const style = document.createElement('style');
+        style.id = 'paymentVerificationAlertStyles';
+        style.textContent = `
+            /* Floating Payment Alert Card */
+            .floating-payment-alert {
+                position: fixed;
+                top: 24px;
+                right: 28px;
+                width: 440px;
+                max-width: calc(100vw - 36px);
+                background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+                border: 1.5px solid #86efac;
+                border-radius: 18px;
+                box-shadow: 0 20px 35px -8px rgba(16, 185, 129, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+                padding: 16px 18px;
+                font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+                z-index: 999998;
+                animation: slideInPayAlert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                box-sizing: border-box;
+            }
+            @keyframes slideInPayAlert {
+                from { opacity: 0; transform: translateY(-20px) scale(0.96); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .floating-payment-alert.hiding {
+                animation: slideOutPayAlert 0.25s ease-in forwards;
+            }
+            @keyframes slideOutPayAlert {
+                from { opacity: 1; transform: translateY(0) scale(1); }
+                to { opacity: 0; transform: translateY(-16px) scale(0.94); }
+            }
+
+            .pay-alert-header {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                position: relative;
+            }
+            .pay-alert-icon-wrapper {
+                position: relative;
+                flex-shrink: 0;
+            }
+            .pay-alert-icon-circle {
+                width: 46px;
+                height: 46px;
+                border-radius: 50%;
+                background: #10b981;
+                color: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 24px;
+                font-weight: 800;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+            }
+            .pay-alert-badge {
+                position: absolute;
+                top: -3px;
+                right: -3px;
+                background: #ef4444;
+                color: #ffffff;
+                border: 2px solid #ffffff;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 800;
+                min-width: 18px;
+                height: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+            }
+
+            .pay-alert-info {
+                flex: 1;
+                min-width: 0;
+                padding-right: 20px;
+            }
+            .pay-alert-title {
+                font-size: 15px;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 0 0 4px 0;
+                letter-spacing: -0.01em;
+            }
+            .pay-alert-customer {
+                font-size: 13px;
+                color: #334155;
+                margin: 0 0 2px 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .pay-alert-customer strong {
+                color: #0f172a;
+                font-weight: 700;
+            }
+            .pay-alert-details {
+                font-size: 13px;
+                color: #1e293b;
+                margin: 0 0 6px 0;
+            }
+            .pay-alert-details strong {
+                color: #065f46;
+                font-weight: 800;
+            }
+            .pay-alert-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                background: #dcfce7;
+                color: #15803d;
+                border: 1px solid #bbf7d0;
+                padding: 3px 10px;
+                border-radius: 9999px;
+                font-size: 11px;
+                font-weight: 700;
+                margin-top: 2px;
+            }
+
+            .pay-alert-thumbnail {
+                width: 52px;
+                height: 76px;
+                border: 2.5px solid #1e293b;
+                border-radius: 9px;
+                background: #0f172a;
+                overflow: hidden;
+                flex-shrink: 0;
+                cursor: pointer;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+                position: relative;
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .pay-alert-thumbnail:hover {
+                transform: scale(1.05);
+                box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
+            }
+            .pay-alert-thumbnail img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+            .pay-alert-thumbnail-fallback {
+                width: 100%;
+                height: 100%;
+                background: #ffffff;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 4px;
+                box-sizing: border-box;
+                text-align: center;
+            }
+
+            .pay-alert-close {
+                position: absolute;
+                top: -2px;
+                right: 0;
+                background: transparent;
+                border: none;
+                color: #64748b;
+                font-size: 18px;
+                line-height: 1;
+                cursor: pointer;
+                padding: 4px;
+                border-radius: 4px;
+                transition: color 0.15s;
+            }
+            .pay-alert-close:hover {
+                color: #0f172a;
+            }
+
+            .pay-alert-actions {
+                display: flex;
+                gap: 10px;
+                margin-top: 14px;
+            }
+            .btn-pay-view-screenshot {
+                flex: 1;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                background: #ffffff;
+                border: 1px solid #cbd5e1;
+                color: #1e293b;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 9px 12px;
+                border-radius: 10px;
+                cursor: pointer;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+                transition: all 0.15s;
+            }
+            .btn-pay-view-screenshot:hover {
+                background: #f8fafc;
+                border-color: #94a3b8;
+            }
+            .btn-pay-open-chat {
+                flex: 1.25;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                background: #10b981;
+                border: none;
+                color: #ffffff;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 9px 14px;
+                border-radius: 10px;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+                transition: all 0.15s;
+            }
+            .btn-pay-open-chat:hover {
+                background: #059669;
+                transform: translateY(-1px);
+                box-shadow: 0 6px 16px rgba(16, 185, 129, 0.45);
+            }
+
+            /* Lightbox Modal */
+            .payment-modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(15, 23, 42, 0.7);
+                backdrop-filter: blur(6px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000000;
+                animation: fadeInModal 0.2s ease-out;
+            }
+            @keyframes fadeInModal {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .payment-modal-content {
+                background: #ffffff;
+                border-radius: 20px;
+                width: 580px;
+                max-width: 94vw;
+                max-height: 90vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
+                animation: scaleInModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            @keyframes scaleInModal {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            .payment-modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 22px;
+                background: #f8fafc;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            .payment-modal-title {
+                font-size: 16px;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 0;
+            }
+            .payment-modal-subtitle {
+                font-size: 13px;
+                color: #64748b;
+                margin-top: 2px;
+            }
+            .payment-modal-close {
+                background: transparent;
+                border: none;
+                font-size: 22px;
+                color: #64748b;
+                cursor: pointer;
+                padding: 4px 8px;
+                border-radius: 6px;
+            }
+            .payment-modal-close:hover {
+                color: #0f172a;
+                background: #e2e8f0;
+            }
+            .payment-modal-body {
+                padding: 16px 22px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background: #0f172a;
+            }
+            .payment-modal-img {
+                max-width: 100%;
+                max-height: 55vh;
+                border-radius: 10px;
+                object-fit: contain;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            }
+            .payment-modal-footer {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 14px 22px;
+                background: #f8fafc;
+                border-top: 1px solid #e2e8f0;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            .btn-modal-verify {
+                background: #10b981;
+                color: #ffffff;
+                border: none;
+                padding: 9px 18px;
+                border-radius: 8px;
+                font-weight: 700;
+                font-size: 13px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: background 0.15s;
+            }
+            .btn-modal-verify:hover {
+                background: #059669;
+            }
+            .btn-modal-reject {
+                background: #ffffff;
+                color: #ef4444;
+                border: 1px solid #fca5a5;
+                padding: 9px 16px;
+                border-radius: 8px;
+                font-weight: 700;
+                font-size: 13px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.15s;
+            }
+            .btn-modal-reject:hover {
+                background: #fef2f2;
+                border-color: #ef4444;
+            }
+            .btn-modal-chat {
+                background: #ffffff;
+                color: #065f46;
+                border: 1px solid #10b981;
+                padding: 9px 16px;
+                border-radius: 8px;
+                font-weight: 700;
+                font-size: 13px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .btn-modal-chat:hover {
+                background: #ecfdf5;
+            }
+
+            /* Floating Call Support Alert Card (Yellow Theme) */
+            .floating-call-support-alert {
+                position: fixed;
+                top: 24px;
+                right: 28px;
+                width: 440px;
+                max-width: calc(100vw - 36px);
+                background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+                border: 1.5px solid #f59e0b;
+                border-radius: 18px;
+                box-shadow: 0 20px 35px -8px rgba(245, 158, 11, 0.28), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+                padding: 16px 18px;
+                font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+                z-index: 999997;
+                animation: slideInCallAlert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                box-sizing: border-box;
+                transition: top 0.25s ease;
+            }
+            @keyframes slideInCallAlert {
+                from { opacity: 0; transform: translateY(-20px) scale(0.96); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .floating-call-support-alert.hiding {
+                animation: slideOutCallAlert 0.25s ease-in forwards;
+            }
+            @keyframes slideOutCallAlert {
+                from { opacity: 1; transform: translateY(0) scale(1); }
+                to { opacity: 0; transform: translateY(-16px) scale(0.94); }
+            }
+
+            .call-alert-header {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                position: relative;
+            }
+            .call-alert-icon-wrapper {
+                position: relative;
+                flex-shrink: 0;
+            }
+            .call-alert-icon-circle {
+                width: 46px;
+                height: 46px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                color: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+            }
+            .call-alert-badge {
+                position: absolute;
+                top: -3px;
+                right: -3px;
+                background: #ef4444;
+                color: #ffffff;
+                border: 2px solid #ffffff;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 800;
+                min-width: 18px;
+                height: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+            }
+
+            .call-alert-info {
+                flex: 1;
+                min-width: 0;
+                padding-right: 20px;
+            }
+            .call-alert-title {
+                font-size: 15px;
+                font-weight: 800;
+                color: #92400e;
+                margin: 0 0 4px 0;
+                letter-spacing: -0.01em;
+            }
+            .call-alert-customer {
+                font-size: 13px;
+                color: #78350f;
+                margin: 0 0 2px 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .call-alert-customer strong {
+                color: #451a03;
+                font-weight: 700;
+            }
+            .call-alert-details {
+                font-size: 12.5px;
+                color: #92400e;
+                margin: 0 0 6px 0;
+            }
+            .call-alert-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                background: #fde68a;
+                color: #92400e;
+                border: 1px solid #fcd34d;
+                padding: 3px 10px;
+                border-radius: 9999px;
+                font-size: 11px;
+                font-weight: 700;
+                margin-top: 2px;
+            }
+
+            .call-alert-close {
+                position: absolute;
+                top: -2px;
+                right: 0;
+                background: transparent;
+                border: none;
+                color: #92400e;
+                font-size: 18px;
+                line-height: 1;
+                cursor: pointer;
+                padding: 4px;
+                border-radius: 4px;
+                transition: color 0.15s;
+            }
+            .call-alert-close:hover {
+                color: #451a03;
+            }
+
+            .call-alert-actions {
+                display: flex;
+                gap: 10px;
+                margin-top: 14px;
+            }
+            .btn-call-support-phone {
+                flex: 1.1;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                background: #f59e0b;
+                border: none;
+                color: #ffffff;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 9px 12px;
+                border-radius: 10px;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+                transition: all 0.15s;
+            }
+            .btn-call-support-phone:hover {
+                background: #d97706;
+                transform: translateY(-1px);
+                box-shadow: 0 6px 16px rgba(245, 158, 11, 0.45);
+            }
+            .btn-call-support-chat {
+                flex: 1.25;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                background: #ffffff;
+                border: 1px solid #f59e0b;
+                color: #92400e;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 9px 14px;
+                border-radius: 10px;
+                cursor: pointer;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+                transition: all 0.15s;
+            }
+            .btn-call-support-chat:hover {
+                background: #fffbeb;
+                transform: translateY(-1px);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+})();
+
+// Sound Effect Player for Notifications
+window.playPaymentNotificationSound = function () {
+    try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.volume = 0.9;
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                playWebAudioChime();
+            });
+        }
+    } catch (e) {
+        playWebAudioChime();
+    }
+};
+
+function playWebAudioChime() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+
+        const now = ctx.currentTime;
+        
+        // 2-tone melodic notification chime: D5 (587.33Hz) -> A5 (880Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now);
+        gain1.gain.setValueAtTime(0.25, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880, now + 0.12);
+        gain2.gain.setValueAtTime(0.3, now + 0.12);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.55);
+    } catch (err) {
+        // AudioContext prevented by browser autoplay policy
+    }
+}
+
+function isPaymentOrderDismissed(orderId) {
+    if (!orderId) return false;
+    try {
+        const snoozed = JSON.parse(sessionStorage.getItem('snoozed_payment_orders') || '{}');
+        const exp = snoozed[String(orderId)];
+        if (exp && Date.now() < exp) return true;
+    } catch (e) {}
+    return false;
+}
+
+function snoozePaymentOrder(orderId, durationMs = 45000) {
+    if (!orderId) return;
+    try {
+        const snoozed = JSON.parse(sessionStorage.getItem('snoozed_payment_orders') || '{}');
+        snoozed[String(orderId)] = Date.now() + durationMs;
+        sessionStorage.setItem('snoozed_payment_orders', JSON.stringify(snoozed));
+    } catch (e) {}
+}
+
+function unmarkPaymentOrderDismissed(orderId) {
+    if (!orderId) return;
+    try {
+        const snoozed = JSON.parse(sessionStorage.getItem('snoozed_payment_orders') || '{}');
+        delete snoozed[String(orderId)];
+        sessionStorage.setItem('snoozed_payment_orders', JSON.stringify(snoozed));
+    } catch (e) {}
+    try {
+        sessionStorage.removeItem('dismissed_payment_order_id');
+        sessionStorage.removeItem('dismissed_payment_order_ids');
+    } catch (e) {}
+}
+
+// Floating Alert Renderer
+window.showPaymentScreenshotAlert = function (data) {
+    if (!data) return;
+    const orderId = data.order_id || '';
+    const orderNumber = data.order_number || (orderId ? `SGB-${orderId}` : 'SGB-Order');
+    const customerName = data.customer_name || 'WhatsApp Customer';
+    const phone = data.phone || '';
+    const amount = data.total_amount || 600;
+    const count = data.count || 1;
+    const rawScreenshot = data.screenshot_url || '';
+    const screenshotUrl = (typeof window.resolveMediaUrl === 'function' && rawScreenshot)
+        ? window.resolveMediaUrl(rawScreenshot)
+        : rawScreenshot;
+
+    // Check if user already dismissed this specific order in this session
+    if (isPaymentOrderDismissed(orderId)) {
+        return; // Kept pending in system, dismissed from popup view
+    }
+
+    // Play notification sound when a new alert is shown or order ID changes
+    if (!window._lastSoundPlayedOrderId || window._lastSoundPlayedOrderId !== String(orderId)) {
+        window._lastSoundPlayedOrderId = String(orderId);
+        window.playPaymentNotificationSound();
+    }
+
+    let alertEl = document.getElementById('floatingPaymentAlert');
+    if (!alertEl) {
+        alertEl = document.createElement('div');
+        alertEl.id = 'floatingPaymentAlert';
+        alertEl.className = 'floating-payment-alert';
+        document.body.appendChild(alertEl);
+    }
+
+    const encodedData = encodeURIComponent(JSON.stringify({
+        order_id: orderId,
+        order_number: orderNumber,
+        customer_name: customerName,
+        phone: phone,
+        total_amount: amount,
+        screenshot_url: screenshotUrl
+    }));
+
+    const thumbnailHtml = screenshotUrl ? `
+        <div class="pay-alert-thumbnail" onclick="window.viewPaymentScreenshotModal('${screenshotUrl}', '${encodedData}')" title="Click to view full screenshot">
+            <img src="${screenshotUrl}" alt="Payment Screenshot" onerror="this.parentElement.innerHTML='<div class=\\'pay-alert-thumbnail-fallback\\'><i class=\\'fa-solid fa-receipt\\' style=\\'color:#10b981;font-size:18px;\\'></i><span style=\\'font-size:9px;font-weight:700;color:#0f172a;margin-top:2px;\\'>₹${amount}</span></div>'">
+        </div>
+    ` : `
+        <div class="pay-alert-thumbnail" onclick="window.viewPaymentScreenshotModal('', '${encodedData}')" title="Payment Evidence">
+            <div class="pay-alert-thumbnail-fallback">
+                <i class="fa-solid fa-receipt" style="color: #10b981; font-size: 18px;"></i>
+                <span style="font-size: 9px; font-weight: 700; color: #0f172a; margin-top: 2px;">₹${amount}</span>
+            </div>
+        </div>
+    `;
+
+    alertEl.innerHTML = `
+        <div class="pay-alert-header">
+            <div class="pay-alert-icon-wrapper">
+                <div class="pay-alert-icon-circle">₹</div>
+                <span class="pay-alert-badge">${count}</span>
+            </div>
+            <div class="pay-alert-info">
+                <h4 class="pay-alert-title">New Payment Screenshot Received!</h4>
+                <div class="pay-alert-customer">Customer: <strong>${customerName}</strong> (${phone})</div>
+                <div class="pay-alert-details">Order: <strong>#${orderNumber}</strong> &nbsp;|&nbsp; Amount: <strong>₹${amount}</strong></div>
+                <div class="pay-alert-pill">
+                    <i class="fa-solid fa-circle-check" style="font-size: 10px;"></i> Received just now · Waiting for verification
+                </div>
+            </div>
+            ${thumbnailHtml}
+            <button class="pay-alert-close" onclick="window.dismissPaymentAlert('${orderId}')" title="Dismiss alert">&times;</button>
+        </div>
+        <div class="pay-alert-actions">
+            <button class="btn-pay-view-screenshot" onclick="window.viewPaymentScreenshotModal('${screenshotUrl}', '${encodedData}')">
+                <i class="fa-regular fa-eye"></i> View Screenshot
+            </button>
+            <button class="btn-pay-open-chat" onclick="window.openPaymentChatAndVerify('${phone}', '${orderId}')">
+                <i class="fa-brands fa-whatsapp" style="font-size: 15px;"></i> Open Chat & Verify
+            </button>
+        </div>
+    `;
+
+    updateFloatingAlertPositions();
+    setTimeout(updateFloatingAlertPositions, 60);
+    setTimeout(updateFloatingAlertPositions, 200);
+};
+
+window.dismissPaymentAlert = function (orderId) {
+    if (orderId) {
+        snoozePaymentOrder(orderId, 45000);
+    }
+    const alertEl = document.getElementById('floatingPaymentAlert');
+    if (alertEl) {
+        alertEl.classList.add('hiding');
+        setTimeout(() => {
+            alertEl.remove();
+            updateFloatingAlertPositions();
+        }, 250);
+    }
+};
+
+// Floating Call Support Alert Renderer (Yellow Theme)
+window.showCallSupportAlert = function (data, totalCount) {
+    if (!data) return;
+    const phone = data.phone || data.phone_number || '';
+    const sessionId = data.session_id || phone;
+    const customerName = data.customer_name || 'WhatsApp Customer';
+    const product = data.call_support_product || 'SGB Blade Protector';
+    const count = totalCount || 1;
+
+    let alertEl = document.getElementById('floatingCallSupportAlert');
+    if (!alertEl) {
+        alertEl = document.createElement('div');
+        alertEl.id = 'floatingCallSupportAlert';
+        alertEl.className = 'floating-call-support-alert';
+        document.body.appendChild(alertEl);
+    }
+
+    alertEl.innerHTML = `
+        <div class="call-alert-header">
+            <div class="call-alert-icon-wrapper">
+                <div class="call-alert-icon-circle">
+                    <i class="fa-solid fa-phone-volume"></i>
+                </div>
+                <span class="call-alert-badge">${count}</span>
+            </div>
+            <div class="call-alert-info">
+                <h4 class="call-alert-title">Customer Requested Call Support!</h4>
+                <div class="call-alert-customer">Customer: <strong>${escapeHtml(customerName)}</strong> (${escapeHtml(phone)})</div>
+                <div class="call-alert-details">Product: <strong>${escapeHtml(product)}</strong> &nbsp;|&nbsp; Reason: <strong>Support Callback</strong></div>
+                <div class="call-alert-pill">
+                    <i class="fa-solid fa-clock"></i> Requested just now · Support callback needed
+                </div>
+            </div>
+            <button class="call-alert-close" onclick="window.dismissCallSupportAlert('${sessionId}', '${phone}')" title="Dismiss alert">&times;</button>
+        </div>
+        <div class="call-alert-actions">
+            <button class="btn-call-support-phone" onclick="window.initiateCallSupportCall('${phone}')">
+                <i class="fa-solid fa-phone"></i> Call Customer
+            </button>
+            <button class="btn-call-support-chat" onclick="window.openCallSupportChat('${phone}', '${sessionId}')">
+                <i class="fa-brands fa-whatsapp" style="font-size: 15px;"></i> Open Chat & Assist
+            </button>
+        </div>
+    `;
+
+    updateFloatingAlertPositions();
+    setTimeout(updateFloatingAlertPositions, 60);
+    setTimeout(updateFloatingAlertPositions, 200);
+};
+
+window.dismissCallSupportAlert = function (sessionId, phone) {
+    if (sessionId) markAlertAsDismissed(sessionId, 45000);
+    if (phone) markAlertAsDismissed(phone, 45000);
+    const alertEl = document.getElementById('floatingCallSupportAlert');
+    if (alertEl) {
+        alertEl.classList.add('hiding');
+        setTimeout(() => {
+            alertEl.remove();
+            updateFloatingAlertPositions();
+        }, 250);
+    }
+};
+
+window.initiateCallSupportCall = function (phone) {
+    if (!phone) return;
+    const cleanPhone = String(phone).replace(/[^\d+]/g, '');
+    if (typeof window.initiateGlobalClickToCall === 'function') {
+        window.initiateGlobalClickToCall(cleanPhone);
+    } else {
+        window.open(`tel:${cleanPhone}`);
+    }
+};
+
+window.openCallSupportChat = function (phone, sessionId) {
+    // Keep yellow alert visible on screen so it stays in handoff tab as user requested
+    const isWhatsAppPage = window.location.pathname.includes('/whatsapp/') || window.location.pathname.endsWith('whatsapp.html');
+    if (isWhatsAppPage) {
+        if (typeof window.switchToHandoffTab === 'function') {
+            window.switchToHandoffTab('handoff');
+        }
+        if (typeof window.openCustomerChatByPhone === 'function') {
+            window.openCustomerChatByPhone(phone);
+        }
+    } else {
+        window.location.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${encodeURIComponent(phone)}&tab=handoff`;
+    }
+};
+
+function updateFloatingAlertPositions() {
+    const payAlert = document.getElementById('floatingPaymentAlert');
+    const callAlert = document.getElementById('floatingCallSupportAlert');
+    let topOffset = 24;
+    if (payAlert && !payAlert.classList.contains('hiding')) {
+        payAlert.style.top = `${topOffset}px`;
+        const payH = payAlert.offsetHeight > 50 ? payAlert.offsetHeight : 155;
+        topOffset += payH + 14;
+    }
+    if (callAlert && !callAlert.classList.contains('hiding')) {
+        callAlert.style.top = `${topOffset}px`;
+    }
+}
+
+// Lightbox Modal for View Screenshot
+window.viewPaymentScreenshotModal = function (imageUrl, encodedData) {
+    let data = {};
+    try {
+        if (encodedData) data = JSON.parse(decodeURIComponent(encodedData));
+    } catch (e) {}
+
+    const orderId = data.order_id || '';
+    const orderNumber = data.order_number || (orderId ? `SGB-${orderId}` : '');
+    const customerName = data.customer_name || 'WhatsApp Customer';
+    const phone = data.phone || '';
+    const amount = data.total_amount || 600;
+
+    let modalOverlay = document.getElementById('paymentScreenshotModal');
+    if (!modalOverlay) {
+        modalOverlay = document.createElement('div');
+        modalOverlay.id = 'paymentScreenshotModal';
+        modalOverlay.className = 'payment-modal-overlay';
+        document.body.appendChild(modalOverlay);
+    }
+
+    const resolvedUrl = (imageUrl && typeof window.resolveMediaUrl === 'function')
+        ? window.resolveMediaUrl(imageUrl)
+        : imageUrl;
+
+    modalOverlay.innerHTML = `
+        <div class="payment-modal-content">
+            <div class="payment-modal-header">
+                <div>
+                    <h3 class="payment-modal-title">Payment Verification — Order #${orderNumber || orderId}</h3>
+                    <div class="payment-modal-subtitle">${customerName} (${phone}) &nbsp;•&nbsp; Expected Amount: <strong style="color: #065f46;">₹${amount}</strong></div>
+                </div>
+                <button class="payment-modal-close" onclick="window.closePaymentScreenshotModal()">&times;</button>
+            </div>
+            <div class="payment-modal-body">
+                ${resolvedUrl ? `
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                        <a href="${resolvedUrl}" target="_blank" style="color: #0284c7; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; border: 1px solid #bae6fd;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Full Image
+                        </a>
+                    </div>
+                    <img src="${resolvedUrl}" class="payment-modal-img" alt="Payment Evidence" onerror="this.outerHTML='<div style=\\'color:#94a3b8;padding:40px;text-align:center;\\'><i class=\\'fa-solid fa-triangle-exclamation\\' style=\\'font-size:32px;color:#f59e0b;margin-bottom:10px;display:block;\\'></i>Image unavailable or loading failed.<br><a href=\\'${resolvedUrl}\\' target=\\'_blank\\' style=\\'color:#38bdf8;margin-top:8px;display:inline-block;\\'>Open Raw Link</a></div>'">
+                ` : `
+                    <div style="color: #94a3b8; padding: 40px; text-align: center;">
+                        <i class="fa-solid fa-image" style="font-size: 36px; margin-bottom: 10px; display: block;"></i>
+                        No preview image attached. Please verify via WhatsApp chat.
+                    </div>
+                `}
+            </div>
+            <div class="payment-modal-footer">
+                <button class="btn-modal-reject" onclick="window.rejectPaymentFromModal('${phone}', '${orderId}')">
+                    <i class="fa-solid fa-xmark"></i> Reject / Request Review
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-modal-chat" onclick="window.closePaymentScreenshotModal(); window.openPaymentChatAndVerify('${phone}', '${orderId}')">
+                        <i class="fa-brands fa-whatsapp"></i> Open Chat
+                    </button>
+                    <button class="btn-modal-verify" onclick="window.verifyPaymentFromModal('${phone}', '${orderId}')">
+                        <i class="fa-solid fa-check"></i> Verify Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modalOverlay.onclick = (e) => {
+        if (e.target === modalOverlay) window.closePaymentScreenshotModal();
+    };
+};
+
+window.closePaymentScreenshotModal = function () {
+    const modalOverlay = document.getElementById('paymentScreenshotModal');
+    if (modalOverlay) modalOverlay.remove();
+};
+
+window.verifyPaymentFromModal = async function (phone, orderId) {
+    if (!confirm(`Confirm verification for Order #${orderId || ''}? This will confirm the order in CRM.`)) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${window.API_URL}/whatsapp/payments/verify`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phone, orderId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to verify payment');
+
+        window.closePaymentScreenshotModal();
+        unmarkPaymentOrderDismissed(orderId);
+        const alertEl = document.getElementById('floatingPaymentAlert');
+        if (alertEl) alertEl.remove();
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Payment Verified', '✅ Payment verified successfully! Order confirmed.', 'success');
+        } else {
+            alert('✅ Payment verified successfully!');
+        }
+
+        window.pollPaymentVerificationSummary();
+        if (typeof window.updateHandoffCounts === 'function') window.updateHandoffCounts();
+        if (typeof window.fetchPendingHumanAlerts === 'function') window.fetchPendingHumanAlerts();
+        if (typeof window.loadCustomers === 'function') window.loadCustomers();
+    } catch (err) {
+        console.error('Error verifying payment from modal:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message, 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
+    }
+};
+
+window.rejectPaymentFromModal = async function (phone, orderId) {
+    const reason = prompt('Enter rejection reason for customer:', 'Invalid screenshot or payment not received');
+    if (reason === null) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${window.API_URL}/whatsapp/payments/reject`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phone, orderId, reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to reject payment');
+
+        window.closePaymentScreenshotModal();
+        unmarkPaymentOrderDismissed(orderId);
+        const alertEl = document.getElementById('floatingPaymentAlert');
+        if (alertEl) alertEl.remove();
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Payment Rejected', 'Payment marked as rejected. Order cancelled.', 'info');
+        } else {
+            alert('Payment marked as rejected.');
+        }
+
+        window.pollPaymentVerificationSummary();
+        if (typeof window.updateHandoffCounts === 'function') window.updateHandoffCounts();
+        if (typeof window.fetchPendingHumanAlerts === 'function') window.fetchPendingHumanAlerts();
+        if (typeof window.loadCustomers === 'function') window.loadCustomers();
+    } catch (err) {
+        console.error('Error rejecting payment from modal:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message, 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
+    }
+};
+
+// Open Chat & Verify
+window.openPaymentChatAndVerify = function (phone, orderId) {
+    const alertEl = document.getElementById('floatingPaymentAlert');
+    if (alertEl) alertEl.remove();
+
+    const isWhatsAppPage = window.location.pathname.includes('/whatsapp/') || window.location.pathname.endsWith('whatsapp.html');
+    if (isWhatsAppPage && typeof window.openCustomerChatByPhone === 'function') {
+        window.openCustomerChatByPhone(phone);
+    } else {
+        window.location.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?phone=${encodeURIComponent(phone)}&tab=payment`;
+    }
+};
+
+// Live Polling & Topbar Badge Management
+window.pollPaymentVerificationSummary = async function () {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${window.API_URL}/whatsapp/payments/pending-summary`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.success) return;
+
+        const count = parseInt(data.count) || 0;
+
+        // Update Top Bar Badge & Button
+        updatePaymentTopBarBadge(count);
+
+        // If there are pending payments
+        if (count > 0) {
+            const list = Array.isArray(data.pending) && data.pending.length > 0 ? data.pending : (data.latest ? [data.latest] : []);
+            const orderToShow = list.find(item => !isPaymentOrderDismissed(item.order_id));
+            if (orderToShow) {
+                orderToShow.count = count;
+                window.showPaymentScreenshotAlert(orderToShow);
+            }
+        } else if (count === 0) {
+            const alertEl = document.getElementById('floatingPaymentAlert');
+            if (alertEl) alertEl.remove();
+        }
+    } catch (err) {
+        // Silent failure for polling
+    }
+};
+
+function updatePaymentTopBarBadge(count) {
+    let badgeEl = document.getElementById('top-payment-count');
+    if (badgeEl) {
+        badgeEl.textContent = count;
+    } else {
+        const topbar = document.querySelector('.topbar');
+        if (topbar && !document.getElementById('btn-top-payment')) {
+            const profileSection = topbar.querySelector('.profile-section');
+            const btn = document.createElement('button');
+            btn.id = 'btn-top-payment';
+            btn.title = 'View Pending Payment Verifications';
+            btn.onclick = () => {
+                window.location.href = `${window.ROOT_PATH}modules/whatsapp/whatsapp.html?tab=payment`;
+            };
+            btn.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; background: #ffffff; border: 1px solid #10b981; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 13px; color: #065f46; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-right: 12px;';
+            btn.innerHTML = `
+                <i class="fa-solid fa-file-invoice-dollar" style="color: #059669; font-size: 13px;"></i>
+                <span>Payment Verification</span>
+                <span id="top-payment-count" style="background: #059669; color: #ffffff; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800; min-width: 18px; text-align: center;">${count}</span>
+            `;
+            if (profileSection) {
+                topbar.insertBefore(btn, profileSection);
+            } else {
+                topbar.appendChild(btn);
+            }
+        }
+    }
+}
+
+// Auto-run payment verification polling on load and every 6s
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(window.pollPaymentVerificationSummary, 600);
+        setInterval(() => {
+            if (!document.hidden) window.pollPaymentVerificationSummary();
+        }, 6000);
+    });
+} else {
+    setTimeout(window.pollPaymentVerificationSummary, 600);
+    setInterval(() => {
+        if (!document.hidden) window.pollPaymentVerificationSummary();
+    }, 6000);
+}
+
 

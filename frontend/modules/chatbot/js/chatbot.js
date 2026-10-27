@@ -243,7 +243,10 @@ document.addEventListener('DOMContentLoaded', () => {
         { type: 'condition', name: 'Condition', category: 'FLOW LOGIC', desc: 'Set branch rules', icon: 'fa-code-branch', iconClass: 'pink-node-icon' },
         { type: 'time_trigger', name: 'Time Trigger / Delay', category: 'FLOW LOGIC', desc: 'Wait N seconds/minutes', icon: 'fa-hourglass-half', iconClass: 'amber-node-icon' },
         { type: 'end', name: 'End', category: 'FLOW LOGIC', desc: 'Terminate interaction', icon: 'fa-ban', iconClass: 'pink-node-icon' },
-        { type: 'create_lead', name: 'Create Lead', category: 'INTEGRATION', desc: 'Insert new lead into CRM', icon: 'fa-address-card', iconClass: 'indigo-node-icon' }
+        { type: 'create_lead', name: 'Create Lead', category: 'INTEGRATION', desc: 'Insert new lead into CRM', icon: 'fa-address-card', iconClass: 'indigo-node-icon' },
+        { type: 'form', name: 'Form', category: 'QUESTION / INPUT', desc: 'Delivery details & fields', icon: 'fa-rectangle-list', iconClass: 'teal-node-icon' },
+        { type: 'payment', name: 'Payment / QR', category: 'MESSAGE', desc: 'Send payment details & QR', icon: 'fa-qrcode', iconClass: 'orange-node-icon' },
+        { type: 'wait_for_media', name: 'Wait for Media', category: 'QUESTION / INPUT', desc: 'Screenshot / evidence capture', icon: 'fa-file-arrow-up', iconClass: 'purple-node-icon' }
     ];
 
     function updateCanvasTransform() {
@@ -560,6 +563,36 @@ document.addEventListener('DOMContentLoaded', () => {
             return { agentName: 'Sales Representative', note: 'Customer requested live human support' };
         } else if (type === 'webhook') {
             return { webhookUrl: 'https://api.example.com/crm/webhook', method: 'POST', sendVariables: true };
+        } else if (type === 'form') {
+            return {
+                title: 'Blade Protector Delivery Details',
+                description: 'Please enter your delivery details.',
+                fields: [
+                    { name: 'customer_name', label: 'Full Name', type: 'text', required: true },
+                    { name: 'delivery_address', label: 'Delivery Address', type: 'textarea', required: true },
+                    { name: 'pincode', label: 'PIN Code', type: 'pincode', required: true },
+                    { name: 'address_confirmed', label: 'Address Confirmation', type: 'checkbox', required: true, text: 'I confirm that my name, delivery address and PIN code are correct.' }
+                ],
+                submitButtonText: 'Save & Continue'
+            };
+        } else if (type === 'payment' || type === 'qr_code') {
+            return {
+                title: 'Blade Protector Payment',
+                message: 'Thank you, Sir!\n\nYour SGB Blade Protector delivery details have been saved.\n\nAmount to pay: ₹{{payable_amount}}\n\nPlease scan the official payment QR code below to complete your payment.\n\nAfter completing the payment, please send your payment screenshot here on WhatsApp.\n\nOur team will verify your payment and process your order.',
+                amount: 600,
+                currency: 'INR',
+                amountSource: 'product',
+                qrImageUrl: '/api/media/quick-replies/1789191406905-qr-0.jpeg'
+            };
+        } else if (type === 'wait_for_media') {
+            return {
+                title: 'Wait for Blade Protector Payment Evidence',
+                expectedType: 'payment_screenshot',
+                acceptImages: true,
+                acceptDocuments: true,
+                message: 'Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.',
+                reminderMessage: 'Sir, please send the payment screenshot image so our team can verify and dispatch your Blade Protector.'
+            };
         }
         return { message: 'Node settings' };
     }
@@ -712,6 +745,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (['create_lead', 'save_lead_field', 'assign_to_user', 'webhook'].includes(node.type)) {
             borderClass = 'integration-node-accent';
             typeIcon = node.type === 'create_lead' ? 'fa-address-card' : node.type === 'save_lead_field' ? 'fa-floppy-disk' : node.type === 'assign_to_user' ? 'fa-user-plus' : 'fa-globe';
+        } else if (node.type === 'form') {
+            borderClass = 'form-node-accent';
+            typeIcon = 'fa-rectangle-list';
+        } else if (node.type === 'payment' || node.type === 'qr_code') {
+            borderClass = 'payment-node-accent';
+            typeIcon = 'fa-qrcode';
+        } else if (node.type === 'wait_for_media') {
+            borderClass = 'wait-media-node-accent';
+            typeIcon = 'fa-file-arrow-up';
         }
 
         nodeEl.classList.add(borderClass);
@@ -865,6 +907,26 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyPreview = `<div style="font-size:0.75rem; color:#6366f1; font-weight:600;"><i class="fa-solid fa-globe"></i> Webhook: ${node.config.method || 'POST'} API</div>`;
         } else if (node.type === 'end') {
             bodyPreview = `<div class="node-preview">Goodbye message: "${node.config.message || 'End'}"</div>`;
+        } else if (node.type === 'form') {
+            const fieldCount = (node.config.fields || []).length;
+            bodyPreview = `
+                <div class="node-preview" style="font-weight:700; color:#0d9488;">📋 ${node.config.title || 'Form'}</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:0.2rem;">${fieldCount} fields: ${(node.config.fields || []).map(f => f.label || f.name).slice(0, 3).join(', ')}${fieldCount > 3 ? '...' : ''}</div>
+                <div style="font-size:0.65rem; color:#0d9488; margin-top:0.25rem;">Submit: "${node.config.submitButtonText || 'Save & Continue'}"</div>
+            `;
+        } else if (node.type === 'payment' || node.type === 'qr_code') {
+            const hasQr = !!node.config.qrImageUrl;
+            bodyPreview = `
+                <div class="node-preview" style="color:#ea580c; font-weight:700;">₹${node.config.amount || 600} ${node.config.currency || 'INR'}</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:0.2rem;">${node.config.amountSource === 'product' ? 'Product Linked' : 'Fixed Amount'}</div>
+                ${hasQr ? `<div style="font-size:0.65rem; color:#10b981; margin-top:0.2rem;"><i class="fa-solid fa-qrcode"></i> Official QR Attached</div>` : `<div style="font-size:0.65rem; color:#ef4444; margin-top:0.2rem;"><i class="fa-solid fa-triangle-exclamation"></i> No QR Image Set</div>`}
+            `;
+        } else if (node.type === 'wait_for_media') {
+            bodyPreview = `
+                <div class="node-preview" style="color:#9333ea; font-weight:700;"><i class="fa-solid fa-file-arrow-up"></i> Expect: ${node.config.expectedType || 'Payment Screenshot'}</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:0.2rem;">Accept: ${[node.config.acceptImages !== false ? 'Images' : null, node.config.acceptDocuments !== false ? 'Documents' : null].filter(Boolean).join(', ')}</div>
+                <div style="font-size:0.65rem; color:#6366f1; margin-top:0.2rem;">Links to Order & Admin Alert</div>
+            `;
         } else {
             bodyPreview = `<div class="node-preview">Active Integration Block</div>`;
         }
@@ -994,6 +1056,35 @@ document.addEventListener('DOMContentLoaded', () => {
             if (stEl) node.config.status = stEl.value;
             const srcEl = document.getElementById('node-cl-source');
             if (srcEl) node.config.source = srcEl.value;
+        } else if (node.type === 'form') {
+            const fTitle = document.getElementById('node-form-title');
+            if (fTitle) node.config.title = fTitle.value;
+            const fDesc = document.getElementById('node-form-desc');
+            if (fDesc) node.config.description = fDesc.value;
+            const fSubmit = document.getElementById('node-form-submit-text');
+            if (fSubmit) node.config.submitButtonText = fSubmit.value;
+        } else if (node.type === 'payment' || node.type === 'qr_code') {
+            const pMsg = document.getElementById('node-payment-msg');
+            if (pMsg) node.config.message = pMsg.value;
+            const pAmt = document.getElementById('node-payment-amount');
+            if (pAmt) node.config.amount = parseFloat(pAmt.value) || 600;
+            const pCur = document.getElementById('node-payment-currency');
+            if (pCur) node.config.currency = pCur.value;
+            const pSrc = document.getElementById('node-payment-amount-source');
+            if (pSrc) node.config.amountSource = pSrc.value;
+            const pQr = document.getElementById('node-payment-qr-url');
+            if (pQr) node.config.qrImageUrl = pQr.value;
+        } else if (node.type === 'wait_for_media') {
+            const wExp = document.getElementById('node-wfm-expected');
+            if (wExp) node.config.expectedType = wExp.value;
+            const wMsg = document.getElementById('node-wfm-msg');
+            if (wMsg) node.config.message = wMsg.value;
+            const wRem = document.getElementById('node-wfm-reminder');
+            if (wRem) node.config.reminderMessage = wRem.value;
+            const wImg = document.getElementById('node-wfm-accept-images');
+            if (wImg) node.config.acceptImages = wImg.checked;
+            const wDoc = document.getElementById('node-wfm-accept-docs');
+            if (wDoc) node.config.acceptDocuments = wDoc.checked;
         }
 
         renderCanvasNodes();
@@ -1163,6 +1254,35 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetSel) mapSimpleOutputConnection(node.id, targetSel.value);
         } else if (node.type === 'end') {
             node.config.message = document.getElementById('node-end-msg').value;
+        } else if (node.type === 'form') {
+            node.config.title = document.getElementById('node-form-title') ? document.getElementById('node-form-title').value : node.config.title;
+            node.config.description = document.getElementById('node-form-desc') ? document.getElementById('node-form-desc').value : node.config.description;
+            node.config.flowId = document.getElementById('node-form-flow-id') ? document.getElementById('node-form-flow-id').value : (node.config.flowId || '1471575221542737');
+            node.config.screenId = document.getElementById('node-form-screen-id') ? document.getElementById('node-form-screen-id').value : (node.config.screenId || 'DELIVERY_DETAILS');
+            node.config.submitButtonText = document.getElementById('node-form-submit-text') ? document.getElementById('node-form-submit-text').value : (node.config.submitButtonText || 'Fill Delivery Details');
+            node.config.submitButtonLabel = node.config.submitButtonText;
+            const targetSel = document.getElementById('node-next-step-select');
+            if (targetSel) mapSimpleOutputConnection(node.id, targetSel.value);
+        } else if (node.type === 'payment' || node.type === 'qr_code') {
+            node.config.title = document.getElementById('node-payment-title') ? document.getElementById('node-payment-title').value : (node.config.title || 'Blade Protector Payment');
+            node.config.message = document.getElementById('node-payment-msg') ? document.getElementById('node-payment-msg').value : node.config.message;
+            node.config.amount = document.getElementById('node-payment-amount') ? parseFloat(document.getElementById('node-payment-amount').value) || 600 : (node.config.amount || 600);
+            node.config.currency = document.getElementById('node-payment-currency') ? document.getElementById('node-payment-currency').value : 'INR';
+            node.config.amountSource = document.getElementById('node-payment-amount-source') ? document.getElementById('node-payment-amount-source').value : 'product';
+            const qrVal = document.getElementById('node-payment-qr-url') ? document.getElementById('node-payment-qr-url').value : (node.config.qrImageUrl || node.config.qrUrl);
+            node.config.qrImageUrl = qrVal;
+            node.config.qrUrl = qrVal;
+            const targetSel = document.getElementById('node-next-step-select');
+            if (targetSel) mapSimpleOutputConnection(node.id, targetSel.value);
+        } else if (node.type === 'wait_for_media') {
+            node.config.title = document.getElementById('node-wfm-title') ? document.getElementById('node-wfm-title').value : (node.config.title || 'Wait for Blade Protector Payment Evidence');
+            node.config.expectedType = document.getElementById('node-wfm-expected') ? document.getElementById('node-wfm-expected').value : 'payment_screenshot';
+            node.config.message = document.getElementById('node-wfm-msg') ? document.getElementById('node-wfm-msg').value : node.config.message;
+            node.config.reminderMessage = document.getElementById('node-wfm-reminder') ? document.getElementById('node-wfm-reminder').value : node.config.reminderMessage;
+            node.config.acceptImages = document.getElementById('node-wfm-accept-images') ? document.getElementById('node-wfm-accept-images').checked : true;
+            node.config.acceptDocuments = document.getElementById('node-wfm-accept-docs') ? document.getElementById('node-wfm-accept-docs').checked : true;
+            const targetSel = document.getElementById('node-next-step-select');
+            if (targetSel) mapSimpleOutputConnection(node.id, targetSel.value);
         }
 
         renderCanvasNodes();
@@ -1244,11 +1364,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<div style="font-size:0.72rem; color:var(--primary-color); background:#f5f3ff; padding:0.4rem; border-radius:0.375rem; border:1px solid #ddd6fe; margin-bottom:0.75rem;"><i class="fa-solid fa-link"></i> Triggered by: ${list}</div>`;
     }
 
+    function extractNodeIdFromInPort(portId) {
+        if (!portId) return '';
+        let s = String(portId);
+        if (s.startsWith('port-')) s = s.slice(5);
+        if (s.endsWith('-in')) s = s.slice(0, -3);
+        return s;
+    }
+
+    function extractNodeIdFromOutPort(portId) {
+        if (!portId) return '';
+        let s = String(portId);
+        if (s.startsWith('port-')) s = s.slice(5);
+        return s.replace(/-out(-\w+)?$/, '');
+    }
+
     function getConnectionTargetNodeName(sourcePortId) {
         const conn = connections.find(c => c.from === sourcePortId);
         if (!conn) return '<span style="color:var(--text-light); font-style:italic;">Disconnected (Drag arrow to connect)</span>';
 
-        const targetNodeId = conn.to.replace('port-', '').replace('-in', '');
+        const targetNodeId = extractNodeIdFromInPort(conn.to);
         const targetNode = nodes.find(n => n.id === targetNodeId);
         return targetNode ? `<span style="color:var(--primary-color); font-weight:700;">${targetNode.name}</span>` : 'Unknown Node';
     }
@@ -1256,7 +1391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getTargetNodeIdFromPort(sourcePortId) {
         const conn = connections.find(c => c.from === sourcePortId);
         if (!conn) return '';
-        return conn.to.replace('port-', '').replace('-in', '');
+        return extractNodeIdFromInPort(conn.to);
     }
 
     // Settings Forms populator overrides
@@ -1991,6 +2126,195 @@ document.addEventListener('DOMContentLoaded', () => {
                     <textarea id="node-end-msg" rows="3">${node.config.message || ''}</textarea>
                 </div>
             `;
+        } else if (node.type === 'form') {
+            const currentTarget = getTargetNodeIdFromPort(`port-${node.id}-out`);
+            const optionsDropdown = getNextNodeOptionsHtml(currentTarget ? `port-${currentTarget}-in` : '');
+            const fields = node.config.fields || [
+                { name: 'customer_name', label: 'Full Name', type: 'text', required: true },
+                { name: 'delivery_address', label: 'Delivery Address', type: 'textarea', required: true },
+                { name: 'pincode', label: 'PIN Code', type: 'pincode', required: true },
+                { name: 'address_confirmed', label: 'Address Confirmation', type: 'checkbox', required: true }
+            ];
+
+            const fieldsListHtml = fields.map((f, i) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; margin-bottom:4px; font-size:0.75rem;">
+                    <div>
+                        <strong>${f.label || f.name}</strong>
+                        <span style="color:#64748b; font-size:0.7rem; margin-left:4px;">(${f.type})</span>
+                    </div>
+                    <span style="font-size:0.65rem; background:${f.required ? '#ccfbf1' : '#f1f5f9'}; color:${f.required ? '#0d9488' : '#64748b'}; font-weight:700; padding:2px 6px; border-radius:4px;">${f.required ? 'REQUIRED' : 'OPTIONAL'}</span>
+                </div>
+            `).join('');
+
+            fieldsHtml = `
+                ${triggerHtml}
+                <div class="inspector-form-group">
+                    <label>Node Name</label>
+                    <input type="text" id="node-name-input" value="${node.name}">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Form Title (WhatsApp Header)</label>
+                    <input type="text" id="node-form-title" value="${node.config.title || 'Blade Protector Delivery Details'}">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Instructions / Prompt</label>
+                    <textarea id="node-form-desc" rows="2">${node.config.description || 'Please enter your delivery details.'}</textarea>
+                </div>
+                <div class="inspector-form-group">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fa-solid fa-rectangle-list" style="color:#0d9488;"></i> Form Fields</span>
+                        <span style="font-size:0.65rem; color:#0d9488; font-weight:700;">${fields.length} Configured</span>
+                    </label>
+                    <div style="margin-top:6px;">
+                        ${fieldsListHtml}
+                    </div>
+                    <div style="font-size:0.68rem; color:#64748b; margin-top:4px;">
+                        <i class="fa-solid fa-circle-info"></i> Stores <code>customer_name</code>, <code>delivery_address</code>, <code>pincode</code>, and <code>address_confirmed</code>.
+                    </div>
+                </div>
+                <div class="inspector-form-group">
+                    <label>Meta WhatsApp Flow ID</label>
+                    <input type="text" id="node-form-flow-id" value="${node.config.flowId || node.config.flow_id || '1471575221542737'}" placeholder="1471575221542737">
+                    <span style="font-size:0.65rem; color:var(--text-light); margin-top:2px; display:block;">Published Meta Flow ID (Native In-App WhatsApp Form)</span>
+                </div>
+                <div class="inspector-form-group">
+                    <label>Flow Screen ID</label>
+                    <input type="text" id="node-form-screen-id" value="${node.config.screenId || 'DELIVERY_DETAILS'}" placeholder="DELIVERY_DETAILS">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Submit Button Text</label>
+                    <input type="text" id="node-form-submit-text" value="${node.config.submitButtonText || node.config.submitButtonLabel || 'Fill Delivery Details'}">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Next Step Target</label>
+                    <select id="node-next-step-select">
+                        ${optionsDropdown}
+                    </select>
+                </div>
+            `;
+        } else if (node.type === 'payment' || node.type === 'qr_code') {
+            const currentTarget = getTargetNodeIdFromPort(`port-${node.id}-out`);
+            const optionsDropdown = getNextNodeOptionsHtml(currentTarget ? `port-${currentTarget}-in` : '');
+            const qrUrl = node.config.qrImageUrl || node.config.qrUrl || '';
+            const resolvedQrUrl = qrUrl ? window.resolveMediaUrl(qrUrl) : '';
+
+            fieldsHtml = `
+                ${triggerHtml}
+                <div class="inspector-form-group">
+                    <label>Node Name</label>
+                    <input type="text" id="node-name-input" value="${node.name}">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Customer Message</label>
+                    <textarea id="node-payment-msg" rows="4">${node.config.message || 'Thank you, Sir!\n\nYour SGB Blade Protector delivery details have been saved.\n\nAmount to pay: ₹{{payable_amount}}\n\nPlease scan the official payment QR code below to complete your payment.\n\nAfter completing the payment, please send your payment screenshot here on WhatsApp.\n\nOur team will verify your payment and process your order.'}</textarea>
+                    <span style="font-size:0.65rem; color:var(--text-light); margin-top:0.25rem; display:block;">Use <code>{{payable_amount}}</code> or <code>{{customer_name}}</code></span>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <div class="inspector-form-group" style="flex:1;">
+                        <label>Payable Amount (₹)</label>
+                        <input type="number" id="node-payment-amount" value="${node.config.amount !== undefined ? node.config.amount : 600}">
+                    </div>
+                    <div class="inspector-form-group" style="flex:1;">
+                        <label>Currency</label>
+                        <input type="text" id="node-payment-currency" value="${node.config.currency || 'INR'}" readonly style="background:#f8fafc;">
+                    </div>
+                </div>
+                <div class="inspector-form-group">
+                    <label>Amount Source</label>
+                    <select id="node-payment-amount-source">
+                        <option value="product" ${node.config.amountSource === 'product' ? 'selected' : ''}>Product Total (SGB Blade Protector ₹600)</option>
+                        <option value="fixed" ${node.config.amountSource === 'fixed' ? 'selected' : ''}>Fixed Amount</option>
+                    </select>
+                </div>
+                <div class="inspector-form-group" style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:8px;">
+                    <label style="color:#c2410c; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fa-solid fa-qrcode"></i> PAYMENT QR CODE IMAGE</span>
+                        <span style="font-size:0.65rem; background:#ffedd5; color:#ea580c; font-weight:bold; padding:2px 6px; border-radius:4px;">Changeable</span>
+                    </label>
+
+                    <!-- Hidden file picker -->
+                    <input type="file" id="node-payment-qr-file-input" accept="image/*" style="display:none;" onchange="handlePaymentQrFileUpload(event)">
+
+                    <!-- QR Image Preview Box -->
+                    <div id="payment-qr-preview-box" style="margin-top:8px; text-align:center; background:#ffffff; border:1px solid #fed7aa; border-radius:6px; padding:8px;">
+                        ${qrUrl ? `
+                            <img id="payment-qr-preview-img" src="${resolvedQrUrl}" style="max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; padding:4px; object-fit:contain;">
+                            <div style="font-size:0.7rem; color:#15803d; font-weight:600; margin-top:4px;"><i class="fa-solid fa-check"></i> QR Code Active</div>
+                        ` : `
+                            <div style="padding:10px; font-size:0.75rem; color:#ef4444; font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> No Payment QR Image Set</div>
+                        `}
+                    </div>
+
+                    <!-- Direct URL input -->
+                    <div style="margin-top:8px;">
+                        <label style="font-size:0.7rem; color:#7c2d12; font-weight:600; margin-bottom:2px; display:block;">QR Image URL / Path:</label>
+                        <input type="text" id="node-payment-qr-url" value="${qrUrl}" placeholder="/api/media/... or https://..." style="font-size:0.75rem; width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px;" oninput="const box = document.getElementById('payment-qr-preview-box'); if (box && this.value) { box.innerHTML = '<img src=\\'' + window.resolveMediaUrl(this.value) + '\\' style=\\'max-height:140px; border-radius:6px; border:1px solid #cbd5e1; padding:4px;\\'><div style=\\'font-size:0.7rem; color:#15803d; font-weight:600; margin-top:4px;\\'><i class=\\'fa-solid fa-check\\'></i> Custom QR Updated</div>'; }">
+                    </div>
+
+                    <!-- Action buttons: Upload new QR or Reset to official SGB QR -->
+                    <div style="display:flex; gap:6px; margin-top:8px;">
+                        <button type="button" class="btn btn-sm" style="flex:1; font-size:0.75rem; background:#4f46e5; color:#ffffff; border:none; padding:6px 8px; border-radius:6px; font-weight:600; cursor:pointer;" onclick="document.getElementById('node-payment-qr-file-input').click();">
+                            <i class="fa-solid fa-upload"></i> <span id="btn-upload-qr-text">Upload New QR</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" style="flex:1; font-size:0.75rem; background:#ea580c; color:#ffffff; border:none; padding:6px 8px; border-radius:6px; font-weight:600; cursor:pointer;" onclick="const inp = document.getElementById('node-payment-qr-url'); if (inp) { inp.value = '/api/media/quick-replies/1789191406905-qr-0.jpeg'; const box = document.getElementById('payment-qr-preview-box'); if (box) box.innerHTML = '<img src=\\'/api/media/quick-replies/1789191406905-qr-0.jpeg\\' style=\\'max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; padding:4px;\\'><div style=\\'font-size:0.7rem; color:#15803d; font-weight:600; margin-top:4px;\\'><i class=\\'fa-solid fa-check\\'></i> Official SGB QR Selected</div>'; window.saveSelectedNodeSettingsSilently(); }">
+                            <i class="fa-solid fa-bolt"></i> Official SGB QR
+                        </button>
+                    </div>
+                </div>
+                <div class="inspector-form-group">
+                    <label>Next Step Target</label>
+                    <select id="node-next-step-select">
+                        ${optionsDropdown}
+                    </select>
+                </div>
+            `;
+        } else if (node.type === 'wait_for_media') {
+            const currentTarget = getTargetNodeIdFromPort(`port-${node.id}-out`);
+            const optionsDropdown = getNextNodeOptionsHtml(currentTarget ? `port-${currentTarget}-in` : '');
+
+            fieldsHtml = `
+                ${triggerHtml}
+                <div class="inspector-form-group">
+                    <label>Node Name</label>
+                    <input type="text" id="node-name-input" value="${node.name}">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Expected Evidence Label</label>
+                    <input type="text" id="node-wfm-expected" value="${node.config.expectedType || 'payment_screenshot'}" placeholder="e.g. payment_screenshot">
+                </div>
+                <div class="inspector-form-group">
+                    <label>Customer Prompt Message</label>
+                    <textarea id="node-wfm-msg" rows="3">${node.config.message || 'Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.'}</textarea>
+                </div>
+                <div class="inspector-form-group">
+                    <label>Text Reminder (if customer replies with text)</label>
+                    <textarea id="node-wfm-reminder" rows="2">${node.config.reminderMessage || 'Sir, please send the payment screenshot image so our team can verify and dispatch your Blade Protector.'}</textarea>
+                </div>
+                <div class="inspector-form-group" style="background:#f5f3ff; border:1px solid #ddd6fe; padding:10px; border-radius:8px;">
+                    <label style="color:#6d28d9; font-weight:700; margin-bottom:6px; display:block;">
+                        <i class="fa-solid fa-file-arrow-up"></i> Accepted Media Types
+                    </label>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <label style="font-size:0.75rem; display:flex; align-items:center; gap:6px; cursor:pointer; margin:0;">
+                            <input type="checkbox" id="node-wfm-accept-images" ${node.config.acceptImages !== false ? 'checked' : ''} style="width:16px; height:16px;">
+                            <span>Accept Images (Screenshot / JPEG / PNG)</span>
+                        </label>
+                        <label style="font-size:0.75rem; display:flex; align-items:center; gap:6px; cursor:pointer; margin:0;">
+                            <input type="checkbox" id="node-wfm-accept-docs" ${node.config.acceptDocuments !== false ? 'checked' : ''} style="width:16px; height:16px;">
+                            <span>Accept Documents (PDF / Receipt)</span>
+                        </label>
+                    </div>
+                </div>
+                <div style="font-size:0.7rem; color:#6b21a8; background:#faf5ff; border:1px solid #f3e8ff; padding:8px; border-radius:6px; margin-top:8px;">
+                    <i class="fa-solid fa-bell"></i> <strong>Admin Alert:</strong> When screenshot is received, creates pending_verification order and alerts Admin & WhatsApp Manager. Normal text will not alert.
+                </div>
+                <div class="inspector-form-group" style="margin-top:10px;">
+                    <label>Success Next Step Target</label>
+                    <select id="node-next-step-select">
+                        ${optionsDropdown}
+                    </select>
+                </div>
+            `;
         }
 
         const deleteBtnHtml = node.type !== 'start' ? `<button class="btn-secondary" style="color:var(--danger-color); border-color:#fee2e2; border-radius:0.375rem; font-weight:700; width:100%; display:flex; align-items:center; justify-content:center; gap:0.25rem;" onclick="deleteNode('${node.id}')"><i class="fa-solid fa-trash-can"></i> Delete Node</button>` : '';
@@ -2169,7 +2493,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Highlight edge path
                 highlightActiveEdge(edge.from, edge.to);
 
-                currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                currentSimNodeId = extractNodeIdFromInPort(edge.to);
                 executeNodeInSim();
             } else {
                 appendSystemMessage('Error: Start node not connected.');
@@ -2216,7 +2540,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out`);
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 }
             }, 1000);
@@ -2235,7 +2559,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out`);
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 }
             }, 1500);
@@ -2254,7 +2578,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 }
             }, 1200);
@@ -2273,7 +2597,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 }
             }, 1200);
@@ -2295,7 +2619,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 } else {
                     appendSystemMessage('Simulation Stalled: Time trigger output not connected.');
@@ -2316,7 +2640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 }
             }, 800);
@@ -2361,7 +2685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out`);
                     if (edge) {
                         highlightActiveEdge(edge.from, edge.to);
-                        currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                        currentSimNodeId = extractNodeIdFromInPort(edge.to);
                         executeNodeInSim();
                     }
                 }, 800);
@@ -2392,7 +2716,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (edge) {
                         highlightActiveEdge(edge.from, edge.to);
-                        currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                        currentSimNodeId = extractNodeIdFromInPort(edge.to);
                         executeNodeInSim();
                     } else {
                         // Fallback connection mapping logic
@@ -2403,6 +2727,80 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             appendSystemMessage('Error: Branch connection not found.');
                         }
+                    }
+                }, 800);
+            });
+            return;
+        }
+
+        if (currentNode.type === 'form') {
+            const formTitle = currentNode.config.title || 'Blade Protector Delivery Details';
+            appendBotMessage(`📋 *${formTitle}*\n${currentNode.config.description || 'Please provide delivery details.'}`);
+            appendChoicesMessage(['Submit Delivery Details (Simulated)'], () => {
+                appendUserMessage('Name: Rajesh Kumar\nAddress: Main Road, Near APMC Market, Tumkur\nPIN: 572101\nConfirmed: Yes');
+                addSimVariable('customer_name', 'Rajesh Kumar');
+                addSimVariable('delivery_address', 'Main Road, Near APMC Market, Tumkur');
+                addSimVariable('pincode', '572101');
+                addSimVariable('address_confirmed', 'true');
+
+                setTimeout(() => {
+                    if (activeNodeEl) {
+                        activeNodeEl.classList.remove('active-node');
+                        activeNodeEl.classList.add('passed-node');
+                    }
+                    const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
+                    if (edge) {
+                        highlightActiveEdge(edge.from, edge.to);
+                        currentSimNodeId = extractNodeIdFromInPort(edge.to);
+                        executeNodeInSim();
+                    }
+                }, 800);
+            });
+            return;
+        }
+
+        if (currentNode.type === 'payment' || currentNode.type === 'qr_code') {
+            const payableAmt = currentNode.config.amount || 600;
+            let msg = (currentNode.config.message || 'Please scan QR code to pay: ₹{{payable_amount}}').replace('{{payable_amount}}', payableAmt);
+            appendBotMessage(msg);
+            if (currentNode.config.qrImageUrl) {
+                appendMediaCardMessage({ mediaUrl: currentNode.config.qrImageUrl, caption: `Official SGB Payment QR (₹${payableAmt})` }, 'image');
+            }
+            addSimVariable('payable_amount', payableAmt);
+
+            setTimeout(() => {
+                if (activeNodeEl) {
+                    activeNodeEl.classList.remove('active-node');
+                    activeNodeEl.classList.add('passed-node');
+                }
+                const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
+                if (edge) {
+                    highlightActiveEdge(edge.from, edge.to);
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
+                    executeNodeInSim();
+                }
+            }, 1200);
+            return;
+        }
+
+        if (currentNode.type === 'wait_for_media') {
+            appendBotMessage(currentNode.config.message || 'Please send your payment screenshot here on WhatsApp.');
+            appendChoicesMessage(['Send Payment Screenshot (Simulated)'], () => {
+                appendUserMessage('📷 [Simulated Payment Screenshot Image]');
+                appendSystemMessage('System Alert: Payment screenshot received -> Order pending_verification -> Admin notified');
+                addSimVariable('payment_evidence_url', '/api/media/quick-replies/1789191406905-qr-0.jpeg');
+                addSimVariable('order_status', 'pending_verification');
+
+                setTimeout(() => {
+                    if (activeNodeEl) {
+                        activeNodeEl.classList.remove('active-node');
+                        activeNodeEl.classList.add('passed-node');
+                    }
+                    const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out` || c.from.startsWith(`port-${currentSimNodeId}-out`));
+                    if (edge) {
+                        highlightActiveEdge(edge.from, edge.to);
+                        currentSimNodeId = extractNodeIdFromInPort(edge.to);
+                        executeNodeInSim();
                     }
                 }, 800);
             });
@@ -2579,7 +2977,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const edge = connections.find(c => c.from === `port-${currentSimNodeId}-out`);
                 if (edge) {
                     highlightActiveEdge(edge.from, edge.to);
-                    currentSimNodeId = edge.to.replace('port-', '').replace('-in', '');
+                    currentSimNodeId = extractNodeIdFromInPort(edge.to);
                     executeNodeInSim();
                 }
             }, 800);
@@ -2763,20 +3161,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Map frontend connections to backend edges
         const mappedEdges = connections.map(conn => {
-            const fromParts = conn.from.split('-');
             let sourceHandle = null;
-            let sourceNodeId = conn.from.replace('port-', '').split('-out')[0];
+            const sourceNodeId = extractNodeIdFromOutPort(conn.from);
 
-            if (fromParts.length > 4 && fromParts[fromParts.length - 2] === 'out') {
-                // Choice option index branch
-                const choiceIndex = parseInt(fromParts[fromParts.length - 1]);
+            // Choice option index branch
+            if (conn.from.includes('-out-')) {
+                const choiceIndex = parseInt(conn.from.split('-out-').pop());
                 const sourceNode = nodes.find(n => n.id === sourceNodeId);
-                if (sourceNode && sourceNode.config && sourceNode.config.choices) {
+                if (sourceNode && sourceNode.config && sourceNode.config.choices && !isNaN(choiceIndex)) {
                     sourceHandle = sourceNode.config.choices[choiceIndex];
                 }
             }
 
-            const targetNodeId = conn.to.replace('port-', '').split('-in')[0];
+            const targetNodeId = extractNodeIdFromInPort(conn.to);
 
             return {
                 source: sourceNodeId,
@@ -4170,6 +4567,68 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('File upload error:', err);
             alert('Error uploading file: ' + err.message);
             if (browseText) browseText.textContent = 'Upload / Pick File';
+        }
+    };
+
+    window.handlePaymentQrFileUpload = async function (event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const btnText = document.getElementById('btn-upload-qr-text');
+        if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', 'image');
+
+            const token = localStorage.getItem('token');
+            const apiBase = window.API_URL || 'http://127.0.0.1:5000/api';
+            const res = await fetch(`${apiBase}/chatbot/media/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('QR upload failed');
+            const data = await res.json();
+            const uploadedMedia = Array.isArray(data) ? data[0] : data;
+            const fileUrl = uploadedMedia.file_url || uploadedMedia.url || uploadedMedia.file_path;
+
+            const urlInput = document.getElementById('node-payment-qr-url');
+            if (urlInput) urlInput.value = fileUrl;
+
+            const resolvedUrl = window.resolveMediaUrl(fileUrl);
+            const previewBox = document.getElementById('payment-qr-preview-box');
+            if (previewBox) {
+                previewBox.innerHTML = `
+                    <img id="payment-qr-preview-img" src="${resolvedUrl}" style="max-height:140px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; padding:4px; object-fit:contain;">
+                    <div style="font-size:0.7rem; color:#15803d; font-weight:600; margin-top:4px;"><i class="fa-solid fa-check"></i> Custom QR Code Active</div>
+                `;
+            }
+
+            if (selectedNode) {
+                selectedNode.config = selectedNode.config || {};
+                selectedNode.config.qrImageUrl = fileUrl;
+                selectedNode.config.qrUrl = fileUrl;
+            }
+
+            if (typeof window.saveSelectedNodeSettingsSilently === 'function') {
+                window.saveSelectedNodeSettingsSilently();
+            } else if (typeof window.saveSelectedNodeSettings === 'function') {
+                window.saveSelectedNodeSettings();
+            }
+
+            if (btnText) btnText.textContent = 'Upload New QR';
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('Success', 'New Payment QR Code uploaded and applied!', 'success');
+            } else {
+                alert('New Payment QR Code uploaded and applied!');
+            }
+        } catch (err) {
+            console.error('Payment QR upload error:', err);
+            alert('Failed to upload QR code: ' + err.message);
+            if (btnText) btnText.textContent = 'Upload New QR';
         }
     };
 });

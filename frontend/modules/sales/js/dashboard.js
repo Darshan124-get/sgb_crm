@@ -945,11 +945,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const phone = lead.phone_number || lead.phone || '-';
             const location = lead.district || lead.city || lead.state || 'Karnataka';
             const status = (lead.status || 'new').toLowerCase();
-            const dateStr = lead.updated_at || lead.created_at ? new Date(lead.updated_at || lead.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-';
+            const relevantDate = lead.assigned_at || (lead.assigned_to ? lead.updated_at : null) || lead.created_at;
+            const dateStr = relevantDate ? new Date(relevantDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-';
             const followupDate = lead.next_followup_date || lead.followup_date ? new Date(lead.next_followup_date || lead.followup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Pending';
 
-            let badgeBg = '#e0e7ff', badgeColor = '#3730a3', statusText = 'New Lead';
-            if (status.includes('contact') || status.includes('call')) {
+            let badgeBg = '#dcfce7', badgeColor = '#15803d', statusText = 'New';
+            if (status === 'new' || status === 'assigned' || !status) {
+                badgeBg = '#dcfce7'; badgeColor = '#15803d'; statusText = 'New';
+            } else if (status.includes('contact') || status.includes('call')) {
                 badgeBg = '#e0f2fe'; badgeColor = '#0369a1'; statusText = 'Contacted';
             } else if (status.includes('follow')) {
                 badgeBg = '#fef3c7'; badgeColor = '#b45309'; statusText = 'In Follow-up';

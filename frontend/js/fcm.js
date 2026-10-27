@@ -81,6 +81,23 @@ export async function initFCM() {
       saveNotificationToCache(title, body);
       updateBellBadge();
 
+      // Live trigger for Blade Protector payment screenshot floating alert
+      if (typeof window.playPaymentNotificationSound === 'function') {
+        window.playPaymentNotificationSound();
+      }
+
+      if (payload.data?.type === 'payment_screenshot' || payload.data?.notification_type === 'payment_screenshot') {
+        if (typeof window.pollPaymentVerificationSummary === 'function') {
+          window.pollPaymentVerificationSummary();
+        }
+      }
+
+      if (payload.data?.type === 'call_support' || payload.data?.notification_type === 'call_support') {
+        if (typeof window.fetchPendingHumanAlerts === 'function') {
+          window.fetchPendingHumanAlerts();
+        }
+      }
+
       if (typeof window.showAlert === 'function') {
         window.showAlert(title, body, 'info');
       } else {

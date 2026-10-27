@@ -5,18 +5,22 @@ exports.getLeads = async (req, res) => {
     const { status, language, assigned_to, is_today, is_unassigned, source, search, page, limit, module: moduleName, dealer_only } = req.query;
     const userRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : 'executive';
     const userId = req.user ? req.user.id : null;
+    const isExecutiveView = (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp');
 
     const isDealerModule = moduleName === 'dealer' || dealer_only === 'true';
 
     try {
         let query = isDealerModule ? `
-            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name
+            SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
+                   u_by.name as assigned_by_name
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
             LEFT JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
             WHERE 1=1
         ` : `
             SELECT l.*, u.name as assigned_to_name, r.name as assigned_role_name,
+                   u_by.name as assigned_by_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\\n', ''), '\\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\\n', ''), '\\r', '')) 
                     ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
@@ -27,6 +31,7 @@ exports.getLeads = async (req, res) => {
             FROM leads l 
             LEFT JOIN users u ON l.assigned_to = u.user_id 
             LEFT JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
             WHERE 1=1
         `;
         let params = [];
@@ -45,7 +50,7 @@ exports.getLeads = async (req, res) => {
         }
 
         // 🛡️ SECURITY: Role-Based Data Isolation
-        if ((userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp')) {
+        if (isExecutiveView) {
             query += ' AND l.assigned_to = ?';
             params.push(userId);
         } else {
@@ -64,12 +69,17 @@ exports.getLeads = async (req, res) => {
                 const placeholders = statusList.map(() => '?').join(',');
                 query += ` AND l.status IN (${placeholders})`;
                 params.push(...statusList);
+            } else if (status === 'new') {
+                if (is_unassigned === 'true' || (!isExecutiveView && !assigned_to)) {
+                    query += " AND (l.status IN ('new', 'assigned') OR l.status IS NULL OR l.status = '') AND l.assigned_to IS NULL";
+                } else {
+                    query += " AND (l.status IN ('new', 'assigned') OR l.status IS NULL OR l.status = '')";
+                }
+            } else if (status === 'assigned') {
+                query += " AND (l.status = 'assigned' OR (l.assigned_to IS NOT NULL AND (l.status = 'new' OR l.status IS NULL OR l.status = '')))";
             } else {
                 query += ' AND l.status = ?';
                 params.push(status);
-                if (status === 'new') {
-                    query += ' AND l.assigned_to IS NULL';
-                }
             }
         }
 
@@ -194,6 +204,62 @@ exports.getLeads = async (req, res) => {
             finalRows = rows.filter(l => l.bot_priority === reqPriority);
         }
 
+        let counts = {};
+        if (pageNum === 1) {
+            try {
+                let statsWhere = 'WHERE 1=1';
+                let statsParams = [];
+                if (isExecutiveView) {
+                    statsWhere += ' AND assigned_to = ?';
+                    statsParams.push(userId);
+                } else if (assigned_to) {
+                    statsWhere += ' AND assigned_to = ?';
+                    statsParams.push(assigned_to);
+                } else if (is_unassigned === 'true') {
+                    statsWhere += ' AND assigned_to IS NULL';
+                }
+                if (search) {
+                    statsWhere += ' AND (customer_name LIKE ? OR phone_number LIKE ? OR first_message LIKE ?)';
+                    const escapedSearch = search.replace(/[%_]/g, '\\$&');
+                    const searchVal = `%${escapedSearch}%`;
+                    statsParams.push(searchVal, searchVal, searchVal);
+                }
+                const newCaseCondition = isExecutiveView 
+                    ? "(status IN ('new', 'assigned') OR status IS NULL OR status = '')" 
+                    : "(status IN ('new', 'assigned') OR status IS NULL OR status = '') AND assigned_to IS NULL";
+
+                const [statsRows] = await pool.query(`
+                    SELECT 
+                        COUNT(*) as all_count,
+                        COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
+                        COUNT(CASE WHEN score = 'hot' OR status = 'interested' THEN 1 END) as hot_count,
+                        COUNT(CASE WHEN status = 'followup' OR (next_followup_date IS NOT NULL AND next_followup_date != '') THEN 1 END) as followup_count,
+                        COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
+                        COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
+                        COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count,
+                        COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_count,
+                        COUNT(CASE WHEN status = 'callback' THEN 1 END) as callback_count
+                    FROM leads
+                    ${statsWhere}
+                `, statsParams);
+
+                const s = statsRows[0] || {};
+                counts = {
+                    all: s.all_count || 0,
+                    today: s.today_count || 0,
+                    hot: s.hot_count || 0,
+                    followup: s.followup_count || 0,
+                    lost: s.lost_count || 0,
+                    open: s.open_count || 0,
+                    new: s.new_count || 0,
+                    converted: s.converted_count || 0,
+                    callback: s.callback_count || 0
+                };
+            } catch (statsErr) {
+                console.error('getLeads counts error:', statsErr.message);
+            }
+        }
+
         const effectiveTotal = (reqPriority && reqPriority !== 'all') ? finalRows.length : totalLeads;
 
         res.json({
@@ -201,7 +267,8 @@ exports.getLeads = async (req, res) => {
             totalLeads: effectiveTotal,
             totalPages: Math.ceil(effectiveTotal / limitNum) || 1,
             currentPage: pageNum,
-            limit: limitNum
+            limit: limitNum,
+            counts
         });
     } catch (err) {
         console.error('getLeads Error:', err);
@@ -215,12 +282,13 @@ exports.getLeadById = async (req, res) => {
 
     try {
         const [rows] = await pool.query(
-            `SELECT l.*, u.name as assigned_to_name,
+            `SELECT l.*, u.name as assigned_to_name, u_by.name as assigned_by_name,
                     (SELECT c.campaign_id FROM campaigns c 
                      WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
                      LIMIT 1) as campaign_name
              FROM leads l
              LEFT JOIN users u ON l.assigned_to = u.user_id
+             LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
              WHERE l.lead_id = ?`,
             [req.params.id]
         );
@@ -243,17 +311,21 @@ exports.getLeadById = async (req, res) => {
         );
         lead.next_followup = followups[0] || null;
 
-        // Fetch ALL orders for this customer (via phone) for history
+        // Fetch ALL orders for this customer (via lead_id or normalized phone) for history
+        const cleanLeadPhone = (lead.phone_number || '').replace(/\D/g, '').slice(-10);
         const [allOrders] = await pool.query(
             `SELECT o.*, 
-                (SELECT GROUP_CONCAT(p.name SEPARATOR ", ") 
+                (SELECT GROUP_CONCAT(CONCAT(p.name, " (x", oi.quantity, ")") SEPARATOR ", ") 
                  FROM order_items oi 
                  JOIN products p ON oi.product_id = p.product_id 
-                 WHERE oi.order_id = o.order_id) as items_summary 
+                 WHERE oi.order_id = o.order_id) as items_summary,
+                COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.order_id = o.order_id), 1) as total_units
              FROM orders o 
-             WHERE o.phone = ? 
+             WHERE o.lead_id = ? 
+                OR o.phone = ? 
+                OR (o.phone IS NOT NULL AND ? != '' AND RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(o.phone, ' ', ''), '-', ''), '+', ''), '(', ''), 10) = ?)
              ORDER BY o.created_at DESC`,
-            [lead.phone_number]
+            [lead.lead_id, lead.phone_number, cleanLeadPhone, cleanLeadPhone]
         );
         lead.order = allOrders[0] || null; // Most recent for top summary
         lead.order_history = allOrders; // Full list for history section
@@ -284,12 +356,30 @@ exports.getLeadById = async (req, res) => {
              FROM chatbot_sessions cs
              JOIN chatbot_flows cf ON cs.flow_id = cf.flow_id
              WHERE cs.lead_id = ? OR cs.phone = ? OR cs.phone LIKE ?
-             ORDER BY cs.session_id DESC LIMIT 1`,
+             ORDER BY cs.session_id DESC LIMIT 20`,
             [lead.lead_id, lead.phone_number, `%${phoneTen}`]
         );
 
         if (sessionRows.length > 0) {
-            const session = sessionRows[0];
+            const isAnswerKey = (k) => ![
+                'first_message', 'is_campaign', '_retry_count', 'flow_id', 'version_id',
+                'payment_verification_status', 'payment_rejected_at', 'payment_rejected_reason',
+                'payment_rejected_by', 'needs_payment_verification', 'payment_verified_at', 'payment_verified_by', 'payment_verified_notes'
+            ].includes(k);
+
+            const countAnswers = (s) => {
+                try {
+                    const v = typeof s.variables === 'string' ? JSON.parse(s.variables) : (s.variables || {});
+                    return Object.keys(v).filter(isAnswerKey).length;
+                } catch(e) { return 0; }
+            };
+
+            let session = sessionRows[0];
+            const maxSession = sessionRows.reduce((prev, curr) => countAnswers(curr) > countAnswers(prev) ? curr : prev, sessionRows[0]);
+            if (countAnswers(maxSession) > countAnswers(session)) {
+                session = maxSession;
+            }
+
             let vars = {};
             try {
                 vars = typeof session.variables === 'string' ? JSON.parse(session.variables) : (session.variables || {});
@@ -306,7 +396,7 @@ exports.getLeadById = async (req, res) => {
                 [session.version_id]
             );
 
-            const questionNodes = nodes.filter(n => ['question', 'buttons', 'list', 'contact_time', 'text_input', 'number_input'].includes(n.node_type));
+            const questionNodes = nodes.filter(n => ['question', 'buttons', 'list', 'contact_time', 'text_input', 'number_input', 'form', 'wait_for_media'].includes(n.node_type));
 
             let steps = [];
             let answeredCount = 0;
@@ -319,13 +409,23 @@ exports.getLeadById = async (req, res) => {
                     } catch (e) {}
 
                     const saveKey = cfg.saveResponseTo || cfg.saveTo;
-                    const qText = cfg.question || node.name || `Question ${idx + 1}`;
+                    const qText = cfg.question || cfg.title || node.name || `Question ${idx + 1}`;
                     let cleanTitle = qText.replace(/^Q:\s*/i, '').split('\n')[0];
                     if (cleanTitle.length > 40) cleanTitle = cleanTitle.substring(0, 37) + '...';
 
                     let answerVal = null;
                     if (saveKey && vars[saveKey] !== undefined && vars[saveKey] !== null) {
                         answerVal = vars[saveKey];
+                    } else if (node.node_type === 'form') {
+                        if (vars.delivery_address) {
+                            answerVal = `${vars.delivery_address}${vars.pincode ? ' (PIN: ' + vars.pincode + ')' : ''}`;
+                        } else if (vars.address) {
+                            answerVal = `${vars.address}${vars.pincode ? ' (PIN: ' + vars.pincode + ')' : ''}`;
+                        }
+                    } else if (node.node_type === 'wait_for_media') {
+                        if (vars.payment_screenshot_url) {
+                            answerVal = 'Payment Screenshot Received';
+                        }
                     }
 
                     const isAnswered = answerVal !== null && answerVal !== undefined && String(answerVal).trim() !== '';
@@ -400,6 +500,97 @@ exports.getLeadById = async (req, res) => {
             lead.chatbot_summary = null;
         }
 
+        // 🛡️ BLADE PROTECTOR DELIVERY DETAILS DISCOVERY
+        let bladeDelivery = null;
+
+        // Check if any session is linked to Flow 43 or Blade Protector
+        const bladeSession = sessionRows.find(s => 
+            s.flow_id === 43 || 
+            (s.flow_name && s.flow_name.toLowerCase().includes('blade protector'))
+        );
+
+        // Find session with delivery address (either Blade Protector or general)
+        const sessionWithAddress = sessionRows.find(s => {
+            let v = {};
+            try { v = typeof s.variables === 'string' ? JSON.parse(s.variables) : (s.variables || {}); } catch(e){}
+            return (v.delivery_address && String(v.delivery_address).trim() !== '') || 
+                   (v.address && String(v.address).trim() !== '');
+        });
+
+        const deliverySession = sessionWithAddress || bladeSession || (sessionRows.length > 0 ? sessionRows[0] : null);
+        let deliveryVars = {};
+        if (deliverySession) {
+            try {
+                deliveryVars = typeof deliverySession.variables === 'string' ? JSON.parse(deliverySession.variables) : (deliverySession.variables || {});
+            } catch(e) {
+                deliveryVars = {};
+            }
+        }
+
+        const bladeOrder = (lead.order_history || []).find(o => 
+            (o.items_summary && o.items_summary.toLowerCase().includes('blade protector')) ||
+            (o.purchase_source === 'whatsapp_chatbot' && parseFloat(o.total_amount) === 600)
+        ) || null;
+
+        const isBladeCustomer = Boolean(
+            bladeSession ||
+            bladeOrder ||
+            (deliverySession && deliverySession.flow_id === 43) ||
+            (deliverySession && deliverySession.flow_name && deliverySession.flow_name.toLowerCase().includes('blade protector')) ||
+            (deliveryVars.order_product && deliveryVars.order_product.toLowerCase().includes('blade')) ||
+            (deliveryVars.product_name && deliveryVars.product_name.toLowerCase().includes('blade')) ||
+            (deliveryVars.call_support_product && deliveryVars.call_support_product.toLowerCase().includes('blade')) ||
+            (lead.first_message && lead.first_message.toLowerCase().includes('blade'))
+        );
+
+        const extractedAddress = deliveryVars.delivery_address || deliveryVars.address || (bladeOrder ? bladeOrder.address : null) || lead.address || null;
+        const extractedPincode = deliveryVars.pincode || (bladeOrder ? bladeOrder.pincode : null) || lead.pincode || null;
+        const extractedName = deliveryVars.customer_name || (bladeOrder ? bladeOrder.customer_name : null) || lead.customer_name || null;
+        const extractedOrderId = deliveryVars.order_id || (bladeOrder ? bladeOrder.order_id : null) || null;
+        const extractedConfirmed = deliveryVars.address_confirmed || (extractedAddress ? 'Yes' : null);
+        const submittedTimestamp = deliveryVars.form_submitted_at || deliveryVars.payment_evidence_timestamp || (bladeOrder ? bladeOrder.created_at : null) || (deliverySession ? deliverySession.updated_at : null);
+        let screenshotUrl = deliveryVars.payment_screenshot_url || null;
+        if (phoneTen) {
+            try {
+                const [cmRows] = await pool.query(
+                    "SELECT cm.media_url FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id JOIN leads l ON cs.lead_id = l.lead_id WHERE (l.phone_number LIKE ? OR l.phone_number = ?) AND cm.sender_type = 'user' AND cm.message_type = 'image' AND cm.media_url IS NOT NULL ORDER BY cm.chat_id DESC LIMIT 1",
+                    [`%${phoneTen}`, lead.phone_number]
+                );
+                if (cmRows.length > 0 && cmRows[0].media_url) {
+                    screenshotUrl = cmRows[0].media_url;
+                }
+            } catch (cmErr) {}
+        }
+        if (screenshotUrl && screenshotUrl.includes('graph.facebook.com')) {
+            const mediaId = screenshotUrl.split('/').pop().replace(/\D/g, '');
+            if (mediaId) {
+                screenshotUrl = `/api/whatsapp/meta-media/${mediaId}`;
+            }
+        }
+        const paymentStatus = deliveryVars.payment_verification_status || deliveryVars.payment_status || (bladeOrder ? bladeOrder.order_status : null);
+
+        if (isBladeCustomer || (extractedAddress && String(extractedAddress).trim() !== '')) {
+            bladeDelivery = {
+                is_blade_protector: isBladeCustomer,
+                has_address: Boolean(extractedAddress && String(extractedAddress).trim() !== ''),
+                product_name: deliveryVars.order_product || deliveryVars.product_name || 'SGB Blade Protector',
+                payable_amount: deliveryVars.payable_amount || (bladeOrder ? bladeOrder.total_amount : 600),
+                recipient_name: extractedName,
+                delivery_address: extractedAddress,
+                pincode: extractedPincode,
+                address_confirmed: extractedConfirmed,
+                submitted_at: submittedTimestamp,
+                order_id: extractedOrderId,
+                payment_status: paymentStatus,
+                payment_screenshot_url: screenshotUrl,
+                session_id: deliverySession ? deliverySession.session_id : null,
+                flow_id: deliverySession ? deliverySession.flow_id : (bladeSession ? bladeSession.flow_id : 43),
+                flow_name: deliverySession ? deliverySession.flow_name : (bladeSession ? bladeSession.flow_name : 'SGB Blade Protector — Direct WhatsApp Sales')
+            };
+        }
+
+        lead.blade_delivery = bladeDelivery;
+
         res.json(lead);
     } catch (err) {
         console.error('getLeadById Error:', err);
@@ -408,7 +599,7 @@ exports.getLeadById = async (req, res) => {
 };
 
 exports.createLead = async (req, res) => {
-    const { phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, delivery_type } = req.body;
+    const { phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, delivery_type, village, sub_district, taluk } = req.body;
     const connection = await pool.getConnection();
 
     try {
@@ -417,9 +608,11 @@ exports.createLead = async (req, res) => {
 
         const cleanPhone = validationUtils.sanitizePhone(phone_number);
         const cleanName = validationUtils.sanitizeAlphabetOnly(customer_name || '');
-        const cleanCity = validationUtils.sanitizeAlphabetOnly(city || '');
-        const cleanState = validationUtils.sanitizeAlphabetOnly(state || '');
-        const cleanDistrict = validationUtils.sanitizeAlphabetOnly(district || '');
+        const cleanVillage = validationUtils.sanitizeAlphanumeric(village || city || '');
+        const cleanTaluk = validationUtils.sanitizeAlphanumeric(taluk || sub_district || '');
+        const cleanCity = cleanVillage || validationUtils.sanitizeAlphanumeric(city || '');
+        const cleanState = validationUtils.sanitizeAlphanumeric(state || '');
+        const cleanDistrict = validationUtils.sanitizeAlphanumeric(district || '');
         const cleanPincode = validationUtils.sanitizePincode(pincode || '');
 
         // 1. Basic Validation
@@ -456,6 +649,7 @@ exports.createLead = async (req, res) => {
         );
 
         let assignedTo = null;
+        let assignedBy = null;
         let status = 'new';
 
         const creatorRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : '';
@@ -464,19 +658,21 @@ exports.createLead = async (req, res) => {
         if (isTelecallerOrSales && req.user && req.user.id) {
             // Telecom Panel / Sales Agent: Assign directly to themselves
             assignedTo = req.user.id;
+            assignedBy = req.user.id;
             status = 'assigned';
         } else {
             // Sales Manager Panel and Admin Panel: Leave as Unassigned
             assignedTo = null;
+            assignedBy = null;
             status = 'new';
         }
 
-        const combinedAddress = [cleanCity, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
+        const combinedAddress = [cleanVillage, cleanTaluk, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
         const finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || null);
 
         const [result] = await connection.query(
-            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, delivery_type) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, assigned_by, delivery_type, village, sub_district, taluk) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 cleanPhone,
                 cleanName || null,
@@ -490,7 +686,11 @@ exports.createLead = async (req, res) => {
                 source || 'manual',
                 status,
                 assignedTo,
-                delivery_type || null
+                assignedBy,
+                delivery_type || null,
+                cleanVillage || null,
+                cleanTaluk || null,
+                cleanTaluk || null
             ]
         );
 
@@ -517,7 +717,8 @@ exports.updateLead = async (req, res) => {
     const {
         phone_number, customer_name, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
-        current_crop, acreage, delivery_type, call_count, notes, remarks
+        current_crop, acreage, delivery_type, call_count, notes, remarks,
+        village, sub_district, taluk
     } = req.body;
 
     let connection;
@@ -538,13 +739,17 @@ exports.updateLead = async (req, res) => {
         const finalStatus = status || currentLead.status;
         const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
-        const finalCity = city !== undefined ? validationUtils.sanitizeAlphabetOnly(city) : currentLead.city;
-        const finalState = state !== undefined ? validationUtils.sanitizeAlphabetOnly(state) : currentLead.state;
-        const finalDistrict = district !== undefined ? validationUtils.sanitizeAlphabetOnly(district) : currentLead.district;
+        const finalCity = city !== undefined ? validationUtils.sanitizeAlphanumeric(city) : currentLead.city;
+        const finalVillage = village !== undefined ? validationUtils.sanitizeAlphanumeric(village) : currentLead.village;
+        const finalSubDistrict = (sub_district !== undefined || taluk !== undefined)
+            ? validationUtils.sanitizeAlphanumeric(sub_district || taluk)
+            : (currentLead.taluk || currentLead.sub_district);
+        const finalState = state !== undefined ? validationUtils.sanitizeAlphanumeric(state) : currentLead.state;
+        const finalDistrict = district !== undefined ? validationUtils.sanitizeAlphanumeric(district) : currentLead.district;
         const finalPincode = pincode !== undefined ? validationUtils.sanitizePincode(pincode) : currentLead.pincode;
 
-        const combinedAddress = [finalCity, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
-        const finalAddress = address !== undefined ? validationUtils.sanitizeAlphanumeric(address) : combinedAddress;
+        const combinedAddress = [finalVillage, finalSubDistrict, finalDistrict, finalState, finalPincode].filter(Boolean).join(', ');
+        const finalAddress = address !== undefined ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || currentLead.address);
 
         const cleanFollowupDate = (next_followup_date && String(next_followup_date).trim() !== '') 
             ? next_followup_date 
@@ -552,12 +757,22 @@ exports.updateLead = async (req, res) => {
 
         const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
 
+        let finalAssignedBy = currentLead.assigned_by;
+        if (assigned_to !== undefined) {
+            if (assigned_to && assigned_to !== '' && String(assigned_to) !== String(currentLead.assigned_to)) {
+                finalAssignedBy = actingUserId;
+            } else if (!assigned_to || assigned_to === '') {
+                finalAssignedBy = null;
+            }
+        }
+
         await connection.query(
             `UPDATE leads SET 
                 phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
-                address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?,
+                address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?, assigned_by = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
-                current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?
+                current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?,
+                village = ?, sub_district = ?, taluk = ?
             WHERE lead_id = ?`,
             [
                 cleanPhone,
@@ -565,12 +780,13 @@ exports.updateLead = async (req, res) => {
                 first_message || currentLead.first_message || null,
                 language || currentLead.language || 'EN',
                 finalAddress || null,
-                finalCity || null,
+                finalCity || finalVillage || null,
                 finalState || null,
                 finalDistrict || null,
                 finalPincode || null,
                 finalStatus,
                 finalAssignedTo || null,
+                finalAssignedBy || null,
                 score || currentLead.score || 'cold',
                 cleanFollowupDate,
                 lost_reason || currentLead.lost_reason || null,
@@ -579,6 +795,9 @@ exports.updateLead = async (req, res) => {
                 acreage || currentLead.acreage || null,
                 delivery_type || currentLead.delivery_type || null,
                 call_count !== undefined ? call_count : currentLead.call_count,
+                finalVillage || null,
+                finalSubDistrict || null,
+                finalSubDistrict || null,
                 req.params.id
             ]
         );
@@ -616,7 +835,8 @@ exports.updateLead = async (req, res) => {
 exports.assignLead = async (req, res) => {
     const { assigned_to } = req.body;
     try {
-        await pool.query('UPDATE leads SET assigned_to = ?, status = "assigned" WHERE lead_id = ?', [assigned_to, req.params.id]);
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+        await pool.query('UPDATE leads SET assigned_to = ?, assigned_by = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?', [assigned_to, actingUserId, req.params.id]);
         
         const [userRows] = await pool.query('SELECT name FROM users WHERE user_id = ?', [assigned_to]);
         const userName = userRows[0] ? userRows[0].name : `user ID ${assigned_to}`;
@@ -758,13 +978,14 @@ exports.transferLead = async (req, res) => {
             targetStatus = 'dealer';
         }
 
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+
         await connection.query(
-            'UPDATE leads SET assigned_to = ?, language = ?, status = CASE WHEN LOWER(status) IN ("dealer", "dealer_converted") THEN status ELSE ? END WHERE lead_id = ?',
-            [targetUser.user_id, finalLanguage, targetStatus, leadId]
+            'UPDATE leads SET assigned_to = ?, assigned_by = ?, language = ?, status = CASE WHEN LOWER(status) IN ("dealer", "dealer_converted") THEN status ELSE ? END WHERE lead_id = ?',
+            [targetUser.user_id, actingUserId, finalLanguage, targetStatus, leadId]
         );
 
         // 4. Log the transfer
-        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
         await connection.query(
             'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
             [leadId, actingUserId, `Lead transferred to ${roleLabel} ${targetUser.name} (ID: ${targetUser.user_id})${target_language ? ` due to language shift to ${target_language}` : ''}`]
@@ -822,22 +1043,39 @@ exports.getStats = async (req, res) => {
             params.push(searchVal, searchVal, searchVal);
         }
 
-        const [open] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup'))`, [...params]);
-        const [today] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND DATE(created_at) = CURDATE()`, [...params]);
-        const [hot] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND score = "hot" AND status = "interested"`, [...params]);
-        const [followup] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "followup"`, [...params]);
-        const [lost] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status IN ("lost", "not_interested")`, [...params]);
-        const [newCount] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere} AND status = "new" AND assigned_to IS NULL`, [...params]);
-        const [all] = await pool.query(`SELECT COUNT(*) as count FROM leads ${baseWhere}`, [...params]);
+        const isExecutiveView = (userRole.includes('executive') || userRole === 'viewer' || userRole === 'sales') && !userRole.includes('whatsapp');
+        const newCaseCondition = isExecutiveView 
+            ? "(status IN ('new', 'assigned') OR status IS NULL OR status = '')" 
+            : "(status IN ('new', 'assigned') OR status IS NULL OR status = '') AND assigned_to IS NULL";
+
+        // Single optimized aggregation query instead of 7 sequential roundtrips
+        const [statsRows] = await pool.query(`
+            SELECT 
+                COUNT(*) as all_count,
+                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_count,
+                COUNT(CASE WHEN score = 'hot' OR status = 'interested' THEN 1 END) as hot_count,
+                COUNT(CASE WHEN status = 'followup' OR (next_followup_date IS NOT NULL AND next_followup_date != '') THEN 1 END) as followup_count,
+                COUNT(CASE WHEN status IN ('lost', 'not_interested') THEN 1 END) as lost_count,
+                COUNT(CASE WHEN (status IS NULL OR status NOT IN ('converted', 'lost', 'not_interested', 'interested', 'followup')) THEN 1 END) as open_count,
+                COUNT(CASE WHEN ${newCaseCondition} THEN 1 END) as new_count,
+                COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_count,
+                COUNT(CASE WHEN status = 'callback' THEN 1 END) as callback_count
+            FROM leads
+            ${baseWhere}
+        `, params);
+
+        const s = statsRows[0] || {};
 
         res.json({
-            all: all[0].count,
-            today: today[0].count,
-            hot: hot[0].count,
-            followup: followup[0].count,
-            lost: lost[0].count,
-            open: open[0].count,
-            new: newCount[0].count
+            all: s.all_count || 0,
+            today: s.today_count || 0,
+            hot: s.hot_count || 0,
+            followup: s.followup_count || 0,
+            lost: s.lost_count || 0,
+            open: s.open_count || 0,
+            new: s.new_count || 0,
+            converted: s.converted_count || 0,
+            callback: s.callback_count || 0
         });
     } catch (err) {
         console.error('getStats Error:', err);
@@ -855,10 +1093,12 @@ exports.bulkAssign = async (req, res) => {
     try {
         await connection.beginTransaction();
 
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
+
         // 1. Bulk Update Leads table
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = ?, status = CASE WHEN status = "new" OR status IS NULL OR status = "" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
-            [staffId, leadIds]
+            'UPDATE leads SET assigned_to = ?, assigned_by = ?, assigned_at = CURRENT_TIMESTAMP, status = CASE WHEN status IS NULL OR status = "" OR status = "new" THEN "assigned" ELSE status END WHERE lead_id IN (?)',
+            [staffId, actingUserId, leadIds]
         );
 
         // 2. Add System Note to each lead
@@ -905,7 +1145,7 @@ exports.bulkUnassign = async (req, res) => {
 
         // 1. Bulk Update Leads table (set assigned_to = NULL and status = 'new' if status is 'assigned')
         const [result] = await connection.query(
-            'UPDATE leads SET assigned_to = NULL, status = CASE WHEN status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
+            'UPDATE leads SET assigned_to = NULL, assigned_by = NULL, status = CASE WHEN status = "assigned" THEN "new" ELSE status END WHERE lead_id IN (?)',
             [leadIds]
         );
 
@@ -937,6 +1177,7 @@ exports.autoAssign = async (req, res) => {
 
         let count = 0;
         const assignedMap = {}; // staffId -> { name: string, count: number }
+        const actingUserId = req.user ? (req.user.id || req.user.user_id || null) : null;
 
         for (const leadId of leadIds) {
             // Get Lead Language
@@ -962,8 +1203,8 @@ exports.autoAssign = async (req, res) => {
                 const staff = staffRows[0];
                 // Assign
                 await connection.query(
-                    'UPDATE leads SET assigned_to = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?',
-                    [staff.user_id, leadId]
+                    'UPDATE leads SET assigned_to = ?, assigned_by = ?, status = CASE WHEN status = "new" THEN "assigned" ELSE status END WHERE lead_id = ?',
+                    [staff.user_id, actingUserId, leadId]
                 );
                 // Touch staff to move them to back of round robin
                 await connection.query('UPDATE users SET updated_at = NOW() WHERE user_id = ?', [staff.user_id]);

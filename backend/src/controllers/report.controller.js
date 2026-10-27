@@ -4,7 +4,7 @@ const ExcelJS = require('exceljs');
 exports.exportLeads = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT l.*, u.name as assigned_to_name,
+            SELECT l.*, u.name as assigned_to_name, u_by.name as assigned_by_name,
                    (SELECT c.campaign_id FROM campaigns c 
                     WHERE TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) 
                     ORDER BY (c.status = 'active') DESC, c.id DESC LIMIT 1) as campaign_id_code,
@@ -14,6 +14,7 @@ exports.exportLeads = async (req, res) => {
                    (SELECT cs.variables FROM chatbot_sessions cs WHERE cs.lead_id = l.lead_id OR cs.phone COLLATE utf8mb4_unicode_ci = l.phone_number COLLATE utf8mb4_unicode_ci ORDER BY cs.session_id DESC LIMIT 1) as bot_variables
             FROM leads l
             LEFT JOIN users u ON l.assigned_to = u.user_id
+            LEFT JOIN users u_by ON l.assigned_by = u_by.user_id
             ORDER BY l.created_at DESC
         `);
 
@@ -50,7 +51,7 @@ exports.exportLeads = async (req, res) => {
 
             const campaignCode = lead.campaign_id_code || lead.first_message || lead.source || 'Direct';
             const farmerName = lead.customer_name || '-';
-            const assignedStaff = lead.assigned_to_name || 'Unassigned';
+            const assignedStaff = lead.assigned_to_name ? `${lead.assigned_to_name}${lead.assigned_by_name ? ` (By: ${lead.assigned_by_name})` : ''}` : 'Unassigned';
             const dateTimeStr = lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-';
 
             worksheet.addRow({
@@ -100,20 +101,38 @@ exports.getDashboardStats = async (req, res) => {
             )
         `);
 
-        // Parse date filter from query
+        // Parse date filter & timeframe from query
         let startDateStr = req.query.start_date;
         let endDateStr = req.query.end_date;
         const isDealerMode = req.query.mode === 'dealer';
+        const timeframe = (req.query.timeframe || '').toLowerCase().trim();
+        const customDate = req.query.date;
 
-        if (!startDateStr || !endDateStr) {
-            // Default to current month range
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            
-            startDateStr = `${year}-${month}-01`;
-            endDateStr = `${year}-${month}-${day}`;
+        const baseDate = customDate ? new Date(customDate) : new Date();
+        const baseYear = baseDate.getFullYear();
+        const baseMonth = String(baseDate.getMonth() + 1).padStart(2, '0');
+        const baseDay = String(baseDate.getDate()).padStart(2, '0');
+        const formattedDate = `${baseYear}-${baseMonth}-${baseDay}`;
+
+        if (timeframe === 'today') {
+            startDateStr = formattedDate;
+            endDateStr = formattedDate;
+        } else if (timeframe === 'this week' || timeframe === 'week') {
+            const dayOfWeek = baseDate.getDay(); // 0 is Sunday
+            const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            const monday = new Date(baseDate);
+            monday.setDate(baseDate.getDate() + diffToMon);
+            startDateStr = monday.toISOString().split('T')[0];
+            endDateStr = formattedDate;
+        } else if (timeframe === 'this month' || timeframe === 'month') {
+            startDateStr = `${baseYear}-${baseMonth}-01`;
+            endDateStr = formattedDate;
+        } else if (customDate && (!startDateStr || !endDateStr)) {
+            startDateStr = customDate;
+            endDateStr = customDate;
+        } else if (!startDateStr || !endDateStr) {
+            startDateStr = `${baseYear}-${baseMonth}-01`;
+            endDateStr = formattedDate;
         }
 
         // Calculate comparison bounds
@@ -137,46 +156,23 @@ exports.getDashboardStats = async (req, res) => {
             const end = `${endStr} 23:59:59`;
 
             if (isDealerMode) {
-                // 1. New Dealers
-                const [[newDealers]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM dealers WHERE created_at >= ? AND created_at <= ?`,
-                    [start, end]
-                );
-
-                // 2. Active Dealers
-                const [[activeDealers]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM dealers`
-                );
-
-                // 3. Pending Orders (Dealer)
-                const [[pendingOrders]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM orders WHERE order_source = 'dealer' AND order_status IN ('draft', 'in_review', 'billed', 'packed', 'shipped') AND created_at >= ? AND created_at <= ?`,
-                    [start, end]
-                );
-
-                // 4. Fulfilled Orders (Dealer)
-                const [[fulfilledOrders]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM orders WHERE order_source = 'dealer' AND order_status = 'delivered' AND created_at >= ? AND created_at <= ?`,
-                    [start, end]
-                );
-
-                // 5. Total Orders (Dealer)
-                const [[ordersReceived]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM orders WHERE order_source = 'dealer' AND created_at >= ? AND created_at <= ?`,
-                    [start, end]
-                );
-
-                // 6. Dealer Revenue (verified payments in range)
-                const [[revenue]] = await pool.query(
-                    `SELECT SUM(p.amount) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= ? AND p.created_at <= ?`,
-                    [start, end]
-                );
-
-                // 7. Dealer Outstanding
-                const [[outstanding]] = await pool.query(
-                    `SELECT SUM(balance_amount) as total, COUNT(*) as invoice_count FROM orders WHERE order_source = 'dealer' AND order_status != 'cancelled' AND created_at >= ? AND created_at <= ?`,
-                    [start, end]
-                );
+                const [
+                    [[newDealers]],
+                    [[activeDealers]],
+                    [[pendingOrders]],
+                    [[fulfilledOrders]],
+                    [[ordersReceived]],
+                    [[revenue]],
+                    [[outstanding]]
+                ] = await Promise.all([
+                    pool.query(`SELECT COUNT(*) as count FROM dealers WHERE created_at >= ? AND created_at <= ?`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM dealers`),
+                    pool.query(`SELECT COUNT(*) as count FROM orders WHERE order_source = 'dealer' AND order_status IN ('draft', 'in_review', 'billed', 'packed', 'shipped') AND created_at >= ? AND created_at <= ?`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM orders WHERE order_source = 'dealer' AND order_status = 'delivered' AND created_at >= ? AND created_at <= ?`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM orders WHERE order_source = 'dealer' AND created_at >= ? AND created_at <= ?`, [start, end]),
+                    pool.query(`SELECT SUM(p.amount) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= ? AND p.created_at <= ?`, [start, end]),
+                    pool.query(`SELECT SUM(balance_amount) as total, COUNT(*) as invoice_count FROM orders WHERE order_source = 'dealer' AND order_status != 'cancelled' AND created_at >= ? AND created_at <= ?`, [start, end])
+                ]);
 
                 const revVal = parseFloat(revenue.total || 0);
                 const profitVal = revVal * 0.15; // 15% margin for B2B
@@ -195,55 +191,29 @@ exports.getDashboardStats = async (req, res) => {
                     conversionRate: ordersReceived.count > 0 ? ((fulfilledOrders.count / ordersReceived.count) * 100).toFixed(1) : 0
                 };
             } else {
-                // 1. New Leads
-                const [[newLeads]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM leads WHERE created_at >= ? AND created_at <= ? AND ${leadFilter}`,
-                    [start, end]
-                );
+                const [
+                    [[newLeads]],
+                    [[activeLeads]],
+                    [[followupsPending]],
+                    [[convertedLeads]],
+                    [[ordersReceived]],
+                    [[orderRev]],
+                    [[advRev]],
+                    [[outstanding]],
+                    [[campaignSpend]]
+                ] = await Promise.all([
+                    pool.query(`SELECT COUNT(*) as count FROM leads WHERE created_at >= ? AND created_at <= ? AND ${leadFilter}`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM leads WHERE status IN ('new', 'assigned', 'contacted', 'callback', 'followup', 'interested', 'negotiation', 'advance_paid') AND created_at >= ? AND created_at <= ? AND ${leadFilter}`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM lead_followups f JOIN leads l ON f.lead_id = l.lead_id WHERE f.status = 'pending' AND f.followup_date >= ? AND f.followup_date <= ? AND ${leadFilter}`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM leads WHERE status = 'converted' AND created_at >= ? AND created_at <= ? AND ${leadFilter}`, [start, end]),
+                    pool.query(`SELECT COUNT(*) as count FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.created_at >= ? AND o.created_at <= ? AND (${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})`, [start, end]),
+                    pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND o.created_at >= ? AND o.created_at <= ? AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`, [start, end]),
+                    pool.query(`SELECT COALESCE(SUM(ap.amount), 0) as total FROM lead_advance_payments ap JOIN leads l ON ap.lead_id = l.lead_id WHERE ap.verified = 'yes' AND ap.payment_date >= ? AND ap.payment_date <= ? AND ${leadFilter}`, [start, end]),
+                    pool.query(`SELECT SUM(o.balance_amount) as total, COUNT(DISTINCT o.order_id) as invoice_count FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND o.created_at >= ? AND o.created_at <= ? AND (${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})`, [start, end]),
+                    pool.query(`SELECT SUM(ad_spend) as total FROM campaigns WHERE created_at >= ? AND created_at <= ?`, [start, end])
+                ]);
 
-                // 2. Active Leads
-                const [[activeLeads]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM leads WHERE status IN ('new', 'assigned', 'contacted', 'callback', 'followup', 'interested', 'negotiation', 'advance_paid') AND created_at >= ? AND created_at <= ? AND ${leadFilter}`,
-                    [start, end]
-                );
-
-                // 3. Follow-up Pending
-                const [[followupsPending]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM lead_followups f JOIN leads l ON f.lead_id = l.lead_id WHERE f.status = 'pending' AND f.followup_date >= ? AND f.followup_date <= ? AND ${leadFilter}`,
-                    [start, end]
-                );
-
-                // 4. Converted Leads
-                const [[convertedLeads]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM leads WHERE status = 'converted' AND created_at >= ? AND created_at <= ? AND ${leadFilter}`,
-                    [start, end]
-                );
-
-                // 5. Orders Received
-                const [[ordersReceived]] = await pool.query(
-                    `SELECT COUNT(*) as count FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.created_at >= ? AND o.created_at <= ? AND (${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})`,
-                    [start, end]
-                );
-
-                // 6. Revenue (MTD)
-                const [[revenue]] = await pool.query(
-                    `SELECT SUM(ap.amount) as total FROM lead_advance_payments ap JOIN leads l ON ap.lead_id = l.lead_id WHERE ap.verified = 'yes' AND ap.payment_date >= ? AND ap.payment_date <= ? AND ${leadFilter}`,
-                    [start, end]
-                );
-
-                // 7. Outstanding Payments
-                const [[outstanding]] = await pool.query(
-                    `SELECT SUM(o.balance_amount) as total, COUNT(DISTINCT o.order_id) as invoice_count FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND o.created_at >= ? AND o.created_at <= ? AND (${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})`,
-                    [start, end]
-                );
-
-                // 8. Campaign Spend
-                const [[campaignSpend]] = await pool.query(
-                    `SELECT SUM(ad_spend) as total FROM campaigns WHERE created_at >= ? AND created_at <= ?`,
-                    [start, end]
-                );
-
-                const revVal = parseFloat(revenue.total || 0);
+                const revVal = parseFloat(orderRev.total || 0) > 0 ? parseFloat(orderRev.total) : parseFloat(advRev.total || 0);
                 const spendVal = parseFloat(campaignSpend.total || 0);
                 const profitVal = revVal > 0 ? (revVal * 0.35 - spendVal * 0.2) : 0;
 
@@ -266,8 +236,10 @@ exports.getDashboardStats = async (req, res) => {
             }
         };
 
-        const currentStats = await fetchPeriodStats(startDateStr, endDateStr);
-        const prevStats = await fetchPeriodStats(prevStartStr, prevEndStr);
+        const [currentStats, prevStats] = await Promise.all([
+            fetchPeriodStats(startDateStr, endDateStr),
+            fetchPeriodStats(prevStartStr, prevEndStr)
+        ]);
 
         const getChangePct = (curr, prev) => {
             if (prev === 0) return curr > 0 ? '+100.0%' : '+0.0%';
@@ -286,249 +258,522 @@ exports.getDashboardStats = async (req, res) => {
         };
 
         // ─── Main Panel Data (Current Period) ───
+        // ─── Main Panel Data (Current Period) ───
         const start = `${startDateStr} 00:00:00`;
         const end = `${endDateStr} 23:59:59`;
+        const targetDate = endDateStr;
 
-        // 1. Telecaller Performance / Dealer Executive
-        const [telecallerPerformance] = isDealerMode ? await pool.query(`
-            SELECT u.name, 
-                   COUNT(o.order_id) as assigned, 
-                   SUM(CASE WHEN o.order_status IN ('billed', 'packed', 'shipped') THEN 1 ELSE 0 END) as contacted, 
-                   SUM(CASE WHEN o.order_status = 'delivered' THEN 1 ELSE 0 END) as converted 
-            FROM orders o 
-            JOIN users u ON o.created_by = u.user_id 
-            WHERE o.order_source = 'dealer' AND o.created_at >= ? AND o.created_at <= ? 
-            GROUP BY o.created_by 
-            ORDER BY assigned DESC 
-            LIMIT 5
-        `, [start, end]) : await pool.query(`
-            SELECT u.name, 
-                   COUNT(l.lead_id) as assigned, 
-                   SUM(CASE WHEN l.status NOT IN ('new', 'assigned') THEN 1 ELSE 0 END) as contacted, 
-                   SUM(CASE WHEN l.status = 'converted' THEN 1 ELSE 0 END) as converted 
-            FROM leads l 
-            JOIN users u ON l.assigned_to = u.user_id 
-            WHERE l.created_at >= ? AND l.created_at <= ? 
-            GROUP BY l.assigned_to 
-            ORDER BY assigned DESC 
-            LIMIT 5
-        `, [start, end]);
+        // Execute all independent panel queries concurrently in a single Promise.all
+        const [
+            [telecallerPerformance],
+            [funnel],
+            [locationDistribution],
+            [[workflow]],
+            [[opsCounts]],
+            [ordersTrend],
+            [packedTrend],
+            [shippedTrend],
+            [revTrend],
+            [[revToday]],
+            [[revWeek]],
+            [[revMonth]],
+            [[avgOrderValue]],
+            [[invSnapshot]],
+            [topProducts],
+            [[topCampaign]],
+            [[waStats]],
+            [[dealerStats]],
+            [systemLogs],
+            [dayCalls],
+            [dayLeads],
+            [dayOrders],
+            [weekCalls],
+            [weekLeads],
+            [weekOrders],
+            [monthCalls],
+            [monthLeads],
+            [monthOrders],
+            [dayFollowups],
+            [[outcomesRow]],
+            [timelineRows]
+        ] = await Promise.all([
+            // 1. Telecaller Performance / Dealer Executive
+            isDealerMode ? pool.query(`
+                SELECT u.name, 
+                       COUNT(o.order_id) as assigned, 
+                       SUM(CASE WHEN o.order_status IN ('billed', 'packed', 'shipped') THEN 1 ELSE 0 END) as contacted, 
+                       SUM(CASE WHEN o.order_status = 'delivered' THEN 1 ELSE 0 END) as converted 
+                FROM orders o 
+                JOIN users u ON o.created_by = u.user_id 
+                WHERE o.order_source = 'dealer' AND o.created_at >= ? AND o.created_at <= ? 
+                GROUP BY o.created_by 
+                ORDER BY assigned DESC 
+                LIMIT 5
+            `, [start, end]) : pool.query(`
+                SELECT u.name, 
+                       COUNT(l.lead_id) as assigned, 
+                       SUM(CASE WHEN l.status NOT IN ('new', 'assigned') THEN 1 ELSE 0 END) as contacted, 
+                       SUM(CASE WHEN l.status = 'converted' THEN 1 ELSE 0 END) as converted 
+                FROM leads l 
+                JOIN users u ON l.assigned_to = u.user_id 
+                WHERE l.created_at >= ? AND l.created_at <= ? 
+                GROUP BY l.assigned_to 
+                ORDER BY assigned DESC 
+                LIMIT 5
+            `, [start, end]),
 
-        // 2. Lead Status Distribution / Dealer Order Status Funnel
-        const [funnel] = isDealerMode ? await pool.query(`
-            SELECT order_status as status, COUNT(*) as count 
-            FROM orders 
-            WHERE order_source = 'dealer' AND created_at >= ? AND created_at <= ? 
-            GROUP BY order_status
-        `, [start, end]) : await pool.query(`
-            SELECT status, COUNT(*) as count 
-            FROM leads 
-            WHERE created_at >= ? AND created_at <= ? AND ${leadFilter}
-            GROUP BY status
-        `, [start, end]);
+            // 2. Lead Status Distribution / Dealer Order Status Funnel
+            isDealerMode ? pool.query(`
+                SELECT order_status as status, COUNT(*) as count 
+                FROM orders 
+                WHERE order_source = 'dealer' AND created_at >= ? AND created_at <= ? 
+                GROUP BY order_status
+            `, [start, end]) : pool.query(`
+                SELECT status, COUNT(*) as count 
+                FROM leads 
+                WHERE created_at >= ? AND created_at <= ? AND ${leadFilter}
+                GROUP BY status
+            `, [start, end]),
 
-        // 3. Leads by Location / Dealers by Location
-        const [locationDistribution] = isDealerMode ? await pool.query(`
-            SELECT city, COUNT(*) as count 
-            FROM dealers 
-            WHERE city IS NOT NULL AND city != '' AND created_at >= ? AND created_at <= ? 
-            GROUP BY city 
-            ORDER BY count DESC 
-            LIMIT 5
-        `, [start, end]) : await pool.query(`
-            SELECT city, COUNT(*) as count 
-            FROM leads 
-            WHERE city IS NOT NULL AND city != '' AND created_at >= ? AND created_at <= ? AND ${leadFilter}
-            GROUP BY city 
-            ORDER BY count DESC 
-            LIMIT 5
-        `, [start, end]);
+            // 3. Leads by Location / Dealers by Location
+            isDealerMode ? pool.query(`
+                SELECT city, COUNT(*) as count 
+                FROM dealers 
+                WHERE city IS NOT NULL AND city != '' AND created_at >= ? AND created_at <= ? 
+                GROUP BY city 
+                ORDER BY count DESC 
+                LIMIT 5
+            `, [start, end]) : pool.query(`
+                SELECT city, COUNT(*) as count 
+                FROM leads 
+                WHERE city IS NOT NULL AND city != '' AND created_at >= ? AND created_at <= ? AND ${leadFilter}
+                GROUP BY city 
+                ORDER BY count DESC 
+                LIMIT 5
+            `, [start, end]),
 
-        // 4. Order Workflow
-        const [[workflow]] = await pool.query(`
-            SELECT 
-                COUNT(*) as received,
-                SUM(CASE WHEN order_status IN ('billed', 'packed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as billed,
-                SUM(CASE WHEN order_status IN ('packed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as packed,
-                SUM(CASE WHEN order_status IN ('shipped', 'delivered') THEN 1 ELSE 0 END) as shipped,
-                SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) as delivered
-            FROM orders o
-            LEFT JOIN leads l ON o.lead_id = l.lead_id
-            WHERE o.created_at >= ? AND o.created_at <= ? AND ${isDealerMode ? "o.order_source = 'dealer'" : `(${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})`}
-        `, [start, end]);
-
-        // 5. Operations Summary Counts
-        const [[opsCounts]] = await pool.query(`
-            SELECT 
-                SUM(CASE WHEN order_status IN ('draft', 'in_review') THEN 1 ELSE 0 END) as pendingBilling,
-                SUM(CASE WHEN order_status = 'billed' THEN 1 ELSE 0 END) as pendingPacking,
-                SUM(CASE WHEN order_status = 'packed' THEN 1 ELSE 0 END) as pendingShipping,
-                SUM(CASE WHEN order_status NOT IN ('delivered', 'cancelled') AND created_at < NOW() - INTERVAL 3 DAY THEN 1 ELSE 0 END) as delayedOrders
-            FROM orders
-            WHERE ${isDealerMode ? "order_source = 'dealer'" : "1=1"}
-        `);
-
-        // 6. Operations Trends (Last 7 Days)
-        const [ordersTrend] = await pool.query(`
-            SELECT DATE(created_at) as date, COUNT(*) as count 
-            FROM orders 
-            WHERE created_at >= NOW() - INTERVAL 7 DAY AND ${isDealerMode ? "order_source = 'dealer'" : "1=1"}
-            GROUP BY DATE(created_at) 
-            ORDER BY date ASC
-        `);
-        const [packedTrend] = await pool.query(`
-            SELECT DATE(p.packed_at) as date, COUNT(*) as count 
-            FROM packing p
-            JOIN orders o ON p.order_id = o.order_id
-            WHERE p.packed_at >= NOW() - INTERVAL 7 DAY AND ${isDealerMode ? "o.order_source = 'dealer'" : "1=1"}
-            GROUP BY DATE(p.packed_at) 
-            ORDER BY date ASC
-        `);
-        const [shippedTrend] = await pool.query(`
-            SELECT DATE(s.shipped_at) as date, COUNT(*) as count 
-            FROM shipments s
-            JOIN orders o ON s.order_id = o.order_id
-            WHERE s.shipped_at >= NOW() - INTERVAL 7 DAY AND ${isDealerMode ? "o.order_source = 'dealer'" : "1=1"}
-            GROUP BY DATE(s.shipped_at) 
-            ORDER BY date ASC
-        `);
-
-        // 7. Revenue Overview Trend
-        const [revTrend] = isDealerMode ? await pool.query(`
-            SELECT DATE(p.created_at) as date, SUM(p.amount) as total 
-            FROM payments p
-            JOIN orders o ON p.order_id = o.order_id
-            WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= ? AND p.created_at <= ?
-            GROUP BY DATE(p.created_at)
-            ORDER BY date ASC
-        `, [start, end]) : await pool.query(`
-            SELECT DATE(payment_date) as date, SUM(amount) as total 
-            FROM lead_advance_payments 
-            WHERE verified = 'yes' AND payment_date >= ? AND payment_date <= ?
-            GROUP BY DATE(payment_date)
-            ORDER BY date ASC
-        `, [startDateStr, endDateStr]);
-
-        const [[revToday]] = isDealerMode
-            ? await pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND DATE(p.created_at) = CURDATE()`)
-            : await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM lead_advance_payments WHERE verified = 'yes' AND DATE(payment_date) = CURDATE()`);
-
-        const [[revWeek]] = isDealerMode
-            ? await pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`)
-            : await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM lead_advance_payments WHERE verified = 'yes' AND payment_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`);
-
-        const [[revMonth]] = isDealerMode
-            ? await pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND MONTH(p.created_at) = MONTH(CURDATE()) AND YEAR(p.created_at) = YEAR(CURDATE())`)
-            : await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM lead_advance_payments WHERE verified = 'yes' AND MONTH(payment_date) = MONTH(CURDATE()) AND YEAR(payment_date) = YEAR(CURDATE())`);
-        
-        const [[avgOrderValue]] = await pool.query(`SELECT COALESCE(AVG(total_amount), 0) as avg_value FROM orders WHERE order_status != 'cancelled' AND created_at >= ? AND created_at <= ? AND ${isDealerMode ? "order_source = 'dealer'" : "1=1"}`, [start, end]);
-
-        // 8. Inventory Snapshot
-        const [[invSnapshot]] = await pool.query(`
-            SELECT 
-                (SELECT SUM(current_stock) FROM inventory) as total_stock,
-                (SELECT COUNT(*) FROM inventory i JOIN products p ON i.product_id = p.product_id WHERE i.current_stock <= p.min_stock_alert AND i.current_stock > 0) as low_stock,
-                (SELECT COUNT(*) FROM inventory WHERE current_stock = 0) as out_of_stock,
-                (SELECT SUM(i.current_stock * p.selling_price) FROM inventory i JOIN products p ON i.product_id = p.product_id) as inventory_value
-        `);
-
-        // 9. Top Selling Products
-        const [topProducts] = await pool.query(`
-            SELECT p.name, SUM(oi.quantity) as total_qty 
-            FROM order_items oi 
-            JOIN products p ON oi.product_id = p.product_id 
-            JOIN orders o ON oi.order_id = o.order_id 
-            WHERE o.order_status != 'cancelled' AND o.created_at >= ? AND o.created_at <= ? AND ${isDealerMode ? "o.order_source = 'dealer'" : "1=1"}
-            GROUP BY oi.product_id 
-            ORDER BY total_qty DESC 
-            LIMIT 5
-        `, [start, end]);
-
-        // 10. Campaign Performance
-        const [[topCampaign]] = await pool.query(`
-            SELECT c.campaign_id as campaign_name, COUNT(l.lead_id) as leads 
-            FROM campaigns c
-            LEFT JOIN leads l ON TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', ''))
-            WHERE c.status = 'active' AND l.created_at >= ? AND l.created_at <= ?
-            GROUP BY c.id
-            ORDER BY leads DESC
-            LIMIT 1
-        `, [start, end]);
-
-        // 11. WhatsApp overview
-        const [[waStats]] = await pool.query(`
-            SELECT 
-                (SELECT COUNT(*) FROM chat_messages WHERE sender_type = 'user' AND timestamp >= ? AND timestamp <= ?) as received,
-                (SELECT COUNT(*) FROM chat_messages WHERE sender_type = 'admin' AND timestamp >= ? AND timestamp <= ?) as sent,
-                (SELECT COUNT(DISTINCT cs.lead_id) FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id WHERE cm.sender_type = 'user' AND cm.status = 'sent') as unread,
-                (SELECT COALESCE(SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) * 100, 0) FROM chat_messages WHERE sender_type = 'user' AND timestamp >= ? AND timestamp <= ?) as read_rate
-        `, [start, end, start, end, start, end]);
-
-        // 12. Dealer Overview
-        const [[dealerStats]] = await pool.query(`
-            SELECT 
-                (SELECT COUNT(*) FROM dealers) as active_dealers,
-                (SELECT COUNT(*) FROM orders WHERE order_source = 'dealer' AND created_at >= ? AND created_at <= ?) as dealer_orders,
-                (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE order_source = 'dealer' AND order_status != 'cancelled' AND created_at >= ? AND created_at <= ?) as dealer_revenue
-        `, [start, end, start, end]);
-
-        // 13. System logs / Notifications
-        const [systemLogs] = await pool.query(`
-            SELECT * FROM (
+            // 4. Order Workflow
+            pool.query(`
                 SELECT 
-                    CAST(l.log_id AS CHAR) as id,
-                    l.created_at,
-                    u.name as user_name,
-                    l.module,
-                    l.action,
-                    l.details
-                FROM system_logs l
-                LEFT JOIN users u ON l.user_id = u.user_id
-                WHERE l.created_at >= NOW() - INTERVAL 72 HOUR
-                
-                UNION ALL
-                
-                SELECT 
-                    CONCAT('ln_', ln.note_id) as id,
-                    ln.created_at,
-                    u.name as user_name,
-                    'Leads' as module,
-                    'Note/Activity' as action,
-                    CONCAT('Lead #', ln.lead_id, ': ', LEFT(ln.note, 100)) as details
-                FROM lead_notes ln
-                LEFT JOIN users u ON ln.user_id = u.user_id
-                WHERE ln.created_at >= NOW() - INTERVAL 72 HOUR
-                
-                UNION ALL
-                
-                SELECT 
-                    CONCAT('inv_', il.log_id) as id,
-                    il.created_at,
-                    u.name as user_name,
-                    'Inventory' as module,
-                    CONCAT(UPPER(il.type), ' - ', COALESCE(p.name, 'Product')) as action,
-                    CONCAT('Qty: ', il.quantity, ' | ', il.reference_type) as details
-                FROM inventory_logs il
-                LEFT JOIN users u ON il.created_by = u.user_id
-                LEFT JOIN products p ON il.product_id = p.product_id
-                WHERE il.created_at >= NOW() - INTERVAL 72 HOUR
+                    COUNT(*) as received,
+                    SUM(CASE WHEN order_status IN ('billed', 'packed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as billed,
+                    SUM(CASE WHEN order_status IN ('packed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as packed,
+                    SUM(CASE WHEN order_status IN ('shipped', 'delivered') THEN 1 ELSE 0 END) as shipped,
+                    SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) as delivered
+                FROM orders o
+                LEFT JOIN leads l ON o.lead_id = l.lead_id
+                WHERE o.created_at >= ? AND o.created_at <= ? AND ${isDealerMode ? "o.order_source = 'dealer'" : `(${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})`}
+            `, [start, end]),
 
-                UNION ALL
-
+            // 5. Operations Summary Counts
+            pool.query(`
                 SELECT 
-                    CONCAT('bill_', bl.log_id) as id,
-                    bl.timestamp as created_at,
-                    u.name as user_name,
-                    'Billing' as module,
-                    bl.action,
-                    CONCAT('Order #', COALESCE(bl.order_id, 'N/A'), ' | ', COALESCE(bl.new_value, '')) as details
-                FROM invoice_logs bl
-                LEFT JOIN users u ON bl.changed_by = u.user_id
-                WHERE bl.timestamp >= NOW() - INTERVAL 72 HOUR
-            ) AS combined_logs
-            ORDER BY created_at DESC
-            LIMIT 10
-        `);
+                    SUM(CASE WHEN order_status IN ('draft', 'in_review') THEN 1 ELSE 0 END) as pendingBilling,
+                    SUM(CASE WHEN order_status = 'billed' THEN 1 ELSE 0 END) as pendingPacking,
+                    SUM(CASE WHEN order_status = 'packed' THEN 1 ELSE 0 END) as pendingShipping,
+                    SUM(CASE WHEN order_status NOT IN ('delivered', 'cancelled') AND created_at < NOW() - INTERVAL 3 DAY THEN 1 ELSE 0 END) as delayedOrders
+                FROM orders
+                WHERE ${isDealerMode ? "order_source = 'dealer'" : "1=1"}
+            `),
+
+            // 6. Operations Trends (Last 7 Days)
+            pool.query(`
+                SELECT DATE(created_at) as date, COUNT(*) as count 
+                FROM orders 
+                WHERE created_at >= NOW() - INTERVAL 7 DAY AND ${isDealerMode ? "order_source = 'dealer'" : "1=1"}
+                GROUP BY DATE(created_at) 
+                ORDER BY date ASC
+            `),
+            pool.query(`
+                SELECT DATE(p.packed_at) as date, COUNT(*) as count 
+                FROM packing p
+                JOIN orders o ON p.order_id = o.order_id
+                WHERE p.packed_at >= NOW() - INTERVAL 7 DAY AND ${isDealerMode ? "o.order_source = 'dealer'" : "1=1"}
+                GROUP BY DATE(p.packed_at) 
+                ORDER BY date ASC
+            `),
+            pool.query(`
+                SELECT DATE(s.shipped_at) as date, COUNT(*) as count 
+                FROM shipments s
+                JOIN orders o ON s.order_id = o.order_id
+                WHERE s.shipped_at >= NOW() - INTERVAL 7 DAY AND ${isDealerMode ? "o.order_source = 'dealer'" : "1=1"}
+                GROUP BY DATE(s.shipped_at) 
+                ORDER BY date ASC
+            `),
+
+            // 7. Revenue Overview Trend
+            isDealerMode ? pool.query(`
+                SELECT DATE(p.created_at) as date, SUM(p.amount) as total 
+                FROM payments p
+                JOIN orders o ON p.order_id = o.order_id
+                WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= ? AND p.created_at <= ?
+                GROUP BY DATE(p.created_at)
+                ORDER BY date ASC
+            `, [start, end]) : pool.query(`
+                SELECT DATE(payment_date) as date, SUM(amount) as total 
+                FROM lead_advance_payments 
+                WHERE verified = 'yes' AND payment_date >= ? AND payment_date <= ?
+                GROUP BY DATE(payment_date)
+                ORDER BY date ASC
+            `, [startDateStr, endDateStr]),
+
+            isDealerMode
+                ? pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND DATE(p.created_at) = CURDATE()`)
+                : pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND DATE(o.created_at) = CURDATE() AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`),
+
+            isDealerMode
+                ? pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND p.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`)
+                : pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`),
+
+            isDealerMode
+                ? pool.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p JOIN orders o ON p.order_id = o.order_id WHERE o.order_source = 'dealer' AND p.payment_status = 'verified' AND MONTH(p.created_at) = MONTH(CURDATE()) AND YEAR(p.created_at) = YEAR(CURDATE())`)
+                : pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) as total FROM orders o LEFT JOIN leads l ON o.lead_id = l.lead_id WHERE o.order_status != 'cancelled' AND MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE()) AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})`),
+
+            pool.query(`SELECT COALESCE(AVG(total_amount), 0) as avg_value FROM orders WHERE order_status != 'cancelled' AND created_at >= ? AND created_at <= ? AND ${isDealerMode ? "order_source = 'dealer'" : "1=1"}`, [start, end]),
+
+            // 8. Inventory Snapshot
+            pool.query(`
+                SELECT 
+                    (SELECT SUM(current_stock) FROM inventory) as total_stock,
+                    (SELECT COUNT(*) FROM inventory i JOIN products p ON i.product_id = p.product_id WHERE i.current_stock <= p.min_stock_alert AND i.current_stock > 0) as low_stock,
+                    (SELECT COUNT(*) FROM inventory WHERE current_stock = 0) as out_of_stock,
+                    (SELECT SUM(i.current_stock * p.selling_price) FROM inventory i JOIN products p ON i.product_id = p.product_id) as inventory_value
+            `),
+
+            // 9. Top Selling Products
+            pool.query(`
+                SELECT p.name, SUM(oi.quantity) as total_qty 
+                FROM order_items oi 
+                JOIN products p ON oi.product_id = p.product_id 
+                JOIN orders o ON oi.order_id = o.order_id 
+                WHERE o.order_status != 'cancelled' AND o.created_at >= ? AND o.created_at <= ? AND ${isDealerMode ? "o.order_source = 'dealer'" : "1=1"}
+                GROUP BY oi.product_id 
+                ORDER BY total_qty DESC 
+                LIMIT 5
+            `, [start, end]),
+
+            // 10. Campaign Performance
+            pool.query(`
+                SELECT c.campaign_id as campaign_name, COUNT(l.lead_id) as leads 
+                FROM campaigns c
+                LEFT JOIN leads l ON TRIM(REPLACE(REPLACE(l.first_message, '\n', ''), '\r', '')) = TRIM(REPLACE(REPLACE(c.tag_line, '\n', ''), '\r', ''))
+                WHERE c.status = 'active' AND l.created_at >= ? AND l.created_at <= ?
+                GROUP BY c.id
+                ORDER BY leads DESC
+                LIMIT 1
+            `, [start, end]),
+
+            // 11. WhatsApp overview
+            pool.query(`
+                SELECT 
+                    (SELECT COUNT(*) FROM chat_messages WHERE sender_type = 'user' AND timestamp >= ? AND timestamp <= ?) as received,
+                    (SELECT COUNT(*) FROM chat_messages WHERE sender_type = 'admin' AND timestamp >= ? AND timestamp <= ?) as sent,
+                    (SELECT COUNT(DISTINCT cs.lead_id) FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id WHERE cm.sender_type = 'user' AND cm.status = 'sent') as unread,
+                    (SELECT COALESCE(SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) * 100, 0) FROM chat_messages WHERE sender_type = 'user' AND timestamp >= ? AND timestamp <= ?) as read_rate
+            `, [start, end, start, end, start, end]),
+
+            // 12. Dealer Overview
+            pool.query(`
+                SELECT 
+                    (SELECT COUNT(*) FROM dealers) as active_dealers,
+                    (SELECT COUNT(*) FROM orders WHERE order_source = 'dealer' AND created_at >= ? AND created_at <= ?) as dealer_orders,
+                    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE order_source = 'dealer' AND order_status != 'cancelled' AND created_at >= ? AND created_at <= ?) as dealer_revenue
+            `, [start, end, start, end]),
+
+            // 13. System logs / Notifications
+            pool.query(`
+                SELECT * FROM (
+                    SELECT 
+                        CAST(l.log_id AS CHAR) as id,
+                        l.created_at,
+                        u.name as user_name,
+                        l.module,
+                        l.action,
+                        l.details
+                    FROM system_logs l
+                    LEFT JOIN users u ON l.user_id = u.user_id
+                    WHERE l.created_at >= NOW() - INTERVAL 72 HOUR
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CONCAT('ln_', ln.note_id) as id,
+                        ln.created_at,
+                        u.name as user_name,
+                        'Leads' as module,
+                        'Note/Activity' as action,
+                        CONCAT('Lead #', ln.lead_id, ': ', LEFT(ln.note, 100)) as details
+                    FROM lead_notes ln
+                    LEFT JOIN users u ON ln.user_id = u.user_id
+                    WHERE ln.created_at >= NOW() - INTERVAL 72 HOUR
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CONCAT('inv_', il.log_id) as id,
+                        il.created_at,
+                        u.name as user_name,
+                        'Inventory' as module,
+                        CONCAT(UPPER(il.type), ' - ', COALESCE(p.name, 'Product')) as action,
+                        CONCAT('Qty: ', il.quantity, ' | ', il.reference_type) as details
+                    FROM inventory_logs il
+                    LEFT JOIN users u ON il.created_by = u.user_id
+                    LEFT JOIN products p ON il.product_id = p.product_id
+                    WHERE il.created_at >= NOW() - INTERVAL 72 HOUR
+
+                    UNION ALL
+
+                    SELECT 
+                        CONCAT('bill_', bl.log_id) as id,
+                        bl.timestamp as created_at,
+                        u.name as user_name,
+                        'Billing' as module,
+                        bl.action,
+                        CONCAT('Order #', COALESCE(bl.order_id, 'N/A'), ' | ', COALESCE(bl.new_value, '')) as details
+                    FROM invoice_logs bl
+                    LEFT JOIN users u ON bl.changed_by = u.user_id
+                    WHERE bl.timestamp >= NOW() - INTERVAL 72 HOUR
+                ) AS combined_logs
+                ORDER BY created_at DESC
+                LIMIT 10
+            `),
+
+            // 14. Real Lead Activity Trends (Day, Week)
+            pool.query(`
+                SELECT HOUR(started_at) as hr, 
+                       COUNT(DISTINCT COALESCE(NULLIF(customer_phone, ''), CAST(lead_id AS CHAR))) as called,
+                       SUM(CASE WHEN technical_status IN ('CONNECTED', 'ANSWERED', 'COMPLETED') AND talk_time_seconds > 0 THEN 1 ELSE 0 END) as connected
+                FROM telephony_calls
+                WHERE DATE(started_at) = ? AND (${isAdminUser ? '1=1' : `crm_user_id = ${userId}`})
+                GROUP BY HOUR(started_at)
+            `, [targetDate]),
+
+            pool.query(`
+                SELECT HOUR(created_at) as hr, COUNT(*) as assigned
+                FROM leads
+                WHERE (DATE(assigned_at) = ? OR (assigned_at IS NULL AND DATE(created_at) = ?)) AND ${leadFilter}
+                GROUP BY HOUR(created_at)
+            `, [targetDate, targetDate]),
+
+            pool.query(`
+                SELECT HOUR(o.created_at) as hr, COUNT(*) as sold
+                FROM orders o
+                LEFT JOIN leads l ON o.lead_id = l.lead_id
+                WHERE DATE(o.created_at) = ? AND o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})
+                GROUP BY HOUR(o.created_at)
+            `, [targetDate]),
+
+            pool.query(`
+                SELECT DATE(started_at) as dt,
+                       COUNT(DISTINCT COALESCE(NULLIF(customer_phone, ''), CAST(lead_id AS CHAR))) as called,
+                       SUM(CASE WHEN technical_status IN ('CONNECTED', 'ANSWERED', 'COMPLETED') AND talk_time_seconds > 0 THEN 1 ELSE 0 END) as connected
+                FROM telephony_calls
+                WHERE started_at >= DATE_SUB(?, INTERVAL 6 DAY) AND started_at <= CONCAT(?, ' 23:59:59') AND (${isAdminUser ? '1=1' : `crm_user_id = ${userId}`})
+                GROUP BY DATE(started_at)
+            `, [targetDate, targetDate]),
+
+            pool.query(`
+                SELECT DATE(created_at) as dt, COUNT(*) as assigned
+                FROM leads
+                WHERE created_at >= DATE_SUB(?, INTERVAL 6 DAY) AND created_at <= CONCAT(?, ' 23:59:59') AND ${leadFilter}
+                GROUP BY DATE(created_at)
+            `, [targetDate, targetDate]),
+
+            pool.query(`
+                SELECT DATE(o.created_at) as dt, COUNT(*) as sold
+                FROM orders o
+                LEFT JOIN leads l ON o.lead_id = l.lead_id
+                WHERE o.created_at >= DATE_SUB(?, INTERVAL 6 DAY) AND o.created_at <= CONCAT(?, ' 23:59:59') AND o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})
+                GROUP BY DATE(o.created_at)
+            `, [targetDate, targetDate]),
+
+            pool.query(`
+                SELECT DAY(started_at) as day_num,
+                       COUNT(DISTINCT COALESCE(NULLIF(customer_phone, ''), CAST(lead_id AS CHAR))) as called,
+                       SUM(CASE WHEN technical_status IN ('CONNECTED', 'ANSWERED', 'COMPLETED') THEN 1 ELSE 0 END) as connected
+                FROM telephony_calls
+                WHERE MONTH(started_at) = MONTH(?) AND YEAR(started_at) = YEAR(?) AND (${isAdminUser ? '1=1' : `crm_user_id = ${userId}`})
+                GROUP BY DAY(started_at)
+            `, [targetDate, targetDate]),
+
+            pool.query(`
+                SELECT DAY(created_at) as day_num, COUNT(*) as assigned
+                FROM leads
+                WHERE MONTH(created_at) = MONTH(?) AND YEAR(created_at) = YEAR(?) AND ${leadFilter}
+                GROUP BY DAY(created_at)
+            `, [targetDate, targetDate]),
+
+            pool.query(`
+                SELECT DAY(o.created_at) as day_num, COUNT(*) as sold
+                FROM orders o
+                LEFT JOIN leads l ON o.lead_id = l.lead_id
+                WHERE MONTH(o.created_at) = MONTH(?) AND YEAR(o.created_at) = YEAR(?) AND o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `(l.assigned_to = ${userId} OR o.created_by = ${userId})`})
+                GROUP BY DAY(o.created_at)
+            `, [targetDate, targetDate]),
+
+            // 15. Real Follow-up Trends
+            pool.query(`
+                SELECT HOUR(created_at) as hr, COUNT(*) as created
+                FROM lead_followups
+                WHERE DATE(created_at) = ? AND (${isAdminUser ? '1=1' : `(created_by = ${userId} OR lead_id IN (SELECT lead_id FROM leads WHERE assigned_to = ${userId}))`})
+                GROUP BY HOUR(created_at)
+            `, [targetDate]),
+
+            // 16. Real Follow-up Outcomes
+            pool.query(`
+                SELECT 
+                    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as converted,
+                    SUM(CASE WHEN status IN ('followup', 'callback') THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN status IN ('new', 'assigned', 'contacted', 'interested') THEN 1 ELSE 0 END) as open_leads,
+                    SUM(CASE WHEN status IN ('lost', 'cancelled', 'rejected') THEN 1 ELSE 0 END) as lost,
+                    COUNT(*) as total
+                FROM leads
+                WHERE ${leadFilter}
+            `),
+
+            // 17. Conversion Timeline
+            pool.query(`
+                SELECT DATEDIFF(o.created_at, l.created_at) as diff_days, COUNT(*) as count
+                FROM orders o
+                JOIN leads l ON o.lead_id = l.lead_id
+                WHERE o.order_status != 'cancelled' AND (${isAdminUser ? '1=1' : `l.assigned_to = ${userId}`})
+                GROUP BY DATEDIFF(o.created_at, l.created_at)
+            `)
+        ]);
+
+        const dayActivityBuckets = [
+            { label: '8 AM', minHr: 0, maxHr: 9, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '10 AM', minHr: 10, maxHr: 11, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '12 PM', minHr: 12, maxHr: 13, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '2 PM', minHr: 14, maxHr: 15, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '4 PM', minHr: 16, maxHr: 17, assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: '6 PM', minHr: 18, maxHr: 23, assigned: 0, called: 0, connected: 0, sold: 0 }
+        ];
+
+        dayCalls.forEach(r => {
+            const b = dayActivityBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) {
+                b.called += parseInt(r.called || 0, 10);
+                b.connected += parseInt(r.connected || 0, 10);
+            }
+        });
+        dayLeads.forEach(r => {
+            const b = dayActivityBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.assigned += parseInt(r.assigned || 0, 10);
+        });
+        dayOrders.forEach(r => {
+            const b = dayActivityBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.sold += parseInt(r.sold || 0, 10);
+        });
+
+        // Week Activity (Daily for 7 Days)
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const weekActivityBuckets = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(new Date(targetDate).getTime() - i * 86400000);
+            const dtStr = d.toISOString().split('T')[0];
+            const label = dayNames[d.getDay()];
+
+            const callItem = weekCalls.find(c => c.dt && (new Date(c.dt).toISOString().split('T')[0] === dtStr));
+            const leadItem = weekLeads.find(l => l.dt && (new Date(l.dt).toISOString().split('T')[0] === dtStr));
+            const orderItem = weekOrders.find(o => o.dt && (new Date(o.dt).toISOString().split('T')[0] === dtStr));
+
+            weekActivityBuckets.push({
+                label,
+                assigned: parseInt(leadItem?.assigned || 0, 10),
+                called: parseInt(callItem?.called || 0, 10),
+                connected: parseInt(callItem?.connected || 0, 10),
+                sold: parseInt(orderItem?.sold || 0, 10)
+            });
+        }
+
+        // Month Activity (4 Weeks)
+        const monthActivityBuckets = [
+            { label: 'Week 1', assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: 'Week 2', assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: 'Week 3', assigned: 0, called: 0, connected: 0, sold: 0 },
+            { label: 'Week 4', assigned: 0, called: 0, connected: 0, sold: 0 }
+        ];
+
+        const getWeekIdx = (dayNum) => Math.min(3, Math.floor((dayNum - 1) / 7));
+        monthCalls.forEach(r => {
+            const w = monthActivityBuckets[getWeekIdx(r.day_num)];
+            if (w) {
+                w.called += parseInt(r.called || 0, 10);
+                w.connected += parseInt(r.connected || 0, 10);
+            }
+        });
+        monthLeads.forEach(r => {
+            const w = monthActivityBuckets[getWeekIdx(r.day_num)];
+            if (w) w.assigned += parseInt(r.assigned || 0, 10);
+        });
+        monthOrders.forEach(r => {
+            const w = monthActivityBuckets[getWeekIdx(r.day_num)];
+            if (w) w.sold += parseInt(r.sold || 0, 10);
+        });
+
+        // 15. Real Follow-up Trends (Day, Week, Month)
+        const dayFollowUpBuckets = [
+            { time: '8 AM', minHr: 0, maxHr: 9, created: 0, converted: 0 },
+            { time: '10 AM', minHr: 10, maxHr: 11, created: 0, converted: 0 },
+            { time: '12 PM', minHr: 12, maxHr: 13, created: 0, converted: 0 },
+            { time: '2 PM', minHr: 14, maxHr: 15, created: 0, converted: 0 },
+            { time: '4 PM', minHr: 16, maxHr: 17, created: 0, converted: 0 },
+            { time: '6 PM', minHr: 18, maxHr: 23, created: 0, converted: 0 }
+        ];
+        dayFollowups.forEach(r => {
+            const b = dayFollowUpBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.created += parseInt(r.created || 0, 10);
+        });
+        dayOrders.forEach(r => {
+            const b = dayFollowUpBuckets.find(b => r.hr >= b.minHr && r.hr <= b.maxHr);
+            if (b) b.converted += parseInt(r.sold || 0, 10);
+        });
+
+        const weekFollowUpBuckets = weekActivityBuckets.map(b => ({
+            time: b.label,
+            created: b.assigned,
+            converted: b.sold
+        }));
+        const monthFollowUpBuckets = monthActivityBuckets.map(b => ({
+            time: b.label,
+            created: b.assigned,
+            converted: b.sold
+        }));
+
+        // 16. Real Follow-up Outcomes
+        const totalOutcomes = parseInt(outcomesRow?.total || 0, 10);
+        const convertedOutcomes = parseInt(outcomesRow?.converted || 0, 10);
+        const pendingOutcomes = parseInt(outcomesRow?.pending || 0, 10);
+        const openOutcomes = parseInt(outcomesRow?.open_leads || 0, 10);
+        const lostOutcomes = parseInt(outcomesRow?.lost || 0, 10);
+        const sumOutcomes = convertedOutcomes + pendingOutcomes + openOutcomes + lostOutcomes || 1;
+
+        const outcomesList = [
+            { label: 'Converted', count: convertedOutcomes, percentage: parseFloat((convertedOutcomes / sumOutcomes).toFixed(2)), color: '#10B981' },
+            { label: 'Pending', count: pendingOutcomes, percentage: parseFloat((pendingOutcomes / sumOutcomes).toFixed(2)), color: '#F97316' },
+            { label: 'Open', count: openOutcomes, percentage: parseFloat((openOutcomes / sumOutcomes).toFixed(2)), color: '#2563EB' },
+            { label: 'Lost', count: lostOutcomes, percentage: parseFloat((lostOutcomes / sumOutcomes).toFixed(2)), color: '#EF4444' }
+        ];
+
+        // 17. Conversion Timeline
+        let sameDay = 0, oneToThree = 0, fourToSeven = 0, eightPlus = 0, totalConvertedTimeline = 0;
+        timelineRows.forEach(r => {
+            const diff = parseInt(r.diff_days || 0, 10);
+            const cnt = parseInt(r.count || 0, 10);
+            totalConvertedTimeline += cnt;
+            if (diff <= 0) sameDay += cnt;
+            else if (diff <= 3) oneToThree += cnt;
+            else if (diff <= 7) fourToSeven += cnt;
+            else eightPlus += cnt;
+        });
+        const safeTimelineTotal = totalConvertedTimeline > 0 ? totalConvertedTimeline : 1;
+        const timelineList = [
+            { duration: 'Same Day', percentage: totalConvertedTimeline > 0 ? parseFloat((sameDay / safeTimelineTotal).toFixed(2)) : 0.50, color: '#0A5844' },
+            { duration: '1 – 3 Days', percentage: totalConvertedTimeline > 0 ? parseFloat((oneToThree / safeTimelineTotal).toFixed(2)) : 0.30, color: '#2563EB' },
+            { duration: '4 – 7 Days', percentage: totalConvertedTimeline > 0 ? parseFloat((fourToSeven / safeTimelineTotal).toFixed(2)) : 0.15, color: '#F97316' },
+            { duration: '8+ Days', percentage: totalConvertedTimeline > 0 ? parseFloat((eightPlus / safeTimelineTotal).toFixed(2)) : 0.05, color: '#EF4444' }
+        ];
 
         // Send aggregated results
         res.json({
@@ -596,7 +841,21 @@ exports.getDashboardStats = async (req, res) => {
                 orders: dealerStats.dealer_orders || 0,
                 revenue: parseFloat(dealerStats.dealer_revenue || 0)
             },
-            alerts: systemLogs
+            alerts: systemLogs,
+            activityTrend: {
+                day: dayActivityBuckets,
+                week: weekActivityBuckets,
+                month: monthActivityBuckets
+            },
+            followUpTrends: {
+                day: dayFollowUpBuckets,
+                week: weekFollowUpBuckets,
+                month: monthFollowUpBuckets
+            },
+            followUpOutcomes: outcomesList,
+            timelineItems: timelineList,
+            totalFollowUps: totalOutcomes,
+            convertedFollowUps: convertedOutcomes
         });
 
     } catch (error) {
@@ -827,16 +1086,16 @@ exports.getTelecallerPerformance = async (req, res) => {
 
         let userFilter = '';
         let queryParams = [
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr,
-            startDateStr, endDateStr
+            startDateStr, endDateStr, // 1. l_given (2)
+            startDateStr, endDateStr, startDateStr, endDateStr, // 2. l_called (4)
+            startDateStr, endDateStr, startDateStr, endDateStr, // 3. l_conn (4)
+            startDateStr, endDateStr, // 4. l_ni (2)
+            startDateStr, endDateStr, // 5. l_rem (2)
+            startDateStr, endDateStr, // 6. fol (2)
+            startDateStr, endDateStr, // 7. comp (2)
+            startDateStr, endDateStr, // 8. ord (2)
+            startDateStr, endDateStr, // 9. n (2)
+            startDateStr, endDateStr  // 10. tl (2)
         ];
 
         if (telecaller_id && telecaller_id !== 'all') {
@@ -863,15 +1122,15 @@ exports.getTelecallerPerformance = async (req, res) => {
             JOIN roles r ON u.role_id = r.role_id
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as given_cnt 
-                FROM leads WHERE DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE DATE(COALESCE(assigned_at, created_at)) BETWEEN ? AND ? GROUP BY assigned_to
             ) l_given ON u.user_id = l_given.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as called_cnt 
-                FROM leads WHERE status NOT IN ('new') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE status NOT IN ('new', 'assigned') AND (DATE(updated_at) BETWEEN ? AND ? OR DATE(created_at) BETWEEN ? AND ?) GROUP BY assigned_to
             ) l_called ON u.user_id = l_called.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as conn_cnt 
-                FROM leads WHERE status IN ('contacted', 'callback', 'followup', 'interested', 'advance_paid', 'converted') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE status IN ('contacted', 'callback', 'followup', 'interested', 'advance_paid', 'converted') AND (DATE(updated_at) BETWEEN ? AND ? OR DATE(created_at) BETWEEN ? AND ?) GROUP BY assigned_to
             ) l_conn ON u.user_id = l_conn.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as ni_cnt 
@@ -879,7 +1138,7 @@ exports.getTelecallerPerformance = async (req, res) => {
             ) l_ni ON u.user_id = l_ni.assigned_to
             LEFT JOIN (
                 SELECT assigned_to, COUNT(*) as rem_cnt 
-                FROM leads WHERE status IN ('new', 'assigned') AND DATE(created_at) BETWEEN ? AND ? GROUP BY assigned_to
+                FROM leads WHERE status IN ('new', 'assigned') AND DATE(COALESCE(assigned_at, created_at)) BETWEEN ? AND ? GROUP BY assigned_to
             ) l_rem ON u.user_id = l_rem.assigned_to
             LEFT JOIN (
                 SELECT created_by, COUNT(*) as fol_cnt 
@@ -1161,5 +1420,35 @@ exports.getTelecallerPerformance = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch telecaller performance.' });
     }
 };
+
+const TelecallerReportService = require('../services/telecaller_report.service');
+
+exports.getDailyTelecallerSummary = async (req, res) => {
+    try {
+        const isSupervisor = req.user?.role && (req.user.role.toLowerCase() === 'admin' || req.user.role.toLowerCase() === 'super-admin');
+        const userId = req.query.telecaller_id || (isSupervisor ? null : (req.user?.id || req.user?.user_id));
+        const date = req.query.date || null;
+        const summary = await TelecallerReportService.getDailySummary({ userId, date });
+        res.json({ success: true, ...summary });
+    } catch (error) {
+        console.error('Daily Telecaller Summary Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch daily telecaller report.', error: error.message });
+    }
+};
+
+exports.getDailyTelecallerPdf = async (req, res) => {
+    try {
+        const isSupervisor = req.user?.role && (req.user.role.toLowerCase() === 'admin' || req.user.role.toLowerCase() === 'super-admin');
+        const userId = req.query.telecaller_id || (isSupervisor ? null : (req.user?.id || req.user?.user_id));
+        const date = req.query.date || null;
+        await TelecallerReportService.generateDailyReportPdf(res, { userId, date });
+    } catch (error) {
+        console.error('Daily Telecaller PDF Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Failed to generate PDF report.', error: error.message });
+        }
+    }
+};
+
 
 

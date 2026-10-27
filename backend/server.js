@@ -2,6 +2,7 @@ const app = require('./src/app');
 const { execSync } = require('child_process');
 require('dotenv').config();
 
+// Active Firebase FCM integration
 const PORT = process.env.PORT || 5000;
 
 function startServer() {

@@ -42,6 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (response.ok) {
                     localStorage.setItem('token', data.token);
+                    if (data.refreshToken) {
+                        localStorage.setItem('refreshToken', data.refreshToken);
+                    }
                     localStorage.setItem('user', JSON.stringify(data.user));
                     localStorage.setItem('username', data.user.name);
 

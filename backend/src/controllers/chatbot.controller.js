@@ -84,6 +84,17 @@ exports.getTemplates = async (req, res) => {
                 badgeText: 'SHOWCASE',
                 usageCount: 31,
                 previewNodes: ['Categories', 'Product Specs', 'Price Quote', 'Buy / Contact']
+            },
+            {
+                id: 'sgb-blade-protector-sales',
+                name: 'SGB Blade Protector — Direct WhatsApp Sales',
+                description: 'Automated WhatsApp sales flow for the SGB Blade Protector priced at ₹600. Presents product media, collects delivery details, sends the payment QR code, waits for payment evidence, and alerts the admin. Also supports customer-requested call support.',
+                category: 'Direct WhatsApp Sales',
+                icon: 'fa-shield-halved',
+                iconColor: 'green-badge',
+                badgeText: 'DIRECT SALES',
+                usageCount: 0,
+                previewNodes: ['Product Media', 'Customer Choice', 'Delivery Form', 'Address Review', 'Payment QR', 'Wait Screenshot', 'Call Support']
             }
         ];
         res.json(templates);
@@ -122,7 +133,42 @@ exports.createFlowFromTemplate = async (req, res) => {
         let nodes = [];
         let edges = [];
 
-        if (templateId === 'just-dumper-enquiry') {
+        if (templateId === 'sgb-blade-protector-sales' || templateId === 'blade-protector-sales' || String(templateId).includes('blade') || String(templateId) === '6') {
+            nodes = [
+                { key: 'node-start', type: 'start', name: 'Start', x: 80, y: 300, config: { triggerType: 'Keyword', keywords: keywords ? (Array.isArray(keywords) ? keywords.join(', ') : keywords) : 'Hi, I am interested in the SGB Blade Protector, SGB Blade Protector, Blade Protector, blade protector', nextNode: 'node-intro-img' } },
+                { key: 'node-intro-img', type: 'image', name: 'Standalone Blade Protector', x: 340, y: 220, config: { mediaUrl: '/api/media/campaigns/sep_blade_protector/auto-reply-1789455691692-0.jpeg', caption: 'SGB Blade Protector — Circular metal protective guard for brush cutters.', nextNode: 'node-promo-img' } },
+                { key: 'node-promo-img', type: 'image', name: 'Blade Protector Mounted', x: 600, y: 220, config: { mediaUrl: '/api/media/campaigns/sep_blade_protector/auto-reply-1789455692365-1.jpeg', caption: 'SGB Blade Protection — Mounted on brush cutter to protect crops from accidental damage.', nextNode: 'node-demo-video' } },
+                { key: 'node-demo-video', type: 'video', name: 'Product Video Demonstration', x: 860, y: 220, config: { mediaUrl: '/api/media/campaigns/sep_blade_protector/auto-reply-1789455692863-2.mp4', caption: 'Demonstration of SGB Blade Protector in field operation.', nextNode: 'node-product-card' } },
+                { key: 'node-product-card', type: 'product', name: 'SGB Blade Protector Card', x: 1120, y: 220, config: { productId: 15, product: 'SGB Blade Protector', price: '₹600', desc: 'A blade protector/guard attached to a compatible brush cutter to help protect crops from accidental damage during cutting operations. Price: ₹600.', image: '/api/media/campaigns/sep_blade_protector/auto-reply-1789455691692-0.jpeg', nextNode: 'node-choice' } },
+                { key: 'node-choice', type: 'question', name: 'Customer Choice', x: 1380, y: 300, config: { question: 'Hello Sir! Welcome to SGB Agro Industries.\n\nIntroducing our SGB Blade Protector.\nIt is designed to help protect crops from accidental damage while using a compatible brush cutter.\n\nPrice: ₹600.\nPlease check the product images and video.\n\nSir, how would you like to proceed?', responseType: 'buttons', choices: ['Buy Now — ₹600', 'Call Support'], options: [{ label: 'Buy Now — ₹600', value: 'buy_now', nextNode: 'node-form' }, { label: 'Call Support', value: 'call_support', nextNode: 'node-support-callback' }], saveResponseTo: 'customer_choice' } },
+                { key: 'node-form', type: 'form', name: 'Blade Protector Delivery Details', x: 1680, y: 200, config: { title: 'Blade Protector Delivery Details', description: 'Please enter your delivery details.', fields: [{ id: 'customer_name', label: 'Full Name', type: 'text', required: true }, { id: 'delivery_address', label: 'Delivery Address', type: 'multiline', required: true }, { id: 'pincode', label: 'PIN Code', type: 'text', required: true }, { id: 'address_confirmed', label: 'Address Confirmation', type: 'checkbox', required: true, text: 'I confirm that my name, delivery address and PIN code are correct.' }], submitButtonLabel: 'Save & Continue', saveTo: 'delivery_details', nextNode: 'node-address-review' } },
+                { key: 'node-address-review', type: 'question', name: 'Address Review', x: 1980, y: 200, config: { question: 'Please confirm your delivery details, Sir.\n\nProduct: SGB Blade Protector\nPrice: ₹600\nName: {{customer_name}}\nDelivery Address: {{delivery_address}}\nPIN Code: {{pincode}}\n\nAre these details correct?', responseType: 'buttons', choices: ['Address Correct', 'Edit Address', 'Cancel'], options: [{ label: 'Address Correct', value: 'address_correct', nextNode: 'node-payment-qr' }, { label: 'Edit Address', value: 'edit_address', nextNode: 'node-form' }, { label: 'Cancel', value: 'cancel', nextNode: 'node-cancel-confirm' }], saveResponseTo: 'address_confirmation_choice' } },
+                { key: 'node-cancel-confirm', type: 'message', name: 'Cancel Confirmation', x: 2280, y: 320, config: { message: 'Notice: You selected Cancel for updating address details. Proceeding with your previously saved details to the payment instructions.', nextNode: 'node-payment-qr' } },
+                { key: 'node-payment-qr', type: 'payment', name: 'Blade Protector Payment', x: 2540, y: 200, config: { title: 'Blade Protector Payment', amount: 600, currency: 'INR', amountSource: 'product_total', productId: 15, productName: 'SGB Blade Protector', qrImageUrl: '/api/media/quick-replies/1789191406905-qr-0.jpeg', message: 'Thank you, Sir!\n\nYour SGB Blade Protector delivery details have been saved.\n\nAmount to pay: ₹{{payable_amount}}\n\nPlease scan the official payment QR code below to complete your payment.\n\nAfter completing the payment, please send your payment screenshot here on WhatsApp.\n\nOur team will verify your payment and process your order.', nextNode: 'node-wait-media' } },
+                { key: 'node-wait-media', type: 'wait_for_media', name: 'Wait for Blade Protector Payment Evidence', x: 2820, y: 200, config: { title: 'Wait for Blade Protector Payment Evidence', acceptedTypes: ['image', 'document'], expectedEvidence: 'Payment screenshot', instructions: 'Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.', reminderText: '⚠️ Please complete the payment and send the payment screenshot here on WhatsApp.\n\nOur team will verify the payment and confirm your order.', product: 'SGB Blade Protector', amount: 600, nextNode: 'node-final-ack' } },
+                { key: 'node-final-ack', type: 'question', name: 'Final Customer Acknowledgment', x: 3100, y: 200, config: { question: 'Thank you, Sir! We have received your payment screenshot.\n\nOur team will verify your payment and contact you regarding the order.\n\nIf you need assistance, you can request a call from our team.\n\nThank you for choosing SGB Agro Industries!', responseType: 'buttons', choices: ['Call Support'], options: [{ label: 'Call Support', value: 'call_support', nextNode: 'node-support-callback' }], saveResponseTo: 'post_payment_choice' } },
+                { key: 'node-support-callback', type: 'create_lead', name: 'Call Support Callback Task', x: 1680, y: 500, config: { status: 'human_needed', source: 'WhatsApp Chatbot', actionType: 'callback_task', product: 'SGB Blade Protector', reason: 'Call Support', nextNode: 'node-support-ack' } },
+                { key: 'node-support-ack', type: 'end', name: 'Support Acknowledgment', x: 1980, y: 500, config: { message: 'Thank you, Sir! A support callback request has been registered for the SGB Blade Protector.\n\nOur sales and support team will call you shortly.\n\nIf you need to call us directly, please contact:\n📞 *8277009667*' } }
+            ];
+            edges = [
+                { source: 'node-start', target: 'node-intro-img' },
+                { source: 'node-intro-img', target: 'node-promo-img' },
+                { source: 'node-promo-img', target: 'node-demo-video' },
+                { source: 'node-demo-video', target: 'node-product-card' },
+                { source: 'node-product-card', target: 'node-choice' },
+                { source: 'node-choice', target: 'node-form', sourceHandle: 'Buy Now — ₹600' },
+                { source: 'node-choice', target: 'node-support-callback', sourceHandle: 'Call Support' },
+                { source: 'node-form', target: 'node-address-review' },
+                { source: 'node-address-review', target: 'node-payment-qr', sourceHandle: 'Address Correct' },
+                { source: 'node-address-review', target: 'node-form', sourceHandle: 'Edit Address' },
+                { source: 'node-address-review', target: 'node-cancel-confirm', sourceHandle: 'Cancel' },
+                { source: 'node-cancel-confirm', target: 'node-payment-qr' },
+                { source: 'node-payment-qr', target: 'node-wait-media' },
+                { source: 'node-wait-media', target: 'node-final-ack' },
+                { source: 'node-final-ack', target: 'node-support-callback', sourceHandle: 'Call Support' },
+                { source: 'node-support-callback', target: 'node-support-ack' }
+            ];
+        } else if (templateId === 'just-dumper-enquiry') {
             nodes = [
                 { key: 'node-start', type: 'start', name: 'Start', x: 80, y: 300, config: { triggerType: 'Keyword', keywords: keywords ? (Array.isArray(keywords) ? keywords.join(', ') : keywords) : 'Dumper, dumper, just dumper' } },
                 { key: 'node-1', type: 'text_input', name: 'Step 1: Place & Pin Code', x: 280, y: 300, config: { question: 'Q: Sir please share your Place and Pincode\n(ಸರ್ ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸ್ಥಳ ಮತ್ತು ಪಿನ್‌ಕೋಡ್ ಹಂಚಿಕೊಳ್ಳಿ)', saveTo: 'place_pincode', saveResponseTo: 'place_pincode', nextNode: 'node-v1' } },
@@ -787,6 +833,9 @@ exports.getNodeTypes = (req, res) => {
         save_lead_field: { label: 'Save CRM Field', desc: 'Binds variable answer to lead column' },
         create_lead: { label: 'Create CRM Lead', desc: 'Generates lead in CRM system' },
         human_handoff: { label: 'Human Handoff', desc: 'Escalates session and pauses bot' },
+        form: { label: 'Form', desc: 'Collect structured customer fields (delivery details)' },
+        payment: { label: 'Payment / QR Code', desc: 'Send payment instructions & QR image for product order' },
+        wait_for_media: { label: 'Wait for Screenshot / Media', desc: 'Wait for customer to send payment screenshot or media' },
         time_trigger: { label: 'Time Trigger / Delay', desc: 'Pauses execution for specified duration before next step' },
         end: { label: 'End Flow', desc: 'Terminates chatbot flow session' }
     });
@@ -1217,37 +1266,188 @@ exports.getPendingHumanAlerts = async (req, res) => {
         const isAdminUser = role === 'admin' || role === 'super-admin' || role.includes('admin');
         const isWhatsappManager = role === 'whatsapp_manager' || role.includes('whatsapp');
 
-        let sql = `
-            SELECT 
-                cs.session_id, cs.flow_id, cs.phone, cs.status as session_status, cs.paused_at, cs.current_node_key,
-                l.lead_id, l.customer_name, l.status as lead_status, l.assigned_to, l.score, l.city,
-                (
-                    SELECT message FROM chat_messages cm 
-                    JOIN chat_sessions s ON cm.session_id = s.session_id 
-                    WHERE s.lead_id = l.lead_id ORDER BY cm.chat_id DESC LIMIT 1
-                ) as last_message
+        // If not admin or whatsapp_manager, user must have a valid userId
+        if (!isAdminUser && !isWhatsappManager && !userId) {
+            return res.json([]);
+        }
+
+        // 1. Fetch active paused chatbot sessions
+        const [pausedSessions] = await pool.query(`
+            SELECT cs.session_id, cs.flow_id, cs.lead_id, cs.phone, cs.status as session_status, cs.paused_at, cs.current_node_key, cs.variables
             FROM chatbot_sessions cs
-            LEFT JOIN leads l ON (cs.lead_id IS NOT NULL AND cs.lead_id = l.lead_id) OR (l.phone_number COLLATE utf8mb4_general_ci LIKE CONCAT('%', RIGHT(REPLACE(cs.phone, '+', ''), 10)) COLLATE utf8mb4_general_ci)
-            WHERE (cs.status = 'paused_for_human' OR l.status = 'human_needed')
+            WHERE cs.status = 'paused_for_human'
+            ORDER BY cs.paused_at DESC, cs.session_id DESC
+            LIMIT 50
+        `);
+
+        // 2. Fetch leads marked human_needed
+        let leadSql = `
+            SELECT l.lead_id, l.customer_name, l.phone_number, l.status as lead_status, l.assigned_to, l.score, l.city, l.updated_at
+            FROM leads l
+            WHERE l.status = 'human_needed'
         `;
-
-        const queryParams = [];
-
-        // Telecallers / Executives only see handoff alerts for leads assigned to them
+        const leadParams = [];
         if (!isAdminUser && !isWhatsappManager) {
-            if (userId) {
-                sql += ` AND l.assigned_to = ?`;
-                queryParams.push(userId);
-            } else {
-                return res.json([]);
+            // ONLY select leads assigned to this telecaller (do not include unassigned leads)
+            leadSql += ` AND l.assigned_to = ?`;
+            leadParams.push(userId);
+        }
+        leadSql += ` ORDER BY l.updated_at DESC, l.lead_id DESC LIMIT 50`;
+        const [humanLeads] = await pool.query(leadSql, leadParams);
+
+        // Map together into fast dictionary
+        const alertsMap = new Map();
+
+        for (const s of pausedSessions) {
+            let vars = {};
+            try { vars = typeof s.variables === 'string' ? JSON.parse(s.variables) : (s.variables || {}); } catch (e) {}
+            const phoneClean = (s.phone || '').replace(/\D/g, '').slice(-10);
+
+            const isCallSupport = !!(
+                vars.is_call_support === true ||
+                vars.call_support_requested === true ||
+                vars.handoff_reason === 'Call Support' ||
+                s.current_node_key === 'node-support-callback' ||
+                s.current_node_key === 'node-support-ack'
+            );
+
+            alertsMap.set(s.session_id, {
+                session_id: s.session_id,
+                flow_id: s.flow_id,
+                phone: s.phone,
+                phoneClean,
+                session_status: s.session_status,
+                paused_at: s.paused_at,
+                current_node_key: s.current_node_key,
+                variables: s.variables,
+                lead_id: s.lead_id || null,
+                customer_name: null,
+                lead_status: 'human_needed',
+                assigned_to: null,
+                score: null,
+                city: null,
+                last_message: null,
+                is_call_support: isCallSupport,
+                call_support_product: vars.call_support_product || 'SGB Blade Protector',
+                call_support_requested_at: vars.call_support_requested_at || s.paused_at
+            });
+        }
+
+        // Fill lead details for sessions
+        for (const [sId, alert] of alertsMap) {
+            let lead = null;
+            if (alert.lead_id) {
+                const [lRows] = await pool.query('SELECT lead_id, customer_name, phone_number, status, assigned_to, score, city FROM leads WHERE lead_id = ? LIMIT 1', [alert.lead_id]);
+                if (lRows.length > 0) lead = lRows[0];
+            } else if (alert.phoneClean) {
+                const [lRows] = await pool.query('SELECT lead_id, customer_name, phone_number, status, assigned_to, score, city FROM leads WHERE phone_number LIKE ? LIMIT 1', [`%${alert.phoneClean}`]);
+                if (lRows.length > 0) lead = lRows[0];
+            }
+
+            // For telecallers/staff (not admin or whatsapp_manager):
+            // The lead MUST exist, MUST be assigned, and MUST match this user's ID.
+            // If lead is unassigned or assigned to someone else, delete the alert immediately.
+            if (!isAdminUser && !isWhatsappManager) {
+                if (!lead || !lead.assigned_to || String(lead.assigned_to) !== String(userId)) {
+                    alertsMap.delete(sId);
+                    continue;
+                }
+            }
+
+            if (lead) {
+                alert.lead_id = lead.lead_id;
+                alert.customer_name = lead.customer_name;
+                alert.lead_status = lead.status;
+                alert.assigned_to = lead.assigned_to;
+                alert.score = lead.score;
+                alert.city = lead.city;
+            } else if (!isAdminUser && !isWhatsappManager) {
+                alertsMap.delete(sId);
             }
         }
 
-        sql += ` ORDER BY cs.paused_at DESC, cs.session_id DESC`;
+        // Add human_needed leads that aren't already represented
+        for (const hl of humanLeads) {
+            if (!isAdminUser && !isWhatsappManager) {
+                if (!hl.assigned_to || String(hl.assigned_to) !== String(userId)) {
+                    continue;
+                }
+            }
 
-        const [rows] = await pool.query(sql, queryParams);
+            const hlPhoneClean = (hl.phone_number || '').replace(/\D/g, '').slice(-10);
+            const exists = Array.from(alertsMap.values()).some(a => a.lead_id === hl.lead_id || (hlPhoneClean && a.phoneClean === hlPhoneClean));
+            if (!exists) {
+                // Check latest session or pending callback followup for this lead to accurately classify Call Support
+                const [[latestSession]] = await pool.query(
+                    'SELECT session_id, flow_id, current_node_key, variables, paused_at FROM chatbot_sessions WHERE (lead_id = ? OR phone LIKE ?) ORDER BY session_id DESC LIMIT 1',
+                    [hl.lead_id, `%${hlPhoneClean}`]
+                );
+                let leadIsCallSupport = false;
+                let sVars = {};
+                if (latestSession) {
+                    try { sVars = typeof latestSession.variables === 'string' ? JSON.parse(latestSession.variables) : (latestSession.variables || {}); } catch (e) {}
+                    if (sVars.is_call_support || sVars.call_support_requested || sVars.handoff_reason === 'Call Support' || latestSession.current_node_key === 'node-support-callback' || latestSession.current_node_key === 'node-support-ack') {
+                        leadIsCallSupport = true;
+                    }
+                }
+                if (!leadIsCallSupport) {
+                    const [[followupRow]] = await pool.query(
+                        'SELECT followup_id FROM lead_followups WHERE lead_id = ? AND (remarks LIKE "%Call Support%" OR remarks LIKE "%callback%") AND status = "pending" LIMIT 1',
+                        [hl.lead_id]
+                    );
+                    if (followupRow) leadIsCallSupport = true;
+                }
 
-        res.json(rows);
+                alertsMap.set(`lead_${hl.lead_id}`, {
+                    session_id: latestSession ? latestSession.session_id : null,
+                    flow_id: latestSession ? latestSession.flow_id : null,
+                    phone: hl.phone_number,
+                    phoneClean: hlPhoneClean,
+                    session_status: 'paused_for_human',
+                    paused_at: (latestSession && latestSession.paused_at) ? latestSession.paused_at : hl.updated_at,
+                    current_node_key: latestSession ? latestSession.current_node_key : null,
+                    variables: sVars,
+                    lead_id: hl.lead_id,
+                    customer_name: hl.customer_name,
+                    lead_status: hl.status,
+                    assigned_to: hl.assigned_to,
+                    score: hl.score,
+                    city: hl.city,
+                    last_message: null,
+                    is_call_support: leadIsCallSupport,
+                    call_support_product: sVars.call_support_product || 'SGB Blade Protector',
+                    call_support_requested_at: (latestSession && latestSession.paused_at) ? latestSession.paused_at : hl.updated_at
+                });
+            }
+        }
+
+        // Fill last_message for alerts and verify support callback text
+        for (const [key, alert] of alertsMap) {
+            if (alert.lead_id) {
+                const [cmRows] = await pool.query(
+                    'SELECT message FROM chat_messages cm JOIN chat_sessions cs ON cm.session_id = cs.session_id WHERE cs.lead_id = ? ORDER BY cm.chat_id DESC LIMIT 1',
+                    [alert.lead_id]
+                );
+                if (cmRows.length > 0) {
+                    alert.last_message = cmRows[0].message;
+                }
+            }
+            if (!alert.is_call_support && alert.last_message && (
+                alert.last_message.toLowerCase().includes('support callback request') ||
+                alert.last_message.toLowerCase().includes('callback request has been registered')
+            )) {
+                alert.is_call_support = true;
+            }
+        }
+
+        let results = Array.from(alertsMap.values());
+
+        // Final strict gate: non-admin and non-whatsapp-manager users only receive alerts for their assigned leads
+        if (!isAdminUser && !isWhatsappManager) {
+            results = results.filter(alert => alert.assigned_to && String(alert.assigned_to) === String(userId));
+        }
+
+        res.json(results);
     } catch (err) {
         console.error('[GET PENDING HUMAN ALERTS ERROR]', err);
         res.status(500).json({ message: 'Error fetching human handoff alerts' });

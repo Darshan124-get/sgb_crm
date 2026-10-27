@@ -23,6 +23,7 @@ let allCustomers = [];
 let totalLeadsCount = 0;
 let totalUnreadCount = 0;
 let totalHandoffCount = 0;
+let totalPaymentCount = 0;
 let isLoadingMoreConversations = false;
 let currentTab = 'all';
 let salesUsers = [];
@@ -289,9 +290,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Check for leadId in URL
+    // Check for phone & tab in URL
     const urlParams = new URLSearchParams(window.location.search);
     const phone = urlParams.get('phone');
+    const tab = urlParams.get('tab');
+    if (tab === 'payment') {
+        currentTab = 'payment';
+        const btnTopPayment = document.getElementById('btn-top-payment');
+        if (btnTopPayment) {
+            btnTopPayment.style.borderColor = '#059669';
+            btnTopPayment.style.background = '#ecfdf5';
+        }
+        if (typeof window.pollPaymentVerificationSummary === 'function') {
+            window.pollPaymentVerificationSummary();
+        }
+    } else if (tab === 'handoff' || tab === 'my_handoff') {
+        currentTab = tab;
+        const btnTopHandoff = document.getElementById('btn-top-handoff');
+        const btnTopMyHandoff = document.getElementById('btn-top-my-handoff');
+        if (btnTopHandoff && tab === 'handoff') {
+            btnTopHandoff.style.borderColor = '#ef4444';
+            btnTopHandoff.style.background = '#fef2f2';
+        }
+        if (btnTopMyHandoff && tab === 'my_handoff') {
+            btnTopMyHandoff.style.borderColor = '#ef4444';
+            btnTopMyHandoff.style.background = '#fef2f2';
+        }
+        if (typeof window.fetchPendingHumanAlerts === 'function') {
+            window.fetchPendingHumanAlerts();
+        }
+    }
     if (phone) {
         window._pendingPhone = phone;
     }
@@ -366,12 +394,17 @@ function renderSidebarTabs() {
     const customLists = loadCustomLists();
     const isCustomListActive = customLists.some(list => list.id === currentTab) || currentTab === 'undefined' || currentTab === 'resolved';
     const isHandoffActive = currentTab === 'handoff' || currentTab === 'my_handoff';
+    const isPaymentActive = currentTab === 'payment';
+    const paymentCount = totalPaymentCount !== undefined ? totalPaymentCount : (allCustomers || []).filter(c => c.has_pending_payment).length;
 
     let html = `
         <div class="tab-item ${currentTab === 'all' ? 'active' : ''}" data-tab="all">All <span id="all-unread-count" style="margin-left: 4px;">${totalCount}</span></div>
         <div class="tab-item ${currentTab === 'unviewed' ? 'active' : ''}" data-tab="unviewed">Unread <span id="unread-count" style="margin-left: 4px;">${unreadCount}</span></div>
         <div class="tab-item ${isHandoffActive ? 'active' : ''}" data-tab="${isAdminOrManager ? 'handoff' : 'my_handoff'}" id="tab-handoff-pill" style="${isHandoffActive ? 'color: #ef4444; border-color: #ef4444; background: #fef2f2;' : 'color: #ef4444; border-color: #fca5a5;'} font-weight: 700;">
             Handoff <span id="handoff-pill-count" style="margin-left: 4px; font-weight: 800;">${handoffCount}</span>
+        </div>
+        <div class="tab-item ${isPaymentActive ? 'active' : ''}" data-tab="payment" id="tab-payment-pill" style="${isPaymentActive ? 'color: #e11d48; border-color: #e11d48; background: #fff1f2;' : 'color: #e11d48; border-color: #fda4af;'} font-weight: 700;">
+            Payment <span id="payment-pill-count" style="margin-left: 4px; background: #e11d48; color: #ffffff; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">${paymentCount}</span>
         </div>
         
         <select id="campaign-filter-select" class="tab-select ${isCampaignActive ? 'active' : ''}" style="
@@ -713,6 +746,9 @@ window.switchToHandoffTab = function(tabType) {
     }
 
     renderCustomerList();
+    if (typeof window.fetchPendingHumanAlerts === 'function') {
+        window.fetchPendingHumanAlerts();
+    }
 };
 
 window.resolveHandoffChat = async function(phoneParam) {
@@ -738,12 +774,14 @@ window.resolveHandoffChat = async function(phoneParam) {
             customer.lead_status = customer.lead_status === 'human_needed' ? 'assigned' : customer.lead_status;
             customer.session_status = null;
             customer.needs_human = false;
+            customer.is_call_support = false;
         }
         if (activeCustomer && activeCustomer.phone === phone) {
             activeCustomer.status = activeCustomer.status === 'human_needed' ? 'assigned' : activeCustomer.status;
             activeCustomer.lead_status = activeCustomer.lead_status === 'human_needed' ? 'assigned' : activeCustomer.lead_status;
             activeCustomer.session_status = null;
             activeCustomer.needs_human = false;
+            activeCustomer.is_call_support = false;
 
             const bannerEl = document.getElementById('handoff-action-banner');
             if (bannerEl) bannerEl.classList.add('hidden');
@@ -751,6 +789,16 @@ window.resolveHandoffChat = async function(phoneParam) {
 
         // Instantly update handoff counts in top bar and sidebar tabs
         updateHandoffCounts();
+
+        // Dismiss floating call support alert for this phone
+        const callAlert = document.getElementById('floatingCallSupportAlert');
+        if (callAlert) callAlert.remove();
+        if (typeof window.unmarkAlertAsDismissed === 'function') {
+            window.unmarkAlertAsDismissed(phone);
+        }
+        if (typeof window.fetchPendingHumanAlerts === 'function') {
+            window.fetchPendingHumanAlerts();
+        }
 
         if (typeof window.showAlert === 'function') {
             window.showAlert('Handoff Resolved', 'Conversation started! Chat moved to standard conversations list.', 'success');
@@ -763,6 +811,16 @@ window.resolveHandoffChat = async function(phoneParam) {
         if (typeof window.showAlert === 'function') {
             window.showAlert('Error', err.message || 'Failed to resolve handoff', 'error');
         }
+    }
+};
+
+window.callCustomerDirect = function(phone) {
+    if (!phone) return;
+    const cleanPhone = phone.replace(/[^\d+]/g, '');
+    if (typeof window.initiateGlobalClickToCall === 'function') {
+        window.initiateGlobalClickToCall(cleanPhone);
+    } else {
+        window.open(`tel:${cleanPhone}`);
     }
 };
 
@@ -779,6 +837,221 @@ window.retriggerBotFromBanner = async function() {
         }
         updateHandoffCounts();
         renderCustomerList();
+    }
+};
+
+function updatePaymentCounts() {
+    if (!Array.isArray(allCustomers)) return;
+    const paymentCustomers = allCustomers.filter(c => c.has_pending_payment);
+    const paymentDisplay = totalPaymentCount !== undefined ? totalPaymentCount : paymentCustomers.length;
+
+    const topPaymentEl = document.getElementById('top-payment-count');
+    if (topPaymentEl) topPaymentEl.textContent = paymentDisplay;
+
+    const paymentPillEl = document.getElementById('payment-pill-count');
+    if (paymentPillEl) paymentPillEl.textContent = paymentDisplay;
+}
+
+window.switchToPaymentTab = function() {
+    currentTab = 'payment';
+    loadCustomers('payment');
+
+    const btnTopPayment = document.getElementById('btn-top-payment');
+    if (btnTopPayment) {
+        btnTopPayment.style.borderColor = '#059669';
+        btnTopPayment.style.background = '#ecfdf5';
+    }
+
+    const container = document.getElementById('sidebar-tabs-container');
+    if (container) {
+        container.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        const pillEl = document.getElementById('tab-payment-pill');
+        if (pillEl) pillEl.classList.add('active');
+    }
+
+    renderCustomerList();
+    if (typeof window.pollPaymentVerificationSummary === 'function') {
+        window.pollPaymentVerificationSummary();
+    }
+};
+
+window.verifyCurrentPayment = async function() {
+    if (!activeCustomer) return;
+    const phone = activeCustomer.phone;
+    const orderId = activeCustomer.payment_order_id;
+    const customerName = activeCustomer.customer_name || phone;
+    const amount = activeCustomer.payment_amount || 600;
+
+    const confirmVerify = confirm(`Verify payment of ₹${amount} for ${customerName}?\n\nThis will confirm order #${orderId || ''} in CRM.`);
+    if (!confirmVerify) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/payments/verify`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeader(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phone, orderId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to verify payment');
+
+        activeCustomer.has_pending_payment = false;
+        activeCustomer.payment_order_id = null;
+        activeCustomer.session_status = 'completed';
+        activeCustomer.needs_human = false;
+        activeCustomer.is_call_support = false;
+        if (activeCustomer.status === 'human_needed') activeCustomer.status = 'converted';
+        if (activeCustomer.lead_status === 'human_needed') activeCustomer.lead_status = 'converted';
+
+        const customerInList = allCustomers.find(c => c.phone === phone);
+        if (customerInList) {
+            customerInList.has_pending_payment = false;
+            customerInList.payment_order_id = null;
+            customerInList.session_status = 'completed';
+            customerInList.needs_human = false;
+            customerInList.is_call_support = false;
+            if (customerInList.status === 'human_needed') customerInList.status = 'converted';
+            if (customerInList.lead_status === 'human_needed') customerInList.lead_status = 'converted';
+        }
+
+        const handoffBanner = document.getElementById('handoff-action-banner');
+        if (handoffBanner) handoffBanner.classList.add('hidden');
+
+        const paymentHeaderActions = document.getElementById('payment-header-actions');
+        if (paymentHeaderActions) paymentHeaderActions.style.display = 'none';
+
+        if (totalPaymentCount > 0) totalPaymentCount--;
+        updatePaymentCounts();
+        updateHandoffCounts();
+        renderSidebarTabs();
+        renderCustomerList();
+
+        sessionStorage.removeItem('dismissed_payment_order_id');
+        const alertEl = document.getElementById('floatingPaymentAlert');
+        if (alertEl) alertEl.remove();
+        if (typeof window.pollPaymentVerificationSummary === 'function') {
+            window.pollPaymentVerificationSummary();
+        }
+        if (typeof window.fetchPendingHumanAlerts === 'function') {
+            window.fetchPendingHumanAlerts();
+        }
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Payment Verified', '✅ Payment verified successfully! Order confirmed.', 'success');
+        } else {
+            alert('✅ Payment verified successfully! Order confirmed.');
+        }
+    } catch (err) {
+        console.error('Error verifying payment:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message || 'Failed to verify payment', 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
+    }
+};
+
+window.rejectCurrentPayment = async function() {
+    if (!activeCustomer) return;
+    const phone = activeCustomer.phone;
+    const orderId = activeCustomer.payment_order_id;
+    const customerName = activeCustomer.customer_name || phone;
+
+    const reason = prompt(`Enter rejection reason for ${customerName}:`, 'Invalid screenshot or payment not received');
+    if (reason === null) return; // User cancelled prompt
+
+    try {
+        const res = await fetch(`${API_BASE}/payments/reject`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeader(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phone, orderId, reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to reject payment');
+
+        activeCustomer.has_pending_payment = false;
+        activeCustomer.payment_order_id = null;
+        activeCustomer.session_status = 'completed';
+        activeCustomer.needs_human = false;
+        activeCustomer.is_call_support = false;
+        if (activeCustomer.status === 'human_needed') activeCustomer.status = 'assigned';
+        if (activeCustomer.lead_status === 'human_needed') activeCustomer.lead_status = 'assigned';
+
+        const customerInList = allCustomers.find(c => c.phone === phone);
+        if (customerInList) {
+            customerInList.has_pending_payment = false;
+            customerInList.payment_order_id = null;
+            customerInList.session_status = 'completed';
+            customerInList.needs_human = false;
+            customerInList.is_call_support = false;
+            if (customerInList.status === 'human_needed') customerInList.status = 'assigned';
+            if (customerInList.lead_status === 'human_needed') customerInList.lead_status = 'assigned';
+        }
+
+        const handoffBanner = document.getElementById('handoff-action-banner');
+        if (handoffBanner) handoffBanner.classList.add('hidden');
+
+        const paymentHeaderActions = document.getElementById('payment-header-actions');
+        if (paymentHeaderActions) paymentHeaderActions.style.display = 'none';
+
+        if (totalPaymentCount > 0) totalPaymentCount--;
+        updatePaymentCounts();
+        updateHandoffCounts();
+        renderSidebarTabs();
+        renderCustomerList();
+
+        sessionStorage.removeItem('dismissed_payment_order_id');
+        const alertEl = document.getElementById('floatingPaymentAlert');
+        if (alertEl) alertEl.remove();
+        if (typeof window.pollPaymentVerificationSummary === 'function') {
+            window.pollPaymentVerificationSummary();
+        }
+        if (typeof window.fetchPendingHumanAlerts === 'function') {
+            window.fetchPendingHumanAlerts();
+        }
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Payment Rejected', 'Payment marked as rejected. Order cancelled.', 'info');
+        } else {
+            alert('❌ Payment marked as rejected. Order cancelled.');
+        }
+    } catch (err) {
+        console.error('Error rejecting payment:', err);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('Error', err.message || 'Failed to reject payment', 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
+    }
+};
+
+window.openCustomerChatByPhone = async function (phone) {
+    if (!phone) return;
+    const phoneTen = String(phone).replace(/\D/g, '').slice(-10);
+    const customer = allCustomers.find(c => c.phone === phone || (c.phone && c.phone.endsWith(phoneTen)));
+    if (customer) {
+        selectCustomer(customer);
+        return;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/customers?search=${encodeURIComponent(phoneTen || phone)}`, { headers: getAuthHeader() });
+        const resData = await res.json();
+        const list = Array.isArray(resData) ? resData : (resData.customers || []);
+        const match = list.find(c => c.phone === phone || (c.phone && c.phone.endsWith(phoneTen)));
+        if (match) {
+            if (!allCustomers.some(c => c.phone === match.phone)) {
+                allCustomers.unshift(match);
+                renderCustomerList();
+            }
+            selectCustomer(match);
+        }
+    } catch (err) {
+        console.error('Error in openCustomerChatByPhone:', err);
     }
 };
 
@@ -812,6 +1085,7 @@ async function loadCustomers(tabParam = null, searchParam = null) {
             if (rawData.totalCount !== undefined && (tabToFetch === 'all' || !totalLeadsCount)) totalLeadsCount = parseInt(rawData.totalCount);
             if (rawData.unreadCount !== undefined) totalUnreadCount = parseInt(rawData.unreadCount);
             if (rawData.handoffCount !== undefined) totalHandoffCount = parseInt(rawData.handoffCount);
+            if (rawData.paymentCount !== undefined) totalPaymentCount = parseInt(rawData.paymentCount);
         }
 
         // Merge incoming customer records with existing in-memory allCustomers array
@@ -819,9 +1093,18 @@ async function loadCustomers(tabParam = null, searchParam = null) {
         data.forEach(c => existingMap.set(c.phone, c));
         allCustomers = Array.from(existingMap.values());
 
+        if (activeCustomer && existingMap.has(activeCustomer.phone)) {
+            Object.assign(activeCustomer, existingMap.get(activeCustomer.phone));
+        }
+
         updateHandoffCounts();
+        updatePaymentCounts();
         renderSidebarTabs(); // update unread and total count
         renderCustomerList();
+
+        // Poll pending alerts on customer update
+        if (typeof window.fetchPendingHumanAlerts === 'function') window.fetchPendingHumanAlerts();
+        if (typeof window.pollPaymentVerificationSummary === 'function') window.pollPaymentVerificationSummary();
 
         // Trigger background preloading of chat histories ONLY ONCE on initial load
         if (!window._hasPreloadedHistories) {
@@ -831,11 +1114,28 @@ async function loadCustomers(tabParam = null, searchParam = null) {
 
         // Check if there is a pending phone to select on load/refresh
         if (window._pendingPhone) {
-            const customer = allCustomers.find(c => c.phone === window._pendingPhone);
+            const pendingPhone = window._pendingPhone;
+            delete window._pendingPhone;
+            const phoneTen = String(pendingPhone).replace(/\D/g, '').slice(-10);
+            const customer = allCustomers.find(c => c.phone === pendingPhone || (c.phone && c.phone.endsWith(phoneTen)));
             if (customer) {
                 selectCustomer(customer);
+            } else {
+                fetch(`${API_BASE}/customers?search=${encodeURIComponent(phoneTen || pendingPhone)}`, { headers: getAuthHeader() })
+                    .then(r => r.json())
+                    .then(resData => {
+                        const list = Array.isArray(resData) ? resData : (resData.customers || []);
+                        const match = list.find(c => c.phone === pendingPhone || (c.phone && c.phone.endsWith(phoneTen)));
+                        if (match) {
+                            if (!allCustomers.some(c => c.phone === match.phone)) {
+                                allCustomers.unshift(match);
+                                renderCustomerList();
+                            }
+                            selectCustomer(match);
+                        }
+                    })
+                    .catch(e => console.error('Error finding pending customer:', e));
             }
-            delete window._pendingPhone;
         }
     } catch (err) {
         console.error('Failed to load customers:', err);
@@ -882,6 +1182,8 @@ function renderCustomerList(shouldResetLimit = true) {
             } else {
                 matchesTab = isHumanNeeded;
             }
+        } else if (currentTab === 'payment') {
+            matchesTab = Boolean(customer.has_pending_payment);
         } else if (currentTab === 'undefined') {
             if (resolved) {
                 matchesTab = false;
@@ -907,7 +1209,14 @@ function renderCustomerList(shouldResetLimit = true) {
             }
         }
 
-        if (!searchTerm && !matchesTab) return false;
+        if (!searchTerm && !matchesTab) {
+            // Keep the currently active/opened conversation visible in the sidebar regardless of tab filter
+            if (activeCustomer && activeCustomer.phone === customer.phone) {
+                matchesTab = true;
+            } else {
+                return false;
+            }
+        }
 
         // Apply search filter if search term is provided
         if (searchTerm) {
@@ -926,8 +1235,15 @@ function renderCustomerList(shouldResetLimit = true) {
         return true;
     });
 
-    // Sort by search relevance first, then by last_message_at DESC
+    // Sort: Keep the currently opened / active conversation pinned at the top so new incoming leads do not push it down!
     filtered.sort((a, b) => {
+        if (!searchTerm && activeCustomer) {
+            const aIsActive = (a.phone === activeCustomer.phone);
+            const bIsActive = (b.phone === activeCustomer.phone);
+            if (aIsActive && !bIsActive) return -1;
+            if (!aIsActive && bIsActive) return 1;
+        }
+
         if (searchTerm) {
             const aName = (a.customer_name || '').toLowerCase();
             const aPhone = (a.phone || '').toLowerCase();
@@ -1038,8 +1354,20 @@ function renderCustomerList(shouldResetLimit = true) {
                 const diffMinutes = Math.max(0, Math.floor((Date.now() - new Date(pausedTs).getTime()) / 60000));
                 waitingStr = diffMinutes > 0 ? `${diffMinutes} min` : 'Just now';
             }
-            handoffBadgeHtml = `<span class="score-badge" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; font-weight: 800; padding: 2px 6px;">Needs Human ${waitingStr ? '• Waiting ' + waitingStr : ''}</span>`;
+            const isCallSupportItem = Boolean(customer.is_call_support);
+            if (isCallSupportItem) {
+                handoffBadgeHtml = `<span class="score-badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; font-weight: 800; padding: 2px 7px; border-radius: 10px;"><i class="fa-solid fa-phone" style="font-size: 10px; margin-right: 3px;"></i>Call Support ${waitingStr ? '• ' + waitingStr : ''}</span>`;
+            } else {
+                handoffBadgeHtml = `<span class="score-badge" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; font-weight: 800; padding: 2px 6px;">Needs Human ${waitingStr ? '• Waiting ' + waitingStr : ''}</span>`;
+            }
         }
+
+        let paymentBadgeHtml = '';
+        if (customer.has_pending_payment) {
+            paymentBadgeHtml = `<span class="score-badge" style="background: #ffe4e6; color: #e11d48; border: 1px solid #fecdd3; font-weight: 800; padding: 2px 7px; border-radius: 10px;">Payment Pending</span>`;
+        }
+
+        const snippetDisplay = customer.has_pending_payment ? '🖼️ Payment screenshot received' : (lastMsg || customer.phone);
 
         item.innerHTML = `
             <div class="avatar-wrap">
@@ -1057,10 +1385,11 @@ function renderCustomerList(shouldResetLimit = true) {
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                    <p class="last-message-snippet" style="flex: 1; min-width: 0;">${tickHtml}${lastMsg || customer.phone}</p>
+                    <p class="last-message-snippet" style="flex: 1; min-width: 0;">${tickHtml}${snippetDisplay}</p>
                     ${hasUnread ? `<span class="unread-badge" style="background-color: var(--whatsapp-green); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">${customer.unread_msg_count}</span>` : ''}
                 </div>
                 <div class="customer-meta-footer">
+                    ${paymentBadgeHtml}
                     ${handoffBadgeHtml}
                     ${scoreLabel ? `<span class="score-badge badge-${scoreClass}">${scoreLabel}</span>` : ''}
                     ${customer.assigned_name ? `<div class="assigned-badge"><i class="fas fa-user-check"></i> ${customer.assigned_name}</div>` : ''}
@@ -1075,8 +1404,17 @@ function renderCustomerList(shouldResetLimit = true) {
         fragment.appendChild(item);
     });
 
+    const prevScrollTop = customerListEl ? customerListEl.scrollTop : 0;
     customerListEl.innerHTML = '';
     customerListEl.appendChild(fragment);
+
+    if (customerListEl) {
+        if (window._isSelectingCustomer) {
+            customerListEl.scrollTop = 0;
+        } else if (prevScrollTop > 0) {
+            customerListEl.scrollTop = prevScrollTop;
+        }
+    }
 
     // Infinite scroll listener on sidebar customer list
     if (customerListEl && !customerListEl._hasLazyScroll) {
@@ -1188,6 +1526,9 @@ async function selectCustomer(customer) {
         quickRepliesPopover.style.display = 'none';
     }
     activeCustomer = customer;
+    if (customer && !allCustomers.some(c => c.phone === customer.phone)) {
+        allCustomers.unshift(customer);
+    }
     isScrollLoadingHistory = true;
     window._isSelectingCustomer = true;
 
@@ -1272,13 +1613,89 @@ async function selectCustomer(customer) {
                 const diffMinutes = Math.max(0, Math.floor((Date.now() - new Date(pausedTs).getTime()) / 60000));
                 waitingStr = diffMinutes > 0 ? `${diffMinutes} min` : 'Just now';
             }
-            if (handoffBannerText) {
-                handoffBannerText.textContent = `🚨 Customer requested Human Handoff ${waitingStr ? '• Waiting ' + waitingStr : ''}`;
+
+            const isCallSupportItem = Boolean(customer.is_call_support);
+
+            if (isCallSupportItem) {
+                // Apply Yellow Theme for Call Support
+                handoffBanner.style.background = 'linear-gradient(90deg, #fffbeb, #fef3c7)';
+                handoffBanner.style.borderBottom = '1.5px solid #fde68a';
+                const bannerIcon = handoffBanner.querySelector('.fa-solid');
+                if (bannerIcon) {
+                    bannerIcon.className = 'fa-solid fa-phone-volume';
+                    bannerIcon.style.color = '#d97706';
+                }
+                const bannerLeftWrap = handoffBanner.querySelector('div:first-child');
+                if (bannerLeftWrap) {
+                    bannerLeftWrap.style.color = '#92400e';
+                }
+                if (handoffBannerText) {
+                    handoffBannerText.textContent = `📞 Customer requested Call Support (${customer.call_support_product || 'SGB Blade Protector'}) ${waitingStr ? '• Waiting ' + waitingStr : ''}`;
+                    handoffBannerText.style.color = '#92400e';
+                }
+
+                // Add or show "Call Customer" button in banner
+                let btnBannerCall = document.getElementById('btn-banner-call-customer');
+                if (!btnBannerCall) {
+                    btnBannerCall = document.createElement('button');
+                    btnBannerCall.id = 'btn-banner-call-customer';
+                    btnBannerCall.className = 'btn-banner-call';
+                    btnBannerCall.style.cssText = `
+                        background: #f59e0b;
+                        color: #ffffff;
+                        border: none;
+                        padding: 6px 14px;
+                        border-radius: 6px;
+                        font-weight: 700;
+                        font-size: 0.82rem;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        transition: background 0.2s;
+                    `;
+                    btnBannerCall.onmouseover = () => btnBannerCall.style.background = '#d97706';
+                    btnBannerCall.onmouseout = () => btnBannerCall.style.background = '#f59e0b';
+                    const actionsDiv = handoffBanner.querySelector('div:last-child');
+                    if (actionsDiv) {
+                        actionsDiv.insertBefore(btnBannerCall, actionsDiv.firstChild);
+                    }
+                }
+                btnBannerCall.style.display = 'inline-flex';
+                btnBannerCall.onclick = () => window.callCustomerDirect(customer.phone);
+                btnBannerCall.innerHTML = `<i class="fa-solid fa-phone"></i> Call Customer (${customer.phone})`;
+            } else {
+                // Restore standard red handoff style
+                handoffBanner.style.background = 'linear-gradient(90deg, #fef2f2, #fff1f2)';
+                handoffBanner.style.borderBottom = '1px solid #fecaca';
+                const bannerIcon = handoffBanner.querySelector('.fa-solid');
+                if (bannerIcon) {
+                    bannerIcon.className = 'fa-solid fa-triangle-exclamation';
+                    bannerIcon.style.color = '#ef4444';
+                }
+                const bannerLeftWrap = handoffBanner.querySelector('div:first-child');
+                if (bannerLeftWrap) {
+                    bannerLeftWrap.style.color = '#991b1b';
+                }
+                if (handoffBannerText) {
+                    handoffBannerText.textContent = `🚨 Customer requested Human Handoff ${waitingStr ? '• Waiting ' + waitingStr : ''}`;
+                    handoffBannerText.style.color = '#991b1b';
+                }
+                const btnBannerCall = document.getElementById('btn-banner-call-customer');
+                if (btnBannerCall) btnBannerCall.style.display = 'none';
             }
+
             handoffBanner.classList.remove('hidden');
         } else {
             handoffBanner.classList.add('hidden');
         }
+    }
+
+    // Payment Verification Header Actions
+    const paymentHeaderActions = document.getElementById('payment-header-actions');
+    if (paymentHeaderActions) {
+        paymentHeaderActions.style.display = customer.has_pending_payment ? 'inline-flex' : 'none';
     }
 
     // Highlight active item

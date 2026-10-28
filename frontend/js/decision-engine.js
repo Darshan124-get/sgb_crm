@@ -328,10 +328,11 @@ function getSelectedProducts(prefix = '') {
                         if (existing) {
                             existing.quantity += item.quantity * qty;
                         } else {
+                            const itemPrice = (item.price !== null && item.price !== undefined) ? parseFloat(item.price) : (parseFloat(item.selling_price) || 0);
                             finalItems.push({
                                 product_id: item.product_id,
                                 quantity: item.quantity * qty,
-                                price: parseFloat(item.selling_price) || 0,
+                                price: itemPrice,
                                 name: item.product_name
                             });
                         }
@@ -407,9 +408,13 @@ async function loadProductsForEngine(prefix = '') {
                         setsHTML = sets.map(s => {
                             let setTotal = 0;
                             (s.items || []).forEach(item => {
-                                setTotal += (item.selling_price || 0) * (item.quantity || 1);
+                                const itemPrice = (item.price !== null && item.price !== undefined) ? parseFloat(item.price) : parseFloat(item.selling_price || 0);
+                                setTotal += itemPrice * (item.quantity || 1);
                             });
-                            const itemsListStr = (s.items || []).map(item => `${item.product_name} (x${item.quantity})`).join(', ');
+                            const itemsListStr = (s.items || []).map(item => {
+                                const itemPrice = (item.price !== null && item.price !== undefined) ? parseFloat(item.price) : parseFloat(item.selling_price || 0);
+                                return `${item.product_name} (x${item.quantity || 1} @ ₹${itemPrice})`;
+                            }).join(', ');
 
                             return `
                                 <div class="product-select-card" data-name="${s.name}" data-type="set" data-id="${s.set_id}" data-price="${setTotal}" onclick="toggleProductSelection(this, '${prefix}')" style="background:#faf5ff; border: 1px solid #d8b4fe;">

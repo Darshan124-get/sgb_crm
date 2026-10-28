@@ -2298,10 +2298,17 @@ function renderDealerProductGrid() {
         setsHTML = loadedDealerProductSets.map(s => {
             let setTotal = 0;
             (s.items || []).forEach(item => {
-                const itemPrice = parseFloat(item.dealer_price) > 0 ? parseFloat(item.dealer_price) : parseFloat(item.selling_price || 0);
+                const itemPrice = (item.price !== null && item.price !== undefined) 
+                    ? parseFloat(item.price) 
+                    : (parseFloat(item.dealer_price) > 0 ? parseFloat(item.dealer_price) : parseFloat(item.selling_price || 0));
                 setTotal += itemPrice * (item.quantity || 1);
             });
-            const itemsListStr = (s.items || []).map(item => `${item.product_name || item.name} (x${item.quantity})`).join(', ');
+            const itemsListStr = (s.items || []).map(item => {
+                const itemPrice = (item.price !== null && item.price !== undefined) 
+                    ? parseFloat(item.price) 
+                    : (parseFloat(item.dealer_price) > 0 ? parseFloat(item.dealer_price) : parseFloat(item.selling_price || 0));
+                return `${item.product_name || item.name} (x${item.quantity || 1} @ ₹${itemPrice})`;
+            }).join(', ');
 
             return `
                 <div class="product-select-card" data-name="${s.name}" data-type="set" data-id="${s.set_id}" data-price="${setTotal}" onclick="toggleDealerProductSelection(this)" style="background:#FFFBF7; border: 1px solid #FED7AA;">
@@ -2431,7 +2438,9 @@ function getDealerSelectedProducts() {
             if (set && set.items && set.items.length > 0) {
                 set.items.forEach(item => {
                     const pid = item.product_id;
-                    const price = parseFloat(item.dealer_price) > 0 ? parseFloat(item.dealer_price) : parseFloat(item.selling_price || 0);
+                    const price = (item.price !== null && item.price !== undefined) 
+                        ? parseFloat(item.price) 
+                        : (parseFloat(item.dealer_price) > 0 ? parseFloat(item.dealer_price) : parseFloat(item.selling_price || 0));
                     const existing = finalItems.find(fi => fi.product_id === pid);
                     if (existing) {
                         existing.quantity += (item.quantity || 1) * qty;

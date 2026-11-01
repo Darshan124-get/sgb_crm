@@ -40,12 +40,34 @@ function startServer() {
     });
 }
 
+const monitorService = require('./src/services/monitor.service');
+
 process.on('unhandledRejection', (reason) => {
     console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
+    try {
+        monitorService.recordError({
+            url: '[System Background Process]',
+            method: 'BACKGROUND',
+            statusCode: 500,
+            errorMessage: `Unhandled Rejection: ${reason?.message || reason}`,
+            stack: reason?.stack || null,
+            actionCategory: 'System & Background'
+        });
+    } catch (e) {}
 });
 
 process.on('uncaughtException', (err) => {
     console.error('⚠️ Uncaught Exception:', err?.message || err);
+    try {
+        monitorService.recordError({
+            url: '[Node.js Process Crash]',
+            method: 'CRASH',
+            statusCode: 500,
+            errorMessage: `Uncaught Exception: ${err?.message || err}`,
+            stack: err?.stack || null,
+            actionCategory: 'System & Background'
+        });
+    } catch (e) {}
 });
 
 startServer();

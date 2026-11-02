@@ -652,10 +652,109 @@ function handleSortFilterChange(val) {
     setSortFilter(val);
 }
 
+// Check whether a dealer matches search query across DEALER ID, FIRM / SHOP NAME, CONTACT, ADDRESS
+function matchesDealerSearch(d, query) {
+    if (!query || !query.trim()) return true;
+
+    const qClean = query.toLowerCase().trim();
+    const qNoPunct = qClean.replace(/[\.\,\-\_\/\#\s]/g, '');
+    const qDigits = qClean.replace(/\D/g, '');
+
+    // 1. DEALER ID Fields
+    const rawId = d.dealer_id != null ? String(d.dealer_id).trim() : '';
+    const rawCode = d.dealer_code ? String(d.dealer_code).trim() : '';
+    const vrlCode = d.vrl_code ? String(d.vrl_code).trim() : '';
+    const sgbCode = rawId ? ('sgb-' + rawId.padStart(3, '0')) : '';
+    const sgbCodeNoDash = rawId ? ('sgb' + rawId.padStart(3, '0')) : '';
+    const dlrCode = rawId ? ('dlr-' + rawId.padStart(3, '0')) : '';
+    const dlrCodeNoDash = rawId ? ('dlr' + rawId.padStart(3, '0')) : '';
+
+    // 2. FIRM / SHOP NAME Fields
+    const firmName = String(d.firm_name || '');
+    const dealerName = String(d.dealer_name || '');
+    const shopName = String(d.shop_name || '');
+    const businessName = String(d.business_name || '');
+    const ownerName = String(d.owner_name || '');
+    const contactPerson = String(d.contact_person || '');
+
+    // 3. CONTACT Fields
+    const phone = String(d.phone_number || d.phone || '');
+    const altPhone = String(d.alternate_phone || d.alt_phone || '');
+    const whatsapp = String(d.whatsapp_number || '');
+    const contactNum = String(d.contact_number || '');
+    const email = String(d.email || '');
+
+    const phoneDigits = phone.replace(/\D/g, '');
+    const altPhoneDigits = altPhone.replace(/\D/g, '');
+    const whatsappDigits = whatsapp.replace(/\D/g, '');
+    const contactNumDigits = contactNum.replace(/\D/g, '');
+    const allPhoneDigits = [phoneDigits, altPhoneDigits, whatsappDigits, contactNumDigits].join(' ');
+
+    // 4. ADDRESS Fields
+    const address = String(d.address || '');
+    const townVillage = String(d.town_village || '');
+    const village = String(d.village || '');
+    const city = String(d.city || '');
+    const taluk = String(d.taluk || '');
+    const district = String(d.district || '');
+    const state = String(d.state || '');
+    const pincode = String(d.pincode || d.pin_code || d.postal_code || '');
+    const nearestVrl = String(d.nearest_vrl || '');
+    let computedAddress = address;
+    if (!computedAddress && city) {
+        computedAddress = (taluk ? taluk + ' Taluk, ' : '') + city + ', ' + (state || 'Karnataka') + (pincode ? ' - ' + pincode : '');
+    }
+
+    // 5. GSTIN
+    const gstNo = String(d.gst_no || d.gst_number || '');
+
+    const textPool = [
+        rawId, rawCode, sgbCode, sgbCodeNoDash, dlrCode, dlrCodeNoDash, vrlCode,
+        firmName, dealerName, shopName, businessName, ownerName, contactPerson,
+        phone, altPhone, whatsapp, contactNum, email,
+        address, townVillage, village, city, taluk, district, state, pincode, nearestVrl, computedAddress,
+        gstNo
+    ].join(' ').toLowerCase();
+
+    const textPoolNoPunct = textPool.replace(/[\.\,\-\_\/\#\s]/g, '');
+
+    // Check direct full match
+    if (textPool.includes(qClean)) return true;
+    if (qNoPunct.length >= 2 && textPoolNoPunct.includes(qNoPunct)) return true;
+    if (qDigits.length >= 3 && allPhoneDigits.includes(qDigits)) return true;
+    if (rawId && (rawId === qClean || (qDigits && rawId === qDigits))) return true;
+
+    // Multi-term match (every word or number separated by space must match)
+    const tokens = qClean.split(/\s+/).filter(Boolean);
+    if (tokens.length > 1) {
+        const allMatch = tokens.every(token => {
+            const tokenNoPunct = token.replace(/[\.\,\-\_\/\#]/g, '');
+            const tokenDigits = token.replace(/\D/g, '');
+
+            if (textPool.includes(token)) return true;
+            if (tokenNoPunct.length >= 2 && textPoolNoPunct.includes(tokenNoPunct)) return true;
+            if (tokenDigits.length >= 3 && allPhoneDigits.includes(tokenDigits)) return true;
+            if (rawId && (rawId === token || (tokenDigits && rawId === tokenDigits))) return true;
+            return false;
+        });
+        if (allMatch) return true;
+    }
+
+    return false;
+}
+
 function filterDealers() {
-    const q1 = (document.getElementById('dealerTableSearch')?.value || '').toLowerCase().trim();
-    const q2 = (document.getElementById('topNavSearch')?.value || '').toLowerCase().trim();
+    const tableInput = document.getElementById('dealerTableSearch');
+    const topInput = document.getElementById('topNavSearch');
+    const q1 = (tableInput?.value || '').trim();
+    const q2 = (topInput?.value || '').trim();
     const query = q1 || q2;
+
+    // Sync clear buttons state
+    const topClearBtn = document.getElementById('topNavClearBtn');
+    const tableClearBtn = document.getElementById('dealerTableClearBtn');
+    if (topClearBtn) topClearBtn.style.display = (topInput?.value || '').trim() ? 'inline-block' : 'none';
+    if (tableClearBtn) tableClearBtn.style.display = (tableInput?.value || '').trim() ? 'block' : 'none';
 
     filteredDealers = allDealers.filter(d => {
         const statusInfo = calculateDealerStatusInfo(d);
@@ -699,15 +798,12 @@ function filterDealers() {
             }
         }
 
-        // Search text check
-        const firm = (d.firm_name || d.dealer_name || '').toLowerCase();
-        const owner = (d.owner_name || d.contact_person || '').toLowerCase();
-        const phone = (d.phone_number || d.phone || '').toLowerCase();
-        const city = (d.city || '').toLowerCase();
-        const gst = (d.gst_no || '').toLowerCase();
-        const code = (d.dealer_code || `sgb-${String(d.dealer_id).padStart(3, '0')}`).toLowerCase();
+        // Search text check across DEALER ID, FIRM / SHOP NAME, CONTACT, ADDRESS
+        if (!matchesDealerSearch(d, query)) {
+            return false;
+        }
 
-        return firm.includes(query) || owner.includes(query) || phone.includes(query) || city.includes(query) || gst.includes(query) || code.includes(query);
+        return true;
     });
 
     // Firm / Shop Name Sorting
@@ -729,11 +825,68 @@ function filterDealers() {
     renderDealersTable();
 }
 
-function handleTopSearch() {
-    const topVal = document.getElementById('topNavSearch').value;
-    const tableSearch = document.getElementById('dealerTableSearch');
-    if (tableSearch) tableSearch.value = topVal;
+function syncDealerSearch(source, forceOpenList = false) {
+    const topInput = document.getElementById('topNavSearch');
+    const tableInput = document.getElementById('dealerTableSearch');
+    const topClearBtn = document.getElementById('topNavClearBtn');
+    const tableClearBtn = document.getElementById('dealerTableClearBtn');
+
+    let currentVal = '';
+    if (source === 'top') {
+        currentVal = topInput ? topInput.value : '';
+        if (tableInput && tableInput.value !== currentVal) {
+            tableInput.value = currentVal;
+        }
+    } else {
+        currentVal = tableInput ? tableInput.value : '';
+        if (topInput && topInput.value !== currentVal) {
+            topInput.value = currentVal;
+        }
+    }
+
+    if (topClearBtn) {
+        topClearBtn.style.display = currentVal.trim() ? 'inline-block' : 'none';
+    }
+    if (tableClearBtn) {
+        tableClearBtn.style.display = currentVal.trim() ? 'block' : 'none';
+    }
+
+    if (forceOpenList || currentVal.trim()) {
+        const listView = document.getElementById('dealers-list-view');
+        if (listView && listView.style.display === 'none') {
+            openDealersListView(false);
+        }
+    }
+
     filterDealers();
+}
+
+function handleTopSearch(forceOpenList = false) {
+    syncDealerSearch('top', forceOpenList);
+}
+
+function handleTableSearch() {
+    syncDealerSearch('table', false);
+}
+
+function clearDealerSearch() {
+    const topInput = document.getElementById('topNavSearch');
+    const tableInput = document.getElementById('dealerTableSearch');
+    const topClearBtn = document.getElementById('topNavClearBtn');
+    const tableClearBtn = document.getElementById('dealerTableClearBtn');
+
+    if (topInput) topInput.value = '';
+    if (tableInput) tableInput.value = '';
+    if (topClearBtn) topClearBtn.style.display = 'none';
+    if (tableClearBtn) tableClearBtn.style.display = 'none';
+
+    const listView = document.getElementById('dealers-list-view');
+    if (listView && listView.style.display === 'none') {
+        openDealersListView(false);
+    }
+
+    filterDealers();
+    if (topInput) topInput.focus();
 }
 
 // State Persistence Helpers for Page Reload
@@ -761,6 +914,17 @@ function restoreActiveViewState() {
     let tab = 'overview';
 
     const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('search')) {
+        const initialSearch = urlParams.get('search');
+        const topSearch = document.getElementById('topNavSearch');
+        const tableSearch = document.getElementById('dealerTableSearch');
+        if (topSearch) topSearch.value = initialSearch;
+        if (tableSearch) tableSearch.value = initialSearch;
+        const topClear = document.getElementById('topNavClearBtn');
+        const tableClear = document.getElementById('dealerTableClearBtn');
+        if (topClear) topClear.style.display = initialSearch.trim() ? 'inline-block' : 'none';
+        if (tableClear) tableClear.style.display = initialSearch.trim() ? 'block' : 'none';
+    }
     if (urlParams.has('view')) {
         view = urlParams.get('view');
         id = urlParams.get('id');
@@ -4073,6 +4237,11 @@ window.confirmAutoCreateDealersAndImport = confirmAutoCreateDealersAndImport;
 window.toggleAllMissingDealersSelection = toggleAllMissingDealersSelection;
 window.updateMissingDealersSelectionCount = updateMissingDealersSelectionCount;
 window.filterDealers = filterDealers;
+window.handleTopSearch = handleTopSearch;
+window.handleTableSearch = handleTableSearch;
+window.syncDealerSearch = syncDealerSearch;
+window.clearDealerSearch = clearDealerSearch;
+window.matchesDealerSearch = matchesDealerSearch;
 window.setSortFilter = setSortFilter;
 window.handleSortFilterChange = handleSortFilterChange;
 window.setDaysFilter = setDaysFilter;

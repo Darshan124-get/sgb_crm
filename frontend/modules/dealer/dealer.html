@@ -209,9 +209,10 @@
         <main class="main-content">
             <!-- Top Bar Header -->
             <header class="topbar">
-                <div class="search-bar">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="topNavSearch" oninput="handleTopSearch()" placeholder="Search...">
+                <div class="search-bar" onclick="document.getElementById('topNavSearch').focus();" style="cursor:text;">
+                    <i class="fa-solid fa-magnifying-glass" onclick="event.stopPropagation(); handleTopSearch(true);" title="Search dealers" style="cursor:pointer;color:#64748b;"></i>
+                    <input type="text" id="topNavSearch" oninput="handleTopSearch()" onkeydown="if(event.key==='Enter'){event.preventDefault();handleTopSearch(true);}" placeholder="Search...">
+                    <i class="fa-solid fa-xmark" id="topNavClearBtn" onclick="event.stopPropagation(); clearDealerSearch();" style="display:none;cursor:pointer;color:#94a3b8;margin-left:auto;padding-left:0.5rem;" title="Clear search"></i>
                 </div>
                 <div class="profile-section">
                     <span class="profile-name" id="profileName">admin</span>
@@ -258,12 +259,18 @@
                         style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                         <!-- Left: Action Controls -->
                         <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-                            <div style="position:relative;width:240px;display:inline-block;">
+                            <div style="position:relative;width:280px;display:inline-block;">
                                 <i class="fa-solid fa-magnifying-glass"
-                                    style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;"></i>
-                                <input type="text" id="dealerTableSearch" oninput="filterDealers()"
-                                    placeholder="Search dealer name, phone, city..."
-                                    style="width:100%;padding:0.4rem 0.75rem 0.4rem 2.2rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.825rem;outline:none;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.03);font-weight:600;color:#0f172a;">
+                                    onclick="document.getElementById('dealerTableSearch').focus(); handleTableSearch();"
+                                    title="Search dealers"
+                                    style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;cursor:pointer;"></i>
+                                <input type="text" id="dealerTableSearch" oninput="handleTableSearch()"
+                                    onkeydown="if(event.key==='Enter'){event.preventDefault();handleTableSearch();}"
+                                    placeholder="Search..."
+                                    style="width:100%;padding:0.4rem 2rem 0.4rem 2.2rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.825rem;outline:none;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.03);font-weight:600;color:#0f172a;">
+                                <i class="fa-solid fa-xmark" id="dealerTableClearBtn" onclick="clearDealerSearch()"
+                                    style="display:none;position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;cursor:pointer;font-size:0.85rem;"
+                                    title="Clear search"></i>
                             </div>
                             <div
                                 style="display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:0.25rem 0.5rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);">

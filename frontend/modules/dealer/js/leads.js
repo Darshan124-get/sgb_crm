@@ -2,7 +2,9 @@
 // leads.js — Dealer Leads Info Module Logic
 // ============================================================
 
-const getApiLeadsBase = () => (window.API_URL || 'http://localhost:5000/api') + '/leads';
+const API_LEADS_BASE = (window.API_URL || 'http://localhost:5000/api') + '/leads';
+const getApiLeadsBase = () => API_LEADS_BASE;
+window.API_LEADS_BASE = API_LEADS_BASE;
 const token = () => localStorage.getItem('token') || '';
 
 let allLeads = [];
@@ -453,13 +455,24 @@ async function saveLeadForm(e) {
     const source = document.getElementById('leadModalSource').value;
     const notes = document.getElementById('leadModalNotes').value.trim();
 
+    // Basic frontend phone validation
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+        if (window.showAlert) {
+            window.showAlert('Validation Error', 'Please enter a valid 10-digit mobile number.', 'warning');
+        } else {
+            alert('Please enter a valid 10-digit mobile number.');
+        }
+        return;
+    }
+
     try {
         if (id) {
             // Edit existing lead
             const existingLead = allLeads.find(l => l.lead_id === id || String(l.id) === String(id));
             const realId = existingLead ? (existingLead.raw_id || existingLead.id) : id;
 
-            await fetch(`${API_LEADS_BASE}/${realId}`, {
+            const res = await fetch(`${API_LEADS_BASE}/${realId}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token()}`,
@@ -468,26 +481,41 @@ async function saveLeadForm(e) {
                 body: JSON.stringify({
                     customer_name: name,
                     firm_name: firm,
-                    phone_number: phone,
+                    phone_number: cleanPhone,
                     email: email,
                     city: city,
                     state: state,
                     status: status,
                     source: source,
-                    notes: notes
+                    notes: notes,
+                    module: 'dealer',
+                    is_dealer: true
                 })
             });
 
-            if (existingLead) {
-                existingLead.firm_name = firm;
-                existingLead.customer_name = name;
-                existingLead.phone_number = phone;
-                existingLead.email = email;
-                existingLead.city = city;
-                existingLead.state = state;
-                existingLead.status = status;
-                existingLead.source = source;
-                existingLead.notes = notes;
+            if (res.ok) {
+                if (existingLead) {
+                    existingLead.firm_name = firm || name || 'Dealer Lead';
+                    existingLead.customer_name = name || firm || 'N/A';
+                    existingLead.phone_number = cleanPhone;
+                    existingLead.email = email;
+                    existingLead.city = city || 'N/A';
+                    existingLead.state = state || 'Karnataka';
+                    existingLead.status = status;
+                    existingLead.source = source;
+                    existingLead.notes = notes;
+                }
+                closeLeadModal();
+                applyLeadFilters();
+                if (window.showAlert) window.showAlert('Success', `Lead "${firm || name}" updated successfully!`, 'success');
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                const errMsg = errData.message || 'Failed to update lead on server.';
+                if (window.showAlert) {
+                    window.showAlert('Update Failed', errMsg, 'error');
+                } else {
+                    alert('Update Failed: ' + errMsg);
+                }
             }
         } else {
             // Add new lead
@@ -500,13 +528,15 @@ async function saveLeadForm(e) {
                 body: JSON.stringify({
                     customer_name: name,
                     firm_name: firm,
-                    phone_number: phone,
+                    phone_number: cleanPhone,
                     email: email,
                     city: city,
                     state: state,
                     status: status,
                     source: source,
-                    notes: notes
+                    notes: notes,
+                    module: 'dealer',
+                    is_dealer: true
                 })
             });
 
@@ -517,7 +547,7 @@ async function saveLeadForm(e) {
                     ...newLeadObj,
                     customer_name: name,
                     firm_name: firm,
-                    phone_number: phone,
+                    phone_number: cleanPhone,
                     email: email,
                     city: city,
                     state: state,
@@ -526,33 +556,27 @@ async function saveLeadForm(e) {
                     notes: notes
                 });
                 allLeads.unshift(normalized);
+                closeLeadModal();
+                applyLeadFilters();
+                if (window.showAlert) window.showAlert('Success', 'New dealer lead added successfully!', 'success');
             } else {
-                // Fallback local add
-                const newLead = {
-                    id: Date.now(),
-                    raw_id: Date.now(),
-                    lead_id: `LEAD-${Math.floor(1000 + Math.random() * 9000)}`,
-                    firm_name: firm,
-                    customer_name: name,
-                    phone_number: phone,
-                    email: email,
-                    city: city || 'N/A',
-                    state: state || 'Karnataka',
-                    source: source,
-                    status: status,
-                    notes: notes,
-                    created_at: new Date().toISOString()
-                };
-                allLeads.unshift(newLead);
+                const errData = await res.json().catch(() => ({}));
+                const errMsg = errData.message || 'Failed to add lead to server.';
+                if (window.showAlert) {
+                    window.showAlert('Add Lead Failed', errMsg, 'error');
+                } else {
+                    alert('Error: ' + errMsg);
+                }
             }
         }
     } catch (err) {
-        console.warn('Backend API save lead warning:', err);
+        console.error('Backend API save lead error:', err);
+        if (window.showAlert) {
+            window.showAlert('Error', 'Unable to save lead: ' + err.message, 'error');
+        } else {
+            alert('Error: ' + err.message);
+        }
     }
-
-    closeLeadModal();
-    applyLeadFilters();
-    if (window.showAlert) window.showAlert('Success', id ? `Lead "${firm || name}" updated successfully!` : 'New dealer lead added successfully!', 'success');
 }
 
 // ── Convert Lead to Dealer ──

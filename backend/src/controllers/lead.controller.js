@@ -599,7 +599,12 @@ exports.getLeadById = async (req, res) => {
 };
 
 exports.createLead = async (req, res) => {
-    const { phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, delivery_type, village, sub_district, taluk } = req.body;
+    const { 
+        phone_number, customer_name, firm_name, first_message, language, 
+        address, city, state, district, pincode, source, delivery_type, 
+        village, sub_district, taluk, is_dealer, module: reqModule, 
+        status: reqStatus, email, notes 
+    } = req.body;
     const connection = await pool.getConnection();
 
     try {
@@ -607,7 +612,10 @@ exports.createLead = async (req, res) => {
         await connection.beginTransaction();
 
         const cleanPhone = validationUtils.sanitizePhone(phone_number);
-        const cleanName = validationUtils.sanitizeAlphabetOnly(customer_name || '');
+        const cleanName = customer_name ? String(customer_name).trim().substring(0, 150) : null;
+        const cleanFirm = firm_name ? String(firm_name).trim().substring(0, 200) : null;
+        const cleanEmail = email ? String(email).trim().substring(0, 150) : null;
+        const finalCustomerName = cleanName || cleanFirm || null;
         const cleanVillage = validationUtils.sanitizeAlphanumeric(village || city || '');
         const cleanTaluk = validationUtils.sanitizeAlphanumeric(taluk || sub_district || '');
         const cleanCity = cleanVillage || validationUtils.sanitizeAlphanumeric(city || '');
@@ -633,49 +641,64 @@ exports.createLead = async (req, res) => {
             });
         }
 
-        // 🔄 AUTO-ASSIGNMENT: Language-Based Round-Robin (Strict No-AI Logic)
-        // Match against comma-separated values in the user's language column
-        const [salesStaff] = await connection.query(
-            `SELECT u.user_id 
-             FROM users u 
-             JOIN roles r ON u.role_id = r.role_id 
-             JOIN departments d ON u.department_id = d.id
-             WHERE d.name LIKE '%sales%' 
-               AND r.name IN ('executive', 'manager')
-               AND (FIND_IN_SET(?, u.language) > 0 OR u.language = 'General') 
-               AND u.status = 'active'
-             ORDER BY u.updated_at ASC LIMIT 1`,
-            [language || 'EN']
-        );
+        const creatorRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : '';
+        const isDealerLead = is_dealer === true || reqModule === 'dealer' || (reqStatus && String(reqStatus).toLowerCase().includes('dealer')) || creatorRole.includes('dealer');
 
         let assignedTo = null;
-        let assignedBy = null;
+        let assignedBy = req.user ? (req.user.id || req.user.user_id || null) : null;
         let status = 'new';
 
-        const creatorRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : '';
-        const isTelecallerOrSales = creatorRole === 'sales' || creatorRole.includes('telecaller') || creatorRole.includes('executive');
-
-        if (isTelecallerOrSales && req.user && req.user.id) {
-            // Telecom Panel / Sales Agent: Assign directly to themselves
-            assignedTo = req.user.id;
-            assignedBy = req.user.id;
-            status = 'assigned';
+        if (isDealerLead) {
+            if (reqStatus && String(reqStatus).toUpperCase() === 'CONVERTED') {
+                status = 'dealer_converted';
+            } else {
+                status = 'dealer';
+            }
+            if (creatorRole.includes('dealer') && req.user && req.user.id) {
+                assignedTo = req.user.id;
+            }
         } else {
-            // Sales Manager Panel and Admin Panel: Leave as Unassigned
-            assignedTo = null;
-            assignedBy = null;
-            status = 'new';
+            // 🔄 AUTO-ASSIGNMENT: Language-Based Round-Robin (Strict No-AI Logic)
+            // Match against comma-separated values in the user's language column
+            const [salesStaff] = await connection.query(
+                `SELECT u.user_id 
+                 FROM users u 
+                 JOIN roles r ON u.role_id = r.role_id 
+                 JOIN departments d ON u.department_id = d.id
+                 WHERE d.name LIKE '%sales%' 
+                   AND r.name IN ('executive', 'manager')
+                   AND (FIND_IN_SET(?, u.language) > 0 OR u.language = 'General') 
+                   AND u.status = 'active'
+                 ORDER BY u.updated_at ASC LIMIT 1`,
+                [language || 'EN']
+            );
+
+            const isTelecallerOrSales = creatorRole === 'sales' || creatorRole.includes('telecaller') || creatorRole.includes('executive');
+
+            if (isTelecallerOrSales && req.user && req.user.id) {
+                // Telecom Panel / Sales Agent: Assign directly to themselves
+                assignedTo = req.user.id;
+                assignedBy = req.user.id;
+                status = 'assigned';
+            } else {
+                // Sales Manager Panel and Admin Panel: Leave as Unassigned
+                assignedTo = null;
+                assignedBy = null;
+                status = 'new';
+            }
         }
 
         const combinedAddress = [cleanVillage, cleanTaluk, cleanDistrict, cleanState, cleanPincode].filter(Boolean).join(', ');
         const finalAddress = address ? validationUtils.sanitizeAlphanumeric(address) : (combinedAddress || null);
 
         const [result] = await connection.query(
-            `INSERT INTO leads (phone_number, customer_name, first_message, language, address, city, state, district, pincode, source, status, assigned_to, assigned_by, delivery_type, village, sub_district, taluk) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO leads (phone_number, customer_name, firm_name, email, first_message, language, address, city, state, district, pincode, source, status, assigned_to, assigned_by, delivery_type, village, sub_district, taluk) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 cleanPhone,
-                cleanName || null,
+                finalCustomerName,
+                cleanFirm,
+                cleanEmail,
                 first_message || null,
                 language || 'EN',
                 finalAddress,
@@ -683,7 +706,7 @@ exports.createLead = async (req, res) => {
                 cleanState || null,
                 cleanDistrict || null,
                 cleanPincode || null,
-                source || 'manual',
+                source || (isDealerLead ? 'website' : 'manual'),
                 status,
                 assignedTo,
                 assignedBy,
@@ -697,13 +720,37 @@ exports.createLead = async (req, res) => {
         const leadId = result.insertId;
 
         // Logging
+        const noteText = isDealerLead
+            ? `Lead created for Dealer Manager. Status: ${status}${cleanFirm ? ` (Firm: ${cleanFirm})` : ''}${notes ? ` - ${notes}` : ''}`
+            : `Lead created via ${source || 'manual'}. Status: ${status}${assignedTo ? ` (Auto-assigned based on language: ${language})` : ' (Unassigned: No matching language staff)'}`;
+
         await connection.query(
             'INSERT INTO lead_notes (lead_id, user_id, note) VALUES (?, ?, ?)',
-            [leadId, req.user.id, `Lead created via ${source || 'manual'}. Status: ${status}${assignedTo ? ` (Auto-assigned based on language: ${language})` : ' (Unassigned: No matching language staff)'}`]
+            [leadId, req.user ? (req.user.id || req.user.user_id) : null, noteText]
         );
 
         await connection.commit();
-        res.status(201).json({ message: 'Lead created successfully', lead_id: leadId, assignedTo });
+        res.status(201).json({ 
+            message: 'Lead created successfully', 
+            lead_id: leadId, 
+            lead: {
+                lead_id: leadId,
+                id: leadId,
+                raw_id: leadId,
+                customer_name: finalCustomerName,
+                firm_name: cleanFirm || finalCustomerName,
+                phone_number: cleanPhone,
+                email: cleanEmail,
+                city: cleanCity,
+                state: cleanState,
+                status: status,
+                source: source || (isDealerLead ? 'WEBSITE' : 'manual'),
+                address: finalAddress,
+                notes: notes || '',
+                created_at: new Date().toISOString()
+            },
+            assignedTo 
+        });
     } catch (err) {
         if (connection) await connection.rollback();
         console.error('CRITICAL: Lead Creation Failed:', err);
@@ -715,7 +762,7 @@ exports.createLead = async (req, res) => {
 
 exports.updateLead = async (req, res) => {
     const {
-        phone_number, customer_name, first_message, language, address, city, state, district, pincode,
+        phone_number, customer_name, firm_name, email, first_message, language, address, city, state, district, pincode,
         status, assigned_to, score, next_followup_date, lost_reason, lost_notes,
         current_crop, acreage, delivery_type, call_count, notes, remarks,
         village, sub_district, taluk
@@ -735,7 +782,9 @@ exports.updateLead = async (req, res) => {
         const currentLead = rows[0];
 
         const cleanPhone = phone_number !== undefined ? validationUtils.sanitizePhone(phone_number) : currentLead.phone_number;
-        const cleanName = customer_name !== undefined ? validationUtils.sanitizeAlphabetOnly(customer_name) : currentLead.customer_name;
+        const cleanName = customer_name !== undefined ? (customer_name ? String(customer_name).trim().substring(0, 150) : null) : currentLead.customer_name;
+        const cleanFirm = firm_name !== undefined ? (firm_name ? String(firm_name).trim().substring(0, 200) : null) : currentLead.firm_name;
+        const cleanEmail = email !== undefined ? (email ? String(email).trim().substring(0, 150) : null) : currentLead.email;
         const finalStatus = status || currentLead.status;
         const finalAssignedTo = (assigned_to !== undefined && assigned_to !== '') ? assigned_to : currentLead.assigned_to;
 
@@ -768,7 +817,7 @@ exports.updateLead = async (req, res) => {
 
         await connection.query(
             `UPDATE leads SET 
-                phone_number = ?, customer_name = ?, first_message = ?, language = ?, 
+                phone_number = ?, customer_name = ?, firm_name = ?, email = ?, first_message = ?, language = ?, 
                 address = ?, city = ?, state = ?, district = ?, pincode = ?, status = ?, assigned_to = ?, assigned_by = ?,
                 score = ?, next_followup_date = ?, lost_reason = ?, lost_notes = ?,
                 current_crop = ?, acreage = ?, delivery_type = ?, call_count = ?,
@@ -777,6 +826,8 @@ exports.updateLead = async (req, res) => {
             [
                 cleanPhone,
                 cleanName,
+                cleanFirm,
+                cleanEmail,
                 first_message || currentLead.first_message || null,
                 language || currentLead.language || 'EN',
                 finalAddress || null,

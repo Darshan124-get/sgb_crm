@@ -163,9 +163,12 @@ class FlowService {
             const res = await fetch(`${this.baseUrl}/flows/${flowId}/duplicate`, {
                 method: 'POST',
                 headers: this.getAuthHeaders(),
-                body: JSON.stringify({ name: options.name })
+                body: JSON.stringify({ name: options?.name })
             });
-            if (!res.ok) throw new Error('Failed to duplicate flow');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || 'Failed to duplicate flow');
+            }
             const data = await res.json();
             return {
                 id: data.duplicated_flow_id,

@@ -686,6 +686,7 @@ exports.publishFlow = async (req, res) => {
 // 6. Duplicate Flow
 exports.duplicateFlow = async (req, res) => {
     const flowId = req.params.flowId;
+    const { name: requestedName } = req.body || {};
     const connection = await pool.getConnection();
 
     try {
@@ -698,21 +699,43 @@ exports.duplicateFlow = async (req, res) => {
             return res.status(404).json({ message: 'Original flow not found' });
         }
         const orig = flowRows[0];
+        const newFlowName = (requestedName && typeof requestedName === 'string' && requestedName.trim()) 
+            ? requestedName.trim() 
+            : `${orig.name} Copy`;
 
-        // Create flow copy
+        // Create flow copy retaining trigger settings
         const [copyResult] = await connection.query(
-            'INSERT INTO chatbot_flows (name, description, category, status) VALUES (?, ?, ?, ?)',
-            [`${orig.name} Copy`, orig.description || '', orig.category || 'enquiry', 'draft']
+            'INSERT INTO chatbot_flows (name, description, category, status, trigger_type, trigger_keywords, language) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [newFlowName, orig.description || '', orig.category || 'enquiry', 'draft', orig.trigger_type || 'Keyword', orig.trigger_keywords || null, orig.language || 'English']
         );
         const newFlowId = copyResult.insertId;
 
-        // Get latest version ID of original flow
-        const [verRows] = await connection.query(
-            'SELECT version_id FROM chatbot_flow_versions WHERE flow_id = ? ORDER BY version_number DESC LIMIT 1',
-            [flowId]
-        );
-        if (verRows.length > 0) {
-            const origVersionId = verRows[0].version_id;
+        // Resolve version to copy: prefer active_version_id if it exists, otherwise latest version
+        let origVersionId = orig.active_version_id;
+        if (!origVersionId) {
+            const [verRows] = await connection.query(
+                'SELECT version_id FROM chatbot_flow_versions WHERE flow_id = ? ORDER BY version_number DESC LIMIT 1',
+                [flowId]
+            );
+            if (verRows.length > 0) {
+                origVersionId = verRows[0].version_id;
+            }
+        }
+
+        if (origVersionId) {
+            let [nodes] = await connection.query('SELECT * FROM chatbot_nodes WHERE version_id = ?', [origVersionId]);
+            // If active version had no nodes, check latest version fallback
+            if (nodes.length === 0) {
+                const [fallbackVer] = await connection.query(
+                    'SELECT version_id FROM chatbot_flow_versions WHERE flow_id = ? ORDER BY version_number DESC LIMIT 1',
+                    [flowId]
+                );
+                if (fallbackVer.length > 0 && fallbackVer[0].version_id !== origVersionId) {
+                    origVersionId = fallbackVer[0].version_id;
+                    const [fallbackNodes] = await connection.query('SELECT * FROM chatbot_nodes WHERE version_id = ?', [origVersionId]);
+                    nodes = fallbackNodes;
+                }
+            }
 
             // Create version 1.0 (Draft) for copy
             const [newVerResult] = await connection.query(
@@ -721,12 +744,20 @@ exports.duplicateFlow = async (req, res) => {
             );
             const newVersionId = newVerResult.insertId;
 
-            // Clone nodes
-            const [nodes] = await connection.query('SELECT * FROM chatbot_nodes WHERE version_id = ?', [origVersionId]);
+            // Clone nodes safely ensuring config is valid JSON string
             for (const n of nodes) {
+                let configStr;
+                if (typeof n.config === 'object' && n.config !== null) {
+                    configStr = JSON.stringify(n.config);
+                } else if (typeof n.config === 'string') {
+                    configStr = n.config;
+                } else {
+                    configStr = JSON.stringify(n.config || {});
+                }
+
                 await connection.query(
                     'INSERT INTO chatbot_nodes (version_id, node_key, node_type, name, position_x, position_y, config) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [newVersionId, n.node_key, n.node_type, n.name, n.position_x, n.position_y, n.config]
+                    [newVersionId, n.node_key, n.node_type, n.name, n.position_x, n.position_y, configStr]
                 );
             }
 
@@ -747,7 +778,7 @@ exports.duplicateFlow = async (req, res) => {
     } catch (err) {
         try { await connection.rollback(); } catch (rbErr) { }
         console.error('[DUPLICATE FLOW ERROR]', err.message);
-        res.status(500).json({ message: 'Error duplicating flow' });
+        res.status(500).json({ message: 'Error duplicating flow: ' + err.message });
     } finally {
         try { connection.release(); } catch (relErr) { }
     }

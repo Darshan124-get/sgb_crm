@@ -233,6 +233,7 @@ CREATE TABLE product_sets (
     set_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     description TEXT,
+    total_price DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -241,6 +242,7 @@ CREATE TABLE product_set_items (
     set_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT DEFAULT 1,
+    price DECIMAL(10,2) DEFAULT NULL,
     FOREIGN KEY (set_id) REFERENCES product_sets(set_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

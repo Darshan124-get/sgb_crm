@@ -1,0 +1,2006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER_CORE // SGB CRM Tactical Developer Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyber-black: #05070f;
+            --cyber-dark: #0a0e1c;
+            --cyber-surface: #0f152a;
+            --cyber-panel: rgba(15, 21, 42, 0.88);
+            --cyber-border: #1a2544;
+            --cyber-border-glow: #00f0ff;
+            
+            --neon-cyan: #00f0ff;
+            --neon-pink: #ff0055;
+            --neon-green: #00ff66;
+            --neon-yellow: #ffe600;
+            --neon-purple: #bd00ff;
+            --neon-blue: #0077ff;
+            
+            --text-main: #e2f1ff;
+            --text-dim: #7f99b8;
+            --text-muted: #486182;
+
+            --font-display: 'Orbitron', monospace, sans-serif;
+            --font-tech: 'Chakra Petch', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --glow-cyan: 0 0 12px rgba(0, 240, 255, 0.45);
+            --glow-pink: 0 0 15px rgba(255, 0, 85, 0.55);
+            --glow-green: 0 0 12px rgba(0, 255, 102, 0.45);
+            --glow-yellow: 0 0 12px rgba(255, 230, 0, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--cyber-black);
+            color: var(--text-main);
+            font-family: var(--font-tech);
+            font-size: 13px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 32px 32px;
+            position: relative;
+        }
+
+        /* Scanline Overlay */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.6;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--cyber-black);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1a2544;
+            border-radius: 0;
+            border: 1px solid var(--neon-cyan);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        /* Cyberpunk Top Bar */
+        header {
+            background: rgba(10, 14, 28, 0.95);
+            border-bottom: 2px solid var(--neon-cyan);
+            box-shadow: 0 4px 20px rgba(0, 240, 255, 0.2);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .brand-zone {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .cyber-glitch-badge {
+            width: 36px;
+            height: 36px;
+            background: #000;
+            border: 1px solid var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--neon-cyan);
+            clip-path: polygon(0 0, 80% 0, 100% 20%, 100% 100%, 20% 100%, 0 80%);
+            position: relative;
+        }
+
+        .brand-meta h1 {
+            font-family: var(--font-display);
+            font-size: 16px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            color: #fff;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-meta h1 span.highlight {
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-cyan);
+        }
+
+        .brand-meta .tagline {
+            font-size: 10px;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            letter-spacing: 0.05em;
+        }
+
+        /* Header Quick Actions */
+        .controls-zone {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .hud-status-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #000;
+            border: 1px solid var(--cyber-border);
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            border-left: 3px solid var(--neon-cyan);
+        }
+
+        .cyber-pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-pink);
+            transition: all 0.3s;
+        }
+
+        .cyber-pulse-dot.online {
+            background: var(--neon-green);
+            box-shadow: var(--glow-green);
+            animation: cyberPulse 1.5s infinite;
+        }
+
+        @keyframes cyberPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+        }
+
+        .cyber-input {
+            background: #000;
+            border: 1px solid var(--cyber-border);
+            color: var(--neon-cyan);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 4px 8px;
+            outline: none;
+            width: 170px;
+            transition: border-color 0.2s;
+        }
+        .cyber-input:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .cyber-btn {
+            font-family: var(--font-display);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border: 1px solid var(--neon-cyan);
+            background: rgba(0, 240, 255, 0.08);
+            color: var(--neon-cyan);
+            cursor: pointer;
+            transition: all 0.2s;
+            clip-path: polygon(0 0, 90% 0, 100% 25%, 100% 100%, 10% 100%, 0 75%);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cyber-btn:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: var(--glow-cyan);
+            transform: translateY(-1px);
+        }
+
+        .cyber-btn-pink {
+            border-color: var(--neon-pink);
+            background: rgba(255, 0, 85, 0.12);
+            color: var(--neon-pink);
+        }
+        .cyber-btn-pink:hover {
+            background: var(--neon-pink);
+            color: #fff;
+            box-shadow: var(--glow-pink);
+        }
+
+        .cyber-btn-yellow {
+            border-color: var(--neon-yellow);
+            background: rgba(255, 230, 0, 0.1);
+            color: var(--neon-yellow);
+        }
+        .cyber-btn-yellow:hover {
+            background: var(--neon-yellow);
+            color: #000;
+            box-shadow: var(--glow-yellow);
+        }
+
+        /* Main Cockpit Layout */
+        main {
+            flex: 1;
+            padding: 16px 20px;
+            max-width: 1750px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Top HUD Tactical Strip: Radar & Health Dial */
+        .tactical-hub-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr 340px;
+            gap: 16px;
+        }
+
+        @media (max-width: 1200px) {
+            .tactical-hub-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cyber Radar HUD Widget */
+        .radar-panel {
+            background: var(--cyber-panel);
+            border: 1px solid var(--cyber-border);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .radar-panel::before {
+            content: "TAC_RADAR // ACTIVE SCAN";
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            font-family: var(--font-mono);
+            font-size: 9px;
+            color: var(--neon-cyan);
+            letter-spacing: 0.1em;
+        }
+
+        #radarCanvas {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            background: #020610;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.15), inset 0 0 20px rgba(0, 240, 255, 0.08);
+            margin-top: 10px;
+        }
+
+        .radar-legend {
+            display: flex;
+            gap: 10px;
+            font-size: 10px;
+            font-family: var(--font-mono);
+            margin-top: 8px;
+        }
+
+        /* System Integrity & Metrics Deck */
+        .metrics-deck {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .system-banner {
+            background: linear-gradient(90deg, rgba(0, 255, 102, 0.12), rgba(0, 240, 255, 0.05));
+            border-left: 4px solid var(--neon-green);
+            border-top: 1px solid var(--cyber-border);
+            border-right: 1px solid var(--cyber-border);
+            border-bottom: 1px solid var(--cyber-border);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sys-state {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sys-state-title {
+            font-family: var(--font-display);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--neon-green);
+            letter-spacing: 0.05em;
+        }
+
+        /* 4 KPI HUD Cards */
+        .hud-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+
+        .hud-card {
+            background: var(--cyber-panel);
+            border: 1px solid var(--cyber-border);
+            padding: 12px 14px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            border-top: 2px solid var(--accent, var(--neon-cyan));
+            border-right: 2px solid var(--accent, var(--neon-cyan));
+        }
+
+        .hud-card-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .hud-card-val {
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+            margin: 4px 0;
+        }
+
+        .hud-card-sub {
+            font-size: 10px;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+
+        /* Live Sparkline Timeline */
+        .spark-panel {
+            background: var(--cyber-panel);
+            border: 1px solid var(--cyber-border);
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        #throughputCanvas {
+            width: 100%;
+            height: 70px;
+            background: #030612;
+            border: 1px solid #131a33;
+        }
+
+        /* Health Dials Deck */
+        .health-vitals-panel {
+            background: var(--cyber-panel);
+            border: 1px solid var(--cyber-border);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .health-vitals-panel h3 {
+            font-family: var(--font-display);
+            font-size: 12px;
+            color: var(--neon-cyan);
+            letter-spacing: 0.08em;
+            border-bottom: 1px solid var(--cyber-border);
+            padding-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vital-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .vital-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-family: var(--font-mono);
+        }
+
+        .vital-progress {
+            height: 6px;
+            background: #030713;
+            border: 1px solid var(--cyber-border);
+            overflow: hidden;
+        }
+
+        .vital-bar {
+            height: 100%;
+            background: var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+            transition: width 0.4s ease;
+        }
+
+        /* Tactical Navigation Tabs */
+        .cyber-nav-tabs {
+            display: flex;
+            gap: 6px;
+            border-bottom: 2px solid var(--cyber-border);
+            padding-bottom: 2px;
+            overflow-x: auto;
+        }
+
+        .cyber-tab-btn {
+            background: rgba(10, 14, 28, 0.7);
+            border: 1px solid var(--cyber-border);
+            color: var(--text-dim);
+            font-family: var(--font-display);
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            clip-path: polygon(0 0, 85% 0, 100% 30%, 100% 100%, 0 100%);
+        }
+
+        .cyber-tab-btn:hover {
+            color: #fff;
+            border-color: var(--neon-cyan);
+        }
+
+        .cyber-tab-btn.active {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+
+        .tab-counter {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            padding: 1px 6px;
+            background: #000;
+            border: 1px solid var(--cyber-border);
+            color: var(--neon-cyan);
+        }
+
+        /* Filter Toolbar */
+        .cyber-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: var(--cyber-panel);
+            border: 1px solid var(--cyber-border);
+            padding: 8px 14px;
+        }
+
+        .cyber-search {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #000;
+            border: 1px solid var(--cyber-border);
+            padding: 4px 10px;
+            flex: 1;
+            max-width: 450px;
+        }
+
+        .cyber-search input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: var(--font-tech);
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+        }
+
+        .filter-tags {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .cyber-chip {
+            padding: 3px 8px;
+            font-size: 10px;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            background: #000;
+            border: 1px solid var(--cyber-border);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .cyber-chip:hover {
+            border-color: var(--neon-cyan);
+            color: #fff;
+        }
+
+        .cyber-chip.active {
+            background: rgba(0, 240, 255, 0.18);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+        }
+
+        .cyber-chip.active.chip-pink {
+            background: rgba(255, 0, 85, 0.18);
+            border-color: var(--neon-pink);
+            color: var(--neon-pink);
+            box-shadow: 0 0 8px rgba(255, 0, 85, 0.3);
+        }
+
+        /* Cyber Table */
+        .cyber-viewport {
+            background: var(--cyber-panel);
+            border: 1px solid var(--cyber-border);
+            display: flex;
+            flex-direction: column;
+            min-height: 480px;
+            position: relative;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            max-height: 580px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
+
+        th {
+            background: #070a14;
+            color: var(--text-dim);
+            font-size: 10px;
+            font-family: var(--font-display);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--cyber-border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #111a33;
+            vertical-align: middle;
+        }
+
+        tr:hover td {
+            background: rgba(0, 240, 255, 0.05);
+            cursor: pointer;
+        }
+
+        tr.tr-error td {
+            background: rgba(255, 0, 85, 0.06);
+        }
+        tr.tr-error:hover td {
+            background: rgba(255, 0, 85, 0.12);
+        }
+
+        .method-tag {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 5px;
+            display: inline-block;
+            text-align: center;
+            border: 1px solid;
+            width: 48px;
+        }
+
+        .m-GET { border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.1); }
+        .m-POST { border-color: var(--neon-green); color: var(--neon-green); background: rgba(0, 255, 102, 0.1); }
+        .m-PUT { border-color: var(--neon-yellow); color: var(--neon-yellow); background: rgba(255, 230, 0, 0.1); }
+        .m-DELETE { border-color: var(--neon-pink); color: var(--neon-pink); background: rgba(255, 0, 85, 0.1); }
+
+        .status-tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 0;
+            display: inline-block;
+            border: 1px solid;
+        }
+
+        .st-2xx { border-color: var(--neon-green); color: var(--neon-green); background: rgba(0, 255, 102, 0.1); }
+        .st-3xx { border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 240, 255, 0.1); }
+        .st-4xx { border-color: var(--neon-yellow); color: var(--neon-yellow); background: rgba(255, 230, 0, 0.1); }
+        .st-5xx { border-color: var(--neon-pink); color: var(--neon-pink); background: rgba(255, 0, 85, 0.15); box-shadow: var(--glow-pink); }
+
+        .caller-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 6px;
+            background: #030612;
+            border: 1px solid var(--cyber-border);
+            font-size: 11px;
+        }
+
+        .role-pill {
+            font-size: 8px;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 1px 4px;
+        }
+        .rp-telecaller { background: #664400; color: #ffe600; }
+        .rp-admin { background: #003366; color: #00f0ff; }
+        .rp-super-admin { background: #4b0082; color: #e6b8ff; }
+        .rp-logistics { background: #004d26; color: #66ff99; }
+        .rp-webhook { background: #262626; color: #d9d9d9; }
+        .rp-guest { background: #1a1a1a; color: #8c8c8c; }
+
+        /* Error Incident Cards */
+        .incident-deck {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .incident-card {
+            background: #080c18;
+            border: 1px solid var(--neon-pink);
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.12);
+        }
+
+        .incident-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .incident-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .incident-msg {
+            color: #ff99aa;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .incident-stack {
+            background: #02040a;
+            border: 1px solid #220815;
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: #fca5a5;
+            white-space: pre-wrap;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        /* Cyber Terminal Console Logs */
+        .terminal-viewport {
+            background: #02040a;
+            border: 1px solid var(--cyber-border);
+            padding: 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            height: 480px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .term-line {
+            line-height: 1.4;
+            display: flex;
+            gap: 10px;
+            word-break: break-word;
+        }
+        .tl-time { color: var(--text-muted); font-size: 10px; min-width: 65px; }
+        .tl-info { color: #80e5ff; }
+        .tl-warn { color: var(--neon-yellow); }
+        .tl-error { color: var(--neon-pink); font-weight: 700; }
+
+        /* Slide-out Drawer */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 200;
+            display: none;
+            justify-content: flex-end;
+        }
+        .drawer-overlay.active { display: flex; }
+
+        .cyber-drawer {
+            width: 620px;
+            max-width: 90vw;
+            background: var(--cyber-dark);
+            border-left: 2px solid var(--neon-cyan);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 30px rgba(0, 240, 255, 0.2);
+            animation: drawerSlide 0.25s ease-out;
+        }
+
+        @keyframes drawerSlide {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        .drawer-top {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--cyber-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #060914;
+        }
+
+        .drawer-content {
+            padding: 18px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .cyber-code {
+            background: #02040a;
+            border: 1px solid var(--cyber-border);
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: #7dd3fc;
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Toast */
+        #cyberToast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #000;
+            border: 1px solid var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+            color: #fff;
+            padding: 10px 18px;
+            font-family: var(--font-display);
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 300;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: all 0.2s;
+            pointer-events: none;
+        }
+        #cyberToast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+
+    <!-- Top Cyberpunk Bar -->
+    <header>
+        <div class="brand-zone">
+            <div class="cyber-glitch-badge">⚡</div>
+            <div class="brand-meta">
+                <h1>CYBER_<span class="highlight">CORE</span> // SGB MONITOR</h1>
+                <div class="tagline">FULL SYSTEM TELEMETRY • LIVE RADAR • ZERO-DB CACHE • AI ERROR EXPORTER</div>
+            </div>
+        </div>
+
+        <div class="controls-zone">
+            <div class="hud-status-chip">
+                <span class="cyber-pulse-dot" id="pulseDot"></span>
+                <span id="connStatus" style="color: var(--neon-cyan); font-weight: 700;">CONNECTING...</span>
+            </div>
+
+            <input type="text" id="targetServerInput" class="cyber-input" placeholder="http://localhost:5000">
+            <button class="cyber-btn" id="btnConnectServer">LINK</button>
+
+            <button class="cyber-btn cyber-btn-pink" id="btnClearCache" title="Zero-DB RAM purge">
+                🗑️ PURGE CACHE
+            </button>
+
+            <button class="cyber-btn" id="btnPauseStream">
+                ⏸️ PAUSE
+            </button>
+
+            <button class="cyber-btn cyber-btn-yellow" id="btnTriggerTest" title="Simulate 400 error & telecaller action">
+                🧪 SIMULATE
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Cockpit -->
+    <main>
+        <!-- Tactical Strip: Sweeping Radar + Metrics Deck + Vitals -->
+        <div class="tactical-hub-grid">
+            <!-- 1. Tactical Sweep Radar -->
+            <div class="radar-panel">
+                <canvas id="radarCanvas" width="220" height="220"></canvas>
+                <div class="radar-legend">
+                    <span style="color: var(--neon-cyan);">● &lt;100ms</span>
+                    <span style="color: var(--neon-yellow);">● &lt;500ms</span>
+                    <span style="color: var(--neon-pink);">● &gt;1s / ERR</span>
+                </div>
+            </div>
+
+            <!-- 2. System Status & KPIs -->
+            <div class="metrics-deck">
+                <div class="system-banner">
+                    <div class="sys-state">
+                        <span style="font-size: 18px;">🛡️</span>
+                        <div>
+                            <div class="sys-state-title" id="bannerHealthTitle">SYSTEM INTEGRITY: 100% // OPTIMAL</div>
+                            <div style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);" id="bannerSubTitle">
+                                DB CONNECTED • ZERO LOCK TIMEOUTS • IN-MEMORY RING BUFFER
+                            </div>
+                        </div>
+                    </div>
+                    <button class="cyber-btn" id="btnRefreshHealth" style="font-size: 10px; padding: 4px 10px;">
+                        ⚡ DEEP DIAGNOSTIC
+                    </button>
+                </div>
+
+                <!-- 4 KPI Cards -->
+                <div class="hud-kpi-grid">
+                    <div class="hud-card" style="--accent: var(--neon-cyan);">
+                        <span class="hud-card-label">TOTAL REQUESTS</span>
+                        <div class="hud-card-val" id="kpiTotal">0</div>
+                        <span class="hud-card-sub" id="kpiRate">0 req/sec</span>
+                    </div>
+
+                    <div class="hud-card" style="--accent: var(--neon-green);">
+                        <span class="hud-card-label">SUCCESS (2XX)</span>
+                        <div class="hud-card-val" id="kpiSuccess" style="color: var(--neon-green);">100%</div>
+                        <span class="hud-card-sub" id="kpiSuccessSub">0 successful</span>
+                    </div>
+
+                    <div class="hud-card" style="--accent: var(--neon-pink);">
+                        <span class="hud-card-label">INCIDENTS (4XX/5XX)</span>
+                        <div class="hud-card-val" id="kpiErrors" style="color: var(--neon-pink);">0</div>
+                        <span class="hud-card-sub" id="kpiErrorRate">0.0% failure</span>
+                    </div>
+
+                    <div class="hud-card" style="--accent: var(--neon-yellow);">
+                        <span class="hud-card-label">AVG LATENCY</span>
+                        <div class="hud-card-val" id="kpiLatency" style="color: var(--neon-yellow);">0 ms</div>
+                        <span class="hud-card-sub">Event loop response</span>
+                    </div>
+                </div>
+
+                <!-- Real-time Sparkline Timeline -->
+                <div class="spark-panel">
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);">
+                        <span>THROUGHPUT TIMELINE (ROLLING WINDOW)</span>
+                        <span style="color: var(--neon-cyan);">● API VOLUME &nbsp; <span style="color: var(--neon-pink);">● ERRORS</span></span>
+                    </div>
+                    <canvas id="throughputCanvas" width="900" height="70"></canvas>
+                </div>
+            </div>
+
+            <!-- 3. Server Health & Vitals Gauge -->
+            <div class="health-vitals-panel">
+                <h3>
+                    <span>🩺 HARDWARE & SERVER VITALS</span>
+                    <span id="vitalUptime" style="font-size: 10px; color: var(--neon-green);">UP: --</span>
+                </h3>
+
+                <!-- DB Status -->
+                <div class="vital-row">
+                    <div class="vital-header">
+                        <span>DATABASE (MYSQL) PING</span>
+                        <span id="vitalDbPing" style="color: var(--neon-green); font-weight: 700;">-- ms</span>
+                    </div>
+                    <div class="vital-progress">
+                        <div class="vital-bar" id="barDbPing" style="width: 100%; background: var(--neon-green);"></div>
+                    </div>
+                </div>
+
+                <!-- Event Loop Delay -->
+                <div class="vital-row">
+                    <div class="vital-header">
+                        <span>EVENT LOOP LAG</span>
+                        <span id="vitalEventLoop" style="color: var(--neon-cyan); font-weight: 700;">0 ms</span>
+                    </div>
+                    <div class="vital-progress">
+                        <div class="vital-bar" id="barEventLoop" style="width: 15%;"></div>
+                    </div>
+                </div>
+
+                <!-- Node Heap Allocation -->
+                <div class="vital-row">
+                    <div class="vital-header">
+                        <span>NODE.JS HEAP RAM</span>
+                        <span id="vitalHeap" style="color: var(--neon-yellow); font-weight: 700;">-- MB</span>
+                    </div>
+                    <div class="vital-progress">
+                        <div class="vital-bar" id="barHeap" style="width: 45%; background: var(--neon-yellow);"></div>
+                    </div>
+                </div>
+
+                <!-- System Free RAM -->
+                <div class="vital-row">
+                    <div class="vital-header">
+                        <span>SYSTEM MEMORY USED</span>
+                        <span id="vitalSysMem" style="color: var(--text-dim);">--%</span>
+                    </div>
+                    <div class="vital-progress">
+                        <div class="vital-bar" id="barSysMem" style="width: 60%; background: var(--neon-purple);"></div>
+                    </div>
+                </div>
+
+                <!-- Hardware info -->
+                <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 6px; display: flex; flex-direction: column; gap: 2px;">
+                    <div>CPU: <strong id="valCpuModel" style="color: #cbd5e1;">--</strong></div>
+                    <div>CORES: <strong id="valCpuCores" style="color: var(--neon-cyan);">--</strong> &nbsp;|&nbsp; PLATFORM: <strong id="valPlatform" style="color: #cbd5e1;">--</strong></div>
+                    <div>RAM BUFFER: <strong id="valBufferUsed" style="color: var(--neon-cyan);">0 / 2000</strong> (AUTO-PRUNES)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tactical Navigation Tabs -->
+        <div class="cyber-nav-tabs">
+            <button class="cyber-tab-btn active" data-tab="stream">
+                ⚡ REAL-TIME API STREAM
+                <span class="tab-counter" id="badgeStream">0</span>
+            </button>
+            <button class="cyber-tab-btn" data-tab="telecallers">
+                📞 TELECALLER & WORKFLOW ACTIONS
+                <span class="tab-counter" id="badgeTelecaller">0</span>
+            </button>
+            <button class="cyber-tab-btn" data-tab="errors">
+                🚨 INCIDENT & ERROR MATRIX
+                <span class="tab-counter" id="badgeErrors" style="color: var(--neon-pink); border-color: var(--neon-pink);">0</span>
+            </button>
+            <button class="cyber-tab-btn" data-tab="console">
+                💻 CYBER TERMINAL / CONSOLE LOGS
+                <span class="tab-counter" id="badgeConsole">0</span>
+            </button>
+            <button class="cyber-tab-btn" data-tab="staff">
+                👤 ACTIVE OPERATIVES / USERS
+                <span class="tab-counter" id="badgeStaff">0</span>
+            </button>
+        </div>
+
+        <!-- Toolbar & Filter -->
+        <div class="cyber-toolbar">
+            <div class="cyber-search">
+                <span style="color: var(--neon-cyan);">🔍</span>
+                <input type="text" id="cyberSearchInput" placeholder="Filter by endpoint, caller name, role, payload, or error keyword...">
+            </div>
+
+            <div class="filter-tags">
+                <span class="cyber-chip active" data-filter="all">ALL TRAFFIC</span>
+                <span class="cyber-chip chip-pink" data-filter="errors">🔴 ERRORS ONLY</span>
+                <span class="cyber-chip" data-filter="telephony">📞 TELEPHONY</span>
+                <span class="cyber-chip" data-filter="leads">👥 LEADS & CRM</span>
+                <span class="cyber-chip" data-filter="orders">📦 ORDERS</span>
+                <span class="cyber-chip" data-filter="billing">💳 BILLING & ZOHO</span>
+                <span class="cyber-chip" data-filter="webhook">⚡ WEBHOOKS</span>
+                <span class="cyber-chip" data-filter="slow">🐢 SLOW (&gt;500ms)</span>
+            </div>
+        </div>
+
+        <!-- Tab View 1: Real-Time API Stream -->
+        <div class="cyber-viewport" id="tabStream">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 85px;">TIMESTAMP</th>
+                            <th style="width: 70px;">METHOD</th>
+                            <th style="width: 80px;">STATUS</th>
+                            <th>ENDPOINT / TARGET URL</th>
+                            <th style="width: 170px;">TACTICAL MODULE</th>
+                            <th style="width: 220px;">OPERATIVE / CALLER</th>
+                            <th style="width: 90px; text-align: right;">DURATION</th>
+                            <th style="width: 95px; text-align: center;">EXPORT</th>
+                        </tr>
+                    </thead>
+                    <tbody id="streamTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab View 2: Telecaller & Workflow Actions -->
+        <div class="cyber-viewport" id="tabTelecallers" style="display: none;">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 90px;">TIME</th>
+                            <th style="width: 220px;">TELECALLER / OPERATIVE</th>
+                            <th style="width: 200px;">WORKFLOW ACTION</th>
+                            <th>TARGET PAYLOAD & CONTEXT</th>
+                            <th style="width: 100px;">STATUS</th>
+                            <th style="width: 100px; text-align: center;">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="telecallerTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab View 3: Incident & Error Matrix -->
+        <div class="cyber-viewport" id="tabErrors" style="display: none;">
+            <div style="padding: 10px 16px; border-bottom: 1px solid var(--cyber-border); display: flex; justify-content: space-between; align-items: center; background: #080c18;">
+                <span style="font-family: var(--font-display); font-size: 11px; color: var(--neon-pink);">
+                    🚨 ACTIVE INCIDENTS // READY FOR 1-CLICK AI DEBUGGING
+                </span>
+                <button class="cyber-btn cyber-btn-pink" id="btnCopyBatchErrors" style="font-size: 10px; padding: 4px 10px;">
+                    📋 COPY ALL INCIDENTS (MARKDOWN)
+                </button>
+            </div>
+            <div class="incident-deck" id="incidentListDeck"></div>
+        </div>
+
+        <!-- Tab View 4: Cyber Terminal Console Logs -->
+        <div class="cyber-viewport" id="tabConsole" style="display: none;">
+            <div style="padding: 8px 14px; border-bottom: 1px solid var(--cyber-border); display: flex; justify-content: space-between; align-items: center; background: #060914;">
+                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--neon-cyan);">
+                    ⚡ SERVER STDOUT / STDERR LIVE STREAM (IN-MEMORY)
+                </span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="cyber-btn" id="btnCopyConsoleLogs" style="font-size: 10px; padding: 3px 8px;">
+                        📋 COPY TERMINAL
+                    </button>
+                </div>
+            </div>
+            <div class="terminal-viewport" id="terminalLogContainer"></div>
+        </div>
+
+        <!-- Tab View 5: Operatives / Staff Directory -->
+        <div class="cyber-viewport" id="tabStaff" style="display: none; padding: 18px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;" id="operativesGrid"></div>
+        </div>
+    </main>
+
+    <!-- Slide-out Drawer for Payload & Stack Inspection -->
+    <div class="drawer-overlay" id="drawerOverlay">
+        <div class="cyber-drawer">
+            <div class="drawer-top">
+                <div>
+                    <h3 id="drawerEndpointTitle" style="font-family: var(--font-mono); font-size: 13px; color: var(--neon-cyan);">REQUEST INSPECT</h3>
+                    <span id="drawerTimeSub" style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);">--</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="cyber-btn" id="btnDrawerCopyAi" style="font-size: 10px;">
+                        📋 COPY FOR AI
+                    </button>
+                    <button class="cyber-btn cyber-btn-pink" id="btnCloseDrawer" style="padding: 2px 8px;">✕</button>
+                </div>
+            </div>
+            <div class="drawer-content">
+                <div>
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);">OPERATIVE CONTEXT</span>
+                    <div id="drawerCallerBox" style="margin-top: 4px; padding: 8px; background: #000; border: 1px solid var(--cyber-border); font-family: var(--font-mono); font-size: 11px;"></div>
+                </div>
+
+                <div>
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);">QUERY PARAMETERS</span>
+                    <pre class="cyber-code" id="drawerQueryBox">None</pre>
+                </div>
+
+                <div>
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);">SANITIZED REQUEST PAYLOAD</span>
+                    <pre class="cyber-code" id="drawerPayloadBox">None</pre>
+                </div>
+
+                <div>
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim);">RESPONSE PREVIEW / ERROR MESSAGE</span>
+                    <pre class="cyber-code" id="drawerResponseBox" style="color: var(--neon-green);">None</pre>
+                </div>
+
+                <div id="drawerStackWrap" style="display: none;">
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--neon-pink); font-weight: 700;">RAW STACK TRACE</span>
+                    <pre class="cyber-code" id="drawerStackBox" style="color: #fca5a5; border-color: var(--neon-pink);"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="cyberToast">📋 DIAGNOSTIC COPIED TO CLIPBOARD</div>
+
+    <!-- Application Script -->
+    <script>
+        (function() {
+            // Configuration & Initial State
+            const defaultBackendUrl = window.location.origin.includes('5000') || window.location.origin.includes('http') 
+                ? window.location.origin 
+                : 'http://localhost:5000';
+
+            let backendUrl = localStorage.getItem('sgb_cyber_monitor_url') || defaultBackendUrl;
+            let eventSource = null;
+            let isPaused = false;
+            let currentTab = 'stream';
+            let currentFilter = 'all';
+            let searchQuery = '';
+            let selectedEvent = null;
+
+            // In-Memory Ring Buffers (Zero DB)
+            const MAX_BROWSER_ITEMS = 1500;
+            let events = [];
+            let errors = [];
+            let consoleLogs = [];
+            let activeCallers = new Map();
+            let throughput = new Array(40).fill({ count: 0, errors: 0 });
+
+            // Radar Blips
+            const radarCanvas = document.getElementById('radarCanvas');
+            const radarCtx = radarCanvas.getContext('2d');
+            let radarBlips = [];
+            let radarAngle = 0;
+
+            // Sparkline
+            const sparkCanvas = document.getElementById('throughputCanvas');
+            const sparkCtx = sparkCanvas.getContext('2d');
+
+            // Elements
+            const targetServerInput = document.getElementById('targetServerInput');
+            const pulseDot = document.getElementById('pulseDot');
+            const connStatus = document.getElementById('connStatus');
+            const btnConnectServer = document.getElementById('btnConnectServer');
+            const btnClearCache = document.getElementById('btnClearCache');
+            const btnPauseStream = document.getElementById('btnPauseStream');
+            const btnTriggerTest = document.getElementById('btnTriggerTest');
+            const btnRefreshHealth = document.getElementById('btnRefreshHealth');
+            const cyberSearchInput = document.getElementById('cyberSearchInput');
+            const cyberToast = document.getElementById('cyberToast');
+
+            targetServerInput.value = backendUrl;
+
+            function toast(msg) {
+                cyberToast.textContent = msg;
+                cyberToast.classList.add('show');
+                setTimeout(() => cyberToast.classList.remove('show'), 2200);
+            }
+
+            // Connect to Backend Real-Time Stream (SSE)
+            function connectStream() {
+                if (eventSource) eventSource.close();
+
+                pulseDot.className = 'cyber-pulse-dot';
+                connStatus.textContent = 'LINKING...';
+
+                try {
+                    eventSource = new EventSource(`${backendUrl}/api/monitoring/stream`);
+
+                    eventSource.onopen = function() {
+                        pulseDot.className = 'cyber-pulse-dot online';
+                        connStatus.textContent = 'ONLINE // SSE STREAM';
+                        fetchSnapshot();
+                    };
+
+                    eventSource.addEventListener('api_event', function(e) {
+                        if (isPaused) return;
+                        try {
+                            const data = JSON.parse(e.data);
+                            processIncomingEvent(data);
+                        } catch (err) {}
+                    });
+
+                    eventSource.addEventListener('error_event', function(e) {
+                        if (isPaused) return;
+                        try {
+                            const errData = JSON.parse(e.data);
+                            processIncomingError(errData);
+                        } catch (err) {}
+                    });
+
+                    eventSource.addEventListener('console_log', function(e) {
+                        if (isPaused) return;
+                        try {
+                            const logData = JSON.parse(e.data);
+                            addConsoleLog(logData);
+                        } catch (err) {}
+                    });
+
+                    eventSource.addEventListener('cache_cleared', function() {
+                        clearLocalData();
+                        toast('RAM CACHE PURGED SUCCESSFULLY');
+                    });
+
+                    eventSource.onerror = function() {
+                        pulseDot.className = 'cyber-pulse-dot';
+                        connStatus.textContent = 'OFFLINE // RETRYING';
+                    };
+                } catch (e) {
+                    pulseDot.className = 'cyber-pulse-dot';
+                    connStatus.textContent = 'LINK FAILED';
+                }
+            }
+
+            // Fetch Initial Snapshot & Health
+            async function fetchSnapshot() {
+                try {
+                    const res = await fetch(`${backendUrl}/api/monitoring/snapshot`);
+                    if (!res.ok) return;
+                    const snap = await res.json();
+
+                    if (snap.recentEvents) events = snap.recentEvents;
+                    if (snap.recentErrors) errors = snap.recentErrors;
+                    if (snap.recentConsoleLogs) consoleLogs = snap.recentConsoleLogs;
+                    if (snap.activeCallers) {
+                        snap.activeCallers.forEach(c => activeCallers.set(c.id || c.name, c));
+                    }
+
+                    updateKPIs(snap.stats);
+                    updateHealthVitals(snap.system);
+                    renderActiveTab();
+                } catch (e) {
+                    console.warn('Snapshot fetch failed:', e);
+                }
+            }
+
+            // Deep Health Check Trigger
+            async function runDeepHealth() {
+                try {
+                    const res = await fetch(`${backendUrl}/api/monitoring/health`);
+                    if (!res.ok) return;
+                    const health = await res.json();
+                    updateHealthVitals(health);
+                    toast('DIAGNOSTIC COMPLETE: ALL VITALS UPDATED');
+                } catch (e) {
+                    toast('HEALTH CHECK FAILED');
+                }
+            }
+
+            // Process incoming API call
+            function processIncomingEvent(ev) {
+                events.unshift(ev);
+                if (events.length > MAX_BROWSER_ITEMS) events.pop();
+
+                if (ev.user && (ev.user.id || ev.user.name)) {
+                    activeCallers.set(ev.user.id || ev.user.name, {
+                        ...ev.user,
+                        lastSeen: Date.now()
+                    });
+                }
+
+                // Push radar blip
+                addRadarBlip(ev);
+
+                // Throughput chart
+                const cur = throughput[throughput.length - 1];
+                cur.count++;
+                if (ev.statusCode >= 400) cur.errors++;
+
+                updateKPIsFromBuffers();
+                renderActiveTab();
+            }
+
+            function processIncomingError(err) {
+                const exists = errors.some(e => e.id === err.id);
+                if (!exists) {
+                    errors.unshift(err);
+                    if (errors.length > 500) errors.pop();
+                    if (currentTab === 'errors') renderErrors();
+                }
+            }
+
+            function addConsoleLog(log) {
+                consoleLogs.unshift(log);
+                if (consoleLogs.length > 1000) consoleLogs.pop();
+                if (currentTab === 'console') renderConsole();
+                document.getElementById('badgeConsole').textContent = consoleLogs.length;
+            }
+
+            // Radar Blip Logic
+            function addRadarBlip(ev) {
+                // Map latency to radius
+                const dur = ev.duration || 20;
+                let radius = 25; // 0 - 50ms inner
+                if (dur > 50 && dur <= 200) radius = 55;
+                else if (dur > 200 && dur <= 600) radius = 80;
+                else if (dur > 600) radius = 100;
+
+                // Random angle
+                const angle = Math.random() * Math.PI * 2;
+                const isError = ev.statusCode >= 400;
+
+                radarBlips.push({
+                    x: Math.cos(angle) * radius,
+                    y: Math.sin(angle) * radius,
+                    color: isError ? '#ff0055' : (dur > 400 ? '#ffe600' : '#00f0ff'),
+                    life: 1.0,
+                    size: isError ? 5 : 3.5,
+                    endpoint: ev.url
+                });
+
+                if (radarBlips.length > 35) radarBlips.shift();
+            }
+
+            // Clear Cache Action
+            async function purgeCache() {
+                try {
+                    await fetch(`${backendUrl}/api/monitoring/clear`, { method: 'POST' });
+                } catch (e) {}
+                clearLocalData();
+                toast('RAM CACHE PURGED (ZERO DB IMPACT)');
+            }
+
+            function clearLocalData() {
+                events = [];
+                errors = [];
+                consoleLogs = [];
+                activeCallers.clear();
+                radarBlips = [];
+                throughput = new Array(40).fill({ count: 0, errors: 0 });
+                updateKPIsFromBuffers();
+                renderActiveTab();
+            }
+
+            // Update KPI Displays
+            function updateKPIs(stats) {
+                if (!stats) return;
+                document.getElementById('kpiTotal').textContent = stats.totalRequests || events.length;
+                document.getElementById('kpiErrors').textContent = (stats.status4xx + stats.status5xx) || errors.length;
+                document.getElementById('kpiErrorRate').textContent = `${stats.errorRatePercent || 0}% failure`;
+                document.getElementById('kpiLatency').textContent = `${stats.avgLatencyMs || 0} ms`;
+                
+                const succPct = stats.totalRequests > 0 
+                    ? (((stats.status2xx) / stats.totalRequests) * 100).toFixed(1) 
+                    : '100';
+                document.getElementById('kpiSuccess').textContent = `${succPct}%`;
+                document.getElementById('kpiSuccessSub').textContent = `${stats.status2xx || 0} successful (2xx)`;
+
+                document.getElementById('badgeStream').textContent = events.length;
+                document.getElementById('badgeErrors').textContent = errors.length;
+                document.getElementById('badgeStaff').textContent = activeCallers.size;
+            }
+
+            function updateKPIsFromBuffers() {
+                const total = events.length;
+                const errs = events.filter(e => e.statusCode >= 400).length;
+                const avgLat = total > 0 ? Math.round(events.reduce((a, b) => a + (b.duration || 0), 0) / total) : 0;
+                
+                document.getElementById('kpiTotal').textContent = total;
+                document.getElementById('kpiErrors').textContent = errs;
+                document.getElementById('kpiLatency').textContent = `${avgLat} ms`;
+                document.getElementById('badgeStream').textContent = total;
+                document.getElementById('badgeErrors').textContent = errors.length;
+                document.getElementById('badgeStaff').textContent = activeCallers.size;
+            }
+
+            // Update Health Vitals Display
+            function updateHealthVitals(h) {
+                if (!h) return;
+
+                // Status Banner
+                const isHealthy = h.status === 'HEALTHY';
+                const bannerTitle = document.getElementById('bannerHealthTitle');
+                bannerTitle.textContent = isHealthy ? 'SYSTEM INTEGRITY: 100% // ALL SYSTEMS NOMINAL' : `SYSTEM STATUS: ${h.status} // ATTENTION REQUIRED`;
+                bannerTitle.style.color = isHealthy ? 'var(--neon-green)' : 'var(--neon-pink)';
+
+                // DB
+                const dbPing = h.db?.latencyMs !== null ? `${h.db.latencyMs} ms` : 'DISCONNECTED';
+                document.getElementById('vitalDbPing').textContent = dbPing;
+                document.getElementById('barDbPing').style.width = h.db?.connected ? '100%' : '0%';
+
+                // Event loop
+                const loopLag = h.eventLoop?.lagMs || 0;
+                document.getElementById('vitalEventLoop').textContent = `${loopLag} ms`;
+                document.getElementById('barEventLoop').style.width = `${Math.min(100, loopLag * 2)}%`;
+
+                // Heap
+                const heapUsed = h.memory?.heapUsedMB || 0;
+                const heapTotal = h.memory?.heapTotalMB || 1;
+                const heapPct = Math.round((heapUsed / heapTotal) * 100);
+                document.getElementById('vitalHeap').textContent = `${heapUsed} / ${heapTotal} MB`;
+                document.getElementById('barHeap').style.width = `${heapPct}%`;
+
+                // System Mem
+                const sysPct = h.memory?.systemUsagePct || 50;
+                document.getElementById('vitalSysMem').textContent = `${sysPct}% used (${h.memory?.systemFreeMB || 0} MB free)`;
+                document.getElementById('barSysMem').style.width = `${sysPct}%`;
+
+                // Hardware
+                document.getElementById('vitalUptime').textContent = `UP: ${h.uptimeFormatted || '--'}`;
+                document.getElementById('valCpuModel').textContent = (h.cpu?.model || 'Generic').substring(0, 24);
+                document.getElementById('valCpuCores').textContent = h.cpu?.cores || '--';
+                document.getElementById('valPlatform').textContent = h.process?.platform || '--';
+                document.getElementById('valBufferUsed').textContent = `${h.bufferStatus?.eventsInMemory || events.length} / ${h.bufferStatus?.maxEventsLimit || 2000}`;
+            }
+
+            // Render Active Tab View
+            function renderActiveTab() {
+                if (currentTab === 'stream') renderStream();
+                else if (currentTab === 'telecallers') renderTelecallers();
+                else if (currentTab === 'errors') renderErrors();
+                else if (currentTab === 'console') renderConsole();
+                else if (currentTab === 'staff') renderStaff();
+            }
+
+            // 1. Render Live Stream
+            function renderStream() {
+                const filtered = filterEvents(events).slice(0, 120);
+                const tbody = document.getElementById('streamTableBody');
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">NO ACTIVE TRAFFIC MATCHES CURRENT FILTER</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = filtered.map(ev => {
+                    const statusClass = ev.statusCode >= 500 ? 'st-5xx' : (ev.statusCode >= 400 ? 'st-4xx' : (ev.statusCode >= 300 ? 'st-3xx' : 'st-2xx'));
+                    const isErr = ev.statusCode >= 400;
+                    const callerName = ev.user?.name || 'Guest / Public';
+                    const callerRole = ev.user?.role || 'guest';
+                    const roleClass = `rp-${callerRole.replace(/\s+/g, '-').toLowerCase()}`;
+
+                    return `
+                        <tr class="${isErr ? 'tr-error' : ''}" onclick="window.inspectEvent('${ev.id}')">
+                            <td style="color: var(--text-dim);">${formatTime(ev.timestamp)}</td>
+                            <td><span class="method-tag m-${ev.method}">${ev.method}</span></td>
+                            <td><span class="status-tag ${statusClass}">${ev.statusCode}</span></td>
+                            <td style="color: #fff;">
+                                <div>${escapeHtml(ev.url)}</div>
+                                ${ev.errorMessage ? `<div style="color: var(--neon-pink); font-size: 10px;">⚠️ ${escapeHtml(ev.errorMessage)}</div>` : ''}
+                            </td>
+                            <td><span style="color: var(--neon-cyan); font-size: 11px;">${ev.actionCategory || 'API'}</span></td>
+                            <td>
+                                <div class="caller-chip">
+                                    <span class="role-pill ${roleClass}">${callerRole}</span>
+                                    <span>${escapeHtml(callerName)}</span>
+                                </div>
+                            </td>
+                            <td style="text-align: right; color: ${ev.duration > 400 ? 'var(--neon-yellow)' : 'var(--text-dim)'};">${ev.duration} ms</td>
+                            <td style="text-align: center;">
+                                <button class="cyber-btn" style="padding: 2px 6px; font-size: 9px;" onclick="event.stopPropagation(); window.copyAiContext('${ev.id}')">📋 COPY</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // 2. Render Telecallers
+            function renderTelecallers() {
+                const telecallerEvents = events.filter(e => 
+                    e.badge === 'telephony' || 
+                    e.user?.role?.includes('telecaller') || 
+                    e.url?.includes('telephony') || 
+                    e.url?.includes('leads')
+                );
+                document.getElementById('badgeTelecaller').textContent = telecallerEvents.length;
+                const tbody = document.getElementById('telecallerTableBody');
+
+                if (telecallerEvents.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">NO TELECALLER OR CALLING ACTIONS RECORDED</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = telecallerEvents.slice(0, 100).map(ev => {
+                    const isErr = ev.statusCode >= 400;
+                    let actionText = ev.actionCategory;
+                    if (ev.url.includes('click-to-call')) actionText = '📞 OUTBOUND CALL TRIGGER';
+                    else if (ev.url.includes('hangup')) actionText = '📴 HANGUP CALL';
+                    else if (ev.url.includes('cdr')) actionText = '📋 CALL LOG SYNC';
+                    else if (ev.url.includes('assign')) actionText = '👥 ADMIN LEAD RE-ASSIGN';
+                    else if (ev.method === 'PUT' && ev.url.includes('leads')) actionText = '📝 LEAD STATUS UPDATE';
+
+                    return `
+                        <tr class="${isErr ? 'tr-error' : ''}" onclick="window.inspectEvent('${ev.id}')">
+                            <td style="color: var(--text-dim);">${formatTime(ev.timestamp)}</td>
+                            <td>
+                                <div class="caller-chip">
+                                    <span class="role-pill rp-telecaller">${ev.user?.role || 'telecaller'}</span>
+                                    <strong>${escapeHtml(ev.user?.name || 'Telecaller')}</strong>
+                                </div>
+                            </td>
+                            <td><strong style="color: var(--neon-yellow);">${actionText}</strong></td>
+                            <td style="color: #cbd5e1; font-size: 11px;">
+                                ${ev.payload ? escapeHtml(JSON.stringify(ev.payload).substring(0, 95)) : escapeHtml(ev.url)}
+                                ${ev.errorMessage ? `<div style="color: var(--neon-pink); font-size: 10px;">❌ FAILED: ${escapeHtml(ev.errorMessage)}</div>` : ''}
+                            </td>
+                            <td><span class="status-tag ${isErr ? 'st-5xx' : 'st-2xx'}">${isErr ? 'FAILED' : 'SUCCESS'}</span></td>
+                            <td style="text-align: center;">
+                                <button class="cyber-btn" style="padding: 2px 6px; font-size: 9px;" onclick="event.stopPropagation(); window.copyAiContext('${ev.id}')">📋 COPY</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // 3. Render Incidents & Errors
+            function renderErrors() {
+                const container = document.getElementById('incidentListDeck');
+                if (errors.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 60px; color: var(--neon-green);">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
+                            <strong style="font-family: var(--font-display);">ZERO ACTIVE INCIDENTS</strong>
+                            <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-top: 4px;">Backend in-memory error buffer is clean.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = errors.slice(0, 60).map(err => {
+                    const caller = err.user?.name ? `${err.user.name} (${err.user.role || 'user'})` : 'System / External';
+                    return `
+                        <div class="incident-card">
+                            <div class="incident-top">
+                                <div class="incident-meta">
+                                    <span class="status-tag st-5xx">${err.statusCode || 500}</span>
+                                    <span class="method-tag m-${err.method || 'GET'}">${err.method || 'ERR'}</span>
+                                    <strong style="color: #fff;">${escapeHtml(err.url || '')}</strong>
+                                    <span style="color: var(--text-dim);">${formatTime(err.timestamp)}</span>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span class="caller-chip" style="font-size: 10px;">${escapeHtml(caller)}</span>
+                                    <button class="cyber-btn cyber-btn-pink" style="font-size: 10px; padding: 3px 10px;" onclick="window.copyAiContext('${err.id}')">
+                                        📋 COPY FOR AI
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="incident-msg">⚠️ ${escapeHtml(err.errorMessage || 'Unknown Server Error')}</div>
+                            ${err.stack ? `<pre class="incident-stack">${escapeHtml(err.stack)}</pre>` : ''}
+                            ${err.payload ? `<div style="font-size: 10px; color: var(--text-dim); font-family: var(--font-mono);">PAYLOAD: <code>${escapeHtml(JSON.stringify(err.payload))}</code></div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // 4. Render Console Logs
+            function renderConsole() {
+                const term = document.getElementById('terminalLogContainer');
+                if (consoleLogs.length === 0) {
+                    term.innerHTML = `<div style="color: var(--text-muted); padding: 20px;">No console logs captured yet.</div>`;
+                    return;
+                }
+
+                term.innerHTML = consoleLogs.slice(0, 150).map(l => {
+                    const colorClass = l.level === 'error' ? 'tl-error' : (l.level === 'warn' ? 'tl-warn' : 'tl-info');
+                    return `
+                        <div class="term-line">
+                            <span class="tl-time">${formatTime(l.timestamp)}</span>
+                            <span class="${colorClass}">${escapeHtml(l.text)}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // 5. Render Operatives
+            function renderStaff() {
+                const grid = document.getElementById('operativesGrid');
+                const list = Array.from(activeCallers.values());
+
+                if (list.length === 0) {
+                    grid.innerHTML = `<div style="color: var(--text-muted); grid-column: 1 / -1; text-align: center; padding: 40px;">No authenticated operative sessions logged yet.</div>`;
+                    return;
+                }
+
+                grid.innerHTML = list.map(st => {
+                    const roleClass = `rp-${(st.role || 'user').toLowerCase().replace(/\s+/g, '-')}`;
+                    return `
+                        <div style="background: #000; border: 1px solid var(--cyber-border); padding: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <strong style="color: #fff; font-family: var(--font-tech); font-size: 13px;">${escapeHtml(st.name || 'Operative')}</strong>
+                                <span class="role-pill ${roleClass}">${st.role || 'user'}</span>
+                            </div>
+                            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); display: flex; flex-direction: column; gap: 2px;">
+                                <div>ID: #${st.id || 'N/A'}</div>
+                                <div>EMAIL: ${escapeHtml(st.email || 'N/A')}</div>
+                                <div>LAST SEEN: ${formatTime(st.lastSeen || new Date())}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Filter Helper
+            function filterEvents(list) {
+                return list.filter(item => {
+                    if (currentFilter === 'errors' && item.statusCode < 400) return false;
+                    if (currentFilter === 'telephony' && item.badge !== 'telephony') return false;
+                    if (currentFilter === 'leads' && item.badge !== 'leads') return false;
+                    if (currentFilter === 'orders' && item.badge !== 'orders') return false;
+                    if (currentFilter === 'billing' && item.badge !== 'billing') return false;
+                    if (currentFilter === 'webhook' && item.badge !== 'webhook') return false;
+                    if (currentFilter === 'slow' && (item.duration || 0) < 500) return false;
+
+                    if (searchQuery) {
+                        const q = searchQuery.toLowerCase();
+                        return (item.url || '').toLowerCase().includes(q) ||
+                               (item.user?.name || '').toLowerCase().includes(q) ||
+                               (item.errorMessage || '').toLowerCase().includes(q) ||
+                               String(item.statusCode).includes(q);
+                    }
+                    return true;
+                });
+            }
+
+            // Radar Animation Loop (Sweeping beam)
+            function drawRadar() {
+                const w = radarCanvas.width;
+                const h = radarCanvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+
+                radarCtx.clearRect(0, 0, w, h);
+
+                // Background grid & concentric rings
+                radarCtx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+                radarCtx.lineWidth = 1;
+
+                [25, 55, 80, 102].forEach(r => {
+                    radarCtx.beginPath();
+                    radarCtx.arc(cx, cy, r, 0, Math.PI * 2);
+                    radarCtx.stroke();
+                });
+
+                // Crosshairs
+                radarCtx.beginPath();
+                radarCtx.moveTo(cx, 8);
+                radarCtx.lineTo(cx, h - 8);
+                radarCtx.moveTo(8, cy);
+                radarCtx.lineTo(w - 8, cy);
+                radarCtx.stroke();
+
+                // Rotating sweep beam
+                radarAngle += 0.045;
+                if (radarAngle >= Math.PI * 2) radarAngle = 0;
+
+                const sweepGradient = radarCtx.createRadialGradient(cx, cy, 10, cx, cy, 105);
+                sweepGradient.addColorStop(0, 'rgba(0, 240, 255, 0.25)');
+                sweepGradient.addColorStop(1, 'rgba(0, 240, 255, 0.0)');
+
+                radarCtx.save();
+                radarCtx.translate(cx, cy);
+                radarCtx.beginPath();
+                radarCtx.moveTo(0, 0);
+                radarCtx.arc(0, 0, 102, radarAngle - 0.5, radarAngle);
+                radarCtx.closePath();
+                radarCtx.fillStyle = sweepGradient;
+                radarCtx.fill();
+
+                // Draw beam front line
+                radarCtx.beginPath();
+                radarCtx.moveTo(0, 0);
+                radarCtx.lineTo(Math.cos(radarAngle) * 102, Math.sin(radarAngle) * 102);
+                radarCtx.strokeStyle = 'rgba(0, 240, 255, 0.9)';
+                radarCtx.lineWidth = 1.5;
+                radarCtx.stroke();
+
+                // Draw blips
+                radarBlips.forEach(blip => {
+                    radarCtx.beginPath();
+                    radarCtx.arc(blip.x, blip.y, blip.size * blip.life, 0, Math.PI * 2);
+                    radarCtx.fillStyle = blip.color;
+                    radarCtx.globalAlpha = blip.life;
+                    radarCtx.shadowColor = blip.color;
+                    radarCtx.shadowBlur = 8;
+                    radarCtx.fill();
+                    radarCtx.shadowBlur = 0;
+                    radarCtx.globalAlpha = 1.0;
+
+                    blip.life -= 0.006;
+                });
+                radarBlips = radarBlips.filter(b => b.life > 0);
+
+                radarCtx.restore();
+
+                requestAnimationFrame(drawRadar);
+            }
+
+            // Draw Throughput Sparkline
+            function drawThroughput() {
+                const w = sparkCanvas.width = sparkCanvas.offsetWidth;
+                const h = sparkCanvas.height = sparkCanvas.offsetHeight;
+                sparkCtx.clearRect(0, 0, w, h);
+
+                const step = w / (throughput.length - 1);
+                const maxVal = Math.max(5, ...throughput.map(p => p.count));
+
+                // Volume fill
+                sparkCtx.beginPath();
+                sparkCtx.strokeStyle = '#00f0ff';
+                sparkCtx.fillStyle = 'rgba(0, 240, 255, 0.12)';
+                sparkCtx.lineWidth = 1.5;
+
+                throughput.forEach((pt, i) => {
+                    const x = i * step;
+                    const y = h - (pt.count / maxVal) * (h - 15) - 4;
+                    if (i === 0) sparkCtx.moveTo(x, y);
+                    else sparkCtx.lineTo(x, y);
+                });
+                sparkCtx.lineTo(w, h);
+                sparkCtx.lineTo(0, h);
+                sparkCtx.closePath();
+                sparkCtx.fill();
+
+                // Errors
+                throughput.forEach((pt, i) => {
+                    if (pt.errors > 0) {
+                        const x = i * step;
+                        const y = h - (pt.count / maxVal) * (h - 15) - 4;
+                        sparkCtx.beginPath();
+                        sparkCtx.arc(x, y, 3.5, 0, Math.PI * 2);
+                        sparkCtx.fillStyle = '#ff0055';
+                        sparkCtx.shadowColor = '#ff0055';
+                        sparkCtx.shadowBlur = 6;
+                        sparkCtx.fill();
+                        sparkCtx.shadowBlur = 0;
+                    }
+                });
+            }
+
+            setInterval(() => {
+                throughput.shift();
+                throughput.push({ count: 0, errors: 0 });
+                drawThroughput();
+            }, 3000);
+
+            // Drawer Deep Dive
+            window.inspectEvent = function(id) {
+                const ev = events.find(e => e.id === id) || errors.find(e => e.id === id);
+                if (!ev) return;
+                selectedEvent = ev;
+
+                document.getElementById('drawerEndpointTitle').textContent = `${ev.method} ${ev.url}`;
+                document.getElementById('drawerTimeSub').textContent = `${ev.timestamp} // ${ev.duration || 0}ms`;
+
+                document.getElementById('drawerCallerBox').innerHTML = `
+                    <div>OPERATIVE: <strong>${escapeHtml(ev.user?.name || 'Guest')}</strong> (Role: ${ev.user?.role || 'guest'}, ID: #${ev.user?.id || 'N/A'})</div>
+                    <div>STATUS: <strong style="color: ${ev.statusCode >= 400 ? 'var(--neon-pink)' : 'var(--neon-green)'};">${ev.statusCode}</strong> &nbsp;|&nbsp; IP: ${ev.ip || '127.0.0.1'}</div>
+                `;
+
+                document.getElementById('drawerQueryBox').textContent = ev.query ? JSON.stringify(ev.query, null, 2) : 'None';
+                document.getElementById('drawerPayloadBox').textContent = ev.payload ? JSON.stringify(ev.payload, null, 2) : 'None';
+                document.getElementById('drawerResponseBox').textContent = ev.errorMessage || ev.responseSnippet || 'None';
+
+                const stackWrap = document.getElementById('drawerStackWrap');
+                if (ev.stack) {
+                    stackWrap.style.display = 'block';
+                    document.getElementById('drawerStackBox').textContent = ev.stack;
+                } else {
+                    stackWrap.style.display = 'none';
+                }
+
+                document.getElementById('drawerOverlay').classList.add('active');
+            };
+
+            // 1-Click Copy For AI
+            window.copyAiContext = function(id) {
+                const item = events.find(e => e.id === id) || errors.find(e => e.id === id) || selectedEvent;
+                if (!item) return;
+
+                const caller = item.user?.name ? `${item.user.name} (Role: ${item.user.role || 'user'}, ID: #${item.user.id || 'N/A'})` : 'Unauthenticated / External';
+
+                const md = [
+                    `### 🚨 SGB CRM Telemetry Incident Diagnostic`,
+                    `- **Timestamp:** ${item.timestamp}`,
+                    `- **Endpoint:** \`${item.method} ${item.url}\``,
+                    `- **HTTP Status:** \`${item.statusCode}\``,
+                    `- **Duration:** ${item.duration || 0} ms`,
+                    `- **Operative / Caller:** ${caller}`,
+                    `- **Module:** ${item.actionCategory || 'API'}`,
+                    item.errorMessage ? `- **Error Message:** ${item.errorMessage}` : null,
+                    item.query ? `\n**Query Params:**\n\`\`\`json\n${JSON.stringify(item.query, null, 2)}\n\`\`\`` : null,
+                    item.payload ? `\n**Request Payload:**\n\`\`\`json\n${JSON.stringify(item.payload, null, 2)}\n\`\`\`` : null,
+                    item.responseSnippet ? `\n**Response Preview:**\n\`\`\`json\n${item.responseSnippet}\n\`\`\`` : null,
+                    item.stack ? `\n**Stack Trace:**\n\`\`\`\n${item.stack}\n\`\`\`` : null
+                ].filter(Boolean).join('\n');
+
+                navigator.clipboard.writeText(md).then(() => {
+                    toast('📋 COPIED TO CLIPBOARD! READY TO PASTE INTO AI CHAT');
+                });
+            };
+
+            // Copy Batch Incidents
+            document.getElementById('btnCopyBatchErrors').addEventListener('click', () => {
+                if (errors.length === 0) {
+                    toast('NO ACTIVE INCIDENTS TO COPY');
+                    return;
+                }
+                const reports = errors.map((e, idx) => {
+                    return `#### Incident #${idx + 1}: ${e.method} ${e.url} (${e.statusCode})\n` +
+                           `- Time: ${e.timestamp} | Operative: ${e.user?.name || 'System'} (${e.user?.role || 'N/A'})\n` +
+                           `- Message: ${e.errorMessage || 'Error'}\n` +
+                           (e.stack ? `\`\`\`\n${e.stack}\n\`\`\`\n` : '');
+                }).join('\n---\n\n');
+
+                navigator.clipboard.writeText(`### 🚨 SGB CRM BATCH INCIDENT REPORT (${errors.length} errors)\n\n${reports}`).then(() => {
+                    toast(`📋 COPIED ALL ${errors.length} INCIDENTS`);
+                });
+            });
+
+            // Copy Console Logs
+            document.getElementById('btnCopyConsoleLogs').addEventListener('click', () => {
+                if (consoleLogs.length === 0) {
+                    toast('NO CONSOLE LOGS');
+                    return;
+                }
+                const txt = consoleLogs.map(l => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.text}`).join('\n');
+                navigator.clipboard.writeText(txt).then(() => {
+                    toast('📋 COPIED CONSOLE LOGS');
+                });
+            });
+
+            // Event Listeners
+            btnConnectServer.addEventListener('click', () => {
+                backendUrl = targetServerInput.value.trim().replace(/\/$/, '');
+                localStorage.setItem('sgb_cyber_monitor_url', backendUrl);
+                connectStream();
+                toast(`LINKING TO ${backendUrl}...`);
+            });
+
+            btnClearCache.addEventListener('click', purgeCache);
+            btnRefreshHealth.addEventListener('click', runDeepHealth);
+
+            btnPauseStream.addEventListener('click', () => {
+                isPaused = !isPaused;
+                btnPauseStream.textContent = isPaused ? '▶️ RESUME' : '⏸️ PAUSE';
+                toast(isPaused ? 'STREAM PAUSED' : 'STREAM RESUMED');
+            });
+
+            // Developer Simulation Test
+            btnTriggerTest.addEventListener('click', async () => {
+                try {
+                    await fetch(`${backendUrl}/api/monitoring/test-telecaller`, { method: 'POST' });
+                    await fetch(`${backendUrl}/api/monitoring/test-error`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: '400' })
+                    });
+                    toast('🧪 FIRED TEST TELECALLER & 400 ERROR');
+                } catch (e) {
+                    toast('SIMULATION FAILED');
+                }
+            });
+
+            // Tab Navigation
+            document.querySelectorAll('.cyber-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.cyber-tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTab = btn.getAttribute('data-tab');
+
+                    document.getElementById('tabStream').style.display = currentTab === 'stream' ? 'flex' : 'none';
+                    document.getElementById('tabTelecallers').style.display = currentTab === 'telecallers' ? 'flex' : 'none';
+                    document.getElementById('tabErrors').style.display = currentTab === 'errors' ? 'flex' : 'none';
+                    document.getElementById('tabConsole').style.display = currentTab === 'console' ? 'flex' : 'none';
+                    document.getElementById('tabStaff').style.display = currentTab === 'staff' ? 'flex' : 'none';
+
+                    renderActiveTab();
+                });
+            });
+
+            // Filter Chips
+            document.querySelectorAll('.cyber-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('.cyber-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    currentFilter = chip.getAttribute('data-filter');
+                    renderActiveTab();
+                });
+            });
+
+            // Search
+            cyberSearchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value.trim();
+                renderActiveTab();
+            });
+
+            // Drawer
+            document.getElementById('btnCloseDrawer').addEventListener('click', () => {
+                document.getElementById('drawerOverlay').classList.remove('active');
+            });
+            document.getElementById('drawerOverlay').addEventListener('click', (e) => {
+                if (e.target.id === 'drawerOverlay') {
+                    document.getElementById('drawerOverlay').classList.remove('active');
+                }
+            });
+            document.getElementById('btnDrawerCopyAi').addEventListener('click', () => {
+                if (selectedEvent) window.copyAiContext(selectedEvent.id);
+            });
+
+            // Helpers
+            function formatTime(isoStr) {
+                if (!isoStr) return '';
+                const d = new Date(isoStr);
+                return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            // Init
+            connectStream();
+            drawRadar();
+            drawThroughput();
+            // Periodic health poll every 10s
+            setInterval(runDeepHealth, 10000);
+        })();
+    </script>
+</body>
+</html>

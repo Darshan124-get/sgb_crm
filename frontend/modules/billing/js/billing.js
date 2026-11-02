@@ -1,3 +1,5 @@
+window.BILLING_API_URL = window.BILLING_API_URL || (window.API_URL ? `${window.API_URL}/billing` : 'http://127.0.0.1:5000/api/billing');
+var BILLING_API_URL = window.BILLING_API_URL;
 let currentOrder = null;
 
 window.openOrderBilling = async function (orderId) {
@@ -76,11 +78,547 @@ window.updateDiscount = function(val) {
     }
 };
 
-window.renderWorkstation = function() {
+const INDIAN_STATES = [
+    { code: 'AP', name: 'Andhra Pradesh' },
+    { code: 'AR', name: 'Arunachal Pradesh' },
+    { code: 'AS', name: 'Assam' },
+    { code: 'BR', name: 'Bihar' },
+    { code: 'CG', name: 'Chhattisgarh' },
+    { code: 'GA', name: 'Goa' },
+    { code: 'GJ', name: 'Gujarat' },
+    { code: 'HR', name: 'Haryana' },
+    { code: 'HP', name: 'Himachal Pradesh' },
+    { code: 'JH', name: 'Jharkhand' },
+    { code: 'KA', name: 'Karnataka' },
+    { code: 'KL', name: 'Kerala' },
+    { code: 'MP', name: 'Madhya Pradesh' },
+    { code: 'MH', name: 'Maharashtra' },
+    { code: 'MN', name: 'Manipur' },
+    { code: 'ML', name: 'Meghalaya' },
+    { code: 'MZ', name: 'Mizoram' },
+    { code: 'NL', name: 'Nagaland' },
+    { code: 'OR', name: 'Odisha' },
+    { code: 'PB', name: 'Punjab' },
+    { code: 'RJ', name: 'Rajasthan' },
+    { code: 'SK', name: 'Sikkim' },
+    { code: 'TN', name: 'Tamil Nadu' },
+    { code: 'TG', name: 'Telangana' },
+    { code: 'TR', name: 'Tripura' },
+    { code: 'UP', name: 'Uttar Pradesh' },
+    { code: 'UK', name: 'Uttarakhand' },
+    { code: 'WB', name: 'West Bengal' },
+    { code: 'AN', name: 'Andaman and Nicobar Islands' },
+    { code: 'CH', name: 'Chandigarh' },
+    { code: 'DN', name: 'Dadra and Nagar Haveli and Daman and Diu' },
+    { code: 'DL', name: 'Delhi' },
+    { code: 'JK', name: 'Jammu and Kashmir' },
+    { code: 'LA', name: 'Ladakh' },
+    { code: 'LD', name: 'Lakshadweep' },
+    { code: 'PY', name: 'Puducherry' }
+];
+
+let currentWorkstationStep = 1;
+let currentZohoSubTab = 'other_details';
+
+window.switchWorkstationStep = function(step) {
+    currentWorkstationStep = step;
+    window.renderWorkstation(step);
+};
+
+window.switchZohoSubTab = function(tabName) {
+    currentZohoSubTab = tabName;
+    const tabOther = document.getElementById('zohoTabContentOther');
+    const tabAddress = document.getElementById('zohoTabContentAddress');
+    const btnOther = document.getElementById('btnZohoTabOther');
+    const btnAddress = document.getElementById('btnZohoTabAddress');
+
+    if (tabName === 'other_details') {
+        if (tabOther) tabOther.style.display = 'block';
+        if (tabAddress) tabAddress.style.display = 'none';
+        if (btnOther) { btnOther.style.borderBottom = '3px solid #3b82f6'; btnOther.style.color = '#1e293b'; btnOther.style.fontWeight = '700'; }
+        if (btnAddress) { btnAddress.style.borderBottom = '3px solid transparent'; btnAddress.style.color = '#64748b'; btnAddress.style.fontWeight = '500'; }
+    } else {
+        if (tabOther) tabOther.style.display = 'none';
+        if (tabAddress) tabAddress.style.display = 'block';
+        if (btnOther) { btnOther.style.borderBottom = '3px solid transparent'; btnOther.style.color = '#64748b'; btnOther.style.fontWeight = '500'; }
+        if (btnAddress) { btnAddress.style.borderBottom = '3px solid #3b82f6'; btnAddress.style.color = '#1e293b'; btnAddress.style.fontWeight = '700'; }
+    }
+};
+
+window.copyBillingToShippingAddress = function() {
+    const fields = [
+        ['zohoBillAttention', 'zohoShipAttention'],
+        ['zohoBillStreet1', 'zohoShipStreet1'],
+        ['zohoBillStreet2', 'zohoShipStreet2'],
+        ['zohoBillCity', 'zohoShipCity'],
+        ['zohoBillState', 'zohoShipState'],
+        ['zohoBillPincode', 'zohoShipPincode'],
+        ['zohoBillPhone', 'zohoShipPhone']
+    ];
+    fields.forEach(([src, dst]) => {
+        const srcEl = document.getElementById(src);
+        const dstEl = document.getElementById(dst);
+        if (srcEl && dstEl) dstEl.value = srcEl.value;
+    });
+    if (window.showAlert) {
+        window.showAlert('Copied!', 'Billing address copied to shipping address.', 'success');
+    }
+};
+
+window.renderWorkstation = function(step = 1) {
+    currentWorkstationStep = step;
+    const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
     const data = currentOrder;
-    
-    const subtotal = data.items.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity, 10)), 0);
+    if (!data) return;
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">
+                    ${step === 1 ? 'Step 1: Create Customer in Zoho Books' : 'Step 2: Sales Order Creation'}
+                </span>
+                <span style="font-size: 0.75rem; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 6px; font-weight: 700;">
+                    ORDER #${data.order_id}
+                </span>
+            </div>
+        `;
+    }
+
+    // Step Progress Bar
+    const progressBar = `
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; gap: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+            <div onclick="switchWorkstationStep(1)" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 1rem; border-radius: 8px; background: ${step === 1 ? '#eff6ff' : 'transparent'}; border: 1px solid ${step === 1 ? '#93c5fd' : 'transparent'};">
+                <span style="width: 24px; height: 24px; border-radius: 50%; background: ${step === 1 ? '#3b82f6' : (data.zoho_contact_id ? '#10b981' : '#cbd5e1')}; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem;">
+                    ${data.zoho_contact_id ? '✓' : '1'}
+                </span>
+                <span style="font-size: 0.85rem; font-weight: 700; color: ${step === 1 ? '#1d4ed8' : '#64748b'};">
+                    1. Customer Details (Zoho)
+                </span>
+            </div>
+
+            <i class="fa-solid fa-arrow-right" style="color: #cbd5e1; font-size: 0.8rem;"></i>
+
+            <div onclick="${data.zoho_contact_id ? 'switchWorkstationStep(2)' : ''}" style="display: flex; align-items: center; gap: 0.5rem; cursor: ${data.zoho_contact_id ? 'pointer' : 'not-allowed'}; opacity: ${data.zoho_contact_id || step === 2 ? 1 : 0.6}; padding: 0.5rem 1rem; border-radius: 8px; background: ${step === 2 ? '#eff6ff' : 'transparent'}; border: 1px solid ${step === 2 ? '#93c5fd' : 'transparent'};">
+                <span style="width: 24px; height: 24px; border-radius: 50%; background: ${step === 2 ? '#3b82f6' : '#cbd5e1'}; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem;">
+                    2
+                </span>
+                <span style="font-size: 0.85rem; font-weight: 700; color: ${step === 2 ? '#1d4ed8' : '#64748b'};">
+                    2. Sales Order Creation
+                </span>
+            </div>
+        </div>
+    `;
+
+    if (step === 1) {
+        modalBody.innerHTML = progressBar + renderZohoCustomerStep(data);
+        switchZohoSubTab(currentZohoSubTab);
+    } else {
+        modalBody.innerHTML = progressBar + renderSalesOrderStep(data);
+    }
+};
+
+function renderZohoCustomerStep(data) {
+    const rawName = (data.customer_name || '').trim();
+    const parts = rawName.split(' ');
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+    const isBusiness = data.order_source === 'dealer' || Boolean(data.company_name);
+    const companyName = data.company_name || data.dealer_name || '';
+    const displayName = rawName || companyName || 'Customer';
+    const phone = data.phone || '';
+    const stateName = data.state || 'Karnataka';
+
+    const addressPart1 = data.address || '';
+    const addressPart2 = [data.village, data.sub_district || data.taluk].filter(Boolean).join(', ');
+    const city = data.city || data.district || '';
+    const pincode = data.pincode || '';
+
+    return `
+        <div class="zoho-customer-form" style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-height: 75vh; overflow-y: auto;">
+            ${data.zoho_contact_id ? `
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="color: #166534; font-weight: 600; font-size: 0.85rem;">
+                        <i class="fa-solid fa-circle-check" style="color: #10b981; margin-right: 6px;"></i>
+                        Customer is already registered on Zoho Books (Contact ID: <strong>${data.zoho_contact_id}</strong>)
+                    </span>
+                    <button type="button" class="btn-billing primary" onclick="switchWorkstationStep(2)" style="padding: 0.4rem 0.8rem; font-size: 0.78rem;">
+                        Next: Sales Order ➔
+                    </button>
+                </div>
+            ` : ''}
+
+            <!-- Customer Type -->
+            <div style="display: flex; align-items: center; margin-bottom: 1.5rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Customer Type</label>
+                <div style="display: flex; gap: 2rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #1e293b; cursor: pointer;">
+                        <input type="radio" name="zoho_customer_type" value="business" ${isBusiness ? 'checked' : ''} style="accent-color: #3b82f6;"> Business
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #1e293b; cursor: pointer;">
+                        <input type="radio" name="zoho_customer_type" value="individual" ${!isBusiness ? 'checked' : ''} style="accent-color: #3b82f6;"> Individual
+                    </label>
+                </div>
+            </div>
+
+            <!-- Primary Contact -->
+            <div style="display: flex; align-items: flex-start; margin-bottom: 1.25rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569; padding-top: 0.5rem;">Primary Contact</label>
+                <div style="display: flex; gap: 0.75rem; flex: 1; max-width: 650px;">
+                    <select id="zohoSalutation" style="width: 120px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="">Salutation</option>
+                        <option value="Mr.">Mr.</option>
+                        <option value="Mrs.">Mrs.</option>
+                        <option value="Ms.">Ms.</option>
+                        <option value="Miss">Miss</option>
+                        <option value="Dr.">Dr.</option>
+                    </select>
+                    <input type="text" id="zohoFirstName" value="${firstName}" placeholder="First Name" style="flex: 1; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                    <input type="text" id="zohoLastName" value="${lastName}" placeholder="Last Name" style="flex: 1; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                </div>
+            </div>
+
+            <!-- Company Name -->
+            <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Company Name</label>
+                <input type="text" id="zohoCompanyName" value="${companyName}" placeholder="Company Name (optional)" style="flex: 1; max-width: 650px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+            </div>
+
+            <!-- Display Name (Required) -->
+            <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Display Name *</label>
+                <input type="text" id="zohoDisplayName" value="${displayName}" placeholder="Customer Display Name" style="flex: 1; max-width: 650px; padding: 0.55rem 0.75rem; border: 2px solid #93c5fd; border-radius: 8px; font-size: 0.875rem; font-weight: 600; color: #1e293b; outline: none;">
+            </div>
+
+            <!-- Email Address -->
+            <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Email Address</label>
+                <div style="position: relative; flex: 1; max-width: 650px;">
+                    <i class="fa-regular fa-envelope" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="email" id="zohoEmail" value="${data.email || ''}" placeholder="email@example.com" style="width: 100%; box-sizing: border-box; padding: 0.55rem 0.75rem 0.55rem 2.25rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                </div>
+            </div>
+
+            <!-- Phone Numbers -->
+            <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Phone</label>
+                <div style="display: flex; gap: 1rem; flex: 1; max-width: 650px;">
+                    <div style="display: flex; flex: 1;">
+                        <span style="background: #f1f5f9; border: 1px solid #cbd5e1; border-right: none; padding: 0.55rem 0.75rem; border-radius: 8px 0 0 8px; font-weight: 700; font-size: 0.8rem; color: #64748b;">+91</span>
+                        <input type="text" id="zohoWorkPhone" placeholder="Work Phone" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0 8px 8px 0; font-size: 0.85rem; outline: none;">
+                    </div>
+                    <div style="display: flex; flex: 1;">
+                        <span style="background: #f1f5f9; border: 1px solid #cbd5e1; border-right: none; padding: 0.55rem 0.75rem; border-radius: 8px 0 0 8px; font-weight: 700; font-size: 0.8rem; color: #64748b;">+91</span>
+                        <input type="text" id="zohoMobile" value="${phone}" placeholder="Mobile" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0 8px 8px 0; font-size: 0.85rem; outline: none;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Language -->
+            <div style="display: flex; align-items: center; margin-bottom: 2rem; gap: 3rem;">
+                <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Customer Language</label>
+                <select id="zohoLanguage" style="width: 250px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                    <option value="English">English</option>
+                    <option value="Kannada">Kannada</option>
+                    <option value="Hindi">Hindi</option>
+                </select>
+            </div>
+
+            <!-- Sub Tabs: Other Details | Address -->
+            <div style="border-bottom: 2px solid #f1f5f9; display: flex; gap: 2rem; margin-bottom: 1.5rem;">
+                <button type="button" id="btnZohoTabOther" onclick="switchZohoSubTab('other_details')" style="padding: 0.5rem 0.5rem; background: transparent; border: none; border-bottom: 3px solid #3b82f6; font-size: 0.9rem; font-weight: 700; color: #1e293b; cursor: pointer;">
+                    Other Details
+                </button>
+                <button type="button" id="btnZohoTabAddress" onclick="switchZohoSubTab('address')" style="padding: 0.5rem 0.5rem; background: transparent; border: none; border-bottom: 3px solid transparent; font-size: 0.9rem; font-weight: 500; color: #64748b; cursor: pointer;">
+                    Address
+                </button>
+            </div>
+
+            <!-- OTHER DETAILS TAB -->
+            <div id="zohoTabContentOther">
+                <!-- GST Treatment -->
+                <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                    <label style="width: 160px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">GST Treatment *</label>
+                    <select id="zohoGstTreatment" style="flex: 1; max-width: 450px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="consumer" ${!data.gst_number ? 'selected' : ''}>Consumer</option>
+                        <option value="business_gst" ${data.gst_number ? 'selected' : ''}>Registered Business - Regular</option>
+                        <option value="business_composition">Registered Business - Composition</option>
+                        <option value="business_none">Unregistered Business</option>
+                        <option value="overseas">Overseas</option>
+                        <option value="special_economic_zone">Special Economic Zone</option>
+                        <option value="deemed_export">Deemed Export</option>
+                    </select>
+                </div>
+
+                <!-- Place of Supply -->
+                <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                    <label style="width: 160px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Place of Supply *</label>
+                    <select id="zohoPlaceOfSupply" style="flex: 1; max-width: 450px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        ${INDIAN_STATES.map(s => `
+                            <option value="${s.code}" ${(s.name.toLowerCase() === stateName.toLowerCase() || s.code.toLowerCase() === stateName.toLowerCase()) ? 'selected' : ''}>
+                                [${s.code}] ${s.name}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+
+                <!-- PAN -->
+                <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                    <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">PAN</label>
+                    <input type="text" id="zohoPan" value="${data.pan_number || ''}" placeholder="ABCDE1234F" style="flex: 1; max-width: 450px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none; text-transform: uppercase;">
+                </div>
+
+                <!-- Tax Preference -->
+                <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                    <label style="width: 160px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Tax Preference *</label>
+                    <div style="display: flex; gap: 2rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #1e293b; cursor: pointer;">
+                            <input type="radio" name="zoho_tax_preference" value="taxable" checked style="accent-color: #3b82f6;"> Taxable
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #1e293b; cursor: pointer;">
+                            <input type="radio" name="zoho_tax_preference" value="tax_exempt" style="accent-color: #3b82f6;"> Tax Exempt
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Currency -->
+                <div style="display: flex; align-items: center; margin-bottom: 1.25rem; gap: 3rem;">
+                    <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Currency</label>
+                    <input type="text" value="INR - Indian Rupee" readonly style="flex: 1; max-width: 450px; padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 8px; font-size: 0.85rem; color: #475569;">
+                </div>
+
+                <!-- Payment Terms -->
+                <div style="display: flex; align-items: center; margin-bottom: 1.5rem; gap: 3rem;">
+                    <label style="width: 160px; font-weight: 600; font-size: 0.85rem; color: #475569;">Payment Terms</label>
+                    <select id="zohoPaymentTerms" style="flex: 1; max-width: 450px; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="0">Due on Receipt</option>
+                        <option value="15">Net 15</option>
+                        <option value="30">Net 30</option>
+                        <option value="45">Net 45</option>
+                        <option value="60">Net 60</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ADDRESS TAB -->
+            <div id="zohoTabContentAddress" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem;">
+                    <!-- Billing Address -->
+                    <div>
+                        <h4 style="margin: 0 0 1rem 0; color: #0f172a; font-size: 1rem; font-weight: 800;">Billing Address</h4>
+                        
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Attention</label>
+                            <input type="text" id="zohoBillAttention" value="${rawName}" placeholder="Attention" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Country / Region</label>
+                            <input type="text" id="zohoBillCountry" value="India" readonly style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px; font-size: 0.85rem; color: #475569;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Street 1</label>
+                            <input type="text" id="zohoBillStreet1" value="${addressPart1}" placeholder="Street Address" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Street 2 / Village / Taluk</label>
+                            <input type="text" id="zohoBillStreet2" value="${addressPart2}" placeholder="Village, Taluk, Landmark" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">City / District</label>
+                            <input type="text" id="zohoBillCity" value="${city}" placeholder="City" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">State</label>
+                                <input type="text" id="zohoBillState" value="${stateName}" placeholder="State" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">PIN Code</label>
+                                <input type="text" id="zohoBillPincode" value="${pincode}" placeholder="PIN Code" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Phone</label>
+                            <input type="text" id="zohoBillPhone" value="${phone}" placeholder="Phone" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+                    </div>
+
+                    <!-- Shipping Address -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; color: #0f172a; font-size: 1rem; font-weight: 800;">Shipping Address</h4>
+                            <button type="button" onclick="copyBillingToShippingAddress()" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-arrow-down"></i> Copy billing address
+                            </button>
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Attention</label>
+                            <input type="text" id="zohoShipAttention" value="${data.shipping_name || rawName}" placeholder="Attention" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Country / Region</label>
+                            <input type="text" id="zohoShipCountry" value="India" readonly style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px; font-size: 0.85rem; color: #475569;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Street 1</label>
+                            <input type="text" id="zohoShipStreet1" value="${data.shipping_address || addressPart1}" placeholder="Street Address" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Street 2 / Village / Taluk</label>
+                            <input type="text" id="zohoShipStreet2" value="${addressPart2}" placeholder="Village, Taluk, Landmark" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">City / District</label>
+                            <input type="text" id="zohoShipCity" value="${data.shipping_city || city}" placeholder="City" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">State</label>
+                                <input type="text" id="zohoShipState" value="${data.shipping_state || stateName}" placeholder="State" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">PIN Code</label>
+                                <input type="text" id="zohoShipPincode" value="${data.shipping_pincode || pincode}" placeholder="PIN Code" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px;">Phone</label>
+                            <input type="text" id="zohoShipPhone" value="${phone}" placeholder="Phone" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTION FOOTER -->
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+                <button type="button" onclick="closeModal()" style="padding: 0.75rem 1.5rem; background: white; color: #64748b; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="button" id="btnSaveZohoCustomer" onclick="saveZohoCustomer()" class="btn-billing primary" style="padding: 0.75rem 2rem; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Save & Create Customer in Zoho ➔
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+window.saveZohoCustomer = async function() {
+    if (!currentOrder) return;
+    const btn = document.getElementById('btnSaveZohoCustomer');
+    const originalText = btn ? btn.innerHTML : '';
+
+    const displayName = (document.getElementById('zohoDisplayName')?.value || '').trim();
+    if (!displayName) {
+        alert('Please enter a Customer Display Name');
+        document.getElementById('zohoDisplayName')?.focus();
+        return;
+    }
+
+    const customerType = document.querySelector('input[name="zoho_customer_type"]:checked')?.value || 'individual';
+    const taxPreference = document.querySelector('input[name="zoho_tax_preference"]:checked')?.value || 'taxable';
+
+    const payload = {
+        customer_type: customerType,
+        salutation: document.getElementById('zohoSalutation')?.value || '',
+        first_name: document.getElementById('zohoFirstName')?.value || '',
+        last_name: document.getElementById('zohoLastName')?.value || '',
+        company_name: document.getElementById('zohoCompanyName')?.value || '',
+        display_name: displayName,
+        customer_name: displayName,
+        email: document.getElementById('zohoEmail')?.value || '',
+        work_phone: document.getElementById('zohoWorkPhone')?.value || '',
+        mobile: document.getElementById('zohoMobile')?.value || '',
+        phone: document.getElementById('zohoMobile')?.value || document.getElementById('zohoWorkPhone')?.value || '',
+        gst_treatment: document.getElementById('zohoGstTreatment')?.value || 'consumer',
+        place_of_supply: document.getElementById('zohoPlaceOfSupply')?.value || 'KA',
+        pan_number: document.getElementById('zohoPan')?.value || '',
+        tax_preference: taxPreference,
+        payment_terms: document.getElementById('zohoPaymentTerms')?.value || 0,
+
+        // Billing
+        billing_attention: document.getElementById('zohoBillAttention')?.value || displayName,
+        billing_address: document.getElementById('zohoBillStreet1')?.value || '',
+        billing_street2: document.getElementById('zohoBillStreet2')?.value || '',
+        billing_city: document.getElementById('zohoBillCity')?.value || '',
+        billing_state: document.getElementById('zohoBillState')?.value || '',
+        billing_pincode: document.getElementById('zohoBillPincode')?.value || '',
+        billing_phone: document.getElementById('zohoBillPhone')?.value || '',
+
+        // Shipping
+        shipping_attention: document.getElementById('zohoShipAttention')?.value || displayName,
+        shipping_address: document.getElementById('zohoShipStreet1')?.value || '',
+        shipping_street2: document.getElementById('zohoShipStreet2')?.value || '',
+        shipping_city: document.getElementById('zohoShipCity')?.value || '',
+        shipping_state: document.getElementById('zohoShipState')?.value || '',
+        shipping_pincode: document.getElementById('zohoShipPincode')?.value || '',
+        shipping_phone: document.getElementById('zohoShipPhone')?.value || ''
+    };
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Customer in Zoho...';
+    }
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/zoho-customer`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            currentOrder.zoho_contact_id = data.contact_id;
+            currentOrder.customer_name = displayName;
+            currentOrder.phone = payload.phone;
+            currentOrder.address = payload.billing_address;
+            currentOrder.city = payload.billing_city;
+            currentOrder.state = payload.billing_state;
+            currentOrder.pincode = payload.billing_pincode;
+
+            if (window.showAlert) {
+                window.showAlert('Success!', `Customer "${displayName}" created on Zoho Books! (Contact ID: ${data.contact_id})`, 'success');
+            } else {
+                alert(`Customer created on Zoho Books! Contact ID: ${data.contact_id}`);
+            }
+
+            // Immediately switch to Step 2: Sales Order Creation
+            window.switchWorkstationStep(2);
+        } else {
+            alert('Zoho Customer Error: ' + (data.message || 'Failed to create customer'));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+    } catch (err) {
+        alert('Network or server error: ' + err.message);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+};
+
+function renderSalesOrderStep(data) {
+    const items = data.items || [];
+    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity, 10)), 0);
     const grandTotal = subtotal - (parseFloat(data.discount) || 0) + (parseFloat(data.shipping_charges) || 0) + (parseFloat(data.extra_charges) || 0);
     const verifiedTotal = (data.payments || []).reduce((sum, p) => {
         if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
@@ -88,158 +626,109 @@ window.renderWorkstation = function() {
     }, 0);
     const advancePaid = Math.max(verifiedTotal, parseFloat(data.advance_amount) || 0);
     const balanceDue = Math.max(0, grandTotal - advancePaid);
-    
+
     data.grandTotal = grandTotal;
     data.balanceDue = balanceDue;
     data.advance_amount = advancePaid;
 
-    modalBody.innerHTML = `
-        <div class="workstation-body" style="padding: 1.5rem; background: #f8fafc; max-height: 80vh; overflow-y: auto;">
-            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem;">
-                    <h3 style="color: #1e293b; font-weight: 800; margin: 0;">
-                        <i class="fas fa-clipboard-list" style="color: #3b82f6; margin-right: 0.5rem;"></i> Zoho Booking Reference
-                    </h3>
-                    <span style="font-size: 0.8rem; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 0.2rem 0.6rem; border-radius: 4px;">ORDER #${data.order_id}</span>
-                </div>
-                
-                <div class="grid-2" style="gap: 2rem; margin-bottom: 2rem;">
-                    <div>
-                        <div style="margin-bottom: 1rem;">
-                            <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Customer Name</label>
-                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.25rem;">
-                                <span style="font-weight: 700; color: #0f172a; font-size: 1.1rem;">${data.customer_name || 'N/A'}</span>
-                                <button onclick="copyToClipboard('${(data.customer_name || '').replace(/'/g, "\\'")}')" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0.5rem;"><i class="fas fa-copy"></i></button>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-bottom: 1rem;">
-                            <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Phone Number</label>
-                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.25rem;">
-                                <span style="font-weight: 700; color: #0f172a; font-size: 1.1rem;">${data.phone || 'N/A'}</span>
-                                <button onclick="copyToClipboard('${data.phone || ''}')" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0.5rem;"><i class="fas fa-copy"></i></button>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 1rem;">
-                            <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Delivery Type</label>
-                            <div style="display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.25rem;">
-                                <span style="font-weight: 700; color: #0f172a; font-size: 1.1rem;">${data.dispatch_through || data.delivery_type || 'N/A'}</span>
-                                <button onclick="copyToClipboard('${(data.dispatch_through || data.delivery_type || '').replace(/'/g, "\\'")}')" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0.5rem;"><i class="fas fa-copy"></i></button>
-                            </div>
-                        </div>
+    return `
+        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-height: 75vh; overflow-y: auto;">
+            <!-- Verified Customer Summary Card -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 4px;">
+                        <span style="font-size: 1.1rem; font-weight: 800; color: #0f172a;">${data.customer_name || 'Customer'}</span>
+                        <span style="font-size: 0.72rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                            <i class="fa-solid fa-check"></i> Zoho Contact: ${data.zoho_contact_id || 'Linked'}
+                        </span>
                     </div>
-
-                    <div>
-                        <label style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Complete Address</label>
-                        <div style="background: #f1f5f9; padding: 1.25rem; border-radius: 8px; margin-top: 0.25rem; position: relative; line-height: 1.8;">
-                            <button onclick="copyToClipboard(formatFullAddress())" style="position: absolute; top: 1rem; right: 1rem; background: #e0e7ff; border: none; color: #3730a3; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;"><i class="fas fa-copy"></i> Copy All</button>
-                            
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div><strong style="color:#475569; display:inline-block; width: 90px;">Village:</strong> <span style="font-weight: 600; color:#0f172a;">${data.village || 'N/A'}</span></div>
-                                <button onclick="copyToClipboard('${(data.village || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div><strong style="color:#475569; display:inline-block; width: 90px;">Sub-District:</strong> <span style="font-weight: 600; color:#0f172a;">${data.sub_district || data.taluk || 'N/A'}</span></div>
-                                <button onclick="copyToClipboard('${(data.sub_district || data.taluk || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div><strong style="color:#475569; display:inline-block; width: 90px;">District:</strong> <span style="font-weight: 600; color:#0f172a;">${data.district || data.city || 'N/A'}</span></div>
-                                <button onclick="copyToClipboard('${(data.district || data.city || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div><strong style="color:#475569; display:inline-block; width: 90px;">State:</strong> <span style="font-weight: 600; color:#0f172a;">${data.state || 'N/A'}</span></div>
-                                <button onclick="copyToClipboard('${(data.state || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div><strong style="color:#475569; display:inline-block; width: 90px;">PIN Code:</strong> <span style="font-weight: 600; color:#0f172a;">${data.pincode || 'N/A'}</span></div>
-                                <button onclick="copyToClipboard('${data.pincode || ''}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div><strong style="color:#475569; display:inline-block; width: 90px;">Phone:</strong> <span style="font-weight: 600; color:#0f172a;">${data.phone || 'N/A'}</span></div>
-                                <button onclick="copyToClipboard('${data.phone || ''}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                            </div>
-                        </div>
+                    <div style="color: #64748b; font-size: 0.85rem;">
+                        <i class="fa-solid fa-phone" style="margin-right: 4px;"></i> ${data.phone || 'N/A'} &nbsp;|&nbsp; 
+                        <i class="fa-solid fa-location-dot" style="margin-right: 4px;"></i> ${data.city || ''}, ${data.state || ''} ${data.pincode ? '-' + data.pincode : ''}
                     </div>
                 </div>
 
-                <h3 style="margin-bottom: 1rem; color: #1e293b; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                    <span><i class="fas fa-box" style="color: #10b981; margin-right: 0.5rem;"></i> Product Details</span>
-                </h3>
+                <button type="button" onclick="switchWorkstationStep(1)" style="background: white; border: 1px solid #cbd5e1; color: #3b82f6; font-size: 0.8rem; font-weight: 700; padding: 0.45rem 0.9rem; border-radius: 8px; cursor: pointer;">
+                    <i class="fa-solid fa-pen-to-square"></i> Edit Customer
+                </button>
+            </div>
 
-                <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem;">
-                    <table class="edit-table" style="margin: 0; width: 100%;">
-                        <thead style="background: #f8fafc;">
-                            <tr>
-                                <th style="padding: 1rem; text-align: left;">Product Name</th>
-                                <th style="width: 120px; text-align: right; padding: 1rem;">Unit Price</th>
-                                <th style="width: 80px; text-align: center; padding: 1rem;">Qty</th>
-                                <th style="width: 120px; text-align: right; padding: 1rem;">Total</th>
+            <!-- Product Items Section -->
+            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+                <span><i class="fas fa-box" style="color: #10b981; margin-right: 0.5rem;"></i> Order Items</span>
+                <span style="font-size: 0.8rem; font-weight: 600; color: #64748b;">${items.length} item(s)</span>
+            </h3>
+
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem;">
+                <table class="edit-table" style="margin: 0; width: 100%;">
+                    <thead style="background: #f8fafc;">
+                        <tr>
+                            <th style="padding: 0.85rem 1rem; text-align: left;">Product</th>
+                            <th style="width: 140px; text-align: right; padding: 0.85rem 1rem;">Unit Price</th>
+                            <th style="width: 100px; text-align: center; padding: 0.85rem 1rem;">Quantity</th>
+                            <th style="width: 140px; text-align: right; padding: 0.85rem 1rem;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.length > 0 ? items.map((item, idx) => `
+                            <tr style="border-top: 1px solid #e2e8f0;">
+                                <td style="padding: 1rem; font-weight: 700;">
+                                    ${item.product_name}
+                                    <div style="font-size: 0.72rem; color: #64748b; font-weight: 500;">SKU: ${item.sku || 'N/A'}</div>
+                                </td>
+                                <td style="text-align: right; font-weight: 600; padding: 1rem;">
+                                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.25rem;">
+                                        <span>₹</span>
+                                        <input type="number" value="${item.price}" oninput="updateOrderItemPrice(${idx}, this.value)" style="width: 90px; text-align: right; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; outline: none;">
+                                    </div>
+                                </td>
+                                <td style="text-align: center; font-weight: 800; padding: 1rem;">
+                                    <input type="number" min="1" value="${item.quantity}" oninput="updateOrderItemQty(${idx}, this.value)" style="width: 60px; text-align: center; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; outline: none;">
+                                </td>
+                                <td style="text-align: right; font-weight: 800; color: #0f172a; padding: 1rem;">
+                                    ₹${(parseFloat(item.price) * parseInt(item.quantity, 10)).toLocaleString()}
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            ${data.items.length > 0 ? data.items.map(item => `
-                                <tr style="border-top: 1px solid #e2e8f0;">
-                                    <td style="font-weight: 700; padding: 1rem;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <div>
-                                                ${item.product_name}
-                                                <div style="font-size:0.7rem; color:#64748b; font-weight: 600;">SKU: ${item.sku}</div>
-                                            </div>
-                                            <button onclick="copyToClipboard('${(item.product_name || '').replace(/'/g, "\\'")}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                                        </div>
-                                    </td>
-                                    <td style="text-align: right; font-weight: 600; padding: 1rem;">
-                                        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.5rem;">
-                                            ₹${item.price}
-                                            <button onclick="copyToClipboard('${item.price}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                                        </div>
-                                    </td>
-                                    <td style="text-align: center; font-weight: 800; color: #0f172a; padding: 1rem;">
-                                        <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
-                                            ${item.quantity}
-                                            <button onclick="copyToClipboard('${item.quantity}')" style="background:none; border:none; color:#94a3b8; cursor:pointer;"><i class="fas fa-copy"></i></button>
-                                        </div>
-                                    </td>
-                                    <td style="text-align: right; font-weight: 800; color: #0f172a; padding: 1rem;">₹${(item.price * item.quantity).toLocaleString()}</td>
-                                </tr>
-                            `).join('') : `<tr><td colspan="4" style="text-align:center; padding: 2rem; color: #64748b;">No items found.</td></tr>`}
-                        </tbody>
-                    </table>
+                        `).join('') : `<tr><td colspan="4" style="text-align:center; padding: 2rem; color: #64748b;">No items in order.</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary & Adjustments -->
+            <div style="display: flex; justify-content: flex-end; gap: 2.5rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 10px; border: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap;">
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Discount</div>
+                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
+                        <span style="font-weight: 800; color: #ef4444;">-₹</span>
+                        <input type="number" id="editableDiscount" value="${data.discount || 0}" oninput="updateDiscount(this.value)" style="width: 90px; padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; text-align: right; color: #ef4444; outline: none;">
+                    </div>
                 </div>
 
-                <div style="display: flex; justify-content: flex-end; gap: 3rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Zoho Bill No.</div>
-                        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
-                            <input type="text" id="editableZohoBill" value="${data.zoho_bill_number || ''}" oninput="updateZohoBill(this.value)" placeholder="Enter bill no." style="width: 140px; padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 800; font-size: 1.1rem; text-align: right; color: #3b82f6;">
-                        </div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Discount</div>
-                        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
-                            <span style="font-weight: 800; color: #0f172a;">₹</span>
-                            <input type="number" id="editableDiscount" value="${data.discount || 0}" oninput="updateDiscount(this.value)" style="width: 100px; padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 800; font-size: 1.1rem; text-align: right; color: #ef4444;">
-                        </div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Amount</div>
-                        <div id="displayGrandTotal" style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">₹${grandTotal.toLocaleString()}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Advance Paid</div>
-                        <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">₹${advancePaid.toLocaleString()}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Due Amount</div>
-                        <div id="displayBalanceDue" style="font-size: 1.5rem; font-weight: 900; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">₹${balanceDue.toLocaleString()}</div>
-                    </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Value</div>
+                    <div id="displayGrandTotal" style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">₹${grandTotal.toLocaleString()}</div>
                 </div>
-                
-                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
-                    <button onclick="closeModal()" style="padding: 0.75rem 2rem; background: white; color: #64748b; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; cursor: pointer;">Cancel</button>
-                    <button onclick="generateFinalInvoice()" style="padding: 0.75rem 2.5rem; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 6px -1px rgb(59 130 246 / 0.3);">
-                        <i class="fas fa-check-circle" style="margin-right: 0.5rem;"></i> MARK AS BILLED
+
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Advance Paid</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">₹${advancePaid.toLocaleString()}</div>
+                </div>
+
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Balance COD Due</div>
+                    <div id="displayBalanceDue" style="font-size: 1.45rem; font-weight: 900; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">₹${balanceDue.toLocaleString()}</div>
+                </div>
+            </div>
+
+            <!-- ACTION FOOTER FOR STEP 2 -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <button type="button" onclick="switchWorkstationStep(1)" style="padding: 0.75rem 1.5rem; background: white; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                    ⬅ Back to Customer Info
+                </button>
+
+                <div style="display: flex; gap: 1rem;">
+                    <button type="button" onclick="approveSalesOrder()" class="btn-billing primary" style="padding: 0.75rem 2.2rem; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                        <i class="fa-solid fa-check-double"></i> Approve & Create Sales Order
                     </button>
                 </div>
             </div>
@@ -247,27 +736,55 @@ window.renderWorkstation = function() {
     `;
 }
 
-async function verifyPayment(paymentId, status) {
+window.updateOrderItemPrice = function(idx, newPrice) {
+    if (!currentOrder || !currentOrder.items || !currentOrder.items[idx]) return;
+    currentOrder.items[idx].price = parseFloat(newPrice) || 0;
+    updateDiscount(currentOrder.discount || 0);
+};
+
+window.updateOrderItemQty = function(idx, newQty) {
+    if (!currentOrder || !currentOrder.items || !currentOrder.items[idx]) return;
+    currentOrder.items[idx].quantity = parseInt(newQty, 10) || 1;
+    updateDiscount(currentOrder.discount || 0);
+};
+
+
+window.approveSalesOrder = async function() {
+    if (!currentOrder) return;
+    if (!confirm(`Are you sure you want to approve Order #${currentOrder.order_id} and convert it to a Sales Order?`)) return;
+
     try {
-        await fetch(`${BILLING_API_URL}/payments/${paymentId}/verify`, {
-            method: 'PATCH',
+        const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/approve`, {
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ status })
+            body: JSON.stringify({
+                discount: currentOrder.discount,
+                shipping_charges: currentOrder.shipping_charges,
+                extra_charges: currentOrder.extra_charges,
+                zoho_bill_number: currentOrder.zoho_bill_number
+            })
         });
 
-        const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        currentOrder = await res.json();
-        renderWorkstation();
+        const data = await res.json();
+        if (res.ok) {
+            closeModal();
+            if (window.showAlert) {
+                window.showAlert('Order Approved!', `Order converted to Sales Order ${data.sales_order_number || ''}. Now ready under Sales Orders.`, 'success');
+            } else {
+                alert(`Order Approved! Converted to Sales Order ${data.sales_order_number || ''}`);
+            }
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        } else {
+            alert(data.message || 'Failed to approve order');
+        }
     } catch (err) {
-        alert('Payment verification failed.');
+        alert('Error approving order: ' + err.message);
     }
-}
-
+};
 
 async function generateFinalInvoice() {
     if (!confirm('Are you sure you want to mark this order as Billed and send it to packing?')) return;
@@ -405,8 +922,10 @@ async function loadPayments(status = 'pending') {
 }
 
 function closeModal() {
-    document.getElementById('billingModal').style.display = 'none';
+    const m = document.getElementById('billingModal');
+    if (m) m.style.display = 'none';
 }
+window.closeModal = closeModal;
 
 /** Finalize & Copy Modal Logic **/
 async function showFinalizeCopyModal(invoiceId) {
@@ -506,7 +1025,7 @@ function setupSearch() {
     }
 }
 
-const BILLING_API_URL = `${window.API_URL}/billing`;
+BILLING_API_URL = window.BILLING_API_URL || `${window.API_URL}/billing`;
 
 let currentTab = 'dashboard';
 let pendingOrders = [];
@@ -517,22 +1036,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function init() {
     loadSidebar();
-    
-    // Hash routing
+    setupSearch();
+
+    // Detect standalone HTML page
+    const currentPage = window.location.pathname.split('/').pop().replace('.html', '').toLowerCase();
+
+    if (currentPage === 'invoices') {
+        loadInvoices();
+        return;
+    }
+    if (currentPage === 'payments') {
+        loadPayments('pending');
+        return;
+    }
+    if (currentPage === 'reports') {
+        loadReports();
+        return;
+    }
+    if (currentPage === 'settings') {
+        loadSettings();
+        return;
+    }
+    if (currentPage === 'pending') {
+        loadPendingOrders();
+        return;
+    }
+    if (currentPage === 'sales-orders') {
+        if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        return;
+    }
+    if (currentPage === 'customers') {
+        if (typeof loadCustomersList === 'function') loadCustomersList();
+        return;
+    }
+    if (currentPage === 'dashboard') {
+        loadDashboard();
+        return;
+    }
+
+    // Fallback / legacy tab switching for billing.html
     const initialHash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'pending', 'in-review', 'invoices', 'history', 'payments', 'reports', 'customers', 'settings'];
+    const validTabs = ['dashboard', 'pending', 'invoices', 'payments', 'reports', 'customers', 'settings'];
     const initialTab = validTabs.includes(initialHash) ? initialHash : 'dashboard';
-    
+
     switchTab(initialTab);
-    
+
     window.addEventListener('hashchange', () => {
         const newHash = window.location.hash.replace('#', '');
         if (newHash && validTabs.includes(newHash)) {
             switchTab(newHash);
         }
     });
-
-    setupSearch();
 }
 
 function loadSidebar() {
@@ -543,16 +1097,18 @@ function loadSidebar() {
 }
 
 function switchTab(tab) {
-    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    const tabs = document.querySelectorAll('.tab-content');
+    if (!tabs || tabs.length === 0) return;
+
+    tabs.forEach(c => c.style.display = 'none');
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
-    document.getElementById(tab).style.display = 'block';
+    const tabEl = document.getElementById(tab);
+    if (tabEl) tabEl.style.display = 'block';
     const link = document.getElementById(`side-${tab}`) || document.getElementById(`nav-${tab}`);
     if (link) link.classList.add('active');
 
     if (tab === 'pending') loadPendingOrders();
-    if (tab === 'in-review') loadInReviewOrders();
-    if (tab === 'history') loadBilledHistory();
     if (tab === 'payments') loadPayments();
     if (tab === 'dashboard') loadDashboard();
     if (tab === 'invoices') loadInvoices();
@@ -560,129 +1116,7 @@ function switchTab(tab) {
     if (tab === 'settings') loadSettings();
 }
 
-async function loadBilledHistory() {
-    try {
-        const res = await fetch(`${BILLING_API_URL}/invoices`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        const invoices = await res.json();
-        const list = document.getElementById('historyList');
-        list.innerHTML = '';
 
-        if (!invoices.length) {
-            list.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No billed data found.</p>';
-            return;
-        }
-
-        for (const inv of invoices) {
-            const card = document.createElement('div');
-            card.className = 'history-card';
-            
-            const date = new Date(inv.invoice_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-            const total = parseFloat(inv.total_amount || 0);
-            const advances = parseFloat(inv.advance_paid || 0);
-            const due = total - advances;
-            
-            card.innerHTML = `
-                <div class="history-card-header">
-                    <div>
-                        <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${inv.order_customer || inv.billing_name || 'Guest'}</div>
-                        <div style="color: #64748b; font-size: 0.75rem;">Inv #${inv.invoice_number} | ${date}</div>
-                    </div>
-                    <div class="status-badge" style="background: #dcfce7; color: #166534; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 800;">BILLED</div>
-                </div>
-                <div class="history-card-body">
-                    <div class="history-item"><span class="history-label">Phone</span> <span style="font-weight: 700;">${inv.billing_phone || 'N/A'}</span></div>
-                    <div class="history-item"><span class="history-label">Village</span> <span>${inv.village || inv.billing_village || 'N/A'}</span></div>
-                    <div class="history-item"><span class="history-label">District</span> <span>${inv.district || inv.billing_district || 'N/A'}</span></div>
-                    <div class="history-item"><span class="history-label">Pincode</span> <span>${inv.pincode || inv.billing_pincode || 'N/A'}</span></div>
-                    <div class="history-item"><span class="history-label">Delivery</span> <span style="color: #6366f1; font-weight: 700;">${inv.delivery_type || 'N/A'}</span></div>
-                    
-                    <div style="margin: 1rem 0; padding-top: 1rem; border-top: 1px dashed #e2e8f0;">
-                        <div class="history-item"><span class="history-label">Total Amount</span> <span style="font-weight: 800; color: #1e293b;">₹${total.toLocaleString()}</span></div>
-                        <div class="history-item"><span class="history-label">Advances</span> <span style="color: #10b981; font-weight: 700;">₹${advances.toLocaleString()}</span></div>
-                        <div class="history-item"><span class="history-label">Due Balance</span> <span style="font-weight: 800; color: #ef4444;">₹${due.toLocaleString()}</span></div>
-                    </div>
-                </div>
-                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                    <button class="btn-copy" style="flex: 1;" onclick="copyFullBillData(${inv.invoice_id}, this)">
-                        <i class="fa-solid fa-copy"></i> Copy Full Data
-                    </button>
-                    <button class="btn-copy" style="background: #3b82f6; color: white; flex: 0 0 45px; justify-content: center;" title="View Invoice" onclick="viewInvoice(${inv.invoice_id})">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                    <button class="btn-copy" style="background: #1e293b; color: white; flex: 0 0 45px; justify-content: center;" title="Print Invoice" onclick="printInvoice(${inv.invoice_id})">
-                        <i class="fa-solid fa-print"></i>
-                    </button>
-                </div>
-            `;
-            list.appendChild(card);
-        }
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-async function copyFullBillData(invoiceId, btn) {
-    try {
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Copying...';
-        
-        const res = await fetch(`${BILLING_API_URL}/invoices/${invoiceId}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch invoice details');
-
-        const data = await res.json();
-        
-        if (!data || !data.items) throw new Error('No data found');
-
-        const productsStr = data.items.map((item, index) => `${index + 1}. ${item.product_name} (Qty: ${item.quantity}) - ₹${parseFloat(item.price * item.quantity).toLocaleString()}`).join('\n');
-        
-        const addressLine = [data.billing_village, data.billing_district, data.state].filter(Boolean).join(', ');
-        const pincodeStr = data.billing_pincode ? ` - ${data.billing_pincode}` : '';
-
-        const message = `
-SGB AGRIVAAN - DISPATCH SUMMARY
---------------------------------------------------
-[ CUSTOMER DETAILS ]
-Name     : ${data.billing_name || 'N/A'}
-Phone    : ${data.billing_phone || 'N/A'}
-Address  : ${data.billing_address || 'N/A'}
-           ${addressLine}${pincodeStr}
-
-[ ORDER DETAILS ]
-${productsStr}
-
-[ FINANCIALS ]
-Total Amount : ₹${parseFloat(data.total_amount || 0).toLocaleString()}
-Advance Paid : ₹${parseFloat(data.advance_paid || 0).toLocaleString()}
-Balance Due  : ₹${(parseFloat(data.total_amount || 0) - parseFloat(data.advance_paid || 0)).toLocaleString()}
-
-[ LOGISTICS ]
-Courier      : ${data.dispatch_through || 'N/A'}
-Destination  : ${data.destination || 'N/A'}
---------------------------------------------------
-System Generated Document
-`.trim();
-
-        await navigator.clipboard.writeText(message);
-        
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-        btn.style.background = '#22c55e';
-        btn.style.color = 'white';
-        
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.background = '';
-            btn.style.color = '';
-        }, 2000);
-    } catch (err) {
-        console.error(err);
-        btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error';
-    }
-}
 
 async function loadReports() {
     const container = document.getElementById('reportsContent');
@@ -1266,42 +1700,102 @@ async function loadDashboard() {
 
 let allPendingOrders = [];
 
-async function loadPendingOrders() {
+window.loadPendingOrders = async function() {
     const tbody = document.getElementById('pendingOrdersBody');
+    if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
 
     try {
         const res = await fetch(`${BILLING_API_URL}/pending`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
-        allPendingOrders = await res.json();
+        if (res.status === 401) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align:center; padding: 3rem;">
+                        <div style="background: #ffffff; border: 1px solid #fecaca; border-radius: 12px; padding: 2rem; max-width: 440px; margin: 0 auto; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.08);">
+                            <i class="fa-solid fa-clock-rotate-left" style="font-size: 2.25rem; color: #ef4444; margin-bottom: 0.75rem; display: block;"></i>
+                            <h3 style="color: #991b1b; margin: 0 0 0.5rem 0; font-size: 1.15rem; font-weight: 800;">Session Expired</h3>
+                            <p style="color: #64748b; font-size: 0.85rem; margin: 0 0 1.25rem 0;">Your login session has expired. Please sign in again to continue.</p>
+                            <a href="../../index.html?error=session_expired" style="display: inline-block; background: #3b82f6; color: white; padding: 0.65rem 1.75rem; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 0.875rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                                <i class="fa-solid fa-right-to-bracket" style="margin-right: 6px;"></i> Sign In Again
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || `Server responded with status ${res.status}`);
+        }
+        const data = await res.json();
+        allPendingOrders = Array.isArray(data) ? data : [];
 
         // Wire up filters once
         document.querySelectorAll('.filter-input-v2').forEach(input => {
             input.onchange = () => applyPendingFilters();
         });
 
+        const searchInput = document.getElementById('globalSearch');
+        if (searchInput) {
+            searchInput.oninput = () => applyPendingFilters();
+        }
+
         applyPendingFilters();
     } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444;">Error loading pending orders.</td></tr>';
+        console.error('Error in loadPendingOrders:', err);
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444; padding: 2rem;">Error loading pending orders: ' + (err.message || 'Server error') + '</td></tr>';
     }
-}
+};
 
-function applyPendingFilters() {
+window.applyPendingFilters = function() {
     const tbody = document.getElementById('pendingOrdersBody');
-    const filterDate = document.getElementById('filterDate').value;
-    const filterSales = document.getElementById('filterSales').value;
-    const filterPayment = document.getElementById('filterPayment').value;
-    const filterSource = document.getElementById('filterSource').value;
+    if (!tbody) return;
 
-    const filtered = allPendingOrders.filter(order => {
-        const matchesDate = !filterDate || new Date(order.created_at).toISOString().split('T')[0] === filterDate;
+    const filterDateEl = document.getElementById('pendingFilterDate') || document.getElementById('filterDate');
+    const filterSalesEl = document.getElementById('pendingFilterSales') || document.getElementById('filterSales');
+    const filterPaymentEl = document.getElementById('pendingFilterStatus') || document.getElementById('filterPayment');
+    const filterSourceEl = document.getElementById('pendingFilterSource') || document.getElementById('filterSource');
+    const searchEl = document.getElementById('globalSearch');
+
+    const filterDate = filterDateEl ? filterDateEl.value : '';
+    const filterSales = filterSalesEl ? filterSalesEl.value : '';
+    const filterPayment = filterPaymentEl ? filterPaymentEl.value : '';
+    const filterSource = filterSourceEl ? filterSourceEl.value : '';
+    const search = searchEl ? searchEl.value.toLowerCase().trim() : '';
+
+    const filtered = (allPendingOrders || []).filter(order => {
+        const matchesDate = !filterDate || (order.created_at && new Date(order.created_at).toISOString().split('T')[0] === filterDate);
         const matchesSales = !filterSales || order.sales_person_name === filterSales;
-        const matchesPayment = !filterPayment ||
-            (filterPayment === 'verified' ? order.advance_verified : !order.advance_verified);
-        const matchesSource = !filterSource || order.lead_source === filterSource;
+        
+        let matchesPayment = true;
+        if (filterPayment === 'verified') {
+            matchesPayment = Boolean(order.advance_verified);
+        } else if (filterPayment === 'unverified') {
+            matchesPayment = !order.advance_verified;
+        } else if (filterPayment === 'draft') {
+            matchesPayment = (order.order_status === 'draft');
+        } else if (filterPayment === 'partial') {
+            const adv = parseFloat(order.advance_paid || 0);
+            const tot = parseFloat(order.total_amount || 0);
+            matchesPayment = adv > 0 && adv < tot;
+        } else if (filterPayment === 'full') {
+            const adv = parseFloat(order.advance_paid || 0);
+            const tot = parseFloat(order.total_amount || 0);
+            matchesPayment = adv >= tot && tot > 0;
+        }
 
-        return matchesDate && matchesSales && matchesPayment && matchesSource;
+        const matchesSource = !filterSource || (order.order_source === filterSource || order.lead_source === filterSource);
+
+        let matchesSearch = true;
+        if (search) {
+            const combined = `${order.order_id} ${order.customer_name || ''} ${order.phone || ''} ${order.sales_person_name || ''}`.toLowerCase();
+            matchesSearch = combined.includes(search);
+        }
+
+        return matchesDate && matchesSales && matchesPayment && matchesSource && matchesSearch;
     });
 
     if (filtered.length === 0) {
@@ -1311,28 +1805,31 @@ function applyPendingFilters() {
 
     tbody.innerHTML = filtered.map(order => `
         <tr>
-            <td style="font-weight: 700;">${window.formatOrderId(order.order_id, order.created_at)}</td>
-            <td style="font-weight: 600;">${order.customer_name}</td>
-            <td>${order.phone}</td>
+            <td style="font-weight: 700;">${window.formatOrderId ? window.formatOrderId(order.order_id, order.created_at) : '#SGB-' + order.order_id}</td>
+            <td style="font-weight: 600;">${order.customer_name || 'N/A'}</td>
+            <td>${order.phone || 'N/A'}</td>
             <td>${order.sales_person_name || 'Staff'}</td>
-            <td style="font-weight: 700;">₹${parseFloat(order.advance_paid || 0).toLocaleString()}</td>
+            <td style="font-weight: 700; color: #10b981;">₹${parseFloat(order.advance_paid || 0).toLocaleString()}</td>
             <td>
                 ${order.has_payment_proof ?
             `<button class="btn-billing" style="width: auto; padding: 4px 10px; background: #f1f5f9; color: #3b82f6;" onclick="openOrderBilling(${order.order_id})"><i class="fas fa-image"></i> View</button>` :
             '<span style="opacity: 0.4;">N/A</span>'}
             </td>
-            <td style="font-weight: 800; color: var(--billing-primary);">₹${parseFloat(order.total_amount).toLocaleString()}</td>
-            <td><span class="status-badge status-${order.order_status}">${order.order_status}</span></td>
+            <td style="font-weight: 800; color: var(--billing-primary);">₹${parseFloat(order.total_amount || 0).toLocaleString()}</td>
+            <td><span class="status-badge status-${order.order_status || 'draft'}">${(order.order_status || 'draft').toUpperCase()}</span></td>
             <td>
-                <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.75rem; font-size: 0.75rem;" onclick="openOrderBilling(${order.order_id})">START BILLING</button>
+                <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.85rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap;" onclick="openOrderBilling(${order.order_id})">
+                    <i class="fa-solid fa-user-plus"></i> Create Customer
+                </button>
             </td>
+
         </tr>
     `).join('');
 
     // Populate Sales Filter if empty
-    const salesSelect = document.getElementById('filterSales');
-    if (salesSelect.options.length <= 1) {
-        const staff = [...new Set(allPendingOrders.map(o => o.sales_person_name).filter(Boolean))];
+    const salesSelect = document.getElementById('pendingFilterSales') || document.getElementById('filterSales');
+    if (salesSelect && salesSelect.options.length <= 1) {
+        const staff = [...new Set((allPendingOrders || []).map(o => o.sales_person_name).filter(Boolean))];
         staff.forEach(name => {
             const opt = document.createElement('option');
             opt.value = name;
@@ -1340,50 +1837,12 @@ function applyPendingFilters() {
             salesSelect.appendChild(opt);
         });
     }
-}
+};
 
-async function loadInReviewOrders() {
-    const tbody = document.getElementById('inReviewOrdersBody');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
+window.filterPendingOrders = window.applyPendingFilters;
 
-    try {
-        const res = await fetch(`${BILLING_API_URL}/pending`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        const allOrders = await res.json();
-        const inReview = allOrders.filter(o => o.order_status === 'in_review');
 
-        if (inReview.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 3rem; color: #64748b;">No orders currently in review.</td></tr>';
-            return;
-        }
 
-        tbody.innerHTML = inReview.map(order => `
-            <tr>
-                <td style="font-weight: 700;">${window.formatOrderId(order.order_id, order.created_at)}</td>
-                <td>
-                    <div style="font-weight: 600;">${order.customer_name}</div>
-                </td>
-                <td><span class="status-badge status-in_review">In Review</span></td>
-                <td style="font-weight: 600;">₹${parseFloat(order.total_amount).toLocaleString()}</td>
-                <td>${calculateWaitTime(order.updated_at)}</td>
-                <td>Price Adjustment</td>
-                <td>
-                    <button class="btn-billing primary" style="width: auto; padding: 0.5rem 1rem;" onclick="openOrderBilling(${order.order_id})">Continue</button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #ef4444;">Error loading in-review orders.</td></tr>';
-    }
-}
-
-function calculateWaitTime(updatedAt) {
-    const diff = new Date() - new Date(updatedAt);
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return 'Just now';
-    return `${hours}h ago`;
-}
 
 async function loadSettings() {
     const container = document.getElementById('settingsForm');

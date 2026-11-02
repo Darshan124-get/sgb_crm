@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Settings | SGB Agro CRM</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --billing-primary: #3b82f6;
+            --billing-secondary: #6366f1;
+            --billing-accent: #f59e0b;
+        }
+
+        #btn-top-payment { display: none !important; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f1f5f9;
+        }
+
+        h1, h2, h3 { font-family: 'Outfit', sans-serif; }
+
+        .main-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .premium-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            border: 1px solid #e2e8f0;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            max-width: 750px;
+        }
+
+        .topbar {
+            background: white;
+            padding: 1rem 2rem;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .search-bar {
+            background: #f1f5f9;
+            padding: 0.5rem 1.25rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 400px;
+        }
+
+        .search-bar input {
+            background: transparent;
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: 0.875rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.9rem;
+            color: #1e293b;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--billing-primary);
+        }
+
+        .btn-billing {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-billing.primary {
+            background: var(--billing-primary);
+            color: white;
+        }
+
+        .btn-billing.primary:hover {
+            background: var(--billing-secondary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-wrapper">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="hamburger" onclick="window.toggleMobileSidebar()">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="globalSearch" placeholder="Search settings...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="userName">Billing Officer</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div style="padding: 1.5rem 0;">
+                <div style="margin-bottom: 1.5rem;">
+                    <h1 style="font-size: 1.85rem; color: #0f172a; font-weight: 800; margin: 0;">⚙️ Billing Settings</h1>
+                    <p style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Company configuration, default GST rates & Zoho Books synchronization.</p>
+                </div>
+
+                <div class="premium-card">
+                    <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Tax & Invoicing Setup</h3>
+                    <div id="settingsForm">
+                        <div style="text-align:center; padding: 2rem;"><div class="loader"></div></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/billing.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+        });
+    </script>
+</body>
+
+</html>

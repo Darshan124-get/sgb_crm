@@ -26,6 +26,10 @@ const productSetRoutes = require('./routes/product-set.routes');
 const chatbotRoutes = require('./routes/chatbot.routes');
 const customerSupportRoutes = require('./routes/customer_support.routes');
 const telephonyRoutes = require('./routes/telephony.routes');
+const zohoRoutes = require('./routes/zoho.routes');
+const monitorRoutes = require('./routes/monitor.routes');
+const tempOrderReportRoutes = require('./routes/temp-order-report.routes');
+const telemetryMiddleware = require('./middleware/monitor.middleware');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -44,6 +48,9 @@ app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '150mb' }));
 app.use(express.urlencoded({ limit: '150mb', extended: true }));
+
+// Real-Time Developer Telemetry Middleware (In-memory, Zero-DB overhead)
+app.use(telemetryMiddleware);
 
 // Global Response Sanitizer Middleware (Mitigates raw SQL / DB Info Leakage)
 app.use((req, res, next) => {
@@ -255,11 +262,22 @@ app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/customer-support', customerSupportRoutes);
 app.use('/api/telephony', telephonyRoutes);
 app.use('/api/integrations/acefone/webhook', telephonyRoutes);
+app.use('/api/integrations/zoho', zohoRoutes);
+app.use('/api/billing/zoho', zohoRoutes);
+app.use('/api/monitoring', monitorRoutes);
+app.use('/api/temp-order-report', tempOrderReportRoutes);
 
+// Shortcut to Developer Monitoring Cockpit
+app.get('/monitor', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../frontend/monitoring.html'));
+});
+
+console.log('✅ Real-Time Developer Monitor: Mounted at /api/monitoring & /monitor');
 console.log('✅ WhatsApp API: Mounted at /api/whatsapp');
 console.log('✅ WhatsApp Webhook: Mounted at /webhook & /api/whatsapp/webhook');
 console.log('✅ Acefone Telephony API: Mounted at /api/telephony');
 console.log('✅ Acefone Webhook: Mounted at /api/integrations/acefone/webhook');
+console.log('✅ Zoho Books API & Webhooks: Mounted at /api/integrations/zoho & /api/billing/zoho');
 
 // Fallback: API routes that don't exist return 404 JSON (not HTML)
 app.all('/api/*', (req, res) => {

@@ -6440,6 +6440,15 @@ window.openPaymentChatAndVerify = function (phone, orderId) {
 
 // Live Polling & Topbar Badge Management
 window.pollPaymentVerificationSummary = async function () {
+    const isBillingPage = window.location.pathname.includes('/billing/') || window.location.pathname.endsWith('billing.html') || window.location.href.includes('/billing/billing.html');
+    if (isBillingPage) {
+        const existingBtn = document.getElementById('btn-top-payment');
+        if (existingBtn) existingBtn.remove();
+        const alertEl = document.getElementById('floatingPaymentAlert');
+        if (alertEl) alertEl.remove();
+        return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -6474,6 +6483,13 @@ window.pollPaymentVerificationSummary = async function () {
 };
 
 function updatePaymentTopBarBadge(count) {
+    const isBillingPage = window.location.pathname.includes('/billing/') || window.location.pathname.endsWith('billing.html') || window.location.href.includes('/billing/billing.html');
+    if (isBillingPage) {
+        const existingBtn = document.getElementById('btn-top-payment');
+        if (existingBtn) existingBtn.remove();
+        return;
+    }
+
     let badgeEl = document.getElementById('top-payment-count');
     if (badgeEl) {
         badgeEl.textContent = count;

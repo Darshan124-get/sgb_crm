@@ -175,9 +175,21 @@ async function duplicateFlow(flowId) {
     try {
         const res = await fetch(`${window.API_URL}/chatbot/flows/${flowId}/duplicate`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            }
         });
-        if (!res.ok) throw new Error('Duplicate request failed');
+        if (!res.ok) {
+            let errorMsg = 'Duplicate request failed';
+            try {
+                const data = await res.json();
+                if (data && (data.message || data.error)) {
+                    errorMsg = data.message || data.error;
+                }
+            } catch (_) {}
+            throw new Error(errorMsg);
+        }
 
         alert('Flow duplicated successfully.');
         fetchFlows();

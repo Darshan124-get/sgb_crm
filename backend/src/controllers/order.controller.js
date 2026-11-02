@@ -216,8 +216,10 @@ exports.updateStatus = async (req, res) => {
     const { status } = req.body;
 
     const VALID_TRANSITIONS = {
-        draft: ['in_review', 'billed', 'cancelled'],
-        in_review: ['billed', 'cancelled'],
+        draft: ['in_review', 'approved', 'so_created', 'billed', 'cancelled'],
+        in_review: ['approved', 'so_created', 'billed', 'cancelled'],
+        approved: ['so_created', 'billed', 'cancelled'],
+        so_created: ['billed', 'packed', 'cancelled'],
         billed: ['packed', 'cancelled'],
         packed: ['shipped', 'cancelled'],
         shipped: ['delivered', 'cancelled'],

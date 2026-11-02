@@ -106,7 +106,7 @@ exports.login = async (req, res) => {
                 permissions: perms
             }, 
             JWT_SECRET, 
-            { expiresIn: '8h' }
+            { expiresIn: '7d' }
         );
 
         const refreshToken = jwt.sign(
@@ -185,7 +185,7 @@ exports.refreshToken = async (req, res) => {
                 permissions: perms
             }, 
             JWT_SECRET, 
-            { expiresIn: '8h' }
+            { expiresIn: '7d' }
         );
 
         const newRefreshToken = jwt.sign(

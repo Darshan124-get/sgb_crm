@@ -8,12 +8,15 @@ const requireBilling = hasPermission('billing_billing');
 // Dashboard & Lists
 router.get('/stats', authenticateToken, requireBilling, billingController.getStats);
 router.get('/pending', authenticateToken, requireBilling, billingController.getPendingOrders);
+router.get('/sales-orders', authenticateToken, requireBilling, billingController.getSalesOrders);
 router.get('/orders', authenticateToken, requireBilling, billingController.getOrdersByStatus);
 router.get('/invoices', authenticateToken, requireBilling, billingController.getAllInvoices);
 
 // Order specifics
 router.get('/orders/:id', authenticateToken, requireBilling, billingController.getOrderForBilling);
 router.patch('/orders/:id', authenticateToken, requireBilling, billingController.updateOrderItems);
+router.post('/orders/:id/approve', authenticateToken, requireBilling, billingController.approveOrder);
+router.post('/orders/:id/zoho-customer', authenticateToken, requireBilling, billingController.createZohoCustomer);
 
 // Invoicing
 router.post('/orders/:id/invoice', authenticateToken, requireBilling, billingController.generateInvoice);

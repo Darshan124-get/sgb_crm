@@ -1666,7 +1666,7 @@ class TelephonyService {
     /**
      * Get recent calls for mobile telecaller app
      */
-    static async getRecentCalls({ crmUserId = null, limit = 50, search = '' } = {}) {
+    static async getRecentCalls({ crmUserId = null, page = 1, limit = 50, search = '', status = 'all' } = {}) {
         let whereClause = `WHERE 1=1`;
         const params = [];
 
@@ -1729,6 +1729,45 @@ class TelephonyService {
             params.push(searchPattern, searchPattern);
         }
 
+        // Summary counts query across all calls for this scope (unaffected by status tab)
+        const [statsRows] = await pool.query(`
+            SELECT 
+                COUNT(*) as total_calls,
+                SUM(CASE WHEN UPPER(c.technical_status) IN ('CONNECTED', 'COMPLETED', 'ANSWERED') AND c.talk_time_seconds > 0 THEN 1 ELSE 0 END) as connected_calls,
+                SUM(CASE WHEN NOT (UPPER(c.technical_status) IN ('CONNECTED', 'COMPLETED', 'ANSWERED') AND c.talk_time_seconds > 0) THEN 1 ELSE 0 END) as missed_calls
+            FROM telephony_calls c
+            LEFT JOIN leads l ON l.lead_id = c.lead_id
+            ${whereClause}
+        `, params);
+
+        const stats = statsRows[0] || {};
+        const allCount = parseInt(stats.total_calls || 0, 10);
+        const connectedCount = parseInt(stats.connected_calls || 0, 10);
+        const missedCount = parseInt(stats.missed_calls || 0, 10);
+
+        // Apply status filter if provided
+        let filterWhere = whereClause;
+        const filterParams = [...params];
+        const normalizedStatus = (status || 'all').toLowerCase();
+        if (normalizedStatus === 'connected') {
+            filterWhere += ` AND UPPER(c.technical_status) IN ('CONNECTED', 'COMPLETED', 'ANSWERED') AND c.talk_time_seconds > 0`;
+        } else if (normalizedStatus === 'missed') {
+            filterWhere += ` AND NOT (UPPER(c.technical_status) IN ('CONNECTED', 'COMPLETED', 'ANSWERED') AND c.talk_time_seconds > 0)`;
+        }
+
+        // Count total matching records for current filter
+        const [totalMatchingRows] = await pool.query(`
+            SELECT COUNT(*) as total
+            FROM telephony_calls c
+            LEFT JOIN leads l ON l.lead_id = c.lead_id
+            ${filterWhere}
+        `, filterParams);
+
+        const totalMatching = totalMatchingRows[0]?.total || 0;
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.max(1, parseInt(limit, 10) || 50);
+        const offset = (pageNum - 1) * limitNum;
+
         const [rows] = await pool.query(`
             SELECT c.id, c.acefone_call_id, c.acefone_ref_id, c.direction,
                    c.customer_phone, c.agent_phone, c.started_at, c.ended_at,
@@ -1745,13 +1784,13 @@ class TelephonyService {
             LEFT JOIN leads l ON l.lead_id = c.lead_id
             LEFT JOIN telephony_dids d ON d.id = c.did_id
             LEFT JOIN telephony_recordings r ON r.call_id = c.id
-            ${whereClause}
+            ${filterWhere}
             ORDER BY c.started_at DESC, c.id DESC
-            LIMIT ?
-        `, [...params, parseInt(limit)]);
+            LIMIT ? OFFSET ?
+        `, [...filterParams, limitNum, offset]);
 
         const defaultBucket = process.env.R2_BUCKET || 'sgb-crm-media';
-        return rows.map(r => {
+        const formattedCalls = rows.map(r => {
             let recordingUrl = null;
             if (r.r2_object_key) {
                 recordingUrl = storageService.getPublicUrl(r.r2_object_key, defaultBucket);
@@ -1763,6 +1802,19 @@ class TelephonyService {
                 recording_url: recordingUrl
             };
         });
+
+        return {
+            calls: formattedCalls,
+            totalCalls: totalMatching,
+            totalPages: Math.ceil(totalMatching / limitNum) || 1,
+            currentPage: pageNum,
+            limit: limitNum,
+            counts: {
+                all: allCount,
+                connected: connectedCount,
+                missed: missedCount
+            }
+        };
     }
 
     /**

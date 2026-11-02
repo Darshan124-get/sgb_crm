@@ -233,7 +233,7 @@ class TelephonyController {
 
     static async getRecentCalls(req, res) {
         try {
-            const { limit, search, telecaller_id } = req.query;
+            const { limit, page, search, status, telecaller_id } = req.query;
             const authenticatedUserId = req.user ? (req.user.user_id || req.user.id) : null;
             const userRole = req.user?.role ? req.user.role.toLowerCase() : '';
             const isSupervisor = userRole === 'admin' || userRole === 'super-admin';
@@ -245,12 +245,23 @@ class TelephonyController {
                 ? (telecaller_id ? parseInt(telecaller_id, 10) : null)
                 : authenticatedUserId;
 
-            const calls = await TelephonyService.getRecentCalls({
+            const result = await TelephonyService.getRecentCalls({
                 crmUserId: targetUserId,
+                page: page ? parseInt(page, 10) : 1,
                 limit: limit ? parseInt(limit, 10) : 50,
-                search: search || ''
+                search: search || '',
+                status: status || 'all'
             });
-            return res.json({ success: true, calls });
+
+            return res.json({
+                success: true,
+                calls: result.calls,
+                totalCalls: result.totalCalls,
+                totalPages: result.totalPages,
+                currentPage: result.currentPage,
+                limit: result.limit,
+                counts: result.counts
+            });
         } catch (err) {
             return res.status(500).json({ success: false, error: err.message });
         }

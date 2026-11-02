@@ -3287,12 +3287,19 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`${window.API_URL}/chatbot/flows/${currentFlowId}/publish`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                }
             });
 
             if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.message || 'Publish request failed');
+                const errData = await res.json().catch(() => ({}));
+                let errMsg = errData.message || 'Publish request failed';
+                if (errData.errors && Array.isArray(errData.errors) && errData.errors.length > 0) {
+                    errMsg += ': ' + errData.errors.join('; ');
+                }
+                throw new Error(errMsg);
             }
 
             const data = await res.json();

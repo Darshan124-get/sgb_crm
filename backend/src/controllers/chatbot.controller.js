@@ -645,18 +645,33 @@ exports.publishFlow = async (req, res) => {
         );
 
         // 5. Create a new draft version for subsequent editing
-        const nextVerNum = (currentVerNum + 0.1).toFixed(1);
+        const [maxVerRows] = await connection.query(
+            'SELECT MAX(version_number) as max_ver FROM chatbot_flow_versions WHERE flow_id = ?',
+            [flowId]
+        );
+        const highestVer = maxVerRows[0]?.max_ver ? parseFloat(maxVerRows[0].max_ver) : currentVerNum;
+        const nextVerNum = (Math.max(highestVer, currentVerNum) + 0.1).toFixed(1);
+
         const [newVerResult] = await connection.query(
             'INSERT INTO chatbot_flow_versions (flow_id, version_number, status) VALUES (?, ?, ?)',
             [flowId, nextVerNum, 'draft']
         );
         const newDraftVersionId = newVerResult.insertId;
 
-        // Clone nodes to the new draft
+        // Clone nodes to the new draft safely ensuring config is valid JSON string
         for (const n of nodes) {
+            let configStr;
+            if (typeof n.config === 'object' && n.config !== null) {
+                configStr = JSON.stringify(n.config);
+            } else if (typeof n.config === 'string') {
+                configStr = n.config;
+            } else {
+                configStr = JSON.stringify(n.config || {});
+            }
+
             await connection.query(
                 'INSERT INTO chatbot_nodes (version_id, node_key, node_type, name, position_x, position_y, config) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [newDraftVersionId, n.node_key, n.node_type, n.name, n.position_x, n.position_y, n.config]
+                [newDraftVersionId, n.node_key, n.node_type, n.name, n.position_x, n.position_y, configStr]
             );
         }
 
@@ -677,7 +692,7 @@ exports.publishFlow = async (req, res) => {
     } catch (err) {
         try { await connection.rollback(); } catch (rbErr) { }
         console.error('[PUBLISH FLOW ERROR]', err.message);
-        res.status(500).json({ message: 'Error publishing flow' });
+        res.status(500).json({ message: 'Error publishing flow: ' + err.message });
     } finally {
         try { connection.release(); } catch (relErr) { }
     }

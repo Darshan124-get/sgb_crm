@@ -12,6 +12,24 @@ const pool = require('../config/db');
 const toInt = (v) => parseInt(v, 10) || null;
 const toFloat = (v) => parseFloat(v) || 0;
 
+// Helper: retrieve target from settings with 35,00,000 default
+async function getMonthlyTargetFromDb(year, month) {
+    try {
+        const key = `sales_target_${year}_${month}`;
+        const [rows] = await pool.query(
+            'SELECT setting_value FROM settings WHERE setting_key = ?',
+            [key]
+        );
+        if (rows.length && rows[0].setting_value !== null && rows[0].setting_value !== '') {
+            return parseFloat(rows[0].setting_value) || 0;
+        }
+    } catch (e) {
+        console.error('[TOR] Error reading target from settings:', e);
+    }
+    // Default November 2026 or fallback: 35,00,000
+    return 3500000;
+}
+
 // ─────────────────────────────────────────────────────────────
 // GET /api/temp-order-report
 // Query params: date, month, year, telecaller_id, page, limit
@@ -68,11 +86,41 @@ exports.getRecords = async (req, res) => {
         const totalQty    = rows.reduce((s, r) => s + (r.quantity || 0), 0);
         const totalAmount = rows.reduce((s, r) => s + parseFloat(r.final_amount || 0), 0);
 
+        // Resolve month and year for monthly target
+        const now = new Date();
+        let resolvedMonth = month ? toInt(month) : null;
+        let resolvedYear  = year  ? toInt(year)  : null;
+        if (!resolvedMonth && date) {
+            const parts = String(date).split('-');
+            if (parts.length >= 2) {
+                resolvedYear  = parseInt(parts[0], 10) || now.getFullYear();
+                resolvedMonth = parseInt(parts[1], 10) || (now.getMonth() + 1);
+            }
+        }
+        if (!resolvedMonth) resolvedMonth = now.getMonth() + 1;
+        if (!resolvedYear)  resolvedYear  = now.getFullYear();
+
+        // Calculate total sales for this month across all orders in temp_order_report
+        const [monthTotalRows] = await pool.query(
+            `SELECT COALESCE(SUM(final_amount), 0) AS monthTotalAmount
+             FROM temp_order_report
+             WHERE MONTH(record_date) = ? AND YEAR(record_date) = ?`,
+            [resolvedMonth, resolvedYear]
+        );
+        const monthTotalAmount = parseFloat(monthTotalRows[0]?.monthTotalAmount || 0);
+        const monthlyTarget = await getMonthlyTargetFromDb(resolvedYear, resolvedMonth);
+        const remainingTarget = Math.max(0, monthlyTarget - monthTotalAmount);
+
         return res.json({
             success: true,
             count: rows.length,
             totalQty,
             totalAmount: totalAmount.toFixed(2),
+            monthTotalAmount: monthTotalAmount.toFixed(2),
+            monthlyTarget,
+            remainingTarget: remainingTarget.toFixed(2),
+            targetMonth: resolvedMonth,
+            targetYear: resolvedYear,
             records: rows,
         });
     } catch (err) {
@@ -322,6 +370,8 @@ exports.getSummary = async (req, res) => {
         // Grand totals
         const grandQty    = productRows.reduce((s, r) => s + (parseInt(r.total_qty) || 0), 0);
         const grandAmount = productRows.reduce((s, r) => s + parseFloat(r.total_amount || 0), 0);
+        const monthlyTarget = await getMonthlyTargetFromDb(resolvedYear, resolvedMonth);
+        const remainingTarget = Math.max(0, monthlyTarget - grandAmount);
 
         return res.json({
             success: true,
@@ -330,6 +380,8 @@ exports.getSummary = async (req, res) => {
                 year: resolvedYear,
                 telecaller_id: telecaller_id ? toInt(telecaller_id) : null,
             },
+            monthlyTarget,
+            remainingTarget: remainingTarget.toFixed(2),
             grandTotal: {
                 qty: grandQty,
                 amount: grandAmount.toFixed(2),
@@ -426,5 +478,84 @@ exports.createBatch = async (req, res) => {
         return res.status(500).json({ success: false, error: 'Failed to save batch records' });
     } finally {
         connection.release();
+    }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/temp-order-report/target
+// Query params: month, year
+// ─────────────────────────────────────────────────────────────
+exports.getTarget = async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        const now = new Date();
+        const resolvedMonth = month ? toInt(month) : now.getMonth() + 1;
+        const resolvedYear  = year  ? toInt(year)  : now.getFullYear();
+
+        const target = await getMonthlyTargetFromDb(resolvedYear, resolvedMonth);
+
+        const [sumRows] = await pool.query(
+            `SELECT COALESCE(SUM(final_amount), 0) AS month_sales
+             FROM temp_order_report
+             WHERE MONTH(record_date) = ? AND YEAR(record_date) = ?`,
+            [resolvedMonth, resolvedYear]
+        );
+        const monthSales = parseFloat(sumRows[0]?.month_sales || 0);
+        const remainingTarget = Math.max(0, target - monthSales);
+
+        return res.json({
+            success: true,
+            month: resolvedMonth,
+            year: resolvedYear,
+            target,
+            monthSales,
+            remainingTarget
+        });
+    } catch (err) {
+        console.error('[TOR] getTarget error:', err);
+        return res.status(500).json({ success: false, error: 'Failed to fetch target' });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/temp-order-report/target
+// Body: { month, year, target }
+// ─────────────────────────────────────────────────────────────
+exports.setTarget = async (req, res) => {
+    try {
+        const { month, year, target } = req.body;
+        const now = new Date();
+        const resolvedMonth = month ? toInt(month) : now.getMonth() + 1;
+        const resolvedYear  = year  ? toInt(year)  : now.getFullYear();
+        const targetVal = parseFloat(target) || 0;
+
+        const key = `sales_target_${resolvedYear}_${resolvedMonth}`;
+        await pool.query(
+            `INSERT INTO settings (setting_key, setting_value)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = ?`,
+            [key, String(targetVal), String(targetVal)]
+        );
+
+        const [sumRows] = await pool.query(
+            `SELECT COALESCE(SUM(final_amount), 0) AS month_sales
+             FROM temp_order_report
+             WHERE MONTH(record_date) = ? AND YEAR(record_date) = ?`,
+            [resolvedMonth, resolvedYear]
+        );
+        const monthSales = parseFloat(sumRows[0]?.month_sales || 0);
+        const remainingTarget = Math.max(0, targetVal - monthSales);
+
+        return res.json({
+            success: true,
+            month: resolvedMonth,
+            year: resolvedYear,
+            target: targetVal,
+            monthSales,
+            remainingTarget
+        });
+    } catch (err) {
+        console.error('[TOR] setTarget error:', err);
+        return res.status(500).json({ success: false, error: 'Failed to update target' });
     }
 };

@@ -11,8 +11,10 @@ const router = express.Router();
 const ctrl = require('../controllers/temp-order-report.controller');
 const { authenticateToken, isManagerOrAdmin } = require('../middleware/auth.middleware');
 
-// Summary must be declared BEFORE /:id to avoid route clash
+// Summary and Target must be declared BEFORE /:id to avoid route clash
 router.get('/summary',    authenticateToken, isManagerOrAdmin, ctrl.getSummary);
+router.get('/target',     authenticateToken, isManagerOrAdmin, ctrl.getTarget);
+router.post('/target',    authenticateToken, isManagerOrAdmin, ctrl.setTarget);
 router.post('/batch',     authenticateToken, isManagerOrAdmin, ctrl.createBatch);
 
 router.get('/',    authenticateToken, isManagerOrAdmin, ctrl.getRecords);

@@ -373,7 +373,7 @@ async function loadRecords() {
         if (!res.ok) throw new Error('Failed to fetch records');
         const data = await res.json();
 
-        updateStats(data.count, data.totalQty, data.totalAmount);
+        updateStats(data.count, data.totalQty, data.totalAmount, data);
         renderRecordsTable(data.records || []);
         _cachedRecords = data.records || [];
     } catch (err) {
@@ -382,10 +382,53 @@ async function loadRecords() {
     }
 }
 
-function updateStats(count, qty, amount) {
+let _currentMonthlyTarget = 3500000;
+let _currentMonthSales = 0;
+let _currentTargetMonth = 11;
+let _currentTargetYear = 2026;
+
+function updateStats(count, qty, amount, data = {}) {
     document.getElementById('stat_count').textContent  = count ?? '—';
     document.getElementById('stat_qty').textContent    = qty ?? '—';
     document.getElementById('stat_amount').textContent = amount ? `₹${formatNum(amount)}` : '—';
+
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    _currentTargetMonth = data.targetMonth || (document.getElementById('flt_month').value ? parseInt(document.getElementById('flt_month').value) : (new Date().getMonth() + 1));
+    _currentTargetYear  = data.targetYear  || (document.getElementById('flt_year').value ? parseInt(document.getElementById('flt_year').value) : new Date().getFullYear());
+
+    if (data.monthlyTarget !== undefined) {
+        _currentMonthlyTarget = parseFloat(data.monthlyTarget) || 0;
+    } else {
+        const cached = localStorage.getItem(`tor_target_${_currentTargetYear}_${_currentTargetMonth}`);
+        _currentMonthlyTarget = cached ? parseFloat(cached) : 3500000;
+    }
+
+    _currentMonthSales = data.monthTotalAmount !== undefined ? parseFloat(data.monthTotalAmount) : parseFloat(amount || 0);
+
+    const remaining = Math.max(0, _currentMonthlyTarget - _currentMonthSales);
+    const monthName = monthNames[_currentTargetMonth - 1] || 'November';
+
+    const targetEl = document.getElementById('stat_monthly_target');
+    if (targetEl) targetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
+
+    const targetMonthLbl = document.getElementById('stat_target_month_lbl');
+    if (targetMonthLbl) targetMonthLbl.textContent = `${monthName} Target (Click ✏️ to edit)`;
+
+    const remainingEl = document.getElementById('stat_remaining_target');
+    if (remainingEl) remainingEl.textContent = `₹${formatNum(remaining)}`;
+
+    const achievedLbl = document.getElementById('stat_achieved_subtext');
+    if (achievedLbl) {
+        const pct = _currentMonthlyTarget > 0 ? ((_currentMonthSales / _currentMonthlyTarget) * 100).toFixed(1) : 0;
+        achievedLbl.textContent = `₹${formatNum(_currentMonthSales)} sales achieved (${pct}%)`;
+    }
+
+    const sumTargetEl = document.getElementById('sum_stat_target');
+    if (sumTargetEl) sumTargetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
+
+    const sumRemainingEl = document.getElementById('sum_stat_remaining');
+    if (sumRemainingEl) sumRemainingEl.textContent = `₹${formatNum(remaining)}`;
 }
 
 function formatNum(v) {
@@ -489,8 +532,19 @@ async function loadSummary() {
 
         // Stats
         document.getElementById('sum_stat_qty').textContent     = data.grandTotal?.qty ?? '—';
+        const sumGrandAmount = parseFloat(data.grandTotal?.amount || 0);
         document.getElementById('sum_stat_amount').textContent  = data.grandTotal?.amount ? `₹${formatNum(data.grandTotal.amount)}` : '—';
         document.getElementById('sum_stat_products').textContent = (data.byProduct || []).length;
+
+        if (data.monthlyTarget !== undefined) {
+            _currentMonthlyTarget = parseFloat(data.monthlyTarget) || 0;
+        }
+        const sumTargetEl = document.getElementById('sum_stat_target');
+        if (sumTargetEl) sumTargetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
+
+        const sumRemainingVal = data.remainingTarget !== undefined ? parseFloat(data.remainingTarget) : Math.max(0, _currentMonthlyTarget - sumGrandAmount);
+        const sumRemainingEl = document.getElementById('sum_stat_remaining');
+        if (sumRemainingEl) sumRemainingEl.textContent = `₹${formatNum(sumRemainingVal)}`;
 
         // Product table
         const byProduct = data.byProduct || [];
@@ -837,4 +891,80 @@ function showToast(message, type = 'success') {
 
 function showAlert(title, msg, type = 'info') {
     showToast(msg || title, type);
+}
+
+// ── Target Edit Modal ─────────────────────────────────────────
+function openTargetModal() {
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthName = monthNames[_currentTargetMonth - 1] || 'November';
+    const displayEl = document.getElementById('targetMonthYearDisplay');
+    if (displayEl) displayEl.textContent = `${monthName} ${_currentTargetYear}`;
+    const inp = document.getElementById('inp_monthly_target');
+    if (inp) inp.value = _currentMonthlyTarget;
+    const modal = document.getElementById('torTargetModalOverlay');
+    if (modal) modal.classList.add('open');
+}
+
+function closeTargetModal() {
+    const modal = document.getElementById('torTargetModalOverlay');
+    if (modal) modal.classList.remove('open');
+}
+
+function overlayTargetClose(e) {
+    if (e.target === document.getElementById('torTargetModalOverlay')) closeTargetModal();
+}
+
+async function submitTargetForm(e) {
+    e.preventDefault();
+    const targetVal = parseFloat(document.getElementById('inp_monthly_target').value) || 0;
+    const btn = document.getElementById('btnSaveTarget');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...';
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${window.API_URL}/temp-order-report/target`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                month: _currentTargetMonth,
+                year: _currentTargetYear,
+                target: targetVal
+            })
+        });
+
+        localStorage.setItem(`tor_target_${_currentTargetYear}_${_currentTargetMonth}`, String(targetVal));
+        _currentMonthlyTarget = targetVal;
+
+        const remaining = Math.max(0, _currentMonthlyTarget - _currentMonthSales);
+        const targetEl = document.getElementById('stat_monthly_target');
+        if (targetEl) targetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
+
+        const remainingEl = document.getElementById('stat_remaining_target');
+        if (remainingEl) remainingEl.textContent = `₹${formatNum(remaining)}`;
+
+        const achievedLbl = document.getElementById('stat_achieved_subtext');
+        if (achievedLbl) {
+            const pct = _currentMonthlyTarget > 0 ? ((_currentMonthSales / _currentMonthlyTarget) * 100).toFixed(1) : 0;
+            achievedLbl.textContent = `₹${formatNum(_currentMonthSales)} sales achieved (${pct}%)`;
+        }
+
+        const sumTargetEl = document.getElementById('sum_stat_target');
+        if (sumTargetEl) sumTargetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
+
+        const sumRemainingEl = document.getElementById('sum_stat_remaining');
+        if (sumRemainingEl) sumRemainingEl.textContent = `₹${formatNum(remaining)}`;
+
+        showAlert('Success', 'Monthly target updated successfully!', 'success');
+        closeTargetModal();
+    } catch (err) {
+        console.error('[TOR] submitTargetForm:', err);
+        showAlert('Error', err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-floppy-disk"></i> Save Target';
+    }
 }

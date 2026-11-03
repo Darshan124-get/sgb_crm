@@ -4322,6 +4322,19 @@ window.dismissHumanAlertToast = function (identifier) {
     if (toast) toast.remove();
 };
 
+window.areNotificationPopupsEnabled = function () {
+    return localStorage.getItem('notifications_enabled') !== 'false';
+};
+
+window.dismissAllNotificationPopups = function () {
+    const toast = document.getElementById('telecaller-human-alert-toast');
+    if (toast) toast.remove();
+    const callAlert = document.getElementById('floatingCallSupportAlert');
+    if (callAlert) callAlert.remove();
+    const payAlert = document.getElementById('floatingPaymentAlert');
+    if (payAlert) payAlert.remove();
+};
+
 let lastAlertCount = 0;
 window.fetchPendingHumanAlerts = async function () {
     const token = localStorage.getItem('token');
@@ -4330,8 +4343,17 @@ window.fetchPendingHumanAlerts = async function () {
     // Skip polling if browser network IO is suspended or offline
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-    // Notifications sound check (sound muted if disabled, but in-app banners always render)
-    const soundMuted = localStorage.getItem('notification_sound_muted') === 'true' || localStorage.getItem('notifications_enabled') === 'false';
+    // Notifications popup check: if disabled, ensure all popups are removed and do not fetch/display
+    if (!window.areNotificationPopupsEnabled()) {
+        const toast = document.getElementById('telecaller-human-alert-toast');
+        if (toast) toast.remove();
+        const callAlert = document.getElementById('floatingCallSupportAlert');
+        if (callAlert) callAlert.remove();
+        lastAlertCount = 0;
+        return;
+    }
+
+    const soundMuted = localStorage.getItem('notification_sound_muted') === 'true';
 
     try {
         const controller = new AbortController();
@@ -5980,6 +6002,8 @@ if (document.readyState === 'loading') {
 
 // Sound Effect Player for Notifications
 window.playPaymentNotificationSound = function () {
+    const soundMuted = localStorage.getItem('notification_sound_muted') === 'true' || localStorage.getItem('notifications_enabled') === 'false';
+    if (soundMuted) return;
     try {
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audio.volume = 0.9;
@@ -6067,6 +6091,11 @@ function unmarkPaymentOrderDismissed(orderId) {
 // Floating Alert Renderer
 window.showPaymentScreenshotAlert = function (data) {
     if (!data) return;
+    if (typeof window.areNotificationPopupsEnabled === 'function' && !window.areNotificationPopupsEnabled()) {
+        const alertEl = document.getElementById('floatingPaymentAlert');
+        if (alertEl) alertEl.remove();
+        return;
+    }
     const orderId = data.order_id || '';
     const orderNumber = data.order_number || (orderId ? `SGB-${orderId}` : 'SGB-Order');
     const customerName = data.customer_name || 'WhatsApp Customer';
@@ -6168,6 +6197,11 @@ window.dismissPaymentAlert = function (orderId) {
 // Floating Call Support Alert Renderer (Yellow Theme)
 window.showCallSupportAlert = function (data, totalCount) {
     if (!data) return;
+    if (typeof window.areNotificationPopupsEnabled === 'function' && !window.areNotificationPopupsEnabled()) {
+        const alertEl = document.getElementById('floatingCallSupportAlert');
+        if (alertEl) alertEl.remove();
+        return;
+    }
     const phone = data.phone || data.phone_number || '';
     const sessionId = data.session_id || phone;
     const customerName = data.customer_name || 'WhatsApp Customer';
@@ -6466,14 +6500,18 @@ window.pollPaymentVerificationSummary = async function () {
         updatePaymentTopBarBadge(count);
 
         // If there are pending payments
-        if (count > 0) {
+        const popupsEnabled = typeof window.areNotificationPopupsEnabled === 'function'
+            ? window.areNotificationPopupsEnabled()
+            : (localStorage.getItem('notifications_enabled') !== 'false');
+
+        if (count > 0 && popupsEnabled) {
             const list = Array.isArray(data.pending) && data.pending.length > 0 ? data.pending : (data.latest ? [data.latest] : []);
             const orderToShow = list.find(item => !isPaymentOrderDismissed(item.order_id));
             if (orderToShow) {
                 orderToShow.count = count;
                 window.showPaymentScreenshotAlert(orderToShow);
             }
-        } else if (count === 0) {
+        } else {
             const alertEl = document.getElementById('floatingPaymentAlert');
             if (alertEl) alertEl.remove();
         }
@@ -6534,3 +6572,54 @@ if (document.readyState === 'loading') {
 }
 
 
+
+// Storage listener for reactive cross-tab notification toggle
+window.addEventListener('storage', (e) => {
+    if (e.key === 'notifications_enabled') {
+        if (e.newValue === 'false') {
+            if (typeof window.dismissAllNotificationPopups === 'function') {
+                window.dismissAllNotificationPopups();
+            }
+        } else {
+            if (typeof window.fetchPendingHumanAlerts === 'function') {
+                window.fetchPendingHumanAlerts();
+            }
+            if (typeof window.pollPaymentVerificationSummary === 'function') {
+                window.pollPaymentVerificationSummary();
+            }
+        }
+    }
+});
+
+// Auto-sync notification settings from backend
+(async function initNotificationSync() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${window.API_URL}/settings`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.notifications_enabled !== undefined) {
+                const isEnabled = data.notifications_enabled !== 'false';
+                localStorage.setItem('notifications_enabled', isEnabled ? 'true' : 'false');
+                if (!isEnabled && typeof window.dismissAllNotificationPopups === 'function') {
+                    window.dismissAllNotificationPopups();
+                }
+            }
+            if (data && data.notification_sound_muted !== undefined) {
+                localStorage.setItem('notification_sound_muted', data.notification_sound_muted === 'true' ? 'true' : 'false');
+            }
+        }
+    } catch (e) {
+        // Silent fallback
+    }
+})();
+
+// Clean up popups immediately if notifications disabled
+if (typeof window.areNotificationPopupsEnabled === 'function' && !window.areNotificationPopupsEnabled()) {
+    if (typeof window.dismissAllNotificationPopups === 'function') {
+        window.dismissAllNotificationPopups();
+    }
+}

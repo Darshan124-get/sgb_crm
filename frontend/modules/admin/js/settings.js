@@ -4,6 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('profileName');
     if (el) el.textContent = user.name || 'Administrator';
 
+    // Synchronize initial UI state from localStorage
+    const initialNotif = localStorage.getItem('notifications_enabled') !== 'false';
+    const notifEl = document.getElementById('s-notifications-toggle');
+    if (notifEl) notifEl.checked = initialNotif;
+    if (!initialNotif && typeof window.dismissAllNotificationPopups === 'function') {
+        window.dismissAllNotificationPopups();
+    }
+
     loadSettings();
 
     document.getElementById('saveBtn').addEventListener('click', saveSettings);
@@ -34,10 +42,41 @@ async function loadSettings() {
         const notifOn = data.notifications_enabled !== undefined ? data.notifications_enabled === 'true' : (localStorage.getItem('notifications_enabled') !== 'false');
         const soundMuted = data.notification_sound_muted !== undefined ? data.notification_sound_muted === 'true' : (localStorage.getItem('notification_sound_muted') === 'true');
 
+        localStorage.setItem('notifications_enabled', notifOn ? 'true' : 'false');
+        localStorage.setItem('notification_sound_muted', soundMuted ? 'true' : 'false');
+
         const notifEl = document.getElementById('s-notifications-toggle');
-        if (notifEl) notifEl.checked = notifOn;
+        if (notifEl) {
+            notifEl.checked = notifOn;
+            notifEl.onchange = () => {
+                const enabled = notifEl.checked;
+                localStorage.setItem('notifications_enabled', enabled ? 'true' : 'false');
+                if (!enabled) {
+                    if (typeof window.dismissAllNotificationPopups === 'function') {
+                        window.dismissAllNotificationPopups();
+                    }
+                } else {
+                    if (typeof window.fetchPendingHumanAlerts === 'function') {
+                        window.fetchPendingHumanAlerts();
+                    }
+                    if (typeof window.pollPaymentVerificationSummary === 'function') {
+                        window.pollPaymentVerificationSummary();
+                    }
+                }
+            };
+        }
+
         const soundEl = document.getElementById('s-sound-mute-toggle');
-        if (soundEl) soundEl.checked = soundMuted;
+        if (soundEl) {
+            soundEl.checked = soundMuted;
+            soundEl.onchange = () => {
+                localStorage.setItem('notification_sound_muted', soundEl.checked ? 'true' : 'false');
+            };
+        }
+
+        if (!notifOn && typeof window.dismissAllNotificationPopups === 'function') {
+            window.dismissAllNotificationPopups();
+        }
 
     } catch (err) {
         showToast('Failed to load settings', true);
@@ -51,6 +90,17 @@ async function saveSettings() {
     // Save to LocalStorage immediately
     localStorage.setItem('notifications_enabled', notifEnabled ? 'true' : 'false');
     localStorage.setItem('notification_sound_muted', soundMuted ? 'true' : 'false');
+
+    if (!notifEnabled && typeof window.dismissAllNotificationPopups === 'function') {
+        window.dismissAllNotificationPopups();
+    } else if (notifEnabled) {
+        if (typeof window.fetchPendingHumanAlerts === 'function') {
+            window.fetchPendingHumanAlerts();
+        }
+        if (typeof window.pollPaymentVerificationSummary === 'function') {
+            window.pollPaymentVerificationSummary();
+        }
+    }
 
     const payload = {
         gst_rate: document.getElementById('s-gst-rate').value,

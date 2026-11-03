@@ -47,13 +47,13 @@ function setDefaultFilters() {
     const formDate = document.getElementById('form_date');
     if (formDate) {
         formDate.value = todayStr;
-        formDate.min = todayStr; // Block previous dates
+        formDate.removeAttribute('min'); // Allow previous dates
         formDate.removeAttribute('max');
     }
 
     const editDate = document.getElementById('edit_date');
     if (editDate) {
-        editDate.min = todayStr; // Block previous dates
+        editDate.removeAttribute('min'); // Allow previous dates
         editDate.removeAttribute('max');
     }
 }
@@ -543,7 +543,7 @@ function openAddModal() {
     const formDate = document.getElementById('form_date');
     if (formDate) {
         formDate.value = dateStr;
-        formDate.min = dateStr; // Block previous dates
+        formDate.removeAttribute('min'); // Allow previous dates
         formDate.removeAttribute('max');
     }
 
@@ -577,10 +577,6 @@ async function saveBatch() {
 
     if (!record_date) {
         return showAlert('Validation', 'Please select a record date.', 'warning');
-    }
-    const todayStr = getLocalDateStr(new Date());
-    if (record_date < todayStr) {
-        return showAlert('Validation', 'Past dates are not allowed. Please select today or future date.', 'warning');
     }
     if (!telecaller_id) {
         return showAlert('Validation', 'Please select a telecaller.', 'warning');
@@ -621,6 +617,10 @@ async function saveBatch() {
 
         showAlert('Success', `${data.savedCount || items.length} product record(s) saved successfully!`, 'success');
         closeModal();
+        if (record_date) {
+            const fltDateEl = document.getElementById('flt_date');
+            if (fltDateEl) fltDateEl.value = record_date;
+        }
         loadRecords();
     } catch (err) {
         console.error('[TOR] saveBatch:', err);
@@ -639,7 +639,7 @@ function openEditModal(id) {
     const todayStr = getLocalDateStr(new Date());
     const editDateInp = document.getElementById('edit_date');
     if (editDateInp) {
-        editDateInp.min = todayStr; // Block previous dates
+        editDateInp.removeAttribute('min'); // Allow previous dates
         editDateInp.removeAttribute('max');
         editDateInp.value = rec.record_date ? rec.record_date.split('T')[0] : todayStr;
     }
@@ -692,10 +692,6 @@ async function submitEditForm(e) {
     if (!record_date || !telecaller_id || !product_id || !final_amount) {
         return showAlert('Validation', 'Please fill in all required fields.', 'warning');
     }
-    const todayStr = getLocalDateStr(new Date());
-    if (record_date < todayStr) {
-        return showAlert('Validation', 'Past dates are not allowed. Please select today or future date.', 'warning');
-    }
 
     const payload = { record_date, telecaller_id, product_id, unit_price, quantity, final_amount, notes };
     const btn = document.getElementById('btnSubmitEdit');
@@ -718,6 +714,10 @@ async function submitEditForm(e) {
 
         showAlert('Success', 'Record updated successfully.', 'success');
         closeEditModal();
+        if (record_date) {
+            const fltDateEl = document.getElementById('flt_date');
+            if (fltDateEl) fltDateEl.value = record_date;
+        }
         loadRecords();
     } catch (err) {
         console.error('[TOR] submitEditForm:', err);

@@ -95,9 +95,9 @@ async function loadTelecallers() {
         const users = Array.isArray(data) ? data : (data.users || []);
 
         _allTelecallers = users.filter(u => {
-            const r = (u.role_name || u.role || '').toLowerCase();
-            return (r.includes('telecaller') || r.includes('sales'))
-                   && !r.includes('manager');
+            const r = (u.role_name || u.role || '').toLowerCase().replace(/[\s_-]+/g, '_');
+            // Allow telecallers, sales executives, and sales managers
+            return r.includes('telecaller') || r.includes('sales_manager') || (r.includes('sales') && !r.includes('admin') && !r.includes('dealer'));
         });
 
         if (!_allTelecallers.length) {

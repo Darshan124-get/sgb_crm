@@ -412,17 +412,8 @@ function updateStats(count, qty, amount, data = {}) {
     const targetEl = document.getElementById('stat_monthly_target');
     if (targetEl) targetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
 
-    const targetMonthLbl = document.getElementById('stat_target_month_lbl');
-    if (targetMonthLbl) targetMonthLbl.textContent = `${monthName} Target (Click ✏️ to edit)`;
-
     const remainingEl = document.getElementById('stat_remaining_target');
     if (remainingEl) remainingEl.textContent = `₹${formatNum(remaining)}`;
-
-    const achievedLbl = document.getElementById('stat_achieved_subtext');
-    if (achievedLbl) {
-        const pct = _currentMonthlyTarget > 0 ? ((_currentMonthSales / _currentMonthlyTarget) * 100).toFixed(1) : 0;
-        achievedLbl.textContent = `₹${formatNum(_currentMonthSales)} sales achieved (${pct}%)`;
-    }
 
     const sumTargetEl = document.getElementById('sum_stat_target');
     if (sumTargetEl) sumTargetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;
@@ -946,11 +937,7 @@ async function submitTargetForm(e) {
         const remainingEl = document.getElementById('stat_remaining_target');
         if (remainingEl) remainingEl.textContent = `₹${formatNum(remaining)}`;
 
-        const achievedLbl = document.getElementById('stat_achieved_subtext');
-        if (achievedLbl) {
-            const pct = _currentMonthlyTarget > 0 ? ((_currentMonthSales / _currentMonthlyTarget) * 100).toFixed(1) : 0;
-            achievedLbl.textContent = `₹${formatNum(_currentMonthSales)} sales achieved (${pct}%)`;
-        }
+
 
         const sumTargetEl = document.getElementById('sum_stat_target');
         if (sumTargetEl) sumTargetEl.textContent = `₹${formatNum(_currentMonthlyTarget)}`;

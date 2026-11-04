@@ -3127,20 +3127,29 @@ function renderMessages(history, shouldResetLimit = true, forceScrollToBottom = 
 
 function refocusMessageInput() {
     if (!messageInputEl) return;
-    try {
-        messageInputEl.focus();
-        const len = messageInputEl.value.length;
-        messageInputEl.setSelectionRange(len, len);
-    } catch (e) {}
-    setTimeout(() => {
-        if (messageInputEl) {
-            try {
-                messageInputEl.focus();
-                const len = messageInputEl.value.length;
-                messageInputEl.setSelectionRange(len, len);
-            } catch (e) {}
-        }
-    }, 10);
+    const doFocus = () => {
+        if (!messageInputEl) return;
+        try {
+            messageInputEl.focus({ preventScroll: true });
+            const len = messageInputEl.value.length;
+            messageInputEl.setSelectionRange(len, len);
+        } catch (e) {}
+    };
+
+    doFocus();
+    requestAnimationFrame(doFocus);
+    setTimeout(doFocus, 25);
+    setTimeout(doFocus, 75);
+    setTimeout(doFocus, 150);
+    setTimeout(doFocus, 300);
+}
+
+function closeQuickRepliesPopover() {
+    if (typeof quickRepliesPopover !== 'undefined' && quickRepliesPopover) {
+        quickRepliesPopover.style.display = 'none';
+        selectedQrIndex = -1;
+    }
+    refocusMessageInput();
 }
 
 async function handleSend() {
@@ -3289,6 +3298,7 @@ function handleMediaSelect(e) {
 
 // Event Listeners Initialization
 function initEventListeners() {
+    sendBtnEl.onpointerdown = (e) => e.preventDefault();
     sendBtnEl.onmousedown = (e) => e.preventDefault();
     sendBtnEl.onclick = handleSend;
     attachBtnEl.onclick = () => mediaInputEl.click();
@@ -3324,9 +3334,7 @@ function initEventListeners() {
                 }
             } else if (e.key === 'Escape') {
                 e.preventDefault();
-                quickRepliesPopover.style.display = 'none';
-                selectedQrIndex = -1;
-                refocusMessageInput();
+                closeQuickRepliesPopover();
                 return;
             }
         }
@@ -3766,12 +3774,20 @@ function filterAndShowPopover(searchTerm) {
                 ${qr.media_url && qr.media_url !== '[]' ? '<i class="fas fa-paperclip" style="margin-right: 5px;"></i>' : ''}${qr.message || 'Media Reply'}
             </div>
         `;
+        item.style.userSelect = 'none';
+        item.style.webkitUserSelect = 'none';
+        item.onpointerdown = (e) => {
+            e.preventDefault();
+        };
         item.onmousedown = (e) => {
             e.preventDefault();
         };
-        item.onclick = async () => {
-            quickRepliesPopover.style.display = 'none';
-            selectedQrIndex = -1;
+        item.onclick = async (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            closeQuickRepliesPopover();
             if (!activeCustomer || !activeCustomer.phone) {
                 refocusMessageInput();
                 return;
@@ -4010,6 +4026,9 @@ if (qrEditMedia) {
 // Bind Quick Reply Button (⚡ icon)
 const quickReplyBtn = document.getElementById('quick-reply-btn');
 if (quickReplyBtn) {
+    quickReplyBtn.onpointerdown = (e) => {
+        e.preventDefault(); // Keep focus on messageInputEl
+    };
     quickReplyBtn.onmousedown = (e) => {
         e.preventDefault(); // Keep focus on messageInputEl
     };
@@ -4017,9 +4036,7 @@ if (quickReplyBtn) {
         e.preventDefault();
         e.stopPropagation();
         if (quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
-            quickRepliesPopover.style.display = 'none';
-            selectedQrIndex = -1;
-            refocusMessageInput();
+            closeQuickRepliesPopover();
         } else {
             await loadQuickReplies();
             filterAndShowPopover('');
@@ -4029,6 +4046,11 @@ if (quickReplyBtn) {
 }
 
 if (quickRepliesPopover) {
+    quickRepliesPopover.addEventListener('pointerdown', (e) => {
+        if (!e.target.closest('#qr-popover-edit-btn')) {
+            e.preventDefault(); // Don't blur message input when clicking inside popover
+        }
+    });
     quickRepliesPopover.addEventListener('mousedown', (e) => {
         if (!e.target.closest('#qr-popover-edit-btn')) {
             e.preventDefault(); // Don't blur message input when clicking inside popover
@@ -4060,8 +4082,7 @@ if (messageInputEl) {
         if (quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
             const btn = document.getElementById('quick-reply-btn');
             if (!quickRepliesPopover.contains(e.target) && (!btn || !btn.contains(e.target)) && e.target !== messageInputEl) {
-                quickRepliesPopover.style.display = 'none';
-                selectedQrIndex = -1;
+                closeQuickRepliesPopover();
             }
         }
     });

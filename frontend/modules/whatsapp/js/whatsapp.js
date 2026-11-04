@@ -1146,6 +1146,38 @@ async function loadCustomers(tabParam = null, searchParam = null) {
 
 let customerDisplayLimit = 30;
 
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function formatCustomerMessageSnippet(rawSnippet, customer) {
+    if (customer && customer.has_pending_payment) {
+        return '🖼️ Payment screenshot received';
+    }
+    if (!rawSnippet) return customer ? customer.phone : '';
+
+    // WhatsApp Reaction check
+    if (rawSnippet === 'Media/Other type: reaction' || rawSnippet.startsWith('Reacted ') || rawSnippet.includes('type: reaction')) {
+        const match = rawSnippet.match(/Reacted\s+([^\s]+)/) || rawSnippet.match(/(\p{Extended_Pictographic})/u);
+        const emoji = match ? match[1] : '👍';
+        return `Reacted ${emoji}`;
+    }
+
+    // WhatsApp Location check
+    if (rawSnippet === 'Media/Other type: location' || rawSnippet.startsWith('📍') || rawSnippet.includes('maps.google.com') || rawSnippet.includes('maps.app.goo.gl')) {
+        return '📍 Location';
+    }
+
+    return rawSnippet;
+}
+
 function renderCustomerList(shouldResetLimit = true) {
     if (!Array.isArray(allCustomers) || allCustomers.length === 0) {
         customerListEl.innerHTML = '<div class="loading-spinner" style="font-size: 0.9rem; color: #8696a0;">No conversations yet.</div>';
@@ -1367,7 +1399,7 @@ function renderCustomerList(shouldResetLimit = true) {
             paymentBadgeHtml = `<span class="score-badge" style="background: #ffe4e6; color: #e11d48; border: 1px solid #fecdd3; font-weight: 800; padding: 2px 7px; border-radius: 10px;">Payment Pending</span>`;
         }
 
-        const snippetDisplay = customer.has_pending_payment ? '🖼️ Payment screenshot received' : (lastMsg || customer.phone);
+        const snippetDisplay = formatCustomerMessageSnippet(lastMsg, customer);
 
         item.innerHTML = `
             <div class="avatar-wrap">
@@ -1400,7 +1432,10 @@ function renderCustomerList(shouldResetLimit = true) {
             e.preventDefault();
             window.showCustomerContextMenu(e, customer.phone);
         };
-        item.onclick = () => selectCustomer(customer);
+        item.onclick = () => {
+            selectCustomer(customer);
+            refocusMessageInput();
+        };
         fragment.appendChild(item);
     });
 
@@ -1501,6 +1536,7 @@ function initChatResizeObserver() {
 function scrollToBottomInstant() {
     if (!messageContainerEl) return;
     initChatResizeObserver();
+    refocusMessageInput();
     messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
     requestAnimationFrame(() => {
         if (messageContainerEl) messageContainerEl.scrollTop = messageContainerEl.scrollHeight;
@@ -1557,6 +1593,7 @@ async function selectCustomer(customer) {
     appContainerEl.classList.add('show-chat');
 
     initChatResizeObserver();
+    refocusMessageInput();
 
     // Use cached history for instant display if available
     const cached = chatHistoryCache.get(customer.phone);
@@ -1714,17 +1751,21 @@ async function selectCustomer(customer) {
         }
     }
     renderCustomerList();
+    refocusMessageInput();
 
     await loadChatHistory(customer.phone, false, true);
     scrollToBottomInstant();
+    refocusMessageInput();
 
     setTimeout(() => {
         isScrollLoadingHistory = false;
+        refocusMessageInput();
     }, 400);
 
     setTimeout(() => {
         window._isSelectingCustomer = false;
         scrollToBottomInstant();
+        refocusMessageInput();
     }, 1000);
 }
 
@@ -2068,6 +2109,9 @@ async function loadChatHistory(phone, isPolling = false, forceScrollToBottom = f
             if (!isPolling || forceScrollToBottom) {
                 // Initial load, chat switch, reload, or send reply: always render the latest messages
                 renderMessages(history, true, forceScrollToBottom || !isPolling);
+                if (!isPolling) {
+                    refocusMessageInput();
+                }
             } else {
                 // Background polling update: check if new messages arrived
                 const lastMsg = history.length > 0 ? history[history.length - 1] : null;
@@ -2902,7 +2946,83 @@ function createSingleMessageElement(msg, history = []) {
 
     const hasMedia = !!(msg.media_url || msg.media_data);
 
-    if (effectiveMimeType && hasMedia) {
+    const isLocation = msg.message_type === 'location' || (msg.body && (msg.body.startsWith('Media/Other type: location') || msg.body.includes('maps.google.com') || msg.body.includes('maps.app.goo.gl') || msg.body.includes('goo.gl/maps')));
+    const isReactionMsg = msg.message_type === 'reaction' || (msg.body && (msg.body === 'Media/Other type: reaction' || msg.body.startsWith('Reacted ') || msg.body.includes('type: reaction')));
+
+    if (isLocation) {
+        let mapsUrl = msg.media_url || '';
+        if (!mapsUrl && msg.body) {
+            const urlMatch = msg.body.match(/https?:\/\/[^\s]+(?:maps\.google\.com|maps\.app\.goo\.gl|goo\.gl\/maps)[^\s]*/i) || msg.body.match(/https?:\/\/[^\s]+/i);
+            if (urlMatch) mapsUrl = urlMatch[0];
+        }
+        let coordsText = '';
+        const coordsMatch = (String(msg.body || '') + ' ' + String(mapsUrl || '')).match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+        if (coordsMatch) {
+            coordsText = `${coordsMatch[1]}, ${coordsMatch[2]}`;
+            if (!mapsUrl) {
+                mapsUrl = `https://maps.google.com/?q=${coordsMatch[1]},${coordsMatch[2]}`;
+            }
+        }
+        if (!mapsUrl) {
+            mapsUrl = 'https://maps.google.com';
+        }
+
+        let locTitle = 'Shared Location';
+        let locAddress = '';
+        if (msg.body && !msg.body.startsWith('Media/Other') && !msg.body.startsWith('http')) {
+            const lines = msg.body.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('http'));
+            if (lines.length > 0) {
+                locTitle = lines[0].replace(/^📍\s*/, '') || 'Shared Location';
+                if (lines.length > 1) {
+                    locAddress = lines.slice(1).join(', ');
+                }
+            }
+        } else {
+            locAddress = 'Click below to view this location on Google Maps';
+        }
+
+        msgEl.classList.add('has-location');
+        contentHtml = `
+            <div class="whatsapp-location-card">
+                <a href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="location-map-banner" title="Open in Google Maps">
+                    <div class="location-pin-wrapper">
+                        <i class="fa-solid fa-location-dot location-pin-icon"></i>
+                        <div class="location-pin-shadow"></div>
+                    </div>
+                    <span class="location-live-tag"><i class="fa-solid fa-location-arrow"></i> Shared Location</span>
+                </a>
+                <div class="location-card-content">
+                    <div class="location-card-title">
+                        <i class="fa-solid fa-map-pin" style="color: #ea4335; font-size: 0.85rem;"></i>
+                        <span>${escapeHtml(locTitle)}</span>
+                    </div>
+                    ${locAddress ? `<div class="location-card-address">${escapeHtml(locAddress)}</div>` : ''}
+                    ${coordsText ? `<div class="location-card-coords"><i class="fa-solid fa-compass"></i> ${escapeHtml(coordsText)}</div>` : ''}
+                    <a href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="location-map-btn">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Google Maps
+                    </a>
+                </div>
+            </div>
+        `;
+    } else if (isReactionMsg) {
+        let reactionEmoji = msg.reaction || '';
+        if (!reactionEmoji && msg.body) {
+            const m = msg.body.match(/Reacted\s+([^\s]+)/) || msg.body.match(/(\p{Extended_Pictographic})/u);
+            if (m) reactionEmoji = m[1];
+        }
+        if (!reactionEmoji) reactionEmoji = '👍';
+
+        msgEl.classList.add('is-reaction');
+        contentHtml = `
+            <div class="message-reaction-card">
+                <span class="message-reaction-emoji">${reactionEmoji}</span>
+                <div class="message-reaction-text">
+                    <span class="message-reaction-title">Reacted ${reactionEmoji}</span>
+                    <span class="message-reaction-subtext"><i class="fa-regular fa-face-smile"></i> WhatsApp Reaction</span>
+                </div>
+            </div>
+        `;
+    } else if (effectiveMimeType && hasMedia) {
         let rawUrl = msg.media_url || '';
         let mediaUrl = '';
         if (rawUrl) {
@@ -3000,12 +3120,23 @@ function createSingleMessageElement(msg, history = []) {
         }
     }
 
+    let reactionBadgeHtml = '';
+    if (msg.reaction && msg.reaction.trim() && !isReactionMsg) {
+        msgEl.classList.add('has-reaction-badge');
+        reactionBadgeHtml = `
+            <div class="message-reaction-badge" title="Reacted: ${escapeHtml(msg.reaction)}">
+                <span class="reaction-emoji">${escapeHtml(msg.reaction)}</span>
+            </div>
+        `;
+    }
+
     msgEl.innerHTML = `
         ${actionsHtml}
         ${senderTagHtml}
         ${forwardedHtml}
         ${replyHtml}
         ${contentHtml}
+        ${reactionBadgeHtml}
         <div class="message-time">
             ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             ${tickHtml}
@@ -3142,6 +3273,7 @@ function refocusMessageInput() {
     setTimeout(doFocus, 75);
     setTimeout(doFocus, 150);
     setTimeout(doFocus, 300);
+    setTimeout(doFocus, 500);
 }
 
 function closeQuickRepliesPopover() {

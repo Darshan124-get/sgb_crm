@@ -89,8 +89,22 @@ const receiveMessage = async (req, res) => {
           let inputText = '';
           let mediaBuffer = null;
           let mimeType = null;
-
           let parsedFlowData = null;
+          let locationUrl = null;
+          let reactionEmoji = null;
+          let replyToChatId = null;
+
+          // Check if this incoming message is a reply to another message
+          if (msg.context && msg.context.id) {
+            try {
+              const [parentRows] = await pool.query('SELECT chat_id FROM chat_messages WHERE message_id = ? LIMIT 1', [msg.context.id]);
+              if (parentRows.length > 0) {
+                replyToChatId = parentRows[0].chat_id;
+              }
+            } catch (pErr) {
+              logger.error('Error fetching parent message context:', pErr.message);
+            }
+          }
 
           // 1. Parse Input Type
           if (msg.type === 'text') {
@@ -130,45 +144,72 @@ const receiveMessage = async (req, res) => {
                 logger.error(`Failed to download incoming media ${mediaId}:`, mediaErr.message);
               }
             }
+          } else if (msg.type === 'reaction') {
+            const reactionData = msg.reaction || {};
+            const targetMessageId = reactionData.message_id;
+            const emoji = reactionData.emoji || '';
+            reactionEmoji = emoji || null;
+
+            inputText = emoji ? `Reacted ${emoji}` : 'Removed reaction';
+
+            // Find target message and update its reaction column
+            if (targetMessageId) {
+              try {
+                const [targetRows] = await pool.query('SELECT chat_id FROM chat_messages WHERE message_id = ? LIMIT 1', [targetMessageId]);
+                if (targetRows.length > 0) {
+                  replyToChatId = targetRows[0].chat_id;
+                  await pool.query('UPDATE chat_messages SET reaction = ? WHERE chat_id = ?', [emoji || null, replyToChatId]);
+                  logger.info(`Updated reaction "${emoji}" on message chat_id ${replyToChatId}`);
+                }
+              } catch (reErr) {
+                logger.error('Error updating reaction on parent message:', reErr.message);
+              }
+            }
+          } else if (msg.type === 'location') {
+            const loc = msg.location || {};
+            const lat = loc.latitude;
+            const lng = loc.longitude;
+            const locName = loc.name || '';
+            const locAddress = loc.address || '';
+            const mapsUrl = loc.url || (lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : '');
+            locationUrl = mapsUrl;
+
+            const details = [locName, locAddress].filter(Boolean).join(', ');
+            inputText = details ? `📍 ${details}\n${mapsUrl}` : (mapsUrl || `📍 Location: ${lat}, ${lng}`);
           } else {
             inputText = `Media/Other type: ${msg.type}`;
           }
 
           try {
-            // Check if this incoming message is a reply to another message
-            let replyToChatId = null;
-            if (msg.context && msg.context.id) {
-              const [parentRows] = await pool.query('SELECT chat_id FROM chat_messages WHERE message_id = ?', [msg.context.id]);
-              if (parentRows.length > 0) {
-                replyToChatId = parentRows[0].chat_id;
-              }
-            }
-
             // 2. Store as Lead (Requirement: Any message creates/updates a lead)
             await messageService.storeMessageAsLead(fromNumber, inputText);
 
             // 3. Log to Chat History (pass msg.id as the messageId parameter, and replyToChatId)
-            await messageService.logChatMessage(fromNumber, 'incoming', msg.type, inputText, mediaBuffer, mimeType, null, msg.id, 'sent', replyToChatId);
+            const mediaPayload = msg.type === 'location' ? locationUrl : mediaBuffer;
+            await messageService.logChatMessage(fromNumber, 'incoming', msg.type, inputText, mediaPayload, mimeType, null, msg.id, 'sent', replyToChatId, 0, null, reactionEmoji);
 
-            // 3b. Trigger Chatbot Flow Engine
-            try {
-              const FlowEngine = require('../services/FlowEngine');
-              let mediaUrl = null;
-              if (msg.type && ['image', 'document', 'audio', 'video'].includes(msg.type)) {
-                mediaUrl = `https://graph.facebook.com/v21.0/${msg[msg.type].id}`;
+            // 3b. Trigger Chatbot Flow Engine (Skip for reactions)
+            if (msg.type !== 'reaction') {
+              try {
+                const FlowEngine = require('../services/FlowEngine');
+                let mediaUrl = null;
+                if (msg.type && ['image', 'document', 'audio', 'video'].includes(msg.type)) {
+                  mediaUrl = `https://graph.facebook.com/v21.0/${msg[msg.type].id}`;
+                } else if (msg.type === 'location') {
+                  mediaUrl = locationUrl;
+                }
+                await FlowEngine.handleMessage(fromNumber, inputText, mediaUrl, {
+                  msgType: msg.type,
+                  mimeType,
+                  mediaBuffer,
+                  messageId: msg.id,
+                  mediaId: msg[msg.type]?.id,
+                  flowData: parsedFlowData
+                });
+              } catch (err) {
+                logger.error(`FlowEngine execution failed for ${fromNumber}:`, err.message);
               }
-              await FlowEngine.handleMessage(fromNumber, inputText, mediaUrl, {
-                msgType: msg.type,
-                mimeType,
-                mediaBuffer,
-                messageId: msg.id,
-                mediaId: msg[msg.type]?.id,
-                flowData: parsedFlowData
-              });
-            } catch (err) {
-              logger.error(`FlowEngine execution failed for ${fromNumber}:`, err.message);
             }
-
             // 4. Campaign Auto-Replies Check (ONLY for ACTIVE campaigns)
             logger.info(`Message received from ${fromNumber}: ${inputText}`);
 

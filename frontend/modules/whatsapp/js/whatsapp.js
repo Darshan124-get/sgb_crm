@@ -3125,11 +3125,30 @@ function renderMessages(history, shouldResetLimit = true, forceScrollToBottom = 
     }
 }
 
+function refocusMessageInput() {
+    if (!messageInputEl) return;
+    try {
+        messageInputEl.focus();
+        const len = messageInputEl.value.length;
+        messageInputEl.setSelectionRange(len, len);
+    } catch (e) {}
+    setTimeout(() => {
+        if (messageInputEl) {
+            try {
+                messageInputEl.focus();
+                const len = messageInputEl.value.length;
+                messageInputEl.setSelectionRange(len, len);
+            } catch (e) {}
+        }
+    }, 10);
+}
+
 async function handleSend() {
     const text = messageInputEl.value.trim();
     if (!text || !activeCustomer) return;
     messageInputEl.value = '';
     messageInputEl.style.height = 'auto';
+    refocusMessageInput();
 
     const payload = { phone: activeCustomer.phone, message: text };
     if (replyingToMessage) {
@@ -3270,6 +3289,7 @@ function handleMediaSelect(e) {
 
 // Event Listeners Initialization
 function initEventListeners() {
+    sendBtnEl.onmousedown = (e) => e.preventDefault();
     sendBtnEl.onclick = handleSend;
     attachBtnEl.onclick = () => mediaInputEl.click();
     mediaInputEl.onchange = handleMediaSelect;
@@ -3279,6 +3299,37 @@ function initEventListeners() {
         renderCustomerList();
     };
     messageInputEl.onkeydown = (e) => {
+        if (typeof quickRepliesPopover !== 'undefined' && quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
+            const items = qrPopoverList ? qrPopoverList.querySelectorAll('.qr-popover-item') : [];
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (items.length > 0) {
+                    selectedQrIndex = (selectedQrIndex + 1) % items.length;
+                    updateQrPopoverSelection(items);
+                }
+                return;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (items.length > 0) {
+                    selectedQrIndex = (selectedQrIndex - 1 + items.length) % items.length;
+                    updateQrPopoverSelection(items);
+                }
+                return;
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (selectedQrIndex >= 0 && selectedQrIndex < items.length) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    items[selectedQrIndex].click();
+                    return;
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                quickRepliesPopover.style.display = 'none';
+                selectedQrIndex = -1;
+                refocusMessageInput();
+                return;
+            }
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -3671,32 +3722,60 @@ function deleteQrEdit() {
     }
 }
 
+let selectedQrIndex = -1;
+
+function updateQrPopoverSelection(items) {
+    items.forEach((item, idx) => {
+        if (idx === selectedQrIndex) {
+            item.style.backgroundColor = 'var(--whatsapp-border)';
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.style.backgroundColor = 'transparent';
+        }
+    });
+}
+
 function filterAndShowPopover(searchTerm) {
     const term = searchTerm.toLowerCase();
     const matches = quickReplies.filter(qr => qr.shortcut.toLowerCase().includes(term));
 
     if (matches.length === 0) {
         quickRepliesPopover.style.display = 'none';
+        selectedQrIndex = -1;
         return;
     }
 
+    selectedQrIndex = 0;
     qrPopoverList.innerHTML = '';
-    matches.forEach(qr => {
+    matches.forEach((qr, index) => {
         const item = document.createElement('div');
+        item.className = 'qr-popover-item';
+        item.dataset.index = index;
         item.style.padding = '12px 20px';
         item.style.cursor = 'pointer';
         item.style.borderBottom = '1px solid var(--whatsapp-border)';
-        item.onmouseover = () => item.style.backgroundColor = 'var(--whatsapp-border)';
-        item.onmouseout = () => item.style.backgroundColor = 'transparent';
+        item.style.backgroundColor = index === 0 ? 'var(--whatsapp-border)' : 'transparent';
+        item.onmouseover = () => {
+            selectedQrIndex = index;
+            const items = qrPopoverList.querySelectorAll('.qr-popover-item');
+            updateQrPopoverSelection(items);
+        };
         item.innerHTML = `
             <div style="font-weight: 600; color: var(--whatsapp-text); font-size: 0.95rem;">/${qr.shortcut}</div>
             <div style="color: var(--whatsapp-secondary); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;">
                 ${qr.media_url && qr.media_url !== '[]' ? '<i class="fas fa-paperclip" style="margin-right: 5px;"></i>' : ''}${qr.message || 'Media Reply'}
             </div>
         `;
+        item.onmousedown = (e) => {
+            e.preventDefault();
+        };
         item.onclick = async () => {
             quickRepliesPopover.style.display = 'none';
-            if (!activeCustomer || !activeCustomer.phone) return;
+            selectedQrIndex = -1;
+            if (!activeCustomer || !activeCustomer.phone) {
+                refocusMessageInput();
+                return;
+            }
 
             // CAPTURE THE TARGET CUSTOMER & PHONE AT THE MOMENT OF CLICK!
             const targetCustomer = activeCustomer;
@@ -3730,6 +3809,7 @@ function filterAndShowPopover(searchTerm) {
                 if (messageInputEl && activeCustomer && activeCustomer.phone === targetPhone) {
                     messageInputEl.value = '';
                     messageInputEl.style.height = 'auto';
+                    refocusMessageInput();
                 }
                 try {
                     let urls = [];
@@ -3847,15 +3927,20 @@ function filterAndShowPopover(searchTerm) {
                 } catch (err) {
                     console.error('Send QR error:', err);
                     window.showAlert('Error', 'Failed to send quick reply', 'error');
+                } finally {
+                    refocusMessageInput();
                 }
             } else if (qr.message) {
                 // For text-only quick replies: populate input box for agent to review/edit before sending
                 if (messageInputEl && activeCustomer && activeCustomer.phone === targetPhone) {
+                    window.lastUsedQuickReplyName = qr.shortcut;
                     messageInputEl.value = qr.message;
                     messageInputEl.style.height = 'auto';
                     messageInputEl.style.height = (messageInputEl.scrollHeight < 100 ? messageInputEl.scrollHeight : 100) + 'px';
-                    messageInputEl.focus();
+                    refocusMessageInput();
                 }
+            } else {
+                refocusMessageInput();
             }
         };
         qrPopoverList.appendChild(item);
@@ -3925,16 +4010,30 @@ if (qrEditMedia) {
 // Bind Quick Reply Button (⚡ icon)
 const quickReplyBtn = document.getElementById('quick-reply-btn');
 if (quickReplyBtn) {
+    quickReplyBtn.onmousedown = (e) => {
+        e.preventDefault(); // Keep focus on messageInputEl
+    };
     quickReplyBtn.onclick = async (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (quickRepliesPopover && quickRepliesPopover.style.display === 'block') {
             quickRepliesPopover.style.display = 'none';
+            selectedQrIndex = -1;
+            refocusMessageInput();
         } else {
             await loadQuickReplies();
             filterAndShowPopover('');
+            refocusMessageInput();
         }
     };
+}
+
+if (quickRepliesPopover) {
+    quickRepliesPopover.addEventListener('mousedown', (e) => {
+        if (!e.target.closest('#qr-popover-edit-btn')) {
+            e.preventDefault(); // Don't blur message input when clicking inside popover
+        }
+    });
 }
 
 // Trigger popover when typing '/' or '\'
@@ -3949,15 +4048,10 @@ if (messageInputEl) {
             }
             filterAndShowPopover(lastWord.substring(1));
         } else {
-            if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
-        }
-    });
-
-    messageInputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
-        } else if (e.key === 'Enter' && !e.shiftKey) {
-            if (quickRepliesPopover) quickRepliesPopover.style.display = 'none';
+            if (quickRepliesPopover) {
+                quickRepliesPopover.style.display = 'none';
+                selectedQrIndex = -1;
+            }
         }
     });
 
@@ -3967,6 +4061,7 @@ if (messageInputEl) {
             const btn = document.getElementById('quick-reply-btn');
             if (!quickRepliesPopover.contains(e.target) && (!btn || !btn.contains(e.target)) && e.target !== messageInputEl) {
                 quickRepliesPopover.style.display = 'none';
+                selectedQrIndex = -1;
             }
         }
     });

@@ -1058,18 +1058,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.head.appendChild(style);
     }
 
-    // ── Inject Hamburger Menu Button for Mobile ──
+    // ── Inject / Bind Hamburger Menu Button for Mobile ──
     const topbar = document.querySelector('.topbar');
-    if (topbar && !topbar.querySelector('.hamburger')) {
-        const hamburger = document.createElement('div');
-        hamburger.className = 'hamburger';
-        hamburger.onclick = () => {
-            if (typeof window.toggleMobileSidebar === 'function') {
-                window.toggleMobileSidebar();
-            }
-        };
-        hamburger.innerHTML = '<i class="fa-solid fa-bars"></i>';
-        topbar.prepend(hamburger);
+    if (topbar) {
+        topbar.querySelectorAll('.fa-bars').forEach(icon => {
+            icon.onclick = (e) => {
+                e.stopPropagation();
+                if (typeof window.toggleMobileSidebar === 'function') {
+                    window.toggleMobileSidebar();
+                }
+            };
+        });
+        if (!topbar.querySelector('.hamburger') && !topbar.querySelector('.fa-bars')) {
+            const hamburger = document.createElement('div');
+            hamburger.className = 'hamburger';
+            hamburger.onclick = () => {
+                if (typeof window.toggleMobileSidebar === 'function') {
+                    window.toggleMobileSidebar();
+                }
+            };
+            hamburger.innerHTML = '<i class="fa-solid fa-bars"></i>';
+            topbar.prepend(hamburger);
+        }
     }
 
     // ── Update Profile Name, Role & Avatar ──
@@ -1319,35 +1329,106 @@ function initSidebar(links) {
     }
 
     // ── Mobile Sidebar Logic ──
-    const sidebar = document.querySelector('.sidebar');
     let overlay = document.getElementById('sidebar-overlay');
 
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'sidebar-overlay';
         overlay.className = 'sidebar-overlay';
-        document.body.appendChild(overlay);
+        document.body.insertBefore(overlay, document.body.firstChild);
     }
 
     window.toggleMobileSidebar = () => {
-        if (!sidebar) return;
-        sidebar.classList.toggle('mobile-active');
-        overlay.classList.toggle('active');
+        const currentSidebar = document.querySelector('.sidebar');
+        if (!currentSidebar) return;
+        const isActive = currentSidebar.classList.toggle('mobile-active');
+        if (overlay) {
+            overlay.classList.toggle('active', isActive);
+        }
+        document.body.style.overflow = (isActive && window.innerWidth <= 768) ? 'hidden' : '';
     };
 
-    overlay.onclick = window.toggleMobileSidebar;
+    overlay.onclick = () => {
+        const currentSidebar = document.querySelector('.sidebar');
+        if (currentSidebar) currentSidebar.classList.remove('mobile-active');
+        if (overlay) overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    };
 
     // Close on link click
     links.forEach(link => {
         if (link.dataset.mobileClickBound) return;
         link.dataset.mobileClickBound = 'true';
         link.addEventListener('click', () => {
-            if (window.innerWidth <= 768 && sidebar) {
-                sidebar.classList.remove('mobile-active');
+            if (window.innerWidth <= 768) {
+                const currentSidebar = document.querySelector('.sidebar');
+                if (currentSidebar) currentSidebar.classList.remove('mobile-active');
                 if (overlay) overlay.classList.remove('active');
+                document.body.style.overflow = '';
             }
         });
     });
+
+    // Delegated click inside sidebar container
+    const containerEl = document.getElementById('sidebar-container');
+    if (containerEl && !containerEl.dataset.mobileDelegatedBound) {
+        containerEl.dataset.mobileDelegatedBound = 'true';
+        containerEl.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link && window.innerWidth <= 768) {
+                const currentSidebar = document.querySelector('.sidebar');
+                if (currentSidebar) currentSidebar.classList.remove('mobile-active');
+                if (overlay) overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+    }
+
+    // Close button in sidebar header
+    const ensureSidebarCloseBtn = () => {
+        const logo = document.querySelector('#sidebar-container .sidebar-logo, .sidebar .sidebar-logo');
+        if (logo && !logo.querySelector('.sidebar-close-btn')) {
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'sidebar-close-btn';
+            closeBtn.setAttribute('aria-label', 'Close menu');
+            closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            closeBtn.onclick = (e) => {
+                e.stopPropagation();
+                const currentSidebar = document.querySelector('.sidebar');
+                if (currentSidebar) currentSidebar.classList.remove('mobile-active');
+                if (overlay) overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            };
+            logo.appendChild(closeBtn);
+        }
+    };
+    ensureSidebarCloseBtn();
+
+    // Keyboard and resize listeners
+    if (!window._mobileSidebarEscapeBound) {
+        window._mobileSidebarEscapeBound = true;
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && window.innerWidth <= 768) {
+                const currentSidebar = document.querySelector('.sidebar');
+                if (currentSidebar && currentSidebar.classList.contains('mobile-active')) {
+                    currentSidebar.classList.remove('mobile-active');
+                    if (overlay) overlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }
+        });
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                const currentSidebar = document.querySelector('.sidebar');
+                if (currentSidebar && currentSidebar.classList.contains('mobile-active')) {
+                    currentSidebar.classList.remove('mobile-active');
+                    if (overlay) overlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }
+        });
+    }
 }
 
 // ─── Global API URL ──────────────────────────────────────────

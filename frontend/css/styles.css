@@ -2966,19 +2966,40 @@ body.modal-open {
         --sidebar-width: 0px !important;
     }
 
+    /* Elevate sidebar container above overlay stacking context */
+    #sidebar-container {
+        position: relative !important;
+        z-index: 10001 !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        flex: 0 0 0px !important;
+    }
+
     .sidebar {
         position: fixed !important;
-        left: -280px !important;
+        left: -300px !important;
         top: 0 !important;
         bottom: 0 !important;
-        z-index: 1000 !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        z-index: 10002 !important;
         width: 280px !important;
+        max-width: 85vw !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
         transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         box-shadow: 10px 0 30px rgba(0, 0, 0, 0.1) !important;
+        background-color: var(--sidebar-bg, #0f172a) !important;
     }
 
     .sidebar.mobile-active {
         left: 0 !important;
+        box-shadow: 14px 0 40px rgba(0, 0, 0, 0.45) !important;
+    }
+
+    .sidebar-close-btn {
+        display: inline-flex !important;
     }
 
     .nav-label,
@@ -3067,17 +3088,45 @@ body.modal-open {
     justify-content: center;
 }
 
+.sidebar-close-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    margin-left: auto;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.sidebar-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
 .sidebar-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.4);
+    background: rgba(15, 23, 42, 0.5);
     backdrop-filter: blur(4px);
-    z-index: 999;
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 10000;
 }
 
 .sidebar-overlay.active {
     display: block;
+}
+
+@media (min-width: 769px) {
+    .sidebar-overlay {
+        display: none !important;
+    }
 }
 
 /* Hide Spinners for Specific Number Inputs */

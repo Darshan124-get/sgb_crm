@@ -928,39 +928,102 @@ const deleteChatMessage = async (chatId) => {
  */
 const markMessagesAsRead = async (phoneInput) => {
   const phone = normalizePhone(phoneInput);
+  const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
   try {
-    const [leads] = await db.execute('SELECT lead_id FROM leads WHERE phone_number = ?', [phone]);
+    const [leads] = await db.execute(
+      'SELECT lead_id FROM leads WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ?',
+      [phone, phoneInput, `%${phoneTen}`]
+    );
     if (leads.length === 0) return;
-    const lead_id = leads[0].lead_id;
+    const leadIds = leads.map(l => l.lead_id);
+    const placeholders = leadIds.map(() => '?').join(',');
 
     await db.execute(`
       UPDATE chat_messages 
       SET status = 'read' 
       WHERE sender_type = 'user' 
         AND status = 'sent' 
-        AND session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = ?)
-    `, [lead_id]);
+        AND session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id IN (${placeholders}))
+    `, leadIds);
   } catch (err) {
     logger.error('Error marking messages as read:', err.message);
   }
 };
 
+/**
+ * Automatically marks customer messages as read when answered by the chatbot,
+ * preserving unread status for unanswered or handoff messages.
+ */
+const markHandledByChatbot = async (phoneInput) => {
+  const phone = normalizePhone(phoneInput);
+  const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
+  try {
+    // 1. Check if lead is currently waiting for human assistance or paused for human
+    const [leads] = await db.execute(
+      'SELECT lead_id, status FROM leads WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ?',
+      [phone, phoneInput, `%${phoneTen}`]
+    );
+    if (leads.length === 0) return;
+
+    const isHumanNeeded = leads.some(l => l.status === 'human_needed');
+    if (isHumanNeeded) {
+      // Handoff requested: customer messages must remain UNREAD for human agent
+      return;
+    }
+
+    const [pausedSessions] = await db.execute(
+      'SELECT session_id FROM chatbot_sessions WHERE (phone = ? OR phone = ? OR phone LIKE ?) AND status = "paused_for_human" LIMIT 1',
+      [phone, phoneInput, `%${phoneTen}`]
+    );
+    if (pausedSessions.length > 0) {
+      // Chatbot is paused for human: customer messages must remain UNREAD for human agent
+      return;
+    }
+
+    // 2. Mark incoming user messages as 'read' only if they were followed by an admin/bot reply in the same session
+    const leadIds = leads.map(l => l.lead_id);
+    const placeholders = leadIds.map(() => '?').join(',');
+
+    await db.execute(`
+      UPDATE chat_messages cm
+      JOIN chat_sessions cs ON cm.session_id = cs.session_id
+      SET cm.status = 'read'
+      WHERE cs.lead_id IN (${placeholders})
+        AND cm.sender_type = 'user'
+        AND cm.status = 'sent'
+        AND EXISTS (
+          SELECT 1 FROM chat_messages cm_admin
+          WHERE cm_admin.session_id = cm.session_id
+            AND cm_admin.sender_type = 'admin'
+            AND cm_admin.chat_id > cm.chat_id
+        )
+    `, leadIds);
+  } catch (err) {
+    logger.error('Error marking handled messages by chatbot:', err.message);
+  }
+};
+
 const markMessagesAsUnread = async (phoneInput) => {
   const phone = normalizePhone(phoneInput);
+  const phoneTen = String(phoneInput).replace(/\D/g, '').slice(-10);
   try {
-    const [leads] = await db.execute('SELECT lead_id FROM leads WHERE phone_number = ?', [phone]);
+    const [leads] = await db.execute(
+      'SELECT lead_id FROM leads WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ?',
+      [phone, phoneInput, `%${phoneTen}`]
+    );
     if (leads.length === 0) return;
-    const lead_id = leads[0].lead_id;
+    const leadIds = leads.map(l => l.lead_id);
+    const placeholders = leadIds.map(() => '?').join(',');
 
     // Change the status of the last message from the user back to 'sent'
     await db.execute(`
       UPDATE chat_messages 
       SET status = 'sent' 
       WHERE sender_type = 'user' 
-        AND session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id = ?)
+        AND session_id IN (SELECT session_id FROM chat_sessions WHERE lead_id IN (${placeholders}))
       ORDER BY chat_id DESC 
       LIMIT 1
-    `, [lead_id]);
+    `, leadIds);
   } catch (err) {
     logger.error('Error marking messages as unread:', err.message);
   }
@@ -991,6 +1054,7 @@ module.exports = {
   getAllChatCustomers,
   deleteChatMessage,
   markMessagesAsRead,
+  markHandledByChatbot,
   markMessagesAsUnread,
   updateMessageStatus
 };

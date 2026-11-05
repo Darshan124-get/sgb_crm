@@ -268,6 +268,13 @@ const receiveMessage = async (req, res) => {
               }
             }
 
+            // Automatically mark handled customer messages as read (unless human handoff is needed)
+            try {
+              await messageService.markHandledByChatbot(fromNumber);
+            } catch (handledErr) {
+              logger.warn(`Error marking handled messages by chatbot for ${fromNumber}:`, handledErr.message);
+            }
+
           } catch (err) {
             logger.error(`Error processing message from ${fromNumber}:`, err.message);
           }
@@ -371,6 +378,13 @@ const sendReply = async (req, res) => {
       await FlowEngine.pauseSessionForAgent(phone);
     } catch (pauseErr) {
       console.warn('Auto bot pause error:', pauseErr.message);
+    }
+
+    // Automatically mark previous incoming customer messages as read upon human executive reply
+    try {
+      await messageService.markMessagesAsRead(phone);
+    } catch (readErr) {
+      logger.warn('Error marking messages as read on reply:', readErr.message);
     }
 
     res.json({ success: true });

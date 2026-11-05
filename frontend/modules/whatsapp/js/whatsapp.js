@@ -1745,6 +1745,11 @@ async function selectCustomer(customer) {
         try {
             fetch(`${API_BASE}/customers/${customer.phone}/read`, { method: 'PUT', headers: getAuthHeader() }).catch(console.error);
             customer.unread_msg_count = 0;
+            if (typeof totalUnreadCount === 'number' && totalUnreadCount > 0) {
+                totalUnreadCount = Math.max(0, totalUnreadCount - 1);
+            }
+            const existing = (allCustomers || []).find(c => c.phone === customer.phone);
+            if (existing) existing.unread_msg_count = 0;
             renderSidebarTabs();
         } catch (err) {
             console.error('Failed to mark as read:', err);
@@ -2121,6 +2126,9 @@ async function loadChatHistory(phone, isPolling = false, forceScrollToBottom = f
                         // New message arrived while polling! Render history
                         const isAtBottom = messageContainerEl ? (messageContainerEl.scrollHeight - messageContainerEl.scrollTop - messageContainerEl.clientHeight < 300) : true;
                         renderMessages(history, false, isAtBottom);
+                        if (lastMsg.direction === 'incoming') {
+                            fetch(`${API_BASE}/customers/${phone}/read`, { method: 'PUT', headers: getAuthHeader() }).catch(console.error);
+                        }
                     } else if (lastMsg.direction === 'outgoing') {
                         // Update tick icon for status changes (delivered/read)
                         const tickContainer = lastEl.querySelector('.message-time');
@@ -3366,6 +3374,16 @@ async function handleSend() {
                 }
             }
             updateCustomerItemSnippet(activeCustomer.phone, text, 'admin', 'sent');
+            if (parseInt(activeCustomer.unread_msg_count || 0) > 0) {
+                activeCustomer.unread_msg_count = 0;
+                if (typeof totalUnreadCount === 'number' && totalUnreadCount > 0) {
+                    totalUnreadCount = Math.max(0, totalUnreadCount - 1);
+                }
+                const existing = (allCustomers || []).find(c => c.phone === activeCustomer.phone);
+                if (existing) existing.unread_msg_count = 0;
+                renderSidebarTabs();
+                renderCustomerList();
+            }
         } else {
             window.showAlert('Error', 'Failed to send message', 'error');
         }

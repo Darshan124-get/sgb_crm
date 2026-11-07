@@ -36,7 +36,10 @@ async function fetchDealerOrders() {
 
         if (res.ok) {
             allOrders = await res.json();
-            await populateDealerDropdown();
+            await Promise.all([
+                populateDealerDropdown(),
+                populateProductDropdown()
+            ]);
             filterDealerOrders();
         } else {
             console.error('Failed to fetch dealer orders');
@@ -127,10 +130,76 @@ async function populateDealerDropdown() {
     select.value = currentVal;
 }
 
+async function populateProductDropdown() {
+    const select = document.getElementById('productFilter');
+    if (!select) return;
+
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">All Products</option>';
+
+    const productSet = new Set();
+
+    // 1. Fetch products from /api/products
+    try {
+        const res = await fetch(`${window.API_URL}/products`, {
+            headers: { 'Authorization': `Bearer ${token()}` }
+        });
+        if (res.ok) {
+            const prods = await res.json();
+            if (Array.isArray(prods)) {
+                prods.forEach(p => {
+                    const name = (p.name || '').trim();
+                    if (name) productSet.add(name);
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('Could not fetch products catalog for filter:', e);
+    }
+
+    // 2. Extract products from allOrders (from both items_detailed and items_summary)
+    if (Array.isArray(allOrders)) {
+        allOrders.forEach(o => {
+            if (o.items_detailed) {
+                const items = o.items_detailed.split('||');
+                items.forEach(it => {
+                    const name = (it.split('::')[0] || '').trim();
+                    if (name && name !== 'Agri Product') {
+                        productSet.add(name);
+                    }
+                });
+            }
+            if (o.items_summary) {
+                const items = o.items_summary.split('||');
+                items.forEach(i => {
+                    const match = i.match(/^(.*?)\s*x\s*\d+$/i);
+                    const name = (match ? match[1] : (i.split(' x ')[0] || '')).trim();
+                    if (name && name !== 'Agri Product') {
+                        productSet.add(name);
+                    }
+                });
+            }
+        });
+    }
+
+    const sortedProducts = Array.from(productSet).sort((a, b) => a.localeCompare(b));
+    sortedProducts.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+    });
+
+    if (currentVal && productSet.has(currentVal)) {
+        select.value = currentVal;
+    }
+}
+
 function resetOrderFilters() {
     const s1 = document.getElementById('orderSearchInput');
     const s2 = document.getElementById('topNavOrderSearch');
     const dSel = document.getElementById('dealerSelectFilter');
+    const pSel = document.getElementById('productFilter');
     const st = document.getElementById('statusFilter');
     const paySt = document.getElementById('paymentStatusFilter');
     const from = document.getElementById('fromDateFilter');
@@ -139,6 +208,7 @@ function resetOrderFilters() {
     if (s1) s1.value = '';
     if (s2) s2.value = '';
     if (dSel) dSel.value = '';
+    if (pSel) pSel.value = '';
     if (st) st.value = '';
     if (paySt) paySt.value = '';
     if (from) from.value = '';
@@ -152,6 +222,7 @@ function filterDealerOrders() {
     const q2 = (document.getElementById('topNavOrderSearch')?.value || '').toLowerCase().trim();
     const search = q1 || q2;
     const selectedDealer = (document.getElementById('dealerSelectFilter')?.value || '').toLowerCase().trim();
+    const selectedProduct = (document.getElementById('productFilter')?.value || '').toLowerCase().trim();
     const status = (document.getElementById('statusFilter')?.value || '').toLowerCase().trim();
     const paymentStatus = (document.getElementById('paymentStatusFilter')?.value || '').toLowerCase().trim();
     const fromDate = document.getElementById('fromDateFilter')?.value || '';
@@ -176,6 +247,43 @@ function filterDealerOrders() {
         let matchesDealer = true;
         if (selectedDealer) {
             matchesDealer = (dealerId === selectedDealer || dealerName === selectedDealer || dealerName.includes(selectedDealer));
+        }
+
+        // Product matching (strict exact product name match, so "Blade" != "SGB - Blade Protection")
+        let matchesProduct = true;
+        if (selectedProduct) {
+            let orderHasProduct = false;
+            if (o.items_detailed) {
+                const items = o.items_detailed.split('||');
+                for (const it of items) {
+                    const pName = (it.split('::')[0] || '').toLowerCase().trim();
+                    if (pName === selectedProduct) {
+                        orderHasProduct = true;
+                        break;
+                    }
+                }
+            }
+            if (!orderHasProduct && o.items_summary) {
+                const items = o.items_summary.split('||');
+                for (const it of items) {
+                    const match = it.match(/^(.*?)\s*x\s*\d+$/i);
+                    const pName = (match ? match[1] : (it.split(' x ')[0] || '')).toLowerCase().trim();
+                    if (pName === selectedProduct) {
+                        orderHasProduct = true;
+                        break;
+                    }
+                }
+            }
+            if (!orderHasProduct && Array.isArray(o.items)) {
+                for (const it of o.items) {
+                    const pName = (it.product_name || it.name || '').toLowerCase().trim();
+                    if (pName === selectedProduct) {
+                        orderHasProduct = true;
+                        break;
+                    }
+                }
+            }
+            matchesProduct = orderHasProduct;
         }
 
         // Status matching (handling empty/draft as 'ordered')
@@ -222,7 +330,7 @@ function filterDealerOrders() {
             }
         }
 
-        return matchesSearch && matchesDealer && matchesStatus && matchesPaymentStatus && matchesDate;
+        return matchesSearch && matchesDealer && matchesProduct && matchesStatus && matchesPaymentStatus && matchesDate;
     });
 
     currentPage = 1;
@@ -1042,7 +1150,8 @@ function exportOrdersCSV() {
         "Phone Number",
         "City",
         "Address",
-        "Products & Quantities",
+        "Product Name",
+        "Quantity",
         "Purchased Date",
         "Shipped Date",
         "Total Amount (₹)",
@@ -1076,33 +1185,129 @@ function exportOrdersCSV() {
             }
         }
 
-        let itemsSummary = '';
-        if (o.items && Array.isArray(o.items) && o.items.length > 0) {
-            itemsSummary = o.items.map(it => `${it.product_name || it.name || 'Item'} (x${it.quantity || 1})`).join('; ');
-        } else if (o.items_summary) {
-            itemsSummary = o.items_summary.replace(/<br\s*\/?>/gi, '; ').replace(/\|\|/g, '; ');
+        // Split order by products so each product has its own record, separate columns, and split amounts in Excel
+        let itemsList = [];
+        if (o.items_detailed) {
+            const rawItems = o.items_detailed.split('||');
+            rawItems.forEach(it => {
+                const trimmed = it.trim();
+                if (!trimmed) return;
+                const parts = trimmed.split('::');
+                const name = (parts[0] || '').trim();
+                const qty = parseFloat(parts[1] || 1);
+                const price = parseFloat(parts[2] || 0);
+                let itemTotal = parseFloat(parts[3] || (qty * price));
+                if (isNaN(itemTotal)) itemTotal = 0;
+                if (name) {
+                    itemsList.push({
+                        productName: name,
+                        quantity: isNaN(qty) ? 1 : qty,
+                        itemTotal: itemTotal
+                    });
+                }
+            });
+        }
+        if (itemsList.length === 0 && o.items_summary) {
+            const rawItems = o.items_summary.replace(/<br\s*\/?>/gi, '||').split('||');
+            rawItems.forEach(it => {
+                const trimmed = it.trim();
+                if (trimmed) {
+                    const match = trimmed.match(/^(.*?)\s*x\s*(\d+(?:\.\d+)?)$/i);
+                    const name = match ? match[1].trim() : trimmed;
+                    const qty = match ? parseFloat(match[2]) : 1;
+                    itemsList.push({
+                        productName: name,
+                        quantity: isNaN(qty) ? 1 : qty,
+                        itemTotal: 0
+                    });
+                }
+            });
+        }
+        if (itemsList.length === 0 && o.items && Array.isArray(o.items) && o.items.length > 0) {
+            o.items.forEach(it => {
+                const name = (it.product_name || it.name || '').trim();
+                const qty = parseFloat(it.quantity || 1);
+                let itemTotal = parseFloat(it.total_price || it.total || (it.price ? it.price * qty : 0));
+                if (isNaN(itemTotal)) itemTotal = 0;
+                if (name) {
+                    itemsList.push({
+                        productName: name,
+                        quantity: isNaN(qty) ? 1 : qty,
+                        itemTotal: itemTotal
+                    });
+                }
+            });
+        }
+        if (itemsList.length === 0) {
+            itemsList = [{
+                productName: '—',
+                quantity: '—',
+                itemTotal: total
+            }];
         }
 
-        const paymentStatus = bal === 0 ? 'Cleared' : (paid > 0 ? 'Partial' : 'Pending');
+        // Normalize split totals to match orderTotal
+        const sumItemTotals = itemsList.reduce((acc, it) => acc + (it.itemTotal || 0), 0);
+        if (itemsList.length > 1) {
+            if (sumItemTotals > 0 && Math.abs(sumItemTotals - total) > 0.01) {
+                itemsList.forEach(it => {
+                    it.itemTotal = Math.round((total * (it.itemTotal / sumItemTotals)) * 100) / 100;
+                });
+            } else if (sumItemTotals === 0 && total > 0) {
+                const perItem = Math.round((total / itemsList.length) * 100) / 100;
+                itemsList.forEach(it => { it.itemTotal = perItem; });
+            }
+        } else if (itemsList.length === 1) {
+            itemsList[0].itemTotal = total;
+        }
 
-        const row = [
-            orderIdText,
-            o.dealer_name || o.firm_name || o.customer_name || '',
-            o.contact_person || o.owner_name || '',
-            o.phone || o.phone_number || '',
-            o.city || '',
-            o.address || '',
-            itemsSummary,
-            date,
-            shippedDate,
-            total,
-            paid,
-            bal,
-            paymentStatus,
-            (o.order_status || 'Draft').toUpperCase()
-        ];
+        let runningPaid = 0;
+        let runningTotal = 0;
 
-        csvContent += row.map(v => sanitize(v)).join(",") + "\n";
+        itemsList.forEach((it, idx) => {
+            const isLast = idx === itemsList.length - 1;
+            let thisTotal = Math.round((it.itemTotal || 0) * 100) / 100;
+            if (isLast && itemsList.length > 1 && total > 0) {
+                const diff = Math.round((total - (runningTotal + thisTotal)) * 100) / 100;
+                if (Math.abs(diff) < 1.0) {
+                    thisTotal = Math.round((thisTotal + diff) * 100) / 100;
+                }
+            }
+            runningTotal += thisTotal;
+
+            let thisPaid = 0;
+            if (paid > 0 && total > 0) {
+                if (isLast && itemsList.length > 1) {
+                    thisPaid = Math.max(0, Math.round((paid - runningPaid) * 100) / 100);
+                } else {
+                    thisPaid = Math.round((paid * (thisTotal / total)) * 100) / 100;
+                }
+            }
+            runningPaid += thisPaid;
+
+            const thisBal = Math.max(0, Math.round((thisTotal - thisPaid) * 100) / 100);
+            const thisPaymentStatus = thisBal <= 0.01 ? 'Cleared' : (thisPaid > 0 ? 'Partial' : 'Pending');
+
+            const row = [
+                orderIdText,
+                o.dealer_name || o.firm_name || o.customer_name || '',
+                o.contact_person || o.owner_name || '',
+                o.phone || o.phone_number || '',
+                o.city || '',
+                o.address || '',
+                it.productName,
+                it.quantity,
+                date,
+                shippedDate,
+                thisTotal,
+                thisPaid,
+                thisBal,
+                thisPaymentStatus,
+                (o.order_status || 'Draft').toUpperCase()
+            ];
+
+            csvContent += row.map(v => sanitize(v)).join(",") + "\n";
+        });
     });
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1571,6 +1776,7 @@ async function deleteDealerOrder(orderId) {
 // Window Exports
 window.fetchDealerOrders = fetchDealerOrders;
 window.populateDealerDropdown = populateDealerDropdown;
+window.populateProductDropdown = populateProductDropdown;
 window.filterDealerOrders = filterDealerOrders;
 window.renderDealerOrdersTable = renderDealerOrdersTable;
 window.goToOrdersPage = goToOrdersPage;

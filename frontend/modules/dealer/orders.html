@@ -289,6 +289,18 @@
                             <input type="date" id="toDateFilter" class="filter-input" onchange="filterDealerOrders()">
                         </div>
 
+                        <div style="position:relative;width:210px;">
+                            <label
+                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Select
+                                Product</label>
+                            <select id="productFilter" class="filter-select" style="width:100%;"
+                                onchange="filterDealerOrders()">
+                                <option value="">All Products</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down"
+                                style="position:absolute;right:0.75rem;bottom:0.75rem;color:#64748b;pointer-events:none;font-size:0.75rem;"></i>
+                        </div>
+
                         <div style="display:flex;align-items:flex-end;gap:0.5rem;">
                             <button class="btn-outline-card" onclick="resetOrderFilters()"
                                 style="padding:0.6rem 0.85rem;color:#64748b;" title="Reset Filters">

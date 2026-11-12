@@ -164,13 +164,31 @@ app.get('/api/media/*', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    // Tier 1: Cloudflare R2
+    // Tier 1: Cloudflare R2 (supports Range requests for video playback/seeking)
     try {
         const r2Data = await storageService.downloadObject({ key: objectKey });
         if (r2Data && r2Data.buffer) {
-            res.setHeader('Content-Type', r2Data.contentType || 'application/octet-stream');
-            if (r2Data.contentLength) res.setHeader('Content-Length', r2Data.contentLength);
+            const totalLen = r2Data.buffer.length;
+            const cType = r2Data.contentType || 'application/octet-stream';
+            res.setHeader('Content-Type', cType);
+            res.setHeader('Accept-Ranges', 'bytes');
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+
+            const rangeHeader = req.headers.range;
+            if (rangeHeader && totalLen > 0) {
+                const parts = rangeHeader.replace(/bytes=/, '').split('-');
+                const start = parseInt(parts[0], 10);
+                const end = parts[1] ? Math.min(parseInt(parts[1], 10), totalLen - 1) : totalLen - 1;
+                if (!isNaN(start) && start >= 0 && start <= end) {
+                    const chunk = r2Data.buffer.subarray(start, end + 1);
+                    res.status(206);
+                    res.setHeader('Content-Range', `bytes ${start}-${end}/${totalLen}`);
+                    res.setHeader('Content-Length', chunk.length);
+                    return res.send(chunk);
+                }
+            }
+
+            res.setHeader('Content-Length', r2Data.contentLength || totalLen);
             return res.send(r2Data.buffer);
         }
     } catch (err) {

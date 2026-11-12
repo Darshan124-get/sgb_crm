@@ -1,6 +1,61 @@
 const db = require('../config/db');
 const customerSupportService = require('../services/customer_support.service');
+const storageService = require('../services/storage.service');
 const path = require('path');
+const fs = require('fs');
+
+const CUSTOMER_SUPPORT_R2_FOLDER = 'customer_support';
+
+/**
+ * Persists an uploaded image or video from Customer Support into Cloudflare R2
+ * under sgb-crm-media/customer_support/ and falls back to local disk only if R2 fails.
+ */
+async function persistCustomerSupportMediaFile(file, keyPrefix = '') {
+    const ext = path.extname(file.originalname || file.filename || '').toLowerCase();
+    const rawBase = path.basename(file.originalname || file.filename || 'media', ext)
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 60) || 'media';
+    const uniqueId = `${Date.now()}-${Math.round(Math.random() * 1E6)}`;
+    const objectFileName = `${keyPrefix}${uniqueId}-${rawBase}${ext}`;
+    const r2Key = `${CUSTOMER_SUPPORT_R2_FOLDER}/${objectFileName}`;
+    const publicMediaUrl = `/api/media/${r2Key}`;
+
+    try {
+        const body = file.buffer ? file.buffer : fs.createReadStream(file.path);
+        await storageService.uploadObject({
+            key: r2Key,
+            body,
+            contentType: file.mimetype || 'application/octet-stream',
+            metadata: {
+                module: 'customer_support',
+                original_name: encodeURIComponent(file.originalname || objectFileName)
+            }
+        });
+
+        // Clean up temporary multer file once stored safely in R2
+        if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (unlinkErr) {
+                console.warn('Temp upload cleanup warn:', unlinkErr.message);
+            }
+        }
+
+        return { fileUrl: publicMediaUrl, r2Key, storage: 'r2' };
+    } catch (r2Err) {
+        console.warn(`[CUSTOMER SUPPORT R2 WARN] Upload failed for '${r2Key}', preserving local fallback:`, r2Err.message);
+        const fallbackDir = path.join(__dirname, '../../uploads', CUSTOMER_SUPPORT_R2_FOLDER);
+        if (!fs.existsSync(fallbackDir)) {
+            fs.mkdirSync(fallbackDir, { recursive: true });
+        }
+        const fallbackPath = path.join(fallbackDir, objectFileName);
+        if (file.buffer) {
+            fs.writeFileSync(fallbackPath, file.buffer);
+        } else if (file.path && fs.existsSync(file.path)) {
+            fs.renameSync(file.path, fallbackPath);
+        }
+        return { fileUrl: publicMediaUrl, r2Key, storage: 'local_fallback' };
+    }
+}
 
 // ── GET DASHBOARD METRICS ──
 exports.getDashboardMetrics = async (req, res) => {
@@ -401,7 +456,7 @@ exports.uploadPhotos = async (req, res) => {
 
         const uploadedPhotos = [];
         for (const file of files) {
-            const fileUrl = `/uploads/${file.filename}`;
+            const { fileUrl } = await persistCustomerSupportMediaFile(file, `case_${id}_`);
             const [result] = await db.query(`
                 INSERT INTO customer_support_photos (case_id, call_id, file_url, file_name, file_size, uploaded_by)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -915,8 +970,8 @@ exports.getSettings = async (req, res) => {
                 b2c_criteria: "order_source = 'lead' AND dealer_id IS NULL AND purchase_source = 'SGB Direct'",
                 b2b_excluded: true,
                 idempotency_enforced: true,
-                photo_storage: 'diskStorage (/uploads)',
-                photo_max_size_mb: 10,
+                photo_storage: `Cloudflare R2 (${storageService.defaultBucket}/${CUSTOMER_SUPPORT_R2_FOLDER}/)`,
+                photo_max_size_mb: 60,
                 notification_channels: ['in_app', 'fcm_push']
             },
             staff,
@@ -940,23 +995,44 @@ exports.lookupCustomer = async (req, res) => {
         }
 
         const cleanPhone = phone.trim().replace(/[^0-9]/g, '');
+        if (cleanPhone.length < 4) {
+            return res.status(400).json({ success: false, message: 'Enter at least 4 phone digits to lookup customer' });
+        }
         const phonePattern = `%${cleanPhone.slice(-10)}%`;
 
-        // 1. Search in orders
-        const [orders] = await db.query(`
+        // 1. Search in orders (including village/sub_district/district where available)
+        const [rawOrders] = await db.query(`
             SELECT o.order_id, o.customer_name, o.phone, o.total_amount, o.order_status, o.created_at,
-                   o.address, o.city, o.state, o.pincode, o.purchase_source,
+                   o.address, o.village, o.sub_district, o.district, o.city, o.state, o.pincode,
+                   o.purchase_source, o.order_source, o.dealer_id,
                    (SELECT GROUP_CONCAT(CONCAT(p.name, ' (x', oi.quantity, ')') SEPARATOR ', ')
                     FROM order_items oi
                     JOIN products p ON oi.product_id = p.product_id
                     WHERE oi.order_id = o.order_id) as items_summary,
+                   (SELECT GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ')
+                    FROM order_items oi
+                    JOIN products p ON oi.product_id = p.product_id
+                    WHERE oi.order_id = o.order_id) as product_names,
                    (SELECT case_id FROM customer_support_cases WHERE order_id = o.order_id LIMIT 1) as existing_case_id,
                    (SELECT case_number FROM customer_support_cases WHERE order_id = o.order_id LIMIT 1) as existing_case_number
             FROM orders o
             WHERE o.phone LIKE ?
             ORDER BY o.created_at DESC
-            LIMIT 5
+            LIMIT 8
         `, [phonePattern]);
+
+        const formatAddr = (row) => [row.address, row.village, row.sub_district, row.city || row.district, row.state, row.pincode]
+            .map(v => (v || '').trim())
+            .filter(Boolean)
+            .filter((v, idx, arr) => arr.indexOf(v) === idx)
+            .join(', ');
+
+        const orders = rawOrders.map(o => ({
+            ...o,
+            product_name: o.product_names || o.items_summary || '',
+            full_address: formatAddr(o),
+            is_b2b_dealer: Boolean(o.dealer_id || o.purchase_source === 'Dealer' || o.order_source === 'dealer')
+        }));
 
         // 2. Search in leads
         const [leads] = await db.query(`
@@ -966,11 +1042,46 @@ exports.lookupCustomer = async (req, res) => {
             LIMIT 1
         `, [phonePattern]);
 
+        // 3. Check latest prior job cards for machinery auto-suggestion
+        const [pastJobCards] = await db.query(`
+            SELECT job_card_id, job_card_number, customer_name, customer_phone, customer_address,
+                   machine_make_model, product_summary, serial_vin_number, hours_run, status
+            FROM customer_support_job_cards
+            WHERE customer_phone LIKE ?
+            ORDER BY created_at DESC
+            LIMIT 5
+        `, [phonePattern]);
+
+        // 4. Check support cases for fallback customer info
+        const [supportCases] = await db.query(`
+            SELECT case_id, case_number, customer_name, customer_phone, product_summary, order_id
+            FROM customer_support_cases
+            WHERE customer_phone LIKE ?
+            ORDER BY created_at DESC
+            LIMIT 3
+        `, [phonePattern]);
+
+        const lead = leads[0] || null;
+        const latestOrder = orders[0] || null;
+        const latestCard = pastJobCards[0] || null;
+        const latestCase = supportCases[0] || null;
+
+        const resolvedCustomer = (lead || latestOrder || latestCard || latestCase) ? {
+            name: (latestOrder && latestOrder.customer_name) || (lead && lead.name) || (latestCard && latestCard.customer_name) || (latestCase && latestCase.customer_name) || '',
+            phone: (latestOrder && latestOrder.phone) || (lead && lead.phone_number) || (latestCard && latestCard.customer_phone) || (latestCase && latestCase.customer_phone) || phone.trim(),
+            address: (latestOrder && latestOrder.full_address) || (lead ? formatAddr(lead) : '') || (latestCard && latestCard.customer_address) || '',
+            machine_make_model: (latestOrder && latestOrder.product_names) || (latestCard && (latestCard.machine_make_model || latestCard.product_summary)) || (latestCase && latestCase.product_summary) || '',
+            serial_vin_number: (latestCard && latestCard.serial_vin_number) || ''
+        } : null;
+
         res.json({
             success: true,
-            found: orders.length > 0 || leads.length > 0,
+            found: Boolean(resolvedCustomer),
+            customer: resolvedCustomer,
             orders,
-            lead: leads[0] || null
+            lead,
+            past_job_cards: pastJobCards,
+            support_cases: supportCases
         });
     } catch (err) {
         console.error('Error in lookupCustomer:', err);
@@ -1081,7 +1192,349 @@ exports.createManualCase = async (req, res) => {
 // ── JOB CARDS MANAGEMENT ──
 // ============================================================
 
-// ── GET JOB CARDS (Paginated with tabs & filters) ──
+const round2 = (val) => Math.round((Number(val) + Number.EPSILON) * 100) / 100;
+
+function toMysqlDate(val) {
+    if (!val) return null;
+    const str = String(val).trim();
+    if (!str) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toMysqlDateTime(val) {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    const str = String(val).trim();
+    if (!str) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return `${str} 00:00:00`;
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function parseJsonField(val, fallback = []) {
+    if (val === undefined || val === null || val === '') return fallback;
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+        try {
+            const parsed = JSON.parse(val);
+            return Array.isArray(parsed) ? parsed : fallback;
+        } catch (e) {
+            return fallback;
+        }
+    }
+    return fallback;
+}
+
+function normalizeAndValidateParts(rawParts) {
+    const items = parseJsonField(rawParts, []);
+    const normalized = [];
+
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item) continue;
+        const partName = (item.part_name || '').trim();
+        const partNumber = (item.part_number || '').trim();
+        const hasAnyInput = partName || partNumber || (item.remarks && item.remarks.trim());
+        if (!hasAnyInput) continue;
+        if (!partName) {
+            return { error: `Part row #${i + 1}: Part description is required` };
+        }
+
+        const qty = parseFloat(item.quantity !== undefined && item.quantity !== '' ? item.quantity : 1);
+        const unitCost = parseFloat(item.unit_cost !== undefined && item.unit_cost !== '' ? item.unit_cost : 0);
+        const isFoc = Boolean(item.is_foc === true || item.is_foc === 1 || item.is_foc === '1' || item.is_foc === 'true');
+
+        if (isNaN(qty) || qty <= 0) {
+            return { error: `Part "${partName}": Quantity must be greater than zero` };
+        }
+        if (isNaN(unitCost) || unitCost < 0) {
+            return { error: `Part "${partName}": Unit price cannot be negative` };
+        }
+
+        const totalCost = isFoc ? 0.00 : round2(qty * unitCost);
+        normalized.push({
+            part_name: partName,
+            part_number: partNumber || null,
+            quantity: round2(qty),
+            unit_cost: round2(unitCost),
+            is_foc: isFoc ? 1 : 0,
+            total_cost: totalCost,
+            remarks: item.remarks ? item.remarks.trim() : null
+        });
+    }
+
+    return { items: normalized };
+}
+
+function normalizeAndValidateLabour(rawLabour) {
+    const items = parseJsonField(rawLabour, []);
+    const normalized = [];
+
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item) continue;
+        const desc = (item.labour_description || item.description || '').trim();
+        const rawCharge = item.amount !== undefined && item.amount !== ''
+            ? item.amount
+            : (item.charge !== undefined && item.charge !== ''
+                ? item.charge
+                : (item.rate !== undefined && item.rate !== ''
+                    ? item.rate
+                    : (item.total_cost !== undefined && item.total_cost !== '' ? item.total_cost : 0)));
+        const parsedCharge = parseFloat(rawCharge);
+        const hasAnyInput = desc || (item.remarks && item.remarks.trim()) || (!isNaN(parsedCharge) && parsedCharge > 0);
+        if (!hasAnyInput) continue;
+        if (!desc) {
+            return { error: `Labour row #${i + 1}: Labour description is required` };
+        }
+
+        if (isNaN(parsedCharge) || parsedCharge < 0) {
+            return { error: `Labour "${desc}": Charge amount cannot be negative` };
+        }
+
+        // Labour is billed as a flat charge rather than hourly; keep DB hours column = 1.00 for schema compatibility
+        const flatCharge = round2(parsedCharge);
+        normalized.push({
+            labour_description: desc,
+            hours: 1,
+            rate: flatCharge,
+            total_cost: flatCharge,
+            remarks: item.remarks ? item.remarks.trim() : null
+        });
+    }
+
+    return { items: normalized };
+}
+
+function calculateAndValidateFinancials(parts, labour, body) {
+    const partsTotal = round2(parts.reduce((sum, p) => sum + (parseFloat(p.total_cost) || 0), 0));
+    const labourTotal = round2(labour.reduce((sum, l) => sum + (parseFloat(l.total_cost) || 0), 0));
+    const subtotal = round2(partsTotal + labourTotal);
+
+    const discount = parseFloat(body.discount_amount !== undefined && body.discount_amount !== '' ? body.discount_amount : 0);
+    if (isNaN(discount) || discount < 0) {
+        return { error: 'Discount cannot be negative' };
+    }
+    if (discount > subtotal + 0.01) {
+        return { error: 'Discount cannot exceed combined Parts Total and Labour Total' };
+    }
+
+    const taxableAmount = round2(Math.max(0, subtotal - discount));
+    const taxPercent = parseFloat(body.tax_percent !== undefined && body.tax_percent !== '' ? body.tax_percent : 0);
+    if (isNaN(taxPercent) || taxPercent < 0 || taxPercent > 100) {
+        return { error: 'Tax percentage must be between 0 and 100' };
+    }
+
+    let taxAmount;
+    if (body.tax_amount !== undefined && body.tax_amount !== null && body.tax_amount !== '') {
+        taxAmount = parseFloat(body.tax_amount);
+        if (isNaN(taxAmount) || taxAmount < 0) {
+            return { error: 'Applicable taxes cannot be negative' };
+        }
+    } else {
+        taxAmount = round2((taxableAmount * taxPercent) / 100);
+    }
+    taxAmount = round2(taxAmount);
+
+    const rawShipping = body.shipping_charge !== undefined && body.shipping_charge !== ''
+        ? body.shipping_charge
+        : (body.shipping_charges !== undefined && body.shipping_charges !== ''
+            ? body.shipping_charges
+            : (body.delivery_charge !== undefined && body.delivery_charge !== '' ? body.delivery_charge : 0));
+    let shippingCharge = parseFloat(rawShipping);
+    if (isNaN(shippingCharge) || shippingCharge < 0) {
+        return { error: 'Shipping / delivery charge cannot be negative' };
+    }
+    shippingCharge = round2(shippingCharge);
+
+    const grandTotal = round2(Math.max(0, taxableAmount + taxAmount + shippingCharge));
+
+    const amountPaid = parseFloat(body.amount_paid !== undefined && body.amount_paid !== '' ? body.amount_paid : 0);
+    if (isNaN(amountPaid) || amountPaid < 0) {
+        return { error: 'Amount paid cannot be negative' };
+    }
+    if (grandTotal > 0 && amountPaid > grandTotal + 0.01) {
+        return { error: 'Amount paid cannot exceed Grand Total' };
+    }
+
+    const clampedPaid = round2(Math.min(amountPaid, grandTotal));
+    const balanceAmount = round2(Math.max(0, grandTotal - clampedPaid));
+
+    let derivedPaymentStatus = 'Unpaid';
+    if (grandTotal === 0) {
+        const requested = (body.payment_status || '').trim();
+        derivedPaymentStatus = ['Paid', 'Unpaid'].includes(requested) ? requested : 'Paid';
+    } else if (clampedPaid >= grandTotal - 0.01) {
+        derivedPaymentStatus = 'Paid';
+    } else if (clampedPaid > 0) {
+        derivedPaymentStatus = 'Partially Paid';
+    }
+
+    const validModes = ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Cheque', 'FOC / Warranty', ''];
+    const rawMode = (body.payment_mode || '').trim();
+    const paymentMode = validModes.includes(rawMode) ? (rawMode || null) : rawMode.slice(0, 50);
+
+    return {
+        financials: {
+            parts_total: partsTotal,
+            labour_total: labourTotal,
+            service_cost: labourTotal,
+            discount_amount: round2(discount),
+            taxable_amount: taxableAmount,
+            tax_percent: round2(taxPercent),
+            tax_amount: taxAmount,
+            shipping_charge: shippingCharge,
+            grand_total: grandTotal,
+            amount_paid: clampedPaid,
+            balance_amount: balanceAmount,
+            payment_status: derivedPaymentStatus,
+            payment_mode: paymentMode
+        }
+    };
+}
+
+function normalizePhotoType(rawType) {
+    const t = (rawType || '').trim();
+    if (t === 'BEFORE_WORK' || t === 'before') return 'BEFORE_WORK';
+    if (t === 'AFTER_WORK' || t === 'after') return 'AFTER_WORK';
+    if (t === 'issue' || t === 'other') return t;
+    return 'BEFORE_WORK';
+}
+
+async function generateNextJobCardNumber(conn = db) {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `JC-${todayStr}-`;
+    const [rows] = await conn.query(
+        'SELECT job_card_number FROM customer_support_job_cards WHERE job_card_number LIKE ? ORDER BY job_card_number DESC LIMIT 1',
+        [`${prefix}%`]
+    );
+    let nextSeq = 1;
+    if (rows.length > 0 && rows[0].job_card_number) {
+        const suffix = rows[0].job_card_number.slice(prefix.length);
+        const parsed = parseInt(suffix, 10);
+        if (!isNaN(parsed) && parsed >= 1) nextSeq = parsed + 1;
+    }
+    return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+}
+
+async function saveJobCardUploadedPhotos(conn, jobCardId, reqFiles, fallbackType, userId, captionText = null) {
+    const inserted = [];
+    const groups = [];
+
+    if (Array.isArray(reqFiles)) {
+        groups.push({ files: reqFiles, type: normalizePhotoType(fallbackType) });
+    } else if (reqFiles && typeof reqFiles === 'object') {
+        if (Array.isArray(reqFiles.before_photos) && reqFiles.before_photos.length > 0) {
+            groups.push({ files: reqFiles.before_photos, type: 'BEFORE_WORK' });
+        }
+        if (Array.isArray(reqFiles.after_photos) && reqFiles.after_photos.length > 0) {
+            groups.push({ files: reqFiles.after_photos, type: 'AFTER_WORK' });
+        }
+        if (Array.isArray(reqFiles.photos) && reqFiles.photos.length > 0) {
+            groups.push({ files: reqFiles.photos, type: normalizePhotoType(fallbackType) });
+        }
+    }
+
+    for (const grp of groups) {
+        const typePrefix = grp.type.toLowerCase();
+        for (const file of grp.files) {
+            const { fileUrl } = await persistCustomerSupportMediaFile(file, `jc_${jobCardId}_${typePrefix}_`);
+            const [res] = await conn.query(`
+                INSERT INTO customer_support_job_card_photos
+                (job_card_id, photo_type, file_url, file_name, file_size, caption, uploaded_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [jobCardId, grp.type, fileUrl, file.originalname, file.size, captionText, userId]);
+            inserted.push({
+                photo_id: res.insertId,
+                photo_type: grp.type,
+                file_url: fileUrl,
+                file_name: file.originalname
+            });
+        }
+    }
+
+    return inserted;
+}
+
+async function replaceJobCardPartsAndLabour(conn, jobCardId, parts, labour) {
+    if (parts !== null) {
+        await conn.query('DELETE FROM customer_support_job_card_parts WHERE job_card_id = ?', [jobCardId]);
+        for (const p of parts) {
+            await conn.query(`
+                INSERT INTO customer_support_job_card_parts
+                (job_card_id, part_name, part_number, quantity, unit_cost, is_foc, total_cost, remarks)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [jobCardId, p.part_name, p.part_number, p.quantity, p.unit_cost, p.is_foc, p.total_cost, p.remarks]);
+        }
+    }
+    if (labour !== null) {
+        await conn.query('DELETE FROM customer_support_job_card_labour WHERE job_card_id = ?', [jobCardId]);
+        for (const l of labour) {
+            await conn.query(`
+                INSERT INTO customer_support_job_card_labour
+                (job_card_id, labour_description, hours, rate, total_cost, remarks)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [jobCardId, l.labour_description, l.hours, l.rate, l.total_cost, l.remarks]);
+        }
+    }
+}
+
+async function resolveCurrentStaffUser(reqUser) {
+    const userId = reqUser.id || reqUser.user_id;
+    let name = reqUser.name || '';
+    if (!name && userId) {
+        const [[u]] = await db.query('SELECT name FROM users WHERE user_id = ?', [userId]);
+        if (u && u.name) name = u.name;
+    }
+    return { userId, name: name || 'Support Staff' };
+}
+
+// ── GET JOB CARD INITIAL META (Next Number, Current Logged-In User, Date, Staff) ──
+exports.getJobCardInitMeta = async (req, res) => {
+    try {
+        const currentStaff = await resolveCurrentStaffUser(req.user);
+        const nextNumber = await generateNextJobCardNumber(db);
+        const todayDate = new Date().toISOString().slice(0, 10);
+
+        const [staffRows] = await db.query(`
+            SELECT u.user_id, u.name, r.name as role_name, d.name as department_name
+            FROM users u
+            LEFT JOIN roles r ON u.role_id = r.role_id
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE u.status = 'active'
+              AND (
+                  u.department_id = 19
+                  OR LOWER(COALESCE(d.name, '')) LIKE '%customer support%'
+                  OR u.role_id IN (36, 37, 38)
+                  OR LOWER(COALESCE(r.name, '')) LIKE '%support%'
+              )
+            ORDER BY u.name ASC
+        `);
+
+        res.json({
+            success: true,
+            next_job_card_number: nextNumber,
+            today_date: todayDate,
+            current_user: {
+                user_id: currentStaff.userId,
+                name: currentStaff.name,
+                role: req.user.role || ''
+            },
+            staff_list: staffRows
+        });
+    } catch (err) {
+        console.error('Error in getJobCardInitMeta:', err);
+        res.status(500).json({ success: false, message: 'Failed to load job card metadata' });
+    }
+};
+
+// ── GET JOB CARDS (Paginated with tabs & filters including Draft) ──
 exports.getJobCards = async (req, res) => {
     try {
         const {
@@ -1097,10 +1550,11 @@ exports.getJobCards = async (req, res) => {
         let whereClauses = ['1=1'];
         let params = [];
 
-        // Status tab filtering
         if (status && status !== 'all' && status !== 'All') {
-            const normalizedStatus = status.toLowerCase().replace(/[-_]/g, ' ');
-            if (normalizedStatus === 'open') {
+            const normalizedStatus = status.toLowerCase().replace(/[-_]/g, ' ').trim();
+            if (normalizedStatus === 'draft') {
+                whereClauses.push("jc.status = 'Draft'");
+            } else if (normalizedStatus === 'open') {
                 whereClauses.push("jc.status = 'Open'");
             } else if (normalizedStatus === 'in progress') {
                 whereClauses.push("jc.status = 'In Progress'");
@@ -1116,38 +1570,39 @@ exports.getJobCards = async (req, res) => {
             }
         }
 
-        // Job type filtering
         if (job_type && job_type !== 'all' && job_type !== 'All') {
             whereClauses.push('jc.job_type = ?');
             params.push(job_type);
         }
 
-        // Priority filtering
         if (priority && priority !== 'all' && priority !== 'All') {
             whereClauses.push('jc.priority = ?');
             params.push(priority);
         }
 
-        // Search query
         if (search && search.trim()) {
             const q = `%${search.trim()}%`;
-            whereClauses.push('(jc.job_card_number LIKE ? OR jc.customer_name LIKE ? OR jc.customer_phone LIKE ? OR jc.product_summary LIKE ? OR CAST(jc.order_id AS CHAR) LIKE ?)');
-            params.push(q, q, q, q, q);
+            whereClauses.push(`(
+                jc.job_card_number LIKE ? OR jc.customer_name LIKE ? OR jc.customer_phone LIKE ?
+                OR jc.product_summary LIKE ? OR jc.machine_make_model LIKE ?
+                OR jc.serial_vin_number LIKE ? OR jc.specific_complaint LIKE ?
+                OR jc.issue_description LIKE ? OR CAST(jc.order_id AS CHAR) LIKE ?
+            )`);
+            params.push(q, q, q, q, q, q, q, q, q);
         }
 
         const whereSql = whereClauses.join(' AND ');
 
-        // Total count for current filter
         const [[countRow]] = await db.query(`
             SELECT COUNT(*) as total
             FROM customer_support_job_cards jc
             WHERE ${whereSql}
         `, params);
 
-        // Status counts across all cards (for UI badge tabs)
         const [[statusCounts]] = await db.query(`
             SELECT 
                 COUNT(*) as all_count,
+                SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) as draft_count,
                 SUM(CASE WHEN status = 'Open' THEN 1 ELSE 0 END) as open_count,
                 SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress_count,
                 SUM(CASE WHEN status = 'On Hold' THEN 1 ELSE 0 END) as on_hold_count,
@@ -1156,13 +1611,13 @@ exports.getJobCards = async (req, res) => {
             FROM customer_support_job_cards
         `);
 
-        // Query job cards
         const [jobCards] = await db.query(`
             SELECT jc.*,
-                   u.name as assigned_to_name,
+                   COALESCE(jc.technician_name, u.name) as assigned_to_name,
                    creator.name as created_by_name,
                    (SELECT COUNT(*) FROM customer_support_job_card_photos WHERE job_card_id = jc.job_card_id) as photo_count,
-                   (SELECT COUNT(*) FROM customer_support_job_card_parts WHERE job_card_id = jc.job_card_id) as part_count
+                   (SELECT COUNT(*) FROM customer_support_job_card_parts WHERE job_card_id = jc.job_card_id) as part_count,
+                   (SELECT COUNT(*) FROM customer_support_job_card_labour WHERE job_card_id = jc.job_card_id) as labour_count
             FROM customer_support_job_cards jc
             LEFT JOIN users u ON jc.assigned_to = u.user_id
             LEFT JOIN users creator ON jc.created_by = creator.user_id
@@ -1177,6 +1632,7 @@ exports.getJobCards = async (req, res) => {
             data: jobCards,
             counts: {
                 all: statusCounts ? (statusCounts.all_count || 0) : 0,
+                draft: statusCounts ? (statusCounts.draft_count || 0) : 0,
                 open: statusCounts ? (statusCounts.open_count || 0) : 0,
                 in_progress: statusCounts ? (statusCounts.in_progress_count || 0) : 0,
                 on_hold: statusCounts ? (statusCounts.on_hold_count || 0) : 0,
@@ -1185,6 +1641,7 @@ exports.getJobCards = async (req, res) => {
             },
             statusCounts: {
                 all: statusCounts ? (statusCounts.all_count || 0) : 0,
+                draft: statusCounts ? (statusCounts.draft_count || 0) : 0,
                 open: statusCounts ? (statusCounts.open_count || 0) : 0,
                 'in progress': statusCounts ? (statusCounts.in_progress_count || 0) : 0,
                 'on hold': statusCounts ? (statusCounts.on_hold_count || 0) : 0,
@@ -1204,40 +1661,40 @@ exports.getJobCards = async (req, res) => {
     }
 };
 
-// ── CREATE NEW JOB CARD ──
+// ── CREATE NEW JOB CARD (Supports Draft, Open, In Progress, On Hold + Full 10 Sections) ──
 exports.createJobCard = async (req, res) => {
     try {
-        const {
-            case_id,
-            order_id,
-            customer_name,
-            customer_phone,
-            customer_address,
-            product_summary,
-            job_type = 'Service/Repair',
-            priority = 'Medium',
-            issue_description,
-            work_required,
-            assigned_to,
-            due_date,
-            notes
-        } = req.body;
+        const body = req.body || {};
+        const requestedStatusRaw = (body.status || 'Open').trim();
+        const allowedCreateStatuses = ['Draft', 'Open', 'In Progress', 'On Hold'];
+        const targetStatus = allowedCreateStatuses.includes(requestedStatusRaw) ? requestedStatusRaw : 'Open';
+        const isDraft = targetStatus === 'Draft';
 
-        if (!customer_name || !customer_name.trim()) {
-            return res.status(400).json({ success: false, message: 'Customer name is required' });
-        }
-        if (!customer_phone || !customer_phone.trim()) {
-            return res.status(400).json({ success: false, message: 'Customer phone number is required' });
-        }
-        if (!issue_description || !issue_description.trim()) {
-            return res.status(400).json({ success: false, message: 'Issue description is required' });
+        const customerName = (body.customer_name || '').trim();
+        const customerPhone = (body.customer_phone || '').trim();
+        const issueDesc = (body.issue_description || '').trim();
+        const specificComplaint = (body.specific_complaint || '').trim();
+
+        if (!isDraft) {
+            if (!customerName) {
+                return res.status(400).json({ success: false, message: 'Customer name is required' });
+            }
+            if (!customerPhone) {
+                return res.status(400).json({ success: false, message: 'Customer phone number is required' });
+            }
+            if (!issueDesc && !specificComplaint) {
+                return res.status(400).json({ success: false, message: 'Customer reported problem or specific complaint is required' });
+            }
+        } else {
+            if (!customerName && !customerPhone && !issueDesc && !specificComplaint && !(body.machine_make_model || body.product_summary || '').trim()) {
+                return res.status(400).json({ success: false, message: 'Enter at least customer info, machine, or complaint details to save a draft' });
+            }
         }
 
-        const cleanPhone = customer_phone.trim();
-        const parsedOrderId = order_id ? parseInt(order_id, 10) : null;
-        const parsedCaseId = case_id ? parseInt(case_id, 10) : null;
+        const parsedOrderId = body.order_id ? parseInt(body.order_id, 10) : null;
+        const parsedCaseId = body.case_id ? parseInt(body.case_id, 10) : null;
 
-        // Restriction check: Only eligible SGB Direct B2C purchases
+        // Restriction check: Only eligible SGB Direct B2C purchases when linked to an order
         if (parsedOrderId) {
             const [[orderRow]] = await db.query(
                 'SELECT order_id, purchase_source, order_source, dealer_id FROM orders WHERE order_id = ?',
@@ -1251,98 +1708,171 @@ exports.createJobCard = async (req, res) => {
             }
         }
 
-        // Duplicate prevention: prevent duplicate open Job Cards for the same customer issue
-        const [duplicateCheck] = await db.query(`
-            SELECT job_card_id, job_card_number, status, issue_description, job_type
-            FROM customer_support_job_cards
-            WHERE customer_phone = ? AND status IN ('Open', 'In Progress', 'On Hold')
-              AND (
-                (? IS NOT NULL AND case_id = ?)
-                OR LOWER(TRIM(issue_description)) = LOWER(TRIM(?))
-                OR (job_type = ? AND ? IS NOT NULL AND order_id = ?)
-              )
-            LIMIT 1
-        `, [
-            cleanPhone,
-            parsedCaseId, parsedCaseId,
-            issue_description.trim(),
-            job_type,
-            parsedOrderId, parsedOrderId
-        ]);
+        // Duplicate prevention for non-draft active Job Cards
+        const effectiveComplaint = issueDesc || specificComplaint;
+        if (!isDraft && customerPhone && effectiveComplaint) {
+            const [duplicateCheck] = await db.query(`
+                SELECT job_card_id, job_card_number, status, issue_description, job_type
+                FROM customer_support_job_cards
+                WHERE customer_phone = ? AND status IN ('Open', 'In Progress', 'On Hold')
+                  AND (
+                    (? IS NOT NULL AND case_id = ?)
+                    OR LOWER(TRIM(COALESCE(issue_description, ''))) = LOWER(TRIM(?))
+                    OR (job_type = ? AND ? IS NOT NULL AND order_id = ?)
+                  )
+                LIMIT 1
+            `, [
+                customerPhone,
+                parsedCaseId, parsedCaseId,
+                effectiveComplaint,
+                body.job_type || 'Service/Repair',
+                parsedOrderId, parsedOrderId
+            ]);
 
-        if (duplicateCheck.length > 0) {
-            const dup = duplicateCheck[0];
-            return res.status(400).json({
-                success: false,
-                message: `An active Job Card (${dup.job_card_number}) is already ${dup.status} for this customer. Please update the existing Job Card instead of creating a duplicate.`,
-                existing_job_card_id: dup.job_card_id,
-                existing_job_card_number: dup.job_card_number
+            if (duplicateCheck.length > 0) {
+                const dup = duplicateCheck[0];
+                return res.status(400).json({
+                    success: false,
+                    message: `An active Job Card (${dup.job_card_number}) is already ${dup.status} for this customer. Please open and edit that card instead.`,
+                    existing_job_card_id: dup.job_card_id,
+                    existing_job_card_number: dup.job_card_number
+                });
+            }
+        }
+
+        // Validate Parts, Labour, and Financials
+        const partsValidation = normalizeAndValidateParts(body.parts);
+        if (partsValidation.error) {
+            return res.status(400).json({ success: false, message: partsValidation.error });
+        }
+        const labourValidation = normalizeAndValidateLabour(body.labour);
+        if (labourValidation.error) {
+            return res.status(400).json({ success: false, message: labourValidation.error });
+        }
+        const finValidation = calculateAndValidateFinancials(partsValidation.items, labourValidation.items, body);
+        if (finValidation.error) {
+            return res.status(400).json({ success: false, message: finValidation.error });
+        }
+
+        const currentStaff = await resolveCurrentStaffUser(req.user);
+        const assignedUserId = body.assigned_to ? parseInt(body.assigned_to, 10) : currentStaff.userId;
+        let technicianName = (body.technician_name || '').trim();
+        if (!technicianName && assignedUserId) {
+            if (assignedUserId === currentStaff.userId) {
+                technicianName = currentStaff.name;
+            } else {
+                const [[techRow]] = await db.query('SELECT name FROM users WHERE user_id = ?', [assignedUserId]);
+                if (techRow) technicianName = techRow.name;
+            }
+        }
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const jobCardNumber = await generateNextJobCardNumber(connection);
+            const machineMakeModel = (body.machine_make_model || body.product_summary || '').trim() || null;
+            const promisedDate = toMysqlDate(body.promised_date || body.due_date);
+            const jobCardDate = toMysqlDate(body.job_card_date) || new Date().toISOString().slice(0, 10);
+            const additionalRemarks = (body.additional_remarks || body.notes || '').trim() || null;
+            const initialDiagnosis = (body.initial_diagnosis || '').trim() || null;
+            const signatureData = (body.customer_signature || '').trim() || null;
+            const fin = finValidation.financials;
+
+            const [insertRes] = await connection.query(`
+                INSERT INTO customer_support_job_cards (
+                    job_card_number, job_card_date, case_id, order_id,
+                    customer_name, customer_phone, customer_address,
+                    product_summary, machine_make_model, serial_vin_number, hours_run,
+                    job_type, priority, status,
+                    specific_complaint, issue_description, original_issue_description, work_required, initial_diagnosis, additional_observations,
+                    before_work_condition, initial_inspection_remarks,
+                    diagnosis, work_performed, parts_replaced_summary, repair_details, additional_remarks, notes,
+                    final_machine_condition, work_completion_remarks,
+                    parts_total, labour_total, service_cost, discount_amount, taxable_amount, tax_percent, tax_amount, shipping_charge,
+                    grand_total, amount_paid, balance_amount, payment_status, payment_mode,
+                    assigned_to, technician_name, due_date,
+                    customer_feedback, technician_remarks, customer_signature, signature_date,
+                    created_by
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?
+                )
+            `, [
+                jobCardNumber, jobCardDate, parsedCaseId, parsedOrderId,
+                customerName || 'Draft Customer', customerPhone || '', (body.customer_address || '').trim() || null,
+                machineMakeModel, machineMakeModel, (body.serial_vin_number || '').trim() || null, (body.hours_run || '').trim() || null,
+                body.job_type || 'Service/Repair', body.priority || 'Medium', targetStatus,
+                specificComplaint || null, issueDesc || specificComplaint || null, issueDesc || specificComplaint || null,
+                (body.work_required || '').trim() || null, initialDiagnosis, (body.additional_observations || '').trim() || null,
+                (body.before_work_condition || '').trim() || null, (body.initial_inspection_remarks || '').trim() || null,
+                (body.diagnosis || '').trim() || null, (body.work_performed || '').trim() || null,
+                (body.parts_replaced_summary || '').trim() || null, (body.repair_details || '').trim() || null,
+                additionalRemarks, additionalRemarks,
+                (body.final_machine_condition || '').trim() || null, (body.work_completion_remarks || '').trim() || null,
+                fin.parts_total, fin.labour_total, fin.service_cost, fin.discount_amount, fin.taxable_amount, fin.tax_percent, fin.tax_amount, fin.shipping_charge,
+                fin.grand_total, fin.amount_paid, fin.balance_amount, fin.payment_status, fin.payment_mode,
+                assignedUserId, technicianName || null, promisedDate,
+                (body.customer_feedback || '').trim() || null, (body.technician_remarks || '').trim() || null,
+                signatureData, signatureData ? new Date() : null,
+                currentStaff.userId
+            ]);
+
+            const newJobCardId = insertRes.insertId;
+
+            await replaceJobCardPartsAndLabour(connection, newJobCardId, partsValidation.items, labourValidation.items);
+
+            await saveJobCardUploadedPhotos(
+                connection,
+                newJobCardId,
+                req.files,
+                body.photo_type || 'BEFORE_WORK',
+                currentStaff.userId
+            );
+
+            await connection.query(`
+                INSERT INTO customer_support_job_card_logs
+                (job_card_id, action, previous_status, new_status, notes, performed_by)
+                VALUES (?, ?, NULL, ?, ?, ?)
+            `, [
+                newJobCardId,
+                isDraft ? 'DRAFT_CREATED' : 'CREATED',
+                targetStatus,
+                isDraft
+                    ? `Draft saved by ${currentStaff.name}`
+                    : `Job Card created (${targetStatus}) for ${body.job_type || 'Service/Repair'}: ${effectiveComplaint}`,
+                currentStaff.userId
+            ]);
+
+            await connection.commit();
+
+            res.json({
+                success: true,
+                message: isDraft ? 'Job Card saved as Draft' : 'Job Card created successfully',
+                job_card_id: newJobCardId,
+                job_card_number: jobCardNumber,
+                status: targetStatus
             });
+        } catch (trxErr) {
+            await connection.rollback();
+            throw trxErr;
+        } finally {
+            connection.release();
         }
-
-        // Auto-generate unique Job Card Number: JC-YYYYMMDD-XXXX
-        const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const [[countRow]] = await db.query(
-            'SELECT COUNT(*) as cnt FROM customer_support_job_cards WHERE job_card_number LIKE ?',
-            [`JC-${todayStr}-%`]
-        );
-        const seq = (((countRow && countRow.cnt) || 0) + 1).toString().padStart(4, '0');
-        const jobCardNumber = `JC-${todayStr}-${seq}`;
-
-        const assignedUserId = assigned_to ? parseInt(assigned_to, 10) : (req.user.id || req.user.user_id);
-        const currentUserId = req.user.id || req.user.user_id;
-
-        const [insertRes] = await db.query(`
-            INSERT INTO customer_support_job_cards
-            (job_card_number, case_id, order_id, customer_name, customer_phone, customer_address, product_summary, job_type, priority, status, issue_description, work_required, assigned_to, due_date, notes, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?, ?, ?, ?, ?)
-        `, [
-            jobCardNumber,
-            parsedCaseId,
-            parsedOrderId,
-            customer_name.trim(),
-            cleanPhone,
-            customer_address ? customer_address.trim() : null,
-            product_summary ? product_summary.trim() : null,
-            job_type,
-            priority,
-            issue_description.trim(),
-            work_required ? work_required.trim() : null,
-            assignedUserId,
-            due_date || null,
-            notes ? notes.trim() : null,
-            currentUserId
-        ]);
-
-        const newJobCardId = insertRes.insertId;
-
-        // Save uploaded photos if any
-        const files = req.files || [];
-        for (const file of files) {
-            const fileUrl = `/uploads/${file.filename}`;
-            await db.query(`
-                INSERT INTO customer_support_job_card_photos
-                (job_card_id, photo_type, file_url, file_name, file_size, uploaded_by)
-                VALUES (?, 'issue', ?, ?, ?, ?)
-            `, [newJobCardId, fileUrl, file.originalname, file.size, currentUserId]);
-        }
-
-        // Add initial activity log
-        await db.query(`
-            INSERT INTO customer_support_job_card_logs
-            (job_card_id, action, previous_status, new_status, notes, performed_by)
-            VALUES (?, 'CREATED', NULL, 'Open', ?, ?)
-        `, [newJobCardId, `Job Card created for ${job_type}: ${issue_description.trim()}`, currentUserId]);
-
-        res.json({
-            success: true,
-            message: 'Job Card created successfully',
-            job_card_id: newJobCardId,
-            job_card_number: jobCardNumber
-        });
     } catch (err) {
         console.error('Error in createJobCard:', err);
-        res.status(500).json({ success: false, message: err.message || 'Failed to create job card' });
+        res.status(500).json({ success: false, message: 'Failed to create job card' });
     }
 };
 
@@ -1353,13 +1883,16 @@ exports.getJobCardDetails = async (req, res) => {
 
         const [rows] = await db.query(`
             SELECT jc.*,
-                   u.name as assigned_to_name, u.email as assigned_to_email, u.phone as assigned_to_phone,
+                   COALESCE(jc.technician_name, u.name) as assigned_to_name,
+                   u.email as assigned_to_email, u.phone as assigned_to_phone,
                    creator.name as created_by_name,
+                   completer.name as completed_by_user_name,
                    c.case_number, c.status as case_status,
                    o.total_amount as order_total_amount, o.order_status, o.address as order_address
             FROM customer_support_job_cards jc
             LEFT JOIN users u ON jc.assigned_to = u.user_id
             LEFT JOIN users creator ON jc.created_by = creator.user_id
+            LEFT JOIN users completer ON jc.completed_by = completer.user_id
             LEFT JOIN customer_support_cases c ON jc.case_id = c.case_id
             LEFT JOIN orders o ON jc.order_id = o.order_id
             WHERE jc.job_card_id = ?
@@ -1369,16 +1902,27 @@ exports.getJobCardDetails = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Job Card not found' });
         }
 
-        const jobCard = rows[0];
+        const raw = rows[0];
+        const jobCard = {
+            ...raw,
+            promised_date: raw.due_date,
+            machine_make_model: raw.machine_make_model || raw.product_summary || '',
+            job_card_date: raw.job_card_date || (raw.created_at ? new Date(raw.created_at).toISOString().slice(0, 10) : null),
+            completed_by_name: raw.completed_by_name || raw.completed_by_user_name || null
+        };
 
-        // Fetch spare parts
         const [parts] = await db.query(`
             SELECT * FROM customer_support_job_card_parts
             WHERE job_card_id = ?
             ORDER BY part_id ASC
         `, [id]);
 
-        // Fetch photos
+        const [labour] = await db.query(`
+            SELECT * FROM customer_support_job_card_labour
+            WHERE job_card_id = ?
+            ORDER BY labour_id ASC
+        `, [id]);
+
         const [photos] = await db.query(`
             SELECT p.*, u.name as uploaded_by_name
             FROM customer_support_job_card_photos p
@@ -1387,7 +1931,6 @@ exports.getJobCardDetails = async (req, res) => {
             ORDER BY p.created_at ASC
         `, [id]);
 
-        // Fetch activity logs
         const [logs] = await db.query(`
             SELECT l.*, u.name as performed_by_name
             FROM customer_support_job_card_logs l
@@ -1396,18 +1939,52 @@ exports.getJobCardDetails = async (req, res) => {
             ORDER BY l.created_at ASC
         `, [id]);
 
-        const partsTotal = parts.reduce((sum, p) => sum + (parseFloat(p.total_cost) || 0), 0);
-        const serviceCost = parseFloat(jobCard.service_cost) || 0;
-        const grandTotal = partsTotal + serviceCost;
+        // Separate Before Work and After Work photos strictly
+        const beforePhotos = photos.filter(p => ['BEFORE_WORK', 'before', 'issue'].includes(p.photo_type));
+        const afterPhotos = photos.filter(p => ['AFTER_WORK', 'after'].includes(p.photo_type));
+        const otherPhotos = photos.filter(p => !['BEFORE_WORK', 'before', 'issue', 'AFTER_WORK', 'after'].includes(p.photo_type));
+
+        const partsTotal = round2(parts.reduce((sum, p) => sum + (p.is_foc ? 0 : (parseFloat(p.total_cost) || 0)), 0));
+        const labourTotal = round2(
+            labour.length > 0
+                ? labour.reduce((sum, l) => sum + (parseFloat(l.total_cost) || 0), 0)
+                : (parseFloat(jobCard.labour_total) || parseFloat(jobCard.service_cost) || 0)
+        );
+        const discountAmount = round2(parseFloat(jobCard.discount_amount) || 0);
+        const taxableAmount = round2(Math.max(0, partsTotal + labourTotal - discountAmount));
+        const taxAmount = round2(parseFloat(jobCard.tax_amount) || 0);
+        const shippingCharge = round2(parseFloat(jobCard.shipping_charge) || 0);
+        const grandTotal = round2(Math.max(0, taxableAmount + taxAmount + shippingCharge));
+        const amountPaid = round2(parseFloat(jobCard.amount_paid) || 0);
+        const balanceAmount = round2(Math.max(0, grandTotal - amountPaid));
 
         res.json({
             success: true,
             job_card: jobCard,
             parts,
+            labour,
             photos,
+            before_photos: beforePhotos,
+            after_photos: afterPhotos,
+            other_photos: otherPhotos,
             logs,
             parts_total: partsTotal,
-            grand_total: grandTotal
+            labour_total: labourTotal,
+            grand_total: grandTotal,
+            financials: {
+                parts_total: partsTotal,
+                labour_total: labourTotal,
+                discount_amount: discountAmount,
+                taxable_amount: taxableAmount,
+                tax_percent: round2(parseFloat(jobCard.tax_percent) || 0),
+                tax_amount: taxAmount,
+                shipping_charge: shippingCharge,
+                grand_total: grandTotal,
+                amount_paid: amountPaid,
+                balance_amount: balanceAmount,
+                payment_status: jobCard.payment_status || 'Unpaid',
+                payment_mode: jobCard.payment_mode || ''
+            }
         });
     } catch (err) {
         console.error('Error in getJobCardDetails:', err);
@@ -1415,7 +1992,267 @@ exports.getJobCardDetails = async (req, res) => {
     }
 };
 
-// ── UPDATE JOB CARD STATUS (Open, In Progress, On Hold, Cancelled) ──
+// ── UPDATE JOB CARD (Draft, Resume, Edit, Save Work In Progress) ──
+exports.updateJobCard = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const body = req.body || {};
+
+        const [[existing]] = await db.query('SELECT * FROM customer_support_job_cards WHERE job_card_id = ?', [id]);
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Job Card not found' });
+        }
+        if (existing.status === 'Completed' || existing.status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: `Cannot edit a Job Card that is already ${existing.status}` });
+        }
+
+        const requestedStatus = (body.status || existing.status).trim();
+        const allowedEditStatuses = ['Draft', 'Open', 'In Progress', 'On Hold'];
+        if (!allowedEditStatuses.includes(requestedStatus)) {
+            return res.status(400).json({ success: false, message: 'Use Complete or Cancel actions to finalize a Job Card' });
+        }
+
+        const customerName = (body.customer_name !== undefined ? body.customer_name : existing.customer_name || '').trim();
+        const customerPhone = (body.customer_phone !== undefined ? body.customer_phone : existing.customer_phone || '').trim();
+        const issueDesc = (body.issue_description !== undefined ? body.issue_description : existing.issue_description || '').trim();
+        const specificComplaint = (body.specific_complaint !== undefined ? body.specific_complaint : existing.specific_complaint || '').trim();
+
+        if (requestedStatus !== 'Draft') {
+            if (!customerName) return res.status(400).json({ success: false, message: 'Customer name is required' });
+            if (!customerPhone) return res.status(400).json({ success: false, message: 'Customer phone number is required' });
+            if (!issueDesc && !specificComplaint) {
+                return res.status(400).json({ success: false, message: 'Customer reported problem or specific complaint is required' });
+            }
+        }
+
+        // Load existing child rows if parts/labour were omitted from payload
+        let nextParts = null;
+        if (body.parts !== undefined) {
+            const pVal = normalizeAndValidateParts(body.parts);
+            if (pVal.error) return res.status(400).json({ success: false, message: pVal.error });
+            nextParts = pVal.items;
+        }
+        let nextLabour = null;
+        if (body.labour !== undefined) {
+            const lVal = normalizeAndValidateLabour(body.labour);
+            if (lVal.error) return res.status(400).json({ success: false, message: lVal.error });
+            nextLabour = lVal.items;
+        }
+
+        const partsForCalc = nextParts !== null
+            ? nextParts
+            : (await db.query('SELECT * FROM customer_support_job_card_parts WHERE job_card_id = ?', [id]))[0];
+        const labourForCalc = nextLabour !== null
+            ? nextLabour
+            : (await db.query('SELECT * FROM customer_support_job_card_labour WHERE job_card_id = ?', [id]))[0];
+
+        const finValidation = calculateAndValidateFinancials(partsForCalc, labourForCalc, {
+            discount_amount: body.discount_amount !== undefined ? body.discount_amount : existing.discount_amount,
+            tax_percent: body.tax_percent !== undefined ? body.tax_percent : existing.tax_percent,
+            tax_amount: body.tax_amount !== undefined ? body.tax_amount : existing.tax_amount,
+            shipping_charge: body.shipping_charge !== undefined ? body.shipping_charge : (body.delivery_charge !== undefined ? body.delivery_charge : existing.shipping_charge),
+            amount_paid: body.amount_paid !== undefined ? body.amount_paid : existing.amount_paid,
+            payment_status: body.payment_status !== undefined ? body.payment_status : existing.payment_status,
+            payment_mode: body.payment_mode !== undefined ? body.payment_mode : existing.payment_mode
+        });
+        if (finValidation.error) {
+            return res.status(400).json({ success: false, message: finValidation.error });
+        }
+
+        const currentStaff = await resolveCurrentStaffUser(req.user);
+        const fin = finValidation.financials;
+        const machineMakeModel = body.machine_make_model !== undefined || body.product_summary !== undefined
+            ? ((body.machine_make_model || body.product_summary || '').trim() || null)
+            : (existing.machine_make_model || existing.product_summary || null);
+        const promisedDate = body.promised_date !== undefined || body.due_date !== undefined
+            ? toMysqlDate(body.promised_date || body.due_date)
+            : existing.due_date;
+
+        // Historical complaint preservation: never overwrite original_issue_description once recorded
+        const preservedOriginalComplaint = existing.original_issue_description || issueDesc || existing.issue_description || null;
+
+        const additionalRemarks = body.additional_remarks !== undefined || body.notes !== undefined
+            ? ((body.additional_remarks !== undefined ? body.additional_remarks : body.notes) || '').trim() || null
+            : (existing.additional_remarks || existing.notes || null);
+
+        let nextSignature = existing.customer_signature;
+        let nextSignatureDate = existing.signature_date;
+        if (body.customer_signature !== undefined) {
+            const sig = (body.customer_signature || '').trim();
+            nextSignature = sig || null;
+            if (sig && sig !== existing.customer_signature) {
+                nextSignatureDate = new Date();
+            } else if (!sig) {
+                nextSignatureDate = null;
+            }
+        }
+
+        const assignedUserId = body.assigned_to ? parseInt(body.assigned_to, 10) : existing.assigned_to;
+        const technicianName = body.technician_name !== undefined
+            ? (body.technician_name || '').trim() || null
+            : existing.technician_name;
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            await connection.query(`
+                UPDATE customer_support_job_cards SET
+                    job_card_date = COALESCE(?, job_card_date),
+                    case_id = ?,
+                    order_id = ?,
+                    customer_name = ?,
+                    customer_phone = ?,
+                    customer_address = ?,
+                    product_summary = ?,
+                    machine_make_model = ?,
+                    serial_vin_number = ?,
+                    hours_run = ?,
+                    job_type = ?,
+                    priority = ?,
+                    status = ?,
+                    specific_complaint = ?,
+                    issue_description = ?,
+                    original_issue_description = ?,
+                    work_required = ?,
+                    initial_diagnosis = ?,
+                    additional_observations = ?,
+                    before_work_condition = ?,
+                    initial_inspection_remarks = ?,
+                    diagnosis = ?,
+                    work_performed = ?,
+                    parts_replaced_summary = ?,
+                    repair_details = ?,
+                    additional_remarks = ?,
+                    notes = ?,
+                    final_machine_condition = ?,
+                    work_completion_remarks = ?,
+                    parts_total = ?,
+                    labour_total = ?,
+                    service_cost = ?,
+                    discount_amount = ?,
+                    taxable_amount = ?,
+                    tax_percent = ?,
+                    tax_amount = ?,
+                    shipping_charge = ?,
+                    grand_total = ?,
+                    amount_paid = ?,
+                    balance_amount = ?,
+                    payment_status = ?,
+                    payment_mode = ?,
+                    assigned_to = ?,
+                    technician_name = ?,
+                    due_date = ?,
+                    work_completion_date = ?,
+                    customer_feedback = ?,
+                    technician_remarks = ?,
+                    customer_signature = ?,
+                    signature_date = ?
+                WHERE job_card_id = ?
+            `, [
+                toMysqlDate(body.job_card_date),
+                body.case_id !== undefined ? (body.case_id ? parseInt(body.case_id, 10) : null) : existing.case_id,
+                body.order_id !== undefined ? (body.order_id ? parseInt(body.order_id, 10) : null) : existing.order_id,
+                customerName || existing.customer_name || 'Draft Customer',
+                customerPhone,
+                body.customer_address !== undefined ? ((body.customer_address || '').trim() || null) : existing.customer_address,
+                machineMakeModel,
+                machineMakeModel,
+                body.serial_vin_number !== undefined ? ((body.serial_vin_number || '').trim() || null) : existing.serial_vin_number,
+                body.hours_run !== undefined ? ((body.hours_run || '').trim() || null) : existing.hours_run,
+                body.job_type || existing.job_type,
+                body.priority || existing.priority,
+                requestedStatus,
+                specificComplaint || null,
+                issueDesc || null,
+                preservedOriginalComplaint,
+                body.work_required !== undefined ? ((body.work_required || '').trim() || null) : existing.work_required,
+                body.initial_diagnosis !== undefined ? ((body.initial_diagnosis || '').trim() || null) : existing.initial_diagnosis,
+                body.additional_observations !== undefined ? ((body.additional_observations || '').trim() || null) : existing.additional_observations,
+                body.before_work_condition !== undefined ? ((body.before_work_condition || '').trim() || null) : existing.before_work_condition,
+                body.initial_inspection_remarks !== undefined ? ((body.initial_inspection_remarks || '').trim() || null) : existing.initial_inspection_remarks,
+                body.diagnosis !== undefined ? ((body.diagnosis || '').trim() || null) : existing.diagnosis,
+                body.work_performed !== undefined ? ((body.work_performed || '').trim() || null) : existing.work_performed,
+                body.parts_replaced_summary !== undefined ? ((body.parts_replaced_summary || '').trim() || null) : existing.parts_replaced_summary,
+                body.repair_details !== undefined ? ((body.repair_details || '').trim() || null) : existing.repair_details,
+                additionalRemarks,
+                additionalRemarks,
+                body.final_machine_condition !== undefined ? ((body.final_machine_condition || '').trim() || null) : existing.final_machine_condition,
+                body.work_completion_remarks !== undefined ? ((body.work_completion_remarks || '').trim() || null) : existing.work_completion_remarks,
+                fin.parts_total, fin.labour_total, fin.service_cost,
+                fin.discount_amount, fin.taxable_amount, fin.tax_percent, fin.tax_amount, fin.shipping_charge,
+                fin.grand_total, fin.amount_paid, fin.balance_amount,
+                fin.payment_status, fin.payment_mode,
+                assignedUserId, technicianName, promisedDate,
+                body.work_completion_date !== undefined ? toMysqlDateTime(body.work_completion_date) : existing.work_completion_date,
+                body.customer_feedback !== undefined ? ((body.customer_feedback || '').trim() || null) : existing.customer_feedback,
+                body.technician_remarks !== undefined ? ((body.technician_remarks || '').trim() || null) : existing.technician_remarks,
+                nextSignature, nextSignatureDate,
+                id
+            ]);
+
+            await replaceJobCardPartsAndLabour(connection, id, nextParts, nextLabour);
+
+            const uploaded = await saveJobCardUploadedPhotos(
+                connection,
+                id,
+                req.files,
+                body.photo_type || 'BEFORE_WORK',
+                currentStaff.userId
+            );
+
+            let actionType = 'WORK_SAVED';
+            let actionNote = `Job Card details saved (${requestedStatus}) by ${currentStaff.name}`;
+            if (requestedStatus === 'Draft') {
+                actionType = 'DRAFT_SAVED';
+                actionNote = `Draft updated by ${currentStaff.name}`;
+            } else if (existing.status === 'Draft' && requestedStatus !== 'Draft') {
+                actionType = 'RESUMED';
+                actionNote = `Draft resumed and moved to ${requestedStatus} by ${currentStaff.name}`;
+            } else if (existing.status !== requestedStatus) {
+                actionType = 'STATUS_CHANGED';
+                actionNote = `Status updated from ${existing.status} to ${requestedStatus}`;
+            }
+            if (uploaded.length > 0) {
+                actionNote += `. Uploaded ${uploaded.length} photo(s).`;
+            }
+
+            await connection.query(`
+                INSERT INTO customer_support_job_card_logs
+                (job_card_id, action, previous_status, new_status, notes, performed_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+                id,
+                actionType,
+                existing.status !== requestedStatus ? existing.status : null,
+                existing.status !== requestedStatus ? requestedStatus : null,
+                actionNote,
+                currentStaff.userId
+            ]);
+
+            await connection.commit();
+
+            res.json({
+                success: true,
+                message: requestedStatus === 'Draft' ? 'Draft saved successfully' : 'Job Card saved successfully',
+                job_card_id: id,
+                status: requestedStatus,
+                financials: fin,
+                uploaded_photos: uploaded
+            });
+        } catch (trxErr) {
+            await connection.rollback();
+            throw trxErr;
+        } finally {
+            connection.release();
+        }
+    } catch (err) {
+        console.error('Error in updateJobCard:', err);
+        res.status(500).json({ success: false, message: 'Failed to save job card changes' });
+    }
+};
+
+// ── UPDATE JOB CARD STATUS (Draft, Open, In Progress, On Hold, Cancelled) ──
 exports.updateJobCardStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1425,12 +2262,11 @@ exports.updateJobCardStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Status is required' });
         }
 
-        const validStatuses = ['Open', 'In Progress', 'On Hold', 'Cancelled'];
+        const validStatuses = ['Draft', 'Open', 'In Progress', 'On Hold', 'Cancelled'];
         if (!validStatuses.includes(status)) {
-            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+            return res.status(400).json({ success: false, message: `Invalid status. Allowed values: ${validStatuses.join(', ')}` });
         }
 
-        // Fetch existing job card
         const [[jobCard]] = await db.query(
             'SELECT job_card_id, job_card_number, status FROM customer_support_job_cards WHERE job_card_id = ?',
             [id]
@@ -1438,7 +2274,6 @@ exports.updateJobCardStatus = async (req, res) => {
         if (!jobCard) {
             return res.status(404).json({ success: false, message: 'Job Card not found' });
         }
-
         if (jobCard.status === 'Completed') {
             return res.status(400).json({ success: false, message: 'Cannot modify a Job Card that is already Completed' });
         }
@@ -1446,14 +2281,11 @@ exports.updateJobCardStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot modify a Job Card that has been Cancelled' });
         }
 
-        // Strict requirement: cancellation reason when cancelling
-        if (status === 'Cancelled') {
-            if (!cancellation_reason || !cancellation_reason.trim()) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Cancellation reason is strictly required when cancelling a Job Card'
-                });
-            }
+        if (status === 'Cancelled' && (!cancellation_reason || !cancellation_reason.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cancellation reason is required when cancelling a Job Card'
+            });
         }
 
         const currentUserId = req.user.id || req.user.user_id;
@@ -1473,71 +2305,69 @@ exports.updateJobCardStatus = async (req, res) => {
             id
         ]);
 
-        // Insert activity log
         const logNotes = isCancelling
             ? `Cancelled: ${cancellation_reason.trim()}`
-            : (notes ? notes.trim() : `Status transitioned from ${jobCard.status} to ${status}`);
+            : (notes ? notes.trim() : `Status changed from ${jobCard.status} to ${status}`);
 
         await db.query(`
             INSERT INTO customer_support_job_card_logs
             (job_card_id, action, previous_status, new_status, notes, performed_by)
-            VALUES (?, 'STATUS_CHANGED', ?, ?, ?, ?)
-        `, [id, jobCard.status, status, logNotes, currentUserId]);
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [id, isCancelling ? 'CANCELLED' : 'STATUS_CHANGED', jobCard.status, status, logNotes, currentUserId]);
 
         res.json({
             success: true,
-            message: `Job Card status updated to ${status}`,
+            message: `Job Card status changed to ${status}`,
             job_card_id: id,
             new_status: status
         });
     } catch (err) {
         console.error('Error in updateJobCardStatus:', err);
-        res.status(500).json({ success: false, message: err.message || 'Failed to update job card status' });
+        res.status(500).json({ success: false, message: 'Failed to change job card status' });
     }
 };
 
-// ── UPLOAD JOB CARD PHOTOS (Before / After / Issue / Other) ──
+// ── UPLOAD JOB CARD PHOTOS (BEFORE_WORK / AFTER_WORK / Legacy types) ──
 exports.uploadJobCardPhotos = async (req, res) => {
     try {
         const { id } = req.params;
-        const { photo_type = 'other' } = req.body;
-        const files = req.files || [];
+        const { photo_type = 'BEFORE_WORK', caption } = req.body;
 
-        if (files.length === 0) {
+        const [[jobCard]] = await db.query(
+            'SELECT job_card_id, status FROM customer_support_job_cards WHERE job_card_id = ?',
+            [id]
+        );
+        if (!jobCard) {
+            return res.status(404).json({ success: false, message: 'Job Card not found' });
+        }
+        if (jobCard.status === 'Completed' || jobCard.status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: `Cannot upload photos to a ${jobCard.status} Job Card` });
+        }
+
+        const currentUserId = req.user.id || req.user.user_id;
+        const uploadedPhotos = await saveJobCardUploadedPhotos(
+            db,
+            id,
+            req.files,
+            photo_type,
+            currentUserId,
+            caption ? caption.trim() : null
+        );
+
+        if (uploadedPhotos.length === 0) {
             return res.status(400).json({ success: false, message: 'No photos provided for upload' });
         }
 
-        const validTypes = ['issue', 'before', 'after', 'other'];
-        const type = validTypes.includes(photo_type) ? photo_type : 'other';
-        const currentUserId = req.user.id || req.user.user_id;
-
-        const uploadedPhotos = [];
-        for (const file of files) {
-            const fileUrl = `/uploads/${file.filename}`;
-            const [result] = await db.query(`
-                INSERT INTO customer_support_job_card_photos
-                (job_card_id, photo_type, file_url, file_name, file_size, uploaded_by)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `, [id, type, fileUrl, file.originalname, file.size, currentUserId]);
-
-            uploadedPhotos.push({
-                photo_id: result.insertId,
-                photo_type: type,
-                file_url: fileUrl,
-                file_name: file.originalname
-            });
-        }
-
-        // Add log
+        const stageSummary = [...new Set(uploadedPhotos.map(p => p.photo_type))].join(', ');
         await db.query(`
             INSERT INTO customer_support_job_card_logs
             (job_card_id, action, previous_status, new_status, notes, performed_by)
             VALUES (?, 'PHOTO_UPLOADED', NULL, NULL, ?, ?)
-        `, [id, `Uploaded ${files.length} photo(s) (${type})`, currentUserId]);
+        `, [id, `Uploaded ${uploadedPhotos.length} photo(s) [${stageSummary}]`, currentUserId]);
 
         res.json({
             success: true,
-            message: `${files.length} photo(s) uploaded successfully`,
+            message: `${uploadedPhotos.length} photo(s) uploaded successfully`,
             photos: uploadedPhotos
         });
     } catch (err) {
@@ -1546,24 +2376,77 @@ exports.uploadJobCardPhotos = async (req, res) => {
     }
 };
 
+// ── DELETE JOB CARD PHOTO (Deliberate removal with audit trail) ──
+exports.deleteJobCardPhoto = async (req, res) => {
+    try {
+        const { id, photoId } = req.params;
+
+        const [[jobCard]] = await db.query(
+            'SELECT job_card_id, status FROM customer_support_job_cards WHERE job_card_id = ?',
+            [id]
+        );
+        if (!jobCard) {
+            return res.status(404).json({ success: false, message: 'Job Card not found' });
+        }
+        if (jobCard.status === 'Completed' || jobCard.status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: `Cannot remove photos from a ${jobCard.status} Job Card` });
+        }
+
+        const [[photo]] = await db.query(
+            'SELECT * FROM customer_support_job_card_photos WHERE photo_id = ? AND job_card_id = ?',
+            [photoId, id]
+        );
+        if (!photo) {
+            return res.status(404).json({ success: false, message: 'Photo not found on this Job Card' });
+        }
+
+        await db.query('DELETE FROM customer_support_job_card_photos WHERE photo_id = ? AND job_card_id = ?', [photoId, id]);
+
+        // Remove media from R2 (if stored via /api/media/...) and any legacy or fallback local disk file
+        if (photo.file_url) {
+            const r2Key = storageService.extractKeyFromUrl(photo.file_url);
+            if (r2Key && !photo.file_url.startsWith('/uploads/')) {
+                try {
+                    await storageService.deleteObject({ key: r2Key });
+                } catch (r2DelErr) {
+                    console.warn('R2 delete warn:', r2DelErr.message);
+                }
+                const fallbackDiskPath = path.join(__dirname, '../../uploads', r2Key);
+                if (fs.existsSync(fallbackDiskPath)) {
+                    try { fs.unlinkSync(fallbackDiskPath); } catch (e) { console.warn('Unlink warn:', e.message); }
+                }
+            } else if (photo.file_url.startsWith('/uploads/')) {
+                const filename = path.basename(photo.file_url);
+                const diskPath = path.join(__dirname, '../../uploads', filename);
+                if (fs.existsSync(diskPath)) {
+                    try { fs.unlinkSync(diskPath); } catch (e) { console.warn('Unlink warn:', e.message); }
+                }
+            }
+        }
+
+        const currentUserId = req.user.id || req.user.user_id;
+        await db.query(`
+            INSERT INTO customer_support_job_card_logs
+            (job_card_id, action, previous_status, new_status, notes, performed_by)
+            VALUES (?, 'PHOTO_DELETED', NULL, NULL, ?, ?)
+        `, [id, `Deleted ${photo.photo_type} photo: ${photo.file_name}`, currentUserId]);
+
+        res.json({
+            success: true,
+            message: 'Photo removed from Job Card',
+            photo_id: Number(photoId)
+        });
+    } catch (err) {
+        console.error('Error in deleteJobCardPhoto:', err);
+        res.status(500).json({ success: false, message: 'Failed to remove photo' });
+    }
+};
+
 // ── COMPLETE JOB CARD ──
 exports.completeJobCard = async (req, res) => {
     try {
         const { id } = req.params;
-        const {
-            diagnosis,
-            work_performed,
-            service_cost = 0,
-            completion_notes,
-            parts
-        } = req.body;
-
-        if (!diagnosis || !diagnosis.trim()) {
-            return res.status(400).json({ success: false, message: 'Diagnosis description is required for completion' });
-        }
-        if (!work_performed || !work_performed.trim()) {
-            return res.status(400).json({ success: false, message: 'Work performed details are required for completion' });
-        }
+        const body = req.body || {};
 
         const [[jobCard]] = await db.query(
             'SELECT * FROM customer_support_job_cards WHERE job_card_id = ?',
@@ -1579,74 +2462,205 @@ exports.completeJobCard = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot complete a cancelled Job Card' });
         }
 
-        const currentUserId = req.user.id || req.user.user_id;
-        const connection = await db.getConnection();
+        // Resolve values from payload or existing saved card
+        const customerName = (body.customer_name !== undefined ? body.customer_name : jobCard.customer_name || '').trim();
+        const customerPhone = (body.customer_phone !== undefined ? body.customer_phone : jobCard.customer_phone || '').trim();
+        const issueDesc = (body.issue_description !== undefined ? body.issue_description : jobCard.issue_description || '').trim();
+        const specificComplaint = (body.specific_complaint !== undefined ? body.specific_complaint : jobCard.specific_complaint || '').trim();
+        const diagnosis = (body.diagnosis !== undefined ? body.diagnosis : jobCard.diagnosis || '').trim();
+        const workPerformed = (body.work_performed !== undefined ? body.work_performed : jobCard.work_performed || '').trim();
+        const finalCondition = (body.final_machine_condition !== undefined ? body.final_machine_condition : jobCard.final_machine_condition || '').trim();
 
+        // Mandatory completion validations (Section 10)
+        if (!customerName || !customerPhone) {
+            return res.status(400).json({ success: false, message: 'Customer name and phone number are required before completion' });
+        }
+        if (!issueDesc && !specificComplaint) {
+            return res.status(400).json({ success: false, message: 'Customer complaint details are required before completion' });
+        }
+        if (!diagnosis) {
+            return res.status(400).json({ success: false, message: 'Diagnosis / Findings description is required for completion' });
+        }
+        if (!workPerformed) {
+            return res.status(400).json({ success: false, message: 'Actual Work Performed details are required for completion' });
+        }
+        if (!finalCondition) {
+            return res.status(400).json({ success: false, message: 'Final machine condition is required before completion' });
+        }
+
+        let nextParts = null;
+        if (body.parts !== undefined) {
+            const pVal = normalizeAndValidateParts(body.parts);
+            if (pVal.error) return res.status(400).json({ success: false, message: pVal.error });
+            nextParts = pVal.items;
+        }
+        let nextLabour = null;
+        if (body.labour !== undefined) {
+            const lVal = normalizeAndValidateLabour(body.labour);
+            if (lVal.error) return res.status(400).json({ success: false, message: lVal.error });
+            nextLabour = lVal.items;
+        }
+
+        const partsForCalc = nextParts !== null
+            ? nextParts
+            : (await db.query('SELECT * FROM customer_support_job_card_parts WHERE job_card_id = ?', [id]))[0];
+        const labourForCalc = nextLabour !== null
+            ? nextLabour
+            : (await db.query('SELECT * FROM customer_support_job_card_labour WHERE job_card_id = ?', [id]))[0];
+
+        const finValidation = calculateAndValidateFinancials(partsForCalc, labourForCalc, {
+            discount_amount: body.discount_amount !== undefined ? body.discount_amount : jobCard.discount_amount,
+            tax_percent: body.tax_percent !== undefined ? body.tax_percent : jobCard.tax_percent,
+            tax_amount: body.tax_amount !== undefined ? body.tax_amount : jobCard.tax_amount,
+            shipping_charge: body.shipping_charge !== undefined ? body.shipping_charge : (body.delivery_charge !== undefined ? body.delivery_charge : jobCard.shipping_charge),
+            amount_paid: body.amount_paid !== undefined ? body.amount_paid : jobCard.amount_paid,
+            payment_status: body.payment_status !== undefined ? body.payment_status : jobCard.payment_status,
+            payment_mode: body.payment_mode !== undefined ? body.payment_mode : jobCard.payment_mode
+        });
+        if (finValidation.error) {
+            return res.status(400).json({ success: false, message: finValidation.error });
+        }
+
+        const currentStaff = await resolveCurrentStaffUser(req.user);
+        const fin = finValidation.financials;
+        const machineMakeModel = body.machine_make_model !== undefined || body.product_summary !== undefined
+            ? ((body.machine_make_model || body.product_summary || '').trim() || null)
+            : (jobCard.machine_make_model || jobCard.product_summary || null);
+        const promisedDate = body.promised_date !== undefined || body.due_date !== undefined
+            ? toMysqlDate(body.promised_date || body.due_date)
+            : jobCard.due_date;
+        const preservedOriginalComplaint = jobCard.original_issue_description || issueDesc || jobCard.issue_description || null;
+        const completedByName = (body.completed_by_name || '').trim() || currentStaff.name;
+        const workCompletionDate = toMysqlDateTime(body.work_completion_date) || new Date();
+
+        const completionNoteText = (body.completion_notes || body.work_completion_remarks || '').trim();
+        const rawRemarks = body.additional_remarks !== undefined ? body.additional_remarks : jobCard.additional_remarks;
+        const updatedNotes = body.notes !== undefined
+            ? ((body.notes || '').trim() || null)
+            : (completionNoteText && jobCard.notes && !jobCard.notes.includes(completionNoteText)
+                ? `${jobCard.notes}\n[Completion]: ${completionNoteText}`
+                : (jobCard.notes || completionNoteText || null));
+
+        let nextSignature = jobCard.customer_signature;
+        let nextSignatureDate = jobCard.signature_date;
+        if (body.customer_signature !== undefined) {
+            const sig = (body.customer_signature || '').trim();
+            nextSignature = sig || null;
+            if (sig && sig !== jobCard.customer_signature) {
+                nextSignatureDate = new Date();
+            }
+        }
+
+        const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
 
-            // 1. Process spare parts if provided
-            let parsedParts = [];
-            if (parts) {
-                if (typeof parts === 'string') {
-                    try { parsedParts = JSON.parse(parts); } catch (e) { parsedParts = []; }
-                } else if (Array.isArray(parts)) {
-                    parsedParts = parts;
-                }
-            }
+            await replaceJobCardPartsAndLabour(connection, id, nextParts, nextLabour);
 
-            for (const item of parsedParts) {
-                if (item && item.part_name && item.part_name.trim()) {
-                    const qty = parseInt(item.quantity, 10) || 1;
-                    const unitCost = parseFloat(item.unit_cost) || 0.00;
-                    const totalCost = qty * unitCost;
-                    const remarks = item.remarks ? item.remarks.trim() : null;
-                    await connection.query(`
-                        INSERT INTO customer_support_job_card_parts
-                        (job_card_id, part_name, part_number, quantity, unit_cost, total_cost, remarks)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    `, [id, item.part_name.trim(), item.part_number || null, qty, unitCost, totalCost, remarks]);
-                }
-            }
-
-            // 2. Upload completion photos if any ('after' photos)
-            const files = req.files || [];
-            for (const file of files) {
-                const fileUrl = `/uploads/${file.filename}`;
-                await connection.query(`
-                    INSERT INTO customer_support_job_card_photos
-                    (job_card_id, photo_type, file_url, file_name, file_size, uploaded_by)
-                    VALUES (?, 'after', ?, ?, ?, ?)
-                `, [id, fileUrl, file.originalname, file.size, currentUserId]);
-            }
-
-            // 3. Update Job Card status to Completed
-            const parsedServiceCost = parseFloat(service_cost) || 0.00;
-            const updatedNotes = completion_notes && completion_notes.trim()
-                ? (jobCard.notes ? `${jobCard.notes}\n[Completion Note]: ${completion_notes.trim()}` : `[Completion Note]: ${completion_notes.trim()}`)
-                : jobCard.notes;
+            await saveJobCardUploadedPhotos(
+                connection,
+                id,
+                req.files,
+                'AFTER_WORK',
+                currentStaff.userId
+            );
 
             await connection.query(`
-                UPDATE customer_support_job_cards
-                SET status = 'Completed',
+                UPDATE customer_support_job_cards SET
+                    status = 'Completed',
+                    customer_name = ?,
+                    customer_phone = ?,
+                    customer_address = ?,
+                    product_summary = ?,
+                    machine_make_model = ?,
+                    serial_vin_number = ?,
+                    hours_run = ?,
+                    job_type = ?,
+                    priority = ?,
+                    specific_complaint = ?,
+                    issue_description = ?,
+                    original_issue_description = ?,
+                    work_required = ?,
+                    initial_diagnosis = ?,
+                    additional_observations = ?,
+                    before_work_condition = ?,
+                    initial_inspection_remarks = ?,
                     diagnosis = ?,
                     work_performed = ?,
-                    service_cost = ?,
+                    parts_replaced_summary = ?,
+                    repair_details = ?,
+                    additional_remarks = ?,
                     notes = ?,
+                    final_machine_condition = ?,
+                    work_completion_remarks = ?,
+                    parts_total = ?,
+                    labour_total = ?,
+                    service_cost = ?,
+                    discount_amount = ?,
+                    taxable_amount = ?,
+                    tax_percent = ?,
+                    tax_amount = ?,
+                    shipping_charge = ?,
+                    grand_total = ?,
+                    amount_paid = ?,
+                    balance_amount = ?,
+                    payment_status = ?,
+                    payment_mode = ?,
+                    due_date = ?,
+                    work_completion_date = ?,
+                    customer_feedback = ?,
+                    technician_remarks = ?,
+                    completed_by = ?,
+                    completed_by_name = ?,
+                    customer_signature = ?,
+                    signature_date = ?,
                     completed_at = NOW()
                 WHERE job_card_id = ?
             `, [
-                diagnosis.trim(),
-                work_performed.trim(),
-                parsedServiceCost,
+                customerName,
+                customerPhone,
+                body.customer_address !== undefined ? ((body.customer_address || '').trim() || null) : jobCard.customer_address,
+                machineMakeModel,
+                machineMakeModel,
+                body.serial_vin_number !== undefined ? ((body.serial_vin_number || '').trim() || null) : jobCard.serial_vin_number,
+                body.hours_run !== undefined ? ((body.hours_run || '').trim() || null) : jobCard.hours_run,
+                body.job_type || jobCard.job_type,
+                body.priority || jobCard.priority,
+                specificComplaint || null,
+                issueDesc || null,
+                preservedOriginalComplaint,
+                body.work_required !== undefined ? ((body.work_required || '').trim() || null) : jobCard.work_required,
+                body.initial_diagnosis !== undefined ? ((body.initial_diagnosis || '').trim() || null) : jobCard.initial_diagnosis,
+                body.additional_observations !== undefined ? ((body.additional_observations || '').trim() || null) : jobCard.additional_observations,
+                body.before_work_condition !== undefined ? ((body.before_work_condition || '').trim() || null) : jobCard.before_work_condition,
+                body.initial_inspection_remarks !== undefined ? ((body.initial_inspection_remarks || '').trim() || null) : jobCard.initial_inspection_remarks,
+                diagnosis,
+                workPerformed,
+                body.parts_replaced_summary !== undefined ? ((body.parts_replaced_summary || '').trim() || null) : jobCard.parts_replaced_summary,
+                body.repair_details !== undefined ? ((body.repair_details || '').trim() || null) : jobCard.repair_details,
+                rawRemarks || null,
                 updatedNotes,
+                finalCondition,
+                completionNoteText || jobCard.work_completion_remarks || null,
+                fin.parts_total, fin.labour_total, fin.service_cost,
+                fin.discount_amount, fin.taxable_amount, fin.tax_percent, fin.tax_amount, fin.shipping_charge,
+                fin.grand_total, fin.amount_paid, fin.balance_amount,
+                fin.payment_status, fin.payment_mode,
+                promisedDate,
+                workCompletionDate,
+                body.customer_feedback !== undefined ? ((body.customer_feedback || '').trim() || null) : jobCard.customer_feedback,
+                body.technician_remarks !== undefined ? ((body.technician_remarks || '').trim() || null) : jobCard.technician_remarks,
+                currentStaff.userId,
+                completedByName,
+                nextSignature,
+                nextSignatureDate,
                 id
             ]);
 
-            // 4. Activity Log
-            const partsListDesc = parsedParts.length > 0
-                ? `${parsedParts.length} spare part(s) recorded for Billing Team`
-                : 'No spare parts used';
+            const partsListDesc = partsForCalc.length > 0
+                ? `${partsForCalc.length} part(s) (Parts: ₹${fin.parts_total}, Labour: ₹${fin.labour_total}, Grand Total: ₹${fin.grand_total})`
+                : `No parts used (Labour: ₹${fin.labour_total}, Grand Total: ₹${fin.grand_total})`;
+
             await connection.query(`
                 INSERT INTO customer_support_job_card_logs
                 (job_card_id, action, previous_status, new_status, notes, performed_by)
@@ -1654,21 +2668,20 @@ exports.completeJobCard = async (req, res) => {
             `, [
                 id,
                 jobCard.status,
-                `Work completed. Diagnosis: ${diagnosis.trim()}. Work performed: ${work_performed.trim()}. ${partsListDesc}.`,
-                currentUserId
+                `Work completed by ${completedByName}. Final condition: ${finalCondition}. Diagnosis: ${diagnosis}. Work performed: ${workPerformed}. ${partsListDesc}.`,
+                currentStaff.userId
             ]);
 
-            // 5. Update linked support case note if case_id exists
-            // (Strict rule: do NOT automatically close the case so customer support can verify resolution)
+            // Update linked support case note ONLY — do NOT automatically close the support case
             if (jobCard.case_id) {
-                const partsSummary = parsedParts.length > 0
-                    ? ` Parts listed: ${parsedParts.map(p => `${p.part_name} (x${p.quantity || 1})`).join(', ')}. Parts list sent to Billing Team for invoice.`
-                    : ' No spare parts used.';
-                const caseNote = `[Job Card ${jobCard.job_card_number} Completed]: Diagnosis: ${diagnosis.trim()}. Work Performed: ${work_performed.trim()}.${partsSummary}`;
+                const partsSummary = partsForCalc.length > 0
+                    ? ` Parts: ${partsForCalc.map(p => `${p.part_name} (x${p.quantity}${p.is_foc ? ' - FOC' : ''})`).join(', ')}.`
+                    : '';
+                const caseNote = `[Job Card ${jobCard.job_card_number} Completed]: Diagnosis: ${diagnosis}. Work Performed: ${workPerformed}. Final Condition: ${finalCondition}.${partsSummary} Total Charges: ₹${fin.grand_total} (Sent for Billing).`;
                 await connection.query(`
                     INSERT INTO customer_support_notes (case_id, note, created_by)
                     VALUES (?, ?, ?)
-                `, [jobCard.case_id, caseNote, currentUserId]);
+                `, [jobCard.case_id, caseNote, currentStaff.userId]);
             }
 
             await connection.commit();
@@ -1677,7 +2690,8 @@ exports.completeJobCard = async (req, res) => {
                 success: true,
                 message: 'Job Card marked as completed successfully',
                 job_card_id: id,
-                job_card_number: jobCard.job_card_number
+                job_card_number: jobCard.job_card_number,
+                financials: fin
             });
         } catch (trxErr) {
             await connection.rollback();
@@ -1687,7 +2701,7 @@ exports.completeJobCard = async (req, res) => {
         }
     } catch (err) {
         console.error('Error in completeJobCard:', err);
-        res.status(500).json({ success: false, message: err.message || 'Failed to complete job card' });
+        res.status(500).json({ success: false, message: 'Failed to complete job card' });
     }
 };
 

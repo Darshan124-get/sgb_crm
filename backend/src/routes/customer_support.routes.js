@@ -1,8 +1,39 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const controller = require('../controllers/customer_support.controller');
 const { authenticateToken } = require('../middleware/auth.middleware');
-const upload = require('../middleware/upload.middleware');
+
+const csTempUploadDir = path.join(__dirname, '../../uploads/customer_support');
+const csUploadStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        if (!fs.existsSync(csTempUploadDir)) {
+            fs.mkdirSync(csTempUploadDir, { recursive: true });
+        }
+        cb(null, csTempUploadDir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage: csUploadStorage,
+    limits: { fileSize: 60 * 1024 * 1024 }, // 60MB max per image or video
+    fileFilter: (req, file, cb) => {
+        const mime = (file.mimetype || '').toLowerCase();
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const allowedExts = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v', '.3gp']);
+        if (mime.startsWith('image/') || mime.startsWith('video/') || allowedExts.has(ext)) {
+            return cb(null, true);
+        }
+        cb(new Error('Only image and video files are allowed in Customer Support'));
+    }
+});
 
 // All customer support routes require authentication
 router.use(authenticateToken);
@@ -38,13 +69,22 @@ router.post('/followups/:id/call', controller.recordFollowupCall);
 router.get('/settings', controller.getSettings);
 
 // Job Cards management
+const jobCardPhotoUpload = upload.fields([
+    { name: 'before_photos', maxCount: 20 },
+    { name: 'after_photos', maxCount: 20 },
+    { name: 'photos', maxCount: 20 }
+]);
+
+router.get('/job-cards/init-meta', controller.getJobCardInitMeta);
 router.get('/job-cards', controller.getJobCards);
-router.post('/job-cards', upload.array('photos', 5), controller.createJobCard);
+router.post('/job-cards', jobCardPhotoUpload, controller.createJobCard);
 router.get('/job-cards/:id', controller.getJobCardDetails);
+router.put('/job-cards/:id', jobCardPhotoUpload, controller.updateJobCard);
 router.patch('/job-cards/:id/status', controller.updateJobCardStatus);
 router.put('/job-cards/:id/status', controller.updateJobCardStatus);
-router.post('/job-cards/:id/photos', upload.array('photos', 10), controller.uploadJobCardPhotos);
-router.post('/job-cards/:id/complete', upload.array('photos', 10), controller.completeJobCard);
+router.post('/job-cards/:id/photos', jobCardPhotoUpload, controller.uploadJobCardPhotos);
+router.delete('/job-cards/:id/photos/:photoId', controller.deleteJobCardPhoto);
+router.post('/job-cards/:id/complete', jobCardPhotoUpload, controller.completeJobCard);
 
 module.exports = router;
 

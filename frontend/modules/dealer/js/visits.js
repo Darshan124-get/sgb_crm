@@ -1166,6 +1166,10 @@ function exportVisitsCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    if (window.recordDealerActivityClient) {
+        window.recordDealerActivityClient('EXPORT', 'DEALER_VISIT', `CSV(${rows.length})`, `Exported ${rows.length} dealer visit record(s) to CSV`);
+    }
 }
 
 // Convert a Prospect Visit into an Official Registered Dealer in DB

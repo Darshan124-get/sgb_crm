@@ -14,31 +14,44 @@
         <div id="sidebar-container"></div>
 
         <main class="support-main">
-            <!-- Header -->
-            <div class="support-header">
-                <div>
-                    <a href="#" id="backToCaseLink" style="text-decoration: none; color: #64748b; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem;">
-                        <i class="fas fa-arrow-left"></i> Back to Case Details
-                    </a>
-                    <div class="support-title-block">
-                        <h1>
-                            <span>Customer Call &amp; Installation Guidance</span>
-                            <span id="caseBadge"></span>
-                        </h1>
-                        <p id="caseHeaderSubtitle">Record customer call outcome, product guidance, notes, and fitting photos.</p>
+            <!-- Topbar Header (Standard across all CRM modules) -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavSearch" placeholder="Search customer support, cases, orders...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">support</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="support-content">
+                <!-- Header -->
+                <div class="support-header">
+                    <div>
+                        <a href="#" id="backToCaseLink" style="text-decoration: none; color: #64748b; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem;">
+                            <i class="fas fa-arrow-left"></i> Back to Case Details
+                        </a>
+                        <div class="support-title-block">
+                            <h1>
+                                <span>Customer Call &amp; Installation Guidance</span>
+                                <span id="caseBadge"></span>
+                            </h1>
+                            <p id="caseHeaderSubtitle">Record customer call outcome, product guidance, notes, and fitting photos.</p>
+                        </div>
+                    </div>
+
+                    <!-- Call Customer Actions -->
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-call" id="btnCallCustomerTop">
+                            <i class="fas fa-phone"></i> Call Customer
+                        </button>
+                        <button class="btn btn-outline" id="btnVideoCallTop" title="Initiate video session">
+                            <i class="fas fa-video"></i> Video Call
+                        </button>
                     </div>
                 </div>
-
-                <!-- Call Customer Actions -->
-                <div style="display: flex; gap: 0.75rem; align-items: center;">
-                    <button class="btn btn-call" id="btnCallCustomerTop">
-                        <i class="fas fa-phone"></i> Call Customer
-                    </button>
-                    <button class="btn btn-outline" id="btnVideoCallTop" title="Initiate video session">
-                        <i class="fas fa-video"></i> Video Call
-                    </button>
-                </div>
-            </div>
 
             <!-- Customer & Order Context Bar -->
             <div class="premium-card" style="padding: 1.25rem 1.5rem; background: white; border-radius: 12px; border: 1px solid var(--support-border); margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
@@ -294,19 +307,19 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
                         <h2 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
                             <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--support-primary-light); color: var(--support-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem;">5</span>
-                            Upload Fitting / Installation Photos
+                            Upload Fitting / Installation Photos & Videos
                         </h2>
-                        <span style="font-size: 0.8rem; color: #64748b;">Supports JPG, PNG, WEBP (Max 10MB each)</span>
+                        <span style="font-size: 0.8rem; color: #64748b;">Supports Images & Videos (JPG, PNG, WEBP, MP4, MOV, WEBM • Max 60MB each)</span>
                     </div>
 
                     <!-- Dropzone -->
                     <div class="photo-upload-dropzone" id="photoDropzone">
                         <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--support-primary); margin-bottom: 0.5rem;"></i>
                         <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.25rem;">
-                            Drag and drop photos here, or <span style="color: var(--support-primary); text-decoration: underline;">browse files</span>
+                            Drag and drop photos or videos here, or <span style="color: var(--support-primary); text-decoration: underline;">browse files</span>
                         </h4>
-                        <p style="font-size: 0.8rem; color: #64748b;">Multiple photos allowed. Take live site photos or upload received customer photos.</p>
-                        <input type="file" id="stagedPhotosInput" multiple accept="image/jpeg,image/png,image/webp" style="display: none;">
+                        <p style="font-size: 0.8rem; color: #64748b;">Multiple files allowed. Upload site photos, videos, or received customer media.</p>
+                        <input type="file" id="stagedPhotosInput" multiple accept="image/*,video/*" style="display: none;">
                     </div>
 
                     <!-- Staged Photos Previews -->
@@ -331,6 +344,7 @@
                     </div>
                 </div> <!-- /#answeredDetailsContainer -->
             </form>
+            </div> <!-- End .support-content -->
         </main>
     </div>
 

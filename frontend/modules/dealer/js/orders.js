@@ -11,9 +11,43 @@ let filteredOrders = [];
 let selectedOrderIds = new Set();
 let currentPage = 1;
 let pageSize = 10;
+let orderProductMultiSelect = null;
+let dealerVisitedByMap = new Map();
+
+function isDealerOrdersAdminUser() {
+    try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const role = String(user.role || '').trim().toLowerCase();
+        return role === 'admin' || role === 'super-admin' || role === 'super_admin';
+    } catch (_) {
+        return false;
+    }
+}
+
+function getSelectedOrderProducts() {
+    if (orderProductMultiSelect) return orderProductMultiSelect.getSelected();
+    const el = document.getElementById('productFilter');
+    if (el && el.tagName === 'SELECT') return el.value ? [el.value] : [];
+    return [];
+}
+
+function initOrderProductMultiSelect() {
+    if (orderProductMultiSelect || !window.DealerProductMultiSelect) return orderProductMultiSelect;
+    orderProductMultiSelect = window.DealerProductMultiSelect.create('productFilter', {
+        compact: false,
+        width: '100%',
+        placeholder: 'All Products',
+        onChange: () => filterDealerOrders()
+    });
+    return orderProductMultiSelect;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'dealer_orders')) return;
+    const spGroup = document.getElementById('salespersonFilterGroup');
+    if (spGroup) {
+        spGroup.style.display = isDealerOrdersAdminUser() ? '' : 'none';
+    }
     fetchDealerOrders();
 });
 
@@ -40,6 +74,7 @@ async function fetchDealerOrders() {
                 populateDealerDropdown(),
                 populateProductDropdown()
             ]);
+            populateSalespersonDropdown();
             filterDealerOrders();
         } else {
             console.error('Failed to fetch dealer orders');
@@ -90,6 +125,7 @@ async function populateDealerDropdown() {
     select.innerHTML = '<option value="">All Dealers</option>';
 
     const dealerMap = new Map();
+    dealerVisitedByMap = new Map();
 
     // 1. Fetch all dealers from API
     try {
@@ -103,6 +139,9 @@ async function populateDealerDropdown() {
                     const name = d.firm_name || d.dealer_name || d.owner_name;
                     if (d.dealer_id && name) {
                         dealerMap.set(String(d.dealer_id), name);
+                    }
+                    if (d.dealer_id && d.visited_by && String(d.visited_by).trim()) {
+                        dealerVisitedByMap.set(String(d.dealer_id), String(d.visited_by).trim());
                     }
                 });
             }
@@ -130,12 +169,49 @@ async function populateDealerDropdown() {
     select.value = currentVal;
 }
 
-async function populateProductDropdown() {
-    const select = document.getElementById('productFilter');
+function populateSalespersonDropdown() {
+    const group = document.getElementById('salespersonFilterGroup');
+    const select = document.getElementById('salespersonFilter');
     if (!select) return;
 
+    if (!isDealerOrdersAdminUser()) {
+        if (group) group.style.display = 'none';
+        select.value = '';
+        return;
+    }
+
+    if (group) group.style.display = '';
     const currentVal = select.value;
-    select.innerHTML = '<option value="">All Products</option>';
+    const salespersons = new Set();
+
+    dealerVisitedByMap.forEach(sp => {
+        if (sp) salespersons.add(sp);
+    });
+    if (Array.isArray(allOrders)) {
+        allOrders.forEach(o => {
+            const sp = (o.created_by_name || o.salesperson_name || o.visited_by || '').trim();
+            if (sp) salespersons.add(sp);
+        });
+    }
+
+    select.innerHTML = '<option value="">All Salespersons</option>';
+    Array.from(salespersons)
+        .sort((a, b) => a.localeCompare(b))
+        .forEach(sp => {
+            const opt = document.createElement('option');
+            opt.value = sp;
+            opt.textContent = sp;
+            select.appendChild(opt);
+        });
+
+    if (currentVal && salespersons.has(currentVal)) {
+        select.value = currentVal;
+    }
+}
+
+async function populateProductDropdown() {
+    const productContainer = document.getElementById('productFilter');
+    if (!productContainer) return;
 
     const productSet = new Set();
 
@@ -182,16 +258,9 @@ async function populateProductDropdown() {
         });
     }
 
-    const sortedProducts = Array.from(productSet).sort((a, b) => a.localeCompare(b));
-    sortedProducts.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        select.appendChild(opt);
-    });
-
-    if (currentVal && productSet.has(currentVal)) {
-        select.value = currentVal;
+    const ms = initOrderProductMultiSelect();
+    if (ms) {
+        ms.setOptions(Array.from(productSet));
     }
 }
 
@@ -199,7 +268,7 @@ function resetOrderFilters() {
     const s1 = document.getElementById('orderSearchInput');
     const s2 = document.getElementById('topNavOrderSearch');
     const dSel = document.getElementById('dealerSelectFilter');
-    const pSel = document.getElementById('productFilter');
+    const spSel = document.getElementById('salespersonFilter');
     const st = document.getElementById('statusFilter');
     const paySt = document.getElementById('paymentStatusFilter');
     const from = document.getElementById('fromDateFilter');
@@ -208,7 +277,8 @@ function resetOrderFilters() {
     if (s1) s1.value = '';
     if (s2) s2.value = '';
     if (dSel) dSel.value = '';
-    if (pSel) pSel.value = '';
+    if (spSel) spSel.value = '';
+    if (orderProductMultiSelect) orderProductMultiSelect.clear();
     if (st) st.value = '';
     if (paySt) paySt.value = '';
     if (from) from.value = '';
@@ -222,7 +292,10 @@ function filterDealerOrders() {
     const q2 = (document.getElementById('topNavOrderSearch')?.value || '').toLowerCase().trim();
     const search = q1 || q2;
     const selectedDealer = (document.getElementById('dealerSelectFilter')?.value || '').toLowerCase().trim();
-    const selectedProduct = (document.getElementById('productFilter')?.value || '').toLowerCase().trim();
+    const selectedSalesperson = isDealerOrdersAdminUser()
+        ? (document.getElementById('salespersonFilter')?.value || '').toLowerCase().trim()
+        : '';
+    const selectedProducts = getSelectedOrderProducts();
     const status = (document.getElementById('statusFilter')?.value || '').toLowerCase().trim();
     const paymentStatus = (document.getElementById('paymentStatusFilter')?.value || '').toLowerCase().trim();
     const fromDate = document.getElementById('fromDateFilter')?.value || '';
@@ -249,41 +322,46 @@ function filterDealerOrders() {
             matchesDealer = (dealerId === selectedDealer || dealerName === selectedDealer || dealerName.includes(selectedDealer));
         }
 
-        // Product matching (strict exact product name match, so "Blade" != "SGB - Blade Protection")
+        // Product matching (strict exact product name match across 1 or more selected products)
         let matchesProduct = true;
-        if (selectedProduct) {
-            let orderHasProduct = false;
-            if (o.items_detailed) {
-                const items = o.items_detailed.split('||');
-                for (const it of items) {
-                    const pName = (it.split('::')[0] || '').toLowerCase().trim();
-                    if (pName === selectedProduct) {
-                        orderHasProduct = true;
-                        break;
+        if (selectedProducts.length > 0) {
+            if (window.DealerProductMultiSelect) {
+                matchesProduct = window.DealerProductMultiSelect.orderMatchesProducts(o, selectedProducts);
+            } else {
+                const targetSet = new Set(selectedProducts.map(p => p.toLowerCase().trim()));
+                let orderHasProduct = false;
+                if (o.items_detailed) {
+                    const items = o.items_detailed.split('||');
+                    for (const it of items) {
+                        const pName = (it.split('::')[0] || '').toLowerCase().trim();
+                        if (targetSet.has(pName)) {
+                            orderHasProduct = true;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!orderHasProduct && o.items_summary) {
-                const items = o.items_summary.split('||');
-                for (const it of items) {
-                    const match = it.match(/^(.*?)\s*x\s*\d+$/i);
-                    const pName = (match ? match[1] : (it.split(' x ')[0] || '')).toLowerCase().trim();
-                    if (pName === selectedProduct) {
-                        orderHasProduct = true;
-                        break;
+                if (!orderHasProduct && o.items_summary) {
+                    const items = o.items_summary.split('||');
+                    for (const it of items) {
+                        const match = it.match(/^(.*?)\s*x\s*\d+$/i);
+                        const pName = (match ? match[1] : (it.split(' x ')[0] || '')).toLowerCase().trim();
+                        if (targetSet.has(pName)) {
+                            orderHasProduct = true;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!orderHasProduct && Array.isArray(o.items)) {
-                for (const it of o.items) {
-                    const pName = (it.product_name || it.name || '').toLowerCase().trim();
-                    if (pName === selectedProduct) {
-                        orderHasProduct = true;
-                        break;
+                if (!orderHasProduct && Array.isArray(o.items)) {
+                    for (const it of o.items) {
+                        const pName = (it.product_name || it.name || '').toLowerCase().trim();
+                        if (targetSet.has(pName)) {
+                            orderHasProduct = true;
+                            break;
+                        }
                     }
                 }
+                matchesProduct = orderHasProduct;
             }
-            matchesProduct = orderHasProduct;
         }
 
         // Status matching (handling empty/draft as 'ordered')
@@ -330,7 +408,19 @@ function filterDealerOrders() {
             }
         }
 
-        return matchesSearch && matchesDealer && matchesProduct && matchesStatus && matchesPaymentStatus && matchesDate;
+        let matchesSalesperson = true;
+        if (selectedSalesperson) {
+            const spName = (
+                o.created_by_name ||
+                o.salesperson_name ||
+                o.visited_by ||
+                dealerVisitedByMap.get(String(o.dealer_id)) ||
+                ''
+            ).toLowerCase().trim();
+            matchesSalesperson = (spName === selectedSalesperson || spName.includes(selectedSalesperson));
+        }
+
+        return matchesSearch && matchesDealer && matchesSalesperson && matchesProduct && matchesStatus && matchesPaymentStatus && matchesDate;
     });
 
     currentPage = 1;
@@ -347,10 +437,11 @@ function updateSelectedOrdersUI() {
     const masterChk = document.getElementById('selectAllOrdersCheckbox');
 
     const count = selectedOrderIds.size;
+    const canDelete = isDealerOrdersAdminUser();
     if (count > 0) {
         if (badge) { badge.style.display = 'inline-flex'; }
         if (countSpan) { countSpan.textContent = count; }
-        if (btnDelete) { btnDelete.style.display = 'inline-flex'; }
+        if (btnDelete) { btnDelete.style.display = canDelete ? 'inline-flex' : 'none'; }
         if (btnClearPayment) { btnClearPayment.style.display = 'inline-flex'; }
         if (bulkStatusContainer) { bulkStatusContainer.style.display = 'inline-block'; }
         if (btnExportLabel) { btnExportLabel.textContent = `Export Selected (${count})`; }
@@ -523,9 +614,10 @@ function renderDealerOrdersTable() {
                         <button class="action-btn-square" title="Edit Order" onclick="openEditOrderModal(${o.order_id})">
                             <i class="fa-regular fa-pen-to-square"></i>
                         </button>
+                        ${isDealerOrdersAdminUser() ? `
                         <button class="action-btn-square" title="Delete Order" style="color:#ef4444;background:#fef2f2;border:1px solid #fecaca;" onclick="deleteDealerOrder(${o.order_id})">
                             <i class="fa-regular fa-trash-can"></i>
-                        </button>
+                        </button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -1320,9 +1412,18 @@ function exportOrdersCSV() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+
+    if (window.recordDealerActivityClient) {
+        window.recordDealerActivityClient('EXPORT', 'DEALER_ORDER', `CSV(${listToExport.length})`, `Exported ${listToExport.length} dealer order record(s) to CSV`);
+    }
 }
 
 async function deleteSelectedOrders() {
+    if (!isDealerOrdersAdminUser()) {
+        if (window.showAlert) window.showAlert("Access Denied", "Only admin users can delete orders.", "error");
+        else alert("Only admin users can delete orders.");
+        return;
+    }
     if (!selectedOrderIds || selectedOrderIds.size === 0) {
         if (window.showAlert) {
             window.showAlert("Selection Required", "Please select at least one order to delete.", "info");
@@ -1730,6 +1831,11 @@ async function handleEditOrderSubmit(e) {
 
 async function deleteDealerOrder(orderId) {
     if (!orderId) return;
+    if (!isDealerOrdersAdminUser()) {
+        if (window.showAlert) window.showAlert('Access Denied', 'Only admin users can delete orders.', 'error');
+        else alert('Only admin users can delete orders.');
+        return;
+    }
 
     const confirmMsg = `Are you sure you want to delete order #${orderId}? This action cannot be undone.`;
     if (!confirm(confirmMsg)) return;

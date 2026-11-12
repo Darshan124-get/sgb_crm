@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const validationUtils = require('../utils/validation.utils');
+const { logDealerActivity, fetchDealerActivityLogs } = require('../utils/dealerActivityLogger');
 
 const ensureOrderPaymentsTable = async (db = pool) => {
     try {
@@ -231,7 +232,15 @@ exports.createDealer = async (req, res) => {
                 visited_date || '', visited_by || '', finalGstNo, cleanVrl, cleanVrlCode, finalStatus, finalImageUrl
             ]
         );
-        res.status(201).json({ message: 'Dealer added successfully', dealer_id: result.insertId });
+        const newDealerId = result.insertId;
+        await logDealerActivity(req, {
+            action: 'CREATE',
+            entity_type: 'DEALER',
+            entity_id: newDealerId,
+            details: `Created new dealer: ${finalDealerName}${cleanCity || cleanDistrict ? ` (${cleanCity || cleanDistrict})` : ''}`,
+            metadata: { dealer_name: finalDealerName, phone: finalPhone, city: cleanCity, district: cleanDistrict, state: cleanState }
+        });
+        res.status(201).json({ message: 'Dealer added successfully', dealer_id: newDealerId });
     } catch (err) {
         console.error('createDealer Error:', err);
         res.status(500).json({ message: 'Error adding dealer: ' + err.message });
@@ -330,6 +339,14 @@ exports.updateDealer = async (req, res) => {
             );
         }
 
+        await logDealerActivity(req, {
+            action: 'UPDATE',
+            entity_type: 'DEALER',
+            entity_id: req.params.id,
+            details: `Updated dealer profile: ${finalDealerName || `#${req.params.id}`}`,
+            metadata: { dealer_id: req.params.id, dealer_name: finalDealerName, phone: finalPhone, status: finalStatus }
+        });
+
         res.json({ message: 'Dealer updated successfully', affectedRows: result.affectedRows });
     } catch (err) {
         console.error('updateDealer Error:', err);
@@ -339,7 +356,18 @@ exports.updateDealer = async (req, res) => {
 
 exports.deleteDealer = async (req, res) => {
     try {
+        const [existing] = await pool.query('SELECT dealer_name FROM dealers WHERE dealer_id = ?', [req.params.id]).catch(() => [[]]);
+        const dealerName = existing[0]?.dealer_name || `#${req.params.id}`;
         await pool.query('DELETE FROM dealers WHERE dealer_id = ?', [req.params.id]);
+
+        await logDealerActivity(req, {
+            action: 'DELETE',
+            entity_type: 'DEALER',
+            entity_id: req.params.id,
+            details: `Deleted dealer: ${dealerName}`,
+            metadata: { dealer_id: req.params.id, dealer_name: dealerName }
+        });
+
         res.json({ message: 'Dealer deleted successfully' });
     } catch (err) {
         console.error('deleteDealer Error:', err);
@@ -378,6 +406,15 @@ exports.bulkDeleteDealers = async (req, res) => {
         const [result] = await connection.query(`DELETE FROM dealers WHERE dealer_id IN (?)`, [dealerIds]);
 
         await connection.commit();
+
+        await logDealerActivity(req, {
+            action: 'DELETE',
+            entity_type: 'DEALER',
+            entity_id: dealerIds.length === 1 ? dealerIds[0] : `BULK(${dealerIds.length})`,
+            details: `Bulk deleted ${result.affectedRows} dealer(s) (IDs: ${dealerIds.slice(0, 10).join(', ')}${dealerIds.length > 10 ? '...' : ''})`,
+            metadata: { dealerIds, deletedCount: result.affectedRows }
+        });
+
         res.json({ success: true, count: result.affectedRows, message: `Successfully deleted ${result.affectedRows} dealer(s)` });
     } catch (err) {
         await connection.rollback();
@@ -490,6 +527,14 @@ exports.createDealerOrder = async (req, res) => {
         await connection.commit();
         connection.release();
 
+        await logDealerActivity(req, {
+            action: 'CREATE',
+            entity_type: 'DEALER_ORDER',
+            entity_id: newOrderId,
+            details: `Created dealer order #${newOrderId} for ${dealer.dealer_name || dealer.firm_name || 'Dealer'} (Total: ₹${totalVal.toLocaleString('en-IN')})`,
+            metadata: { order_id: newOrderId, dealer_id: dealerId, dealer_name: dealer.dealer_name, total_amount: totalVal, advance_amount: advVal, balance_amount: balVal }
+        });
+
         res.status(201).json({
             message: 'Dealer order confirmed successfully',
             order_id: newOrderId
@@ -528,6 +573,7 @@ exports.getDealerOrders = async (req, res) => {
                 o.balance_amount,
                 o.created_by,
                 u.name as created_by_name,
+                d.visited_by as visited_by,
                 o.created_at,
                 d.dealer_name,
                 d.contact_person,
@@ -602,6 +648,14 @@ exports.payDealerOrderBalance = async (req, res) => {
             ]
         );
 
+        await logDealerActivity(req, {
+            action: 'PAYMENT',
+            entity_type: 'ORDER_PAYMENT',
+            entity_id: orderId,
+            details: `Recorded balance payment of ₹${payVal.toLocaleString('en-IN')} for order #${orderId} via ${payment_method || 'Bank Transfer'}`,
+            metadata: { order_id: orderId, payment_amount: payVal, advance_amount: newAdv, balance_amount: newBal, payment_method: payment_method || 'Bank Transfer', notes: notes || 'Balance Payment' }
+        });
+
         res.json({
             message: 'Balance payment recorded successfully',
             order_id: orderId,
@@ -675,6 +729,14 @@ exports.updateDealerOrder = async (req, res) => {
             await recalculateDealerStatus(rows[0].dealer_id, pool);
         }
 
+        await logDealerActivity(req, {
+            action: 'UPDATE',
+            entity_type: 'DEALER_ORDER',
+            entity_id: orderId,
+            details: `Updated dealer order #${orderId}: Status '${status}', Total ₹${totalVal.toLocaleString('en-IN')}${addPayVal > 0 ? `, Added payment ₹${addPayVal.toLocaleString('en-IN')}` : ''}`,
+            metadata: { order_id: orderId, order_status: status, total_amount: totalVal, advance_amount: advVal, balance_amount: balVal, added_payment: addPayVal }
+        });
+
         res.json({
             message: 'Order details updated successfully',
             order_id: orderId,
@@ -725,6 +787,14 @@ exports.deleteDealerOrder = async (req, res) => {
 
         await connection.commit();
 
+        await logDealerActivity(req, {
+            action: 'DELETE',
+            entity_type: 'DEALER_ORDER',
+            entity_id: orderId,
+            details: `Deleted dealer order #${orderId}`,
+            metadata: { order_id: orderId, dealer_id: dealerId }
+        });
+
         res.json({ success: true, message: 'Order deleted successfully', order_id: orderId });
     } catch (err) {
         await connection.rollback();
@@ -767,6 +837,15 @@ exports.bulkDeleteDealerOrders = async (req, res) => {
         }
 
         await connection.commit();
+
+        await logDealerActivity(req, {
+            action: 'DELETE',
+            entity_type: 'DEALER_ORDER',
+            entity_id: orderIds.length === 1 ? orderIds[0] : `BULK(${orderIds.length})`,
+            details: `Bulk deleted ${result.affectedRows} dealer order(s) (IDs: ${orderIds.slice(0, 10).join(', ')}${orderIds.length > 10 ? '...' : ''})`,
+            metadata: { orderIds, deletedCount: result.affectedRows }
+        });
+
         res.json({ success: true, count: result.affectedRows, message: `Successfully deleted ${result.affectedRows} order(s)` });
     } catch (err) {
         await connection.rollback();
@@ -840,6 +919,15 @@ exports.bulkClearPaymentDealerOrders = async (req, res) => {
         }
 
         await connection.commit();
+
+        await logDealerActivity(req, {
+            action: 'PAYMENT',
+            entity_type: 'ORDER_PAYMENT',
+            entity_id: orderIds.length === 1 ? orderIds[0] : `BULK(${orderIds.length})`,
+            details: `Bulk cleared remaining balance for ${updatedCount} dealer order(s)`,
+            metadata: { orderIds, updatedCount }
+        });
+
         res.json({
             success: true,
             count: updatedCount,
@@ -890,6 +978,14 @@ exports.bulkUpdateDealerOrdersStatus = async (req, res) => {
         }
 
         await connection.commit();
+
+        await logDealerActivity(req, {
+            action: 'STATUS',
+            entity_type: 'DEALER_ORDER',
+            entity_id: orderIds.length === 1 ? orderIds[0] : `BULK(${orderIds.length})`,
+            details: `Bulk updated order status to '${targetStatus.toUpperCase()}' for ${result.affectedRows} dealer order(s)`,
+            metadata: { orderIds, order_status: targetStatus, affectedRows: result.affectedRows }
+        });
 
         res.json({
             success: true,
@@ -1119,6 +1215,14 @@ exports.bulkImportDealers = async (req, res) => {
 
         await connection.commit();
 
+        await logDealerActivity(req, {
+            action: 'IMPORT',
+            entity_type: 'DEALER',
+            entity_id: `IMPORT(${insertedCount + updatedCount})`,
+            details: `Bulk imported ${insertedCount} new dealer(s), updated ${updatedCount}, skipped ${skippedCount}`,
+            metadata: { insertedCount, updatedCount, skippedCount, duplicateAction }
+        });
+
         let message = `Bulk import completed! ${insertedCount} new dealer(s) imported.`;
         if (updatedCount > 0) message += ` ${updatedCount} existing dealer(s) updated.`;
         if (skippedCount > 0) message += ` ${skippedCount} duplicate dealer(s) skipped.`;
@@ -1139,3 +1243,41 @@ exports.bulkImportDealers = async (req, res) => {
         connection.release();
     }
 };
+
+exports.getDealerActivityLogs = async (req, res) => {
+    try {
+        const { search, action, entity, limit = 50, page = 1 } = req.query;
+        const result = await fetchDealerActivityLogs({
+            search,
+            action,
+            entity,
+            limit,
+            page
+        });
+        res.json(result);
+    } catch (err) {
+        console.error('getDealerActivityLogs Error:', err);
+        res.status(500).json({ success: false, message: 'Error fetching dealer activity logs: ' + err.message });
+    }
+};
+
+exports.recordDealerClientActivity = async (req, res) => {
+    try {
+        const { action, entity_type, entity_id, details, metadata } = req.body;
+        if (!action || !details) {
+            return res.status(400).json({ success: false, message: 'Action and details are required' });
+        }
+        await logDealerActivity(req, {
+            action,
+            entity_type: entity_type || 'DEALER',
+            entity_id: entity_id || null,
+            details,
+            metadata
+        });
+        res.json({ success: true, message: 'Activity logged successfully' });
+    } catch (err) {
+        console.error('recordDealerClientActivity Error:', err);
+        res.status(500).json({ success: false, message: 'Error recording activity log' });
+    }
+};
+

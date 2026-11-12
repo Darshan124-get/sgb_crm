@@ -631,9 +631,76 @@
         };
     }
 
-    // 11. Initializer Wire-Up
+    // 11. Support Header & Topbar User Profile Safeguard
+    window.ensureSupportUserProfile = function () {
+        const profileSec = document.querySelector('.topbar .profile-section') || document.querySelector('.profile-section');
+        if (!profileSec) return;
+
+        const user = (typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : null) || {};
+        const userName = user.name || user.username || 'support';
+        const initial = userName.charAt(0).toUpperCase();
+
+        const nameEl = profileSec.querySelector('#profileName, .profile-name');
+        if (nameEl && (!nameEl.textContent || nameEl.textContent === 'admin' || nameEl.textContent === 'support')) {
+            nameEl.textContent = userName;
+        }
+        const avatarEl = profileSec.querySelector('.avatar');
+        if (avatarEl && !avatarEl.querySelector('span')) {
+            avatarEl.innerHTML = `<span style="font-weight:700;font-size:0.9rem;">${initial}</span>`;
+        }
+
+        if (!profileSec.dataset.profileBound) {
+            profileSec.dataset.profileBound = 'true';
+            profileSec.style.cursor = 'pointer';
+            profileSec.addEventListener('click', (e) => {
+                if (e.target.closest('.notif-bell') || e.target.closest('.notif-envelope') || e.target.closest('#topbarDialerBtn')) {
+                    return;
+                }
+                window.location.href = `${window.ROOT_PATH || '../../'}modules/admin/profile.html`;
+            });
+        }
+    };
+
+    // 12. Topbar Search Helper for Customer Support
+    function initSupportTopbarSearch() {
+        const topSearch = document.getElementById('topNavSearch') || document.getElementById('topNavSupportSearch');
+        if (!topSearch || topSearch.dataset.boundSearch) return;
+        topSearch.dataset.boundSearch = 'true';
+
+        topSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const term = topSearch.value.trim();
+                const currentSearchInput = document.getElementById('searchInput');
+                if (currentSearchInput) {
+                    currentSearchInput.value = term;
+                    currentSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    if (typeof window.filterOrders === 'function') window.filterOrders();
+                    if (typeof window.loadCases === 'function') window.loadCases();
+                } else {
+                    window.location.href = `dashboard.html?search=${encodeURIComponent(term)}`;
+                }
+            }
+        });
+    }
+
+    // Support Notification Click Delegation
+    document.addEventListener('click', (e) => {
+        const bell = e.target.closest('.notif-bell');
+        if (bell && typeof window.openNotificationsModal === 'function') {
+            e.stopPropagation();
+            window.openNotificationsModal();
+        }
+    });
+
+    // 13. Initializer Wire-Up
     const initAll = () => {
         initSupportMobileNav();
+        initSupportTopbarSearch();
+
+        if (typeof window.ensureSupportUserProfile === 'function') {
+            window.ensureSupportUserProfile();
+        }
 
         if (typeof window.initSupportNotifications === 'function') {
             window.initSupportNotifications();
@@ -657,6 +724,41 @@
     } else {
         initAll();
     }
+
+    /**
+     * Detects whether a File object or stored media URL/filename represents a video.
+     */
+    window.isSupportVideoFile = function (fileOrUrl, fallbackName = '') {
+        if (fileOrUrl && typeof fileOrUrl === 'object' && typeof fileOrUrl.type === 'string') {
+            if (fileOrUrl.type.toLowerCase().startsWith('video/')) return true;
+        }
+        const target = typeof fileOrUrl === 'string'
+            ? fileOrUrl
+            : ((fileOrUrl && fileOrUrl.name) || fallbackName || '');
+        const clean = String(target || fallbackName || '').split('?')[0].split('#')[0].toLowerCase();
+        return /\.(mp4|mov|webm|avi|mkv|m4v|3gp)$/.test(clean);
+    };
+
+    window.SUPPORT_MEDIA_MAX_MB = 60;
+    window.SUPPORT_MEDIA_MAX_BYTES = 60 * 1024 * 1024;
+
+    window.isSupportMediaFile = function (file) {
+        if (!file) return false;
+        const mime = (file.type || '').toLowerCase();
+        if (mime.startsWith('image/') || mime.startsWith('video/')) return true;
+        const name = (file.name || '').toLowerCase();
+        return /\.(jpg|jpeg|png|webp|gif|bmp|heic|mp4|mov|webm|avi|mkv|m4v|3gp)$/.test(name);
+    };
+
+    window.validateSupportMediaFile = function (file) {
+        if (!window.isSupportMediaFile(file)) {
+            return { ok: false, reason: `Skipped "${file.name}": Only images and videos are allowed.` };
+        }
+        if (file.size > window.SUPPORT_MEDIA_MAX_BYTES) {
+            return { ok: false, reason: `Skipped "${file.name}": File size exceeds ${window.SUPPORT_MEDIA_MAX_MB}MB limit.` };
+        }
+        return { ok: true };
+    };
 
 })();
 

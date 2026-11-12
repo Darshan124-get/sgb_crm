@@ -248,21 +248,30 @@ async function handleScheduleFollowup() {
     }
 }
 
-// ── PHOTO STAGING & PREVIEWS ──
+// ── PHOTO & VIDEO STAGING & PREVIEWS ──
 function handleFilesSelected(fileList) {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = window.SUPPORT_MEDIA_MAX_BYTES || (60 * 1024 * 1024);
+    const maxMb = window.SUPPORT_MEDIA_MAX_MB || 60;
 
     let addedCount = 0;
     for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        if (!validTypes.includes(file.type)) {
-            window.showToast(`Skipped "${file.name}": Unsupported format. Only JPG, PNG, WEBP allowed.`, 'error');
-            continue;
-        }
-        if (file.size > maxSize) {
-            window.showToast(`Skipped "${file.name}": File size exceeds 10MB limit.`, 'error');
-            continue;
+        if (window.validateSupportMediaFile) {
+            const check = window.validateSupportMediaFile(file);
+            if (!check.ok) {
+                window.showToast(check.reason, 'error');
+                continue;
+            }
+        } else {
+            const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/');
+            if (!isAllowed) {
+                window.showToast(`Skipped "${file.name}": Unsupported format. Only images and videos allowed.`, 'error');
+                continue;
+            }
+            if (file.size > maxSize) {
+                window.showToast(`Skipped "${file.name}": File size exceeds ${maxMb}MB limit.`, 'error');
+                continue;
+            }
         }
 
         stagedPhotos.push(file);
@@ -271,7 +280,7 @@ function handleFilesSelected(fileList) {
 
     if (addedCount > 0) {
         renderStagedPhotos();
-        window.showToast(`${addedCount} photo(s) staged for upload`, 'success');
+        window.showToast(`${addedCount} file(s) staged for upload`, 'success');
     }
 }
 
@@ -284,13 +293,19 @@ function renderStagedPhotos() {
         thumbCard.className = 'photo-thumb-card';
 
         const objUrl = URL.createObjectURL(file);
+        const isVideo = window.isSupportVideoFile
+            ? window.isSupportVideoFile(file, file.name)
+            : (file.type || '').startsWith('video/');
+        const previewHtml = isVideo
+            ? `<video src="${objUrl}" controls muted style="width:100%;height:100%;object-fit:cover;background:#0f172a;"></video>`
+            : `<img src="${objUrl}" alt="${file.name}">`;
         thumbCard.innerHTML = `
-            <img src="${objUrl}" alt="${file.name}">
-            <button type="button" class="photo-thumb-remove" title="Remove image" onclick="removeStagedPhoto(${index})">
+            ${previewHtml}
+            <button type="button" class="photo-thumb-remove" title="Remove file" onclick="removeStagedPhoto(${index})">
                 <i class="fas fa-times"></i>
             </button>
             <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; font-size: 0.65rem; padding: 2px 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
-                ${file.name}
+                ${isVideo ? '<i class="fas fa-video" style="margin-right:3px;"></i>' : ''}${file.name}
             </div>
         `;
         container.appendChild(thumbCard);

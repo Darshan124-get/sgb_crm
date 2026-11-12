@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const role = (currentUser.role || '').toLowerCase();
             if (role === 'admin' || role === 'super-admin') {
                 window.location.href = `${window.ROOT_PATH}modules/admin/dashboard.html`;
+            } else if (role.includes('support')) {
+                window.location.href = `${window.ROOT_PATH}modules/customer_support/dashboard.html`;
+            } else if (role.includes('dealer')) {
+                window.location.href = `${window.ROOT_PATH}modules/dealer/dashboard.html`;
             } else if (role.includes('telecaller') || role.includes('sales')) {
                 window.location.href = `${window.ROOT_PATH}modules/sales/dashboard.html`;
             } else if (role.includes('billing')) {

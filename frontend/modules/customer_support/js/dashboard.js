@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCases();
     });
 
-    document.getElementById('btnNotifToggle').addEventListener('click', openNotificationsModal);
+    document.getElementById('btnNotifToggle')?.addEventListener('click', openNotificationsModal);
 });
 
 async function loadMetrics() {

@@ -870,6 +870,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (item) item.remove();
                         else link.remove();
                     });
+
+                    // 🔐 Dealer Activity Log & Admin-only nav items are strictly restricted to Admin only 🔐
+                    const adminOnlyLinks = sidebarContainer.querySelectorAll('#nav-dealer-activity-log, a[href*="activity_log.html"], .admin-only-nav');
+                    adminOnlyLinks.forEach(link => {
+                        const item = link.closest('.nav-item');
+                        if (item) item.remove();
+                        else link.remove();
+                    });
                 }
 
                 // ── Cleanup Empty Group Titles ──
@@ -1102,8 +1110,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         section.style.cursor = 'pointer';
         section.title = 'View My Profile';
         section.addEventListener('click', (e) => {
-            // Ignore click if clicking notification icons
-            if (e.target.closest('.notif-bell') || e.target.closest('.notif-envelope')) {
+            // Ignore click if clicking notification icons or dialer
+            if (e.target.closest('.notif-bell') || e.target.closest('.notif-envelope') || e.target.closest('#topbarDialerBtn')) {
                 return;
             }
             window.location.href = `${window.ROOT_PATH}modules/admin/profile.html`;
@@ -1118,7 +1126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             legacyBell.remove();
         }
 
-        if (!profileSection.querySelector('.notif-bell')) {
+        if (!profileSection.querySelector('.notif-bell') && !document.getElementById('btnNotifToggle')) {
             const bellDiv = document.createElement('div');
             bellDiv.className = 'notif-bell';
             bellDiv.style.cssText = `
@@ -5311,19 +5319,25 @@ window.initGlobalPhoneDialer = function() {
     const existingFloatBtn = document.getElementById('globalDialerFloatingBtn');
     if (existingFloatBtn) existingFloatBtn.remove();
 
-    // 2. Inject Topbar Phone Icon if topbar exists
-    const profileSection = document.querySelector('.profile-section');
-    if (profileSection && !document.getElementById('topbarDialerBtn')) {
-        const topbarBtn = document.createElement('button');
-        topbarBtn.id = 'topbarDialerBtn';
-        topbarBtn.title = 'Open Phone Dialer';
-        topbarBtn.style.cssText = 'background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;';
-        topbarBtn.innerHTML = '<i class="fas fa-phone-alt"></i>';
-        topbarBtn.onclick = (e) => {
-            e.stopPropagation();
-            window.toggleGlobalDialer();
-        };
-        profileSection.insertBefore(topbarBtn, profileSection.firstChild);
+    // 2. Inject Topbar Phone Icon if topbar exists (skip for customer_support)
+    const isSupportPage = window.location.pathname.includes('customer_support');
+    if (isSupportPage) {
+        const existingDialerBtn = document.getElementById('topbarDialerBtn');
+        if (existingDialerBtn) existingDialerBtn.remove();
+    } else {
+        const profileSection = document.querySelector('.profile-section');
+        if (profileSection && !document.getElementById('topbarDialerBtn')) {
+            const topbarBtn = document.createElement('button');
+            topbarBtn.id = 'topbarDialerBtn';
+            topbarBtn.title = 'Open Phone Dialer';
+            topbarBtn.style.cssText = 'background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;';
+            topbarBtn.innerHTML = '<i class="fas fa-phone-alt"></i>';
+            topbarBtn.onclick = (e) => {
+                e.stopPropagation();
+                window.toggleGlobalDialer();
+            };
+            profileSection.insertBefore(topbarBtn, profileSection.firstChild);
+        }
     }
 
     // 3. Inject Dialer Modal HTML
@@ -6556,7 +6570,8 @@ window.openPaymentChatAndVerify = function (phone, orderId) {
 // Live Polling & Topbar Badge Management
 window.pollPaymentVerificationSummary = async function () {
     const isBillingPage = window.location.pathname.includes('/billing/') || window.location.pathname.endsWith('billing.html') || window.location.href.includes('/billing/billing.html');
-    if (isBillingPage) {
+    const isSupportPage = window.location.pathname.includes('customer_support');
+    if (isBillingPage || isSupportPage) {
         const existingBtn = document.getElementById('btn-top-payment');
         if (existingBtn) existingBtn.remove();
         const alertEl = document.getElementById('floatingPaymentAlert');
@@ -6603,7 +6618,8 @@ window.pollPaymentVerificationSummary = async function () {
 
 function updatePaymentTopBarBadge(count) {
     const isBillingPage = window.location.pathname.includes('/billing/') || window.location.pathname.endsWith('billing.html') || window.location.href.includes('/billing/billing.html');
-    if (isBillingPage) {
+    const isSupportPage = window.location.pathname.includes('customer_support');
+    if (isBillingPage || isSupportPage) {
         const existingBtn = document.getElementById('btn-top-payment');
         if (existingBtn) existingBtn.remove();
         return;
@@ -6704,3 +6720,20 @@ if (typeof window.areNotificationPopupsEnabled === 'function' && !window.areNoti
         window.dismissAllNotificationPopups();
     }
 }
+
+// Fire-and-forget helper to record Dealer client-side actions (e.g. exports, visits)
+window.recordDealerActivityClient = function (action, entity_type, entity_id, details, metadata = null) {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const baseUrl = window.API_URL || 'http://127.0.0.1:5000/api';
+        fetch(`${baseUrl}/dealers/activity-logs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ action, entity_type, entity_id, details, metadata })
+        }).catch(() => {});
+    } catch (e) {}
+};

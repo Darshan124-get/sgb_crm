@@ -730,6 +730,22 @@ exports.createLead = async (req, res) => {
         );
 
         await connection.commit();
+
+        if (isDealerLead) {
+            try {
+                const { logDealerActivity } = require('../utils/dealerActivityLogger');
+                if (logDealerActivity) {
+                    await logDealerActivity(req, {
+                        action: 'CREATE',
+                        entity_type: 'DEALER_LEAD',
+                        entity_id: leadId,
+                        details: `Created new dealer lead #${leadId}: ${cleanFirm || finalCustomerName}${cleanCity ? ` (${cleanCity})` : ''}`,
+                        metadata: { lead_id: leadId, customer_name: finalCustomerName, firm_name: cleanFirm, phone: cleanPhone, status }
+                    });
+                }
+            } catch (dlErr) {}
+        }
+
         res.status(201).json({ 
             message: 'Lead created successfully', 
             lead_id: leadId, 
@@ -873,6 +889,24 @@ exports.updateLead = async (req, res) => {
             [req.params.id, actingUserId, noteToSave]);
 
         await connection.commit();
+
+        try {
+            const lowerStatus = String(finalStatus || '').toLowerCase();
+            const isDealer = lowerStatus.includes('dealer') || (currentLead.firm_name && currentLead.firm_name !== '');
+            if (isDealer) {
+                const { logDealerActivity } = require('../utils/dealerActivityLogger');
+                if (logDealerActivity) {
+                    await logDealerActivity(req, {
+                        action: 'UPDATE',
+                        entity_type: 'DEALER_LEAD',
+                        entity_id: req.params.id,
+                        details: `Updated dealer lead #${req.params.id}: ${currentLead.firm_name || currentLead.customer_name || 'Lead'} (Status: ${finalStatus})`,
+                        metadata: { lead_id: req.params.id, status: finalStatus }
+                    });
+                }
+            }
+        } catch (dlErr) {}
+
         res.json({ message: 'Lead updated successfully' });
     } catch (err) {
         if (connection) await connection.rollback();

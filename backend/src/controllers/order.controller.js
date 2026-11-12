@@ -287,8 +287,18 @@ exports.updateStatus = async (req, res) => {
                 if (recalculateDealerStatus) {
                     await recalculateDealerStatus(orderInfo.dealer_id, connection);
                 }
+                const { logDealerActivity } = require('../utils/dealerActivityLogger');
+                if (logDealerActivity) {
+                    await logDealerActivity(req, {
+                        action: 'STATUS',
+                        entity_type: 'DEALER_ORDER',
+                        entity_id: id,
+                        details: `Updated order #${id} status to '${status.toUpperCase()}' (${orderInfo.customer_name || 'Dealer'})`,
+                        metadata: { order_id: id, status, customer_name: orderInfo.customer_name, dealer_id: orderInfo.dealer_id }
+                    });
+                }
             } catch (err) {
-                console.error('Error recalculating dealer status in order status transition:', err);
+                console.error('Error in dealer status transition/logging:', err);
             }
         }
 
@@ -889,6 +899,21 @@ exports.bulkImportOrders = async (req, res) => {
         }
 
         const dealersFoundCount = matchedByDealerId + matchedByPhone + matchedByGst + matchedByName;
+
+        if (!dryRun && ordersImported > 0) {
+            try {
+                const { logDealerActivity } = require('../utils/dealerActivityLogger');
+                if (logDealerActivity) {
+                    await logDealerActivity(req, {
+                        action: 'IMPORT',
+                        entity_type: 'DEALER_ORDER',
+                        entity_id: `IMPORT(${ordersImported})`,
+                        details: `Bulk imported ${ordersImported} dealer order(s)${autoCreatedDealers > 0 ? ` and auto-created ${autoCreatedDealers} new dealer(s)` : ''}`,
+                        metadata: { ordersImported, autoCreatedDealers, duplicateOrders, errorRows, totalRevenue }
+                    });
+                }
+            } catch (logErr) {}
+        }
 
         res.status(200).json({
             success: true,

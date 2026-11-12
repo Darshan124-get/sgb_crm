@@ -118,6 +118,25 @@ exports.login = async (req, res) => {
         // Log the login activity
         await logActivity(user.user_id, 'Auth', 'User Login', `Logged in from IP: ${req.ip || 'Unknown'}`, req.ip);
         
+        try {
+            const roleLower = (user.role_name || '').toLowerCase();
+            if (roleLower === 'admin' || roleLower === 'super-admin' || roleLower.includes('dealer')) {
+                const { logDealerActivity } = require('../utils/dealerActivityLogger');
+                if (logDealerActivity) {
+                    await logDealerActivity(req, {
+                        user_id: user.user_id,
+                        user_name: user.name,
+                        user_role: user.role_name,
+                        action: 'LOGIN',
+                        entity_type: 'AUTH',
+                        entity_id: user.user_id,
+                        details: `User ${user.name} (${user.email || user.phone || 'N/A'}) logged into ${roleLower.includes('dealer') ? 'Dealer Panel' : 'Admin Dashboard'}`,
+                        metadata: { email: user.email, role: user.role_name }
+                    });
+                }
+            }
+        } catch (authLogErr) {}
+        
         res.json({ 
             token, 
             refreshToken,

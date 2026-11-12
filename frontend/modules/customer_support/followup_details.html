@@ -14,31 +14,44 @@
         <div id="sidebar-container"></div>
 
         <main class="support-main">
-            <!-- Header -->
-            <div class="support-header">
-                <div>
-                    <a href="contacted_followup.html" style="text-decoration: none; color: #64748b; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem;">
-                        <i class="fas fa-arrow-left"></i> Back to Follow-ups &amp; Contacted
-                    </a>
-                    <div class="support-title-block">
-                        <h1>
-                            <span>30-Day Product Health Check</span>
-                            <span id="followupStatusBadge"></span>
-                        </h1>
-                        <p id="followupHeaderSubtitle">Routine 30-day post-installation satisfaction check and feedback review.</p>
+            <!-- Topbar Header (Standard across all CRM modules) -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavSearch" placeholder="Search customer support, cases, orders...">
+                </div>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">support</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div class="support-content">
+                <!-- Header -->
+                <div class="support-header">
+                    <div>
+                        <a href="contacted_followup.html" style="text-decoration: none; color: #64748b; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem;">
+                            <i class="fas fa-arrow-left"></i> Back to Follow-ups &amp; Contacted
+                        </a>
+                        <div class="support-title-block">
+                            <h1>
+                                <span>30-Day Product Health Check</span>
+                                <span id="followupStatusBadge"></span>
+                            </h1>
+                            <p id="followupHeaderSubtitle">Routine 30-day post-installation satisfaction check and feedback review.</p>
+                        </div>
+                    </div>
+
+                    <!-- Call Button -->
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-call" id="btnCallCustomer">
+                            <i class="fas fa-phone"></i> Call Customer
+                        </button>
+                        <a href="#" id="viewFullCaseLink" class="btn btn-outline">
+                            <i class="fas fa-folder-open"></i> View Case Profile
+                        </a>
                     </div>
                 </div>
-
-                <!-- Call Button -->
-                <div style="display: flex; gap: 0.75rem; align-items: center;">
-                    <button class="btn btn-call" id="btnCallCustomer">
-                        <i class="fas fa-phone"></i> Call Customer
-                    </button>
-                    <a href="#" id="viewFullCaseLink" class="btn btn-outline">
-                        <i class="fas fa-folder-open"></i> View Case Profile
-                    </a>
-                </div>
-            </div>
 
             <!-- Two-Column Layout -->
             <div style="display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start;">
@@ -252,6 +265,7 @@
 
                 </div>
             </div>
+            </div> <!-- End .support-content -->
         </main>
     </div>
 

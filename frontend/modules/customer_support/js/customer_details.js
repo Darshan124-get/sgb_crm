@@ -140,15 +140,23 @@ function renderPhotos(photos) {
     const grid = document.getElementById('photoGalleryGrid');
 
     if (photos.length === 0) {
-        grid.innerHTML = `<div style="grid-column: 1/-1; color: #94a3b8; font-size: 0.85rem; padding: 1rem 0;">No installation photos uploaded yet.</div>`;
+        grid.innerHTML = `<div style="grid-column: 1/-1; color: #94a3b8; font-size: 0.85rem; padding: 1rem 0;">No installation photos or videos uploaded yet.</div>`;
         return;
     }
 
-    grid.innerHTML = photos.map(p => `
-        <div class="photo-thumb-card" onclick="openLightbox('${p.file_url}')" style="cursor: pointer;" title="Click to view full size">
-            <img src="${p.file_url}" alt="Fitting Photo">
-        </div>
-    `).join('');
+    grid.innerHTML = photos.map(p => {
+        const mediaUrl = window.resolveMediaUrl ? window.resolveMediaUrl(p.file_url) : p.file_url;
+        const isVideo = window.isSupportVideoFile ? window.isSupportVideoFile(p.file_url, p.file_name) : /\.(mp4|mov|webm|avi|mkv)$/i.test(p.file_url || '');
+        const escapedUrl = escapeHtml(mediaUrl).replace(/'/g, '&#039;');
+        const bodyHtml = isVideo
+            ? `<video src="${escapedUrl}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;background:#0f172a;"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.28);color:white;font-size:1.4rem;"><i class="fas fa-play-circle"></i></div>`
+            : `<img src="${escapedUrl}" alt="Fitting Photo">`;
+        return `
+            <div class="photo-thumb-card" onclick="openLightbox('${escapedUrl}', ${isVideo})" style="cursor: pointer;" title="Click to view full size">
+                ${bodyHtml}
+            </div>
+        `;
+    }).join('');
 }
 
 function renderCalls(calls) {
@@ -200,15 +208,33 @@ async function handleAddNote(e) {
 }
 
 async function handleUploadPhotos(e) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-        formData.append('photos', files[i]);
+    const validFiles = [];
+    for (const file of files) {
+        if (window.validateSupportMediaFile) {
+            const check = window.validateSupportMediaFile(file);
+            if (!check.ok) {
+                window.showToast(check.reason, 'error');
+                continue;
+            }
+        } else if (file.size > 60 * 1024 * 1024) {
+            window.showToast(`Skipped "${file.name}": File size exceeds 60MB limit.`, 'error');
+            continue;
+        }
+        validFiles.push(file);
     }
 
-    window.showToast(`Uploading ${files.length} photo(s)...`, 'info');
+    if (validFiles.length === 0) {
+        e.target.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    validFiles.forEach(file => formData.append('photos', file));
+
+    window.showToast(`Uploading ${validFiles.length} file(s)...`, 'info');
 
     try {
         const data = await window.supportFetch(`/cases/${currentCaseId}/photos`, {
@@ -229,11 +255,27 @@ async function handleUploadPhotos(e) {
     }
 }
 
-function openLightbox(url) {
+function openLightbox(url, isVideo = false) {
     const modal = document.getElementById('photoLightboxModal');
     const img = document.getElementById('lightboxImg');
-    img.src = url;
+    const vid = document.getElementById('lightboxVideo');
+    const videoMode = Boolean(isVideo) || (window.isSupportVideoFile && window.isSupportVideoFile(url));
+    if (videoMode && vid) {
+        if (img) { img.style.display = 'none'; img.src = ''; }
+        vid.src = url;
+        vid.style.display = 'block';
+    } else {
+        if (vid) { vid.pause(); vid.style.display = 'none'; vid.src = ''; }
+        if (img) { img.src = url; img.style.display = 'block'; }
+    }
     modal.classList.add('active');
+}
+
+function closeCustomerLightbox() {
+    const modal = document.getElementById('photoLightboxModal');
+    const vid = document.getElementById('lightboxVideo');
+    if (vid) { vid.pause(); vid.src = ''; }
+    if (modal) modal.classList.remove('active');
 }
 
 function escapeHtml(str) {

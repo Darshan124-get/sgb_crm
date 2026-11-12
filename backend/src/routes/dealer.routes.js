@@ -8,14 +8,16 @@ const { authenticateToken, isAdmin, isAdminOrSales } = require('../middleware/au
 router.get('/orders', authenticateToken, dealerController.getDealerOrders);
 router.get('/orders/:orderId/payments', authenticateToken, dealerController.getOrderPaymentHistory);
 router.put('/orders/:orderId', authenticateToken, isAdminOrSales, dealerController.updateDealerOrder);
-router.delete('/orders/:orderId', authenticateToken, isAdminOrSales, dealerController.deleteDealerOrder);
+router.delete('/orders/:orderId', authenticateToken, isAdmin, dealerController.deleteDealerOrder);
 router.post('/orders/:orderId/pay-balance', authenticateToken, isAdminOrSales, dealerController.payDealerOrderBalance);
-router.post('/orders/bulk-delete', authenticateToken, isAdminOrSales, dealerController.bulkDeleteDealerOrders);
+router.post('/orders/bulk-delete', authenticateToken, isAdmin, dealerController.bulkDeleteDealerOrders);
 router.post('/orders/bulk-clear-payment', authenticateToken, isAdminOrSales, dealerController.bulkClearPaymentDealerOrders);
 router.post('/orders/bulk-status', authenticateToken, isAdminOrSales, dealerController.bulkUpdateDealerOrdersStatus);
 router.post('/orders/bulk-import', authenticateToken, isAdminOrSales, orderController.bulkImportOrders);
 router.post('/bulk-import', authenticateToken, isAdminOrSales, dealerController.bulkImportDealers);
 router.post('/bulk-delete', authenticateToken, isAdminOrSales, dealerController.bulkDeleteDealers);
+router.get('/activity-logs', authenticateToken, isAdmin, dealerController.getDealerActivityLogs);
+router.post('/activity-logs', authenticateToken, dealerController.recordDealerClientActivity);
 
 // Parametric routes NEXT
 router.get('/', authenticateToken, dealerController.getDealers);

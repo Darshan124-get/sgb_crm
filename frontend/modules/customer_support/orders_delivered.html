@@ -14,21 +14,34 @@
         <div id="sidebar-container"></div>
 
         <main class="support-main">
-            <!-- Header -->
-            <div class="support-header">
-                <div class="support-title-block">
-                    <h1><i class="fas fa-box-open" style="color: #0284c7;"></i> Orders Delivered (Initial Support Queue)</h1>
-                    <p>Direct B2C orders marked delivered by logistics. Reach out to guide customers through unboxing and installation.</p>
+            <!-- Topbar Header (Standard across all CRM modules) -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavSearch" placeholder="Search customer support, cases, orders...">
                 </div>
-                <div style="display: flex; gap: 0.75rem; align-items: center;">
-                    <button type="button" id="btnOpenManualCase" class="btn btn-primary" onclick="window.openManualCaseModal()" data-action="open-manual-case" title="Manually enter customer phone & details to initiate support call">
-                        <i class="fas fa-plus-circle"></i> New Support Case / Call
-                    </button>
-                    <a href="dashboard.html" class="btn btn-outline">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
-                    </a>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">support</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
                 </div>
-            </div>
+            </header>
+
+            <div class="support-content">
+                <!-- Header -->
+                <div class="support-header">
+                    <div class="support-title-block">
+                        <h1><i class="fas fa-box-open" style="color: #0284c7;"></i> Orders Delivered (Initial Support Queue)</h1>
+                        <p>Direct B2C orders marked delivered by logistics. Reach out to guide customers through unboxing and installation.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                        <button type="button" id="btnOpenManualCase" class="btn btn-primary" onclick="window.openManualCaseModal()" data-action="open-manual-case" title="Manually enter customer phone & details to initiate support call">
+                            <i class="fas fa-plus-circle"></i> New Support Case / Call
+                        </button>
+                        <a href="dashboard.html" class="btn btn-outline">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
 
             <!-- Filter Bar -->
             <div class="filter-bar">
@@ -83,6 +96,7 @@
                     </div>
                 </div>
             </div>
+            </div> <!-- End .support-content -->
         </main>
     </div>
 

@@ -14,18 +14,31 @@
         <div id="sidebar-container"></div>
 
         <main class="support-main">
-            <!-- Header -->
-            <div class="support-header">
-                <div class="support-title-block">
-                    <h1><i class="fas fa-clipboard-check" style="color: #10b981;"></i> Completed Support Cases</h1>
-                    <p>Historical record of successfully assisted customers, verified installation guides, and photo logs.</p>
+            <!-- Topbar Header (Standard across all CRM modules) -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="topNavSearch" placeholder="Search customer support, cases, orders...">
                 </div>
-                <div>
-                    <a href="dashboard.html" class="btn btn-outline">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
-                    </a>
+                <div class="profile-section">
+                    <span class="profile-name" id="profileName">support</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
                 </div>
-            </div>
+            </header>
+
+            <div class="support-content">
+                <!-- Header -->
+                <div class="support-header">
+                    <div class="support-title-block">
+                        <h1><i class="fas fa-clipboard-check" style="color: #10b981;"></i> Completed Support Cases</h1>
+                        <p>Historical record of successfully assisted customers, verified installation guides, and photo logs.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                        <a href="dashboard.html" class="btn btn-outline">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
 
             <!-- Filter Bar -->
             <div class="filter-bar">
@@ -75,6 +88,7 @@
                     </div>
                 </div>
             </div>
+            </div> <!-- End .support-content -->
         </main>
     </div>
 

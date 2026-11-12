@@ -12,6 +12,36 @@ let orderStatusChartInstance = null;
 let paymentTypeChartInstance = null;
 let currentMetricView = 'sales'; // 'sales' or 'orders'
 let currentChartRange = 'month';
+let currentPbViewMode = 'single'; // 'single' | 'monthly'
+let pbMonthInitialized = false;
+let repProductMultiSelect = null;
+
+function getSelectedReportProducts() {
+    if (repProductMultiSelect) return repProductMultiSelect.getSelected();
+    const el = document.getElementById('repProductSelect');
+    if (el && el.tagName === 'SELECT') return el.value ? [el.value] : [];
+    return [];
+}
+
+function initReportProductMultiSelect() {
+    if (repProductMultiSelect || !window.DealerProductMultiSelect) return repProductMultiSelect;
+    repProductMultiSelect = window.DealerProductMultiSelect.create('repProductSelect', {
+        compact: true,
+        placeholder: 'All Products',
+        onChange: () => applyReportsFilters()
+    });
+    return repProductMultiSelect;
+}
+
+function isReportsAdminUser() {
+    try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const role = String(user.role || '').trim().toLowerCase();
+        return role === 'admin' || role === 'super-admin' || role === 'super_admin';
+    } catch (_) {
+        return false;
+    }
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (window.requireAuth && !window.requireAuth(['admin', 'super-admin', 'dealer', 'dealer_manager', 'dealer_executive', 'dealer_viewer'], 'dealer_reports')) return;
@@ -20,11 +50,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profileElem = document.getElementById('profileName');
     if (profileElem) profileElem.textContent = user.name || user.email || 'admin';
 
+    const salespersonSelect = document.getElementById('repSalespersonSelect');
+    if (salespersonSelect) {
+        if (isReportsAdminUser()) {
+            salespersonSelect.style.display = '';
+        } else {
+            salespersonSelect.style.display = 'none';
+            salespersonSelect.value = '';
+        }
+    }
+
     // Leave date inputs empty by default so All Dealers shows all dealer records & lifetime order stats
     const startDateInput = document.getElementById('repStartDate');
     const endDateInput = document.getElementById('repEndDate');
     if (startDateInput) startDateInput.value = '';
     if (endDateInput) endDateInput.value = '';
+
+    const topSearch = document.getElementById('topNavSearch');
+    if (topSearch) {
+        topSearch.addEventListener('input', () => renderProductBreakdownTable());
+    }
 
     initOverviewCharts();
     await loadReportsData();
@@ -48,8 +93,9 @@ async function loadReportsData() {
     }
 
     populateFilterDropdowns();
+    populateProductBreakdownMonthDropdown();
     updateSummaryMetrics();
-    renderRecentOrdersTable();
+    renderProductBreakdownTable();
     updateTopDealersTable();
     updateTopProductsTable();
     updateChartsData();
@@ -67,7 +113,7 @@ function populateFilterDropdowns() {
     }
 
     const salespersonSelect = document.getElementById('repSalespersonSelect');
-    if (salespersonSelect) {
+    if (salespersonSelect && isReportsAdminUser()) {
         const currentVal = salespersonSelect.value;
         const salespersons = new Set();
         allDealersData.forEach(d => { if (d.visited_by) salespersons.add(d.visited_by.trim()); });
@@ -82,13 +128,21 @@ function populateFilterDropdowns() {
         });
         salespersonSelect.innerHTML = spHtml;
         if (currentVal) salespersonSelect.value = currentVal;
+    } else if (salespersonSelect) {
+        salespersonSelect.style.display = 'none';
+        salespersonSelect.value = '';
     }
 
-    const productSelect = document.getElementById('repProductSelect');
-    if (productSelect) {
-        const currentVal = productSelect.value;
+    const productContainer = document.getElementById('repProductSelect');
+    if (productContainer) {
         const products = new Set();
         allOrdersData.forEach(o => {
+            if (o.items_detailed) {
+                o.items_detailed.split('||').forEach(it => {
+                    const pName = (it.split('::')[0] || '').trim();
+                    if (pName) products.add(pName);
+                });
+            }
             if (o.items_summary) {
                 const items = o.items_summary.split('||');
                 items.forEach(i => {
@@ -98,12 +152,10 @@ function populateFilterDropdowns() {
             }
         });
 
-        let prHtml = '<option value="">All Products</option>';
-        products.forEach(p => {
-            prHtml += `<option value="${p}">${p}</option>`;
-        });
-        productSelect.innerHTML = prHtml;
-        if (currentVal) productSelect.value = currentVal;
+        const ms = initReportProductMultiSelect();
+        if (ms) {
+            ms.setOptions(Array.from(products));
+        }
     }
 }
 
@@ -111,8 +163,8 @@ function getFilteredData() {
     const selectedDealerId = document.getElementById('repDealerSelect')?.value || '';
     const startDateVal = document.getElementById('repStartDate')?.value || '';
     const endDateVal = document.getElementById('repEndDate')?.value || '';
-    const selectedSalesperson = document.getElementById('repSalespersonSelect')?.value || '';
-    const selectedProduct = document.getElementById('repProductSelect')?.value || '';
+    const selectedSalesperson = isReportsAdminUser() ? (document.getElementById('repSalespersonSelect')?.value || '') : '';
+    const selectedProducts = getSelectedReportProducts();
 
     // Filter Dealers list
     let filteredDealers = allDealersData;
@@ -151,12 +203,16 @@ function getFilteredData() {
         });
     }
 
-    if (selectedProduct) {
-        const pLower = selectedProduct.toLowerCase();
-        filteredOrders = filteredOrders.filter(o => {
-            const summary = (o.items_summary || '').toLowerCase();
-            return summary.includes(pLower);
-        });
+    if (selectedProducts.length > 0) {
+        if (window.DealerProductMultiSelect) {
+            filteredOrders = filteredOrders.filter(o => window.DealerProductMultiSelect.orderMatchesProducts(o, selectedProducts));
+        } else {
+            const pSet = new Set(selectedProducts.map(p => p.toLowerCase()));
+            filteredOrders = filteredOrders.filter(o => {
+                const summary = (o.items_summary || '').toLowerCase();
+                return Array.from(pSet).some(p => summary.includes(p));
+            });
+        }
     }
 
     return {
@@ -524,57 +580,429 @@ function toggleOverviewMetric(metricType) {
     updateChartsData();
 }
 
-function renderRecentOrdersTable() {
-    const tbody = document.getElementById('recentOrdersTbody');
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getOrderMonthKey(createdAt) {
+    if (!createdAt) return '';
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthLabel(ym) {
+    if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return 'All Months';
+    const [yr, mo] = ym.split('-').map(Number);
+    const d = new Date(yr, mo - 1, 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+/**
+ * Shared parser extracting structured product lines from B2B order rows.
+ * Respects optional productFilter so multi-item orders don't inflate unrelated products.
+ */
+function parseOrderProductItems(order, productFilter = '') {
+    const matchesFilter = (itemName) => {
+        if (window.DealerProductMultiSelect) {
+            return window.DealerProductMultiSelect.itemNameMatchesProducts(itemName, productFilter);
+        }
+        const list = Array.isArray(productFilter) ? productFilter : (productFilter ? [productFilter] : []);
+        const clean = list.map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
+        if (clean.length === 0) return true;
+        return clean.includes(String(itemName || '').trim().toLowerCase());
+    };
+    const out = [];
+
+    if (order.items_detailed) {
+        order.items_detailed.split('||').forEach(itemStr => {
+            const parts = itemStr.split('::');
+            if (parts.length < 2) return;
+            const name = parts[0].trim() || 'Agri Product';
+            if (!matchesFilter(name)) return;
+            const qty = parseInt(parts[1].trim(), 10) || 1;
+            const price = parseFloat(parts[2] || 0) || 0;
+            const total = parseFloat(parts[3] || (qty * price)) || 0;
+            out.push({ name, qty, amount: total });
+        });
+    } else if (order.items_summary) {
+        const rawItems = order.items_summary.split('||');
+        rawItems.forEach(itemStr => {
+            const parts = itemStr.split(' x ');
+            if (parts.length !== 2) return;
+            const name = parts[0].trim() || 'Agri Product';
+            if (!matchesFilter(name)) return;
+            const qty = parseInt(parts[1].trim(), 10) || 0;
+            const approxTotal = (parseFloat(order.total_amount || 0) || 0) / Math.max(1, rawItems.length);
+            out.push({ name, qty, amount: approxTotal });
+        });
+    }
+
+    return out;
+}
+
+/**
+ * Aggregate orders into product-wise totals with distinct orders, dealer breakdown, qty, and revenue.
+ */
+function aggregateProductBreakdown(orders, productFilter = '') {
+    const productMap = new Map();
+    const distinctOrderIds = new Set();
+    const distinctDealerKeys = new Set();
+
+    orders.forEach(o => {
+        const lineItems = parseOrderProductItems(o, productFilter);
+        if (lineItems.length === 0) return;
+
+        distinctOrderIds.add(o.order_id);
+        const dealerKey = o.dealer_id ? `D-${o.dealer_id}` : `N-${(o.dealer_name || o.firm_name || o.customer_name || 'Dealer Store').trim()}`;
+        const dealerName = (o.firm_name || o.dealer_name || o.customer_name || 'Dealer Store').trim();
+        distinctDealerKeys.add(dealerKey);
+
+        lineItems.forEach(item => {
+            if (!productMap.has(item.name)) {
+                productMap.set(item.name, {
+                    name: item.name,
+                    orderIds: new Set(),
+                    dealerMap: new Map(),
+                    qty: 0,
+                    sales: 0
+                });
+            }
+            const entry = productMap.get(item.name);
+            entry.orderIds.add(o.order_id);
+            entry.qty += item.qty;
+            entry.sales += item.amount;
+
+            if (!entry.dealerMap.has(dealerKey)) {
+                entry.dealerMap.set(dealerKey, {
+                    dealerName,
+                    orderIds: new Set(),
+                    qty: 0,
+                    sales: 0
+                });
+            }
+            const dEntry = entry.dealerMap.get(dealerKey);
+            dEntry.orderIds.add(o.order_id);
+            dEntry.qty += item.qty;
+            dEntry.sales += item.amount;
+        });
+    });
+
+    const grandSales = Array.from(productMap.values()).reduce((s, p) => s + p.sales, 0);
+    const grandQty = Array.from(productMap.values()).reduce((s, p) => s + p.qty, 0);
+
+    const rows = Array.from(productMap.values())
+        .map(entry => {
+            const dealers = Array.from(entry.dealerMap.values())
+                .map(d => ({
+                    dealerName: d.dealerName,
+                    orderCount: d.orderIds.size,
+                    qty: d.qty,
+                    sales: Math.round(d.sales)
+                }))
+                .sort((a, b) => b.qty - a.qty || b.sales - a.sales);
+
+            const salesRounded = Math.round(entry.sales);
+            return {
+                name: entry.name,
+                orderCount: entry.orderIds.size,
+                dealerCount: entry.dealerMap.size,
+                dealers,
+                qty: entry.qty,
+                sales: salesRounded,
+                avgRate: entry.qty > 0 ? Math.round(entry.sales / entry.qty) : 0,
+                sharePct: grandSales > 0 ? ((entry.sales / grandSales) * 100) : 0
+            };
+        })
+        .sort((a, b) => b.sales - a.sales || b.qty - a.qty);
+
+    return {
+        rows,
+        totalOrders: distinctOrderIds.size,
+        totalDealers: distinctDealerKeys.size,
+        totalQty: grandQty,
+        totalSales: Math.round(grandSales)
+    };
+}
+
+function populateProductBreakdownMonthDropdown() {
+    const sel = document.getElementById('pbMonthSelect');
+    if (!sel) return;
+
+    const prevVal = sel.value;
+    const monthCounts = new Map();
+
+    allOrdersData.forEach(o => {
+        if ((o.order_status || '').toLowerCase() === 'cancelled') return;
+        const ym = getOrderMonthKey(o.created_at);
+        if (!ym) return;
+        monthCounts.set(ym, (monthCounts.get(ym) || 0) + 1);
+    });
+
+    const sortedMonths = Array.from(monthCounts.keys()).sort((a, b) => b.localeCompare(a));
+    const now = new Date();
+    const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    let html = '<option value="">All Months (Overall)</option>';
+    sortedMonths.forEach(ym => {
+        const cnt = monthCounts.get(ym) || 0;
+        const tag = ym === currentYM ? ' (This Month)' : '';
+        html += `<option value="${ym}">${formatMonthLabel(ym)}${tag} — ${cnt} orders</option>`;
+    });
+
+    sel.innerHTML = html;
+
+    if (!pbMonthInitialized) {
+        pbMonthInitialized = true;
+        if (monthCounts.has(currentYM)) {
+            sel.value = currentYM;
+        } else if (sortedMonths.length > 0) {
+            sel.value = sortedMonths[0];
+        } else {
+            sel.value = '';
+        }
+    } else if (prevVal && (prevVal === '' || monthCounts.has(prevVal))) {
+        sel.value = prevVal;
+    }
+}
+
+function switchProductBreakdownMode(mode, btnEl) {
+    currentPbViewMode = mode;
+    const tabs = document.getElementById('pbViewModeTabs');
+    if (tabs) {
+        tabs.querySelectorAll('.pill-tab-btn').forEach(b => b.classList.remove('active'));
+    }
+    if (btnEl) btnEl.classList.add('active');
+
+    const monthSel = document.getElementById('pbMonthSelect');
+    if (monthSel) {
+        monthSel.style.display = mode === 'monthly' ? 'none' : '';
+    }
+    renderProductBreakdownTable();
+}
+
+function toggleProductDealerDrawer(drawerId, btnEl) {
+    const row = document.getElementById(drawerId);
+    if (!row) return;
+    const isOpen = row.style.display !== 'none';
+    row.style.display = isOpen ? 'none' : 'table-row';
+    if (btnEl) {
+        const icon = btnEl.querySelector('i');
+        if (icon) {
+            icon.className = isOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+        }
+    }
+}
+
+function buildProductBreakdownRowHtml(p, idx, drawerPrefix, colors) {
+    const drawerId = `${drawerPrefix}-${idx}`;
+    const color = colors[idx % colors.length];
+    const barWidth = Math.min(100, Math.max(2, Math.round(p.sharePct)));
+
+    const dealerRowsHtml = p.dealers.map((d, dIdx) => `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:0.45rem 0.65rem;color:#64748b;width:36px;">${dIdx + 1}</td>
+            <td style="padding:0.45rem 0.65rem;font-weight:700;color:#1e293b;">
+                <i class="fa-solid fa-store" style="color:#FF6B00;margin-right:6px;font-size:0.75rem;"></i>${escapeHtml(d.dealerName)}
+            </td>
+            <td style="padding:0.45rem 0.65rem;text-align:center;font-weight:600;color:#475569;">${d.orderCount}</td>
+            <td style="padding:0.45rem 0.65rem;text-align:right;font-weight:700;color:#0f172a;">${d.qty.toLocaleString('en-IN')}</td>
+            <td style="padding:0.45rem 0.65rem;text-align:right;font-weight:800;color:#0f172a;">₹${d.sales.toLocaleString('en-IN')}</td>
+        </tr>
+    `).join('');
+
+    return `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:0.78rem 0.75rem;text-align:center;font-weight:700;color:#94a3b8;">${idx + 1}</td>
+            <td style="padding:0.78rem 0.75rem;font-weight:700;color:#0f172a;">
+                <i class="fa-solid fa-cubes" style="color:${color};margin-right:8px;"></i>${escapeHtml(p.name)}
+            </td>
+            <td style="padding:0.78rem 0.75rem;text-align:center;font-weight:700;color:#334155;">${p.orderCount}</td>
+            <td style="padding:0.78rem 0.75rem;text-align:center;">
+                <button type="button" onclick="toggleProductDealerDrawer('${drawerId}', this)"
+                    style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:9999px;padding:3px 10px;font-size:0.74rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;"
+                    title="View dealer-wise quantities for ${escapeHtml(p.name)}">
+                    <span>${p.dealerCount} ${p.dealerCount === 1 ? 'Dealer' : 'Dealers'}</span>
+                    <i class="fa-solid fa-chevron-down" style="font-size:0.65rem;"></i>
+                </button>
+            </td>
+            <td style="padding:0.78rem 0.75rem;text-align:right;font-weight:800;color:#0f172a;">${p.qty.toLocaleString('en-IN')}</td>
+            <td style="padding:0.78rem 0.75rem;text-align:right;font-weight:600;color:#64748b;">₹${p.avgRate.toLocaleString('en-IN')}</td>
+            <td style="padding:0.78rem 0.75rem;text-align:right;font-weight:800;color:#0f172a;">₹${p.sales.toLocaleString('en-IN')}</td>
+            <td style="padding:0.78rem 0.75rem;text-align:right;">
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+                    <div style="width:54px;height:6px;background:#e2e8f0;border-radius:9999px;overflow:hidden;">
+                        <div style="width:${barWidth}%;height:100%;background:${color};border-radius:9999px;"></div>
+                    </div>
+                    <span style="font-weight:700;color:#334155;font-size:0.76rem;min-width:42px;text-align:right;">${p.sharePct.toFixed(1)}%</span>
+                </div>
+            </td>
+        </tr>
+        <tr id="${drawerId}" style="display:none;background:#f8fafc;">
+            <td colspan="8" style="padding:0.75rem 1.25rem 0.9rem 3rem;border-bottom:1px solid #e2e8f0;">
+                <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+                    <div style="padding:0.5rem 0.75rem;background:#f1f5f9;font-size:0.74rem;font-weight:800;color:#334155;border-bottom:1px solid #e2e8f0;">
+                        <i class="fa-solid fa-users" style="color:#FF6B00;margin-right:6px;"></i>Dealers ordering ${escapeHtml(p.name)}
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+                        <thead>
+                            <tr style="background:#f8fafc;color:#64748b;font-size:0.68rem;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">
+                                <th style="padding:0.45rem 0.65rem;text-align:left;">#</th>
+                                <th style="padding:0.45rem 0.65rem;text-align:left;">Dealer Name</th>
+                                <th style="padding:0.45rem 0.65rem;text-align:center;">Orders</th>
+                                <th style="padding:0.45rem 0.65rem;text-align:right;">Qty Ordered</th>
+                                <th style="padding:0.45rem 0.65rem;text-align:right;">Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>${dealerRowsHtml}</tbody>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+function getActiveBreakdownScopeOrders() {
+    const { orders } = getFilteredData();
+    const startVal = document.getElementById('repStartDate')?.value || '';
+    const endVal = document.getElementById('repEndDate')?.value || '';
+    const selectedMonth = document.getElementById('pbMonthSelect')?.value || '';
+    const searchQuery = (document.getElementById('topNavSearch')?.value || '').trim().toLowerCase();
+
+    let scoped = orders;
+    if (currentPbViewMode === 'single' && selectedMonth && !startVal && !endVal) {
+        scoped = scoped.filter(o => getOrderMonthKey(o.created_at) === selectedMonth);
+    }
+
+    if (searchQuery) {
+        scoped = scoped.filter(o => {
+            const dealerText = (o.firm_name || o.dealer_name || o.customer_name || '').toLowerCase();
+            const prodText = (o.items_summary || o.items_detailed || '').toLowerCase();
+            return dealerText.includes(searchQuery) || prodText.includes(searchQuery);
+        });
+    }
+
+    return {
+        scopedOrders: scoped,
+        selectedMonth,
+        hasTopDateRange: Boolean(startVal || endVal),
+        selectedProduct: getSelectedReportProducts()
+    };
+}
+
+function renderProductBreakdownTable() {
+    const tbody = document.getElementById('productBreakdownTbody');
+    const tfoot = document.getElementById('productBreakdownTfoot');
+    const metaEl = document.getElementById('pbPeriodSummaryMeta');
     if (!tbody) return;
 
-    const { orders } = getFilteredData();
+    const { scopedOrders, selectedMonth, hasTopDateRange, selectedProduct } = getActiveBreakdownScopeOrders();
+    const colors = ['#FF6B00', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#14B8A6', '#6366F1'];
 
-    if (orders.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No recent dealer orders found matching selected filters.</td>
-            </tr>`;
+    if (currentPbViewMode === 'monthly') {
+        // Group orders by month (descending) for Month-by-Month stacked view
+        const monthGroups = new Map();
+        scopedOrders.forEach(o => {
+            const ym = getOrderMonthKey(o.created_at) || 'Unknown';
+            if (!monthGroups.has(ym)) monthGroups.set(ym, []);
+            monthGroups.get(ym).push(o);
+        });
+
+        const sortedMonths = Array.from(monthGroups.keys()).sort((a, b) => b.localeCompare(a));
+        if (sortedMonths.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No B2B product sales found matching selected filters.</td></tr>`;
+            if (tfoot) tfoot.style.display = 'none';
+            if (metaEl) metaEl.textContent = 'Month-by-Month B2B summary — 0 orders';
+            return;
+        }
+
+        const overallAgg = aggregateProductBreakdown(scopedOrders, selectedProduct);
+        if (metaEl) {
+            metaEl.textContent = `Month-by-Month Summary (${sortedMonths.length} ${sortedMonths.length === 1 ? 'month' : 'months'}) · ${overallAgg.totalOrders} Orders · ${overallAgg.totalQty.toLocaleString('en-IN')} Units · ₹${overallAgg.totalSales.toLocaleString('en-IN')}`;
+        }
+
+        let html = '';
+        sortedMonths.forEach((ym, mIdx) => {
+            const mOrders = monthGroups.get(ym);
+            const agg = aggregateProductBreakdown(mOrders, selectedProduct);
+            if (agg.rows.length === 0) return;
+
+            html += `
+                <tr style="background:#eff6ff;border-top:2px solid #bfdbfe;border-bottom:1px solid #bfdbfe;">
+                    <td colspan="8" style="padding:0.65rem 0.9rem;font-weight:800;color:#1e3a8a;font-size:0.82rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                            <span><i class="fa-regular fa-calendar-check" style="margin-right:6px;"></i>${escapeHtml(formatMonthLabel(ym))}</span>
+                            <span style="font-size:0.76rem;color:#1d4ed8;">
+                                ${agg.totalOrders} Orders · ${agg.totalDealers} Dealers · ${agg.totalQty.toLocaleString('en-IN')} Units · ₹${agg.totalSales.toLocaleString('en-IN')}
+                            </span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            html += agg.rows.map((p, idx) => buildProductBreakdownRowHtml(p, idx, `pb-m${mIdx}`, colors)).join('');
+        });
+
+        tbody.innerHTML = html || `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No B2B product sales found matching selected filters.</td></tr>`;
+        if (tfoot) {
+            tfoot.style.display = overallAgg.rows.length > 0 ? 'table-footer-group' : 'none';
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="2" style="padding:0.85rem 0.75rem;">OVERALL TOTAL (${sortedMonths.length} Months)</td>
+                    <td style="padding:0.85rem 0.75rem;text-align:center;">${overallAgg.totalOrders}</td>
+                    <td style="padding:0.85rem 0.75rem;text-align:center;">${overallAgg.totalDealers} Dealers</td>
+                    <td style="padding:0.85rem 0.75rem;text-align:right;">${overallAgg.totalQty.toLocaleString('en-IN')}</td>
+                    <td style="padding:0.85rem 0.75rem;text-align:right;color:#64748b;">—</td>
+                    <td style="padding:0.85rem 0.75rem;text-align:right;">₹${overallAgg.totalSales.toLocaleString('en-IN')}</td>
+                    <td style="padding:0.85rem 0.75rem;text-align:right;">100.0%</td>
+                </tr>
+            `;
+        }
         return;
     }
 
-    const recent = orders.slice(0, 8);
-    tbody.innerHTML = recent.map(o => {
-        const orderIdCode = typeof window.formatOrderId === 'function' ? window.formatOrderId(o.order_id, o.created_at) : `#SGB-${o.order_id}`;
-        const dealerName = o.dealer_name || o.firm_name || o.customer_name || 'Dealer Store';
-        const orderDate = new Date(o.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        const total = parseFloat(o.total_amount || 0);
-        const paid = parseFloat(o.advance_amount || 0);
-        const balance = Math.max(0, total - paid);
+    // Selected Month / Filtered Range view
+    const agg = aggregateProductBreakdown(scopedOrders, selectedProduct);
+    const periodLabel = hasTopDateRange
+        ? 'Selected Date Range'
+        : (selectedMonth ? formatMonthLabel(selectedMonth) : 'All Months');
 
-        let statusBg = '#fff7ed';
-        let statusColor = '#ea580c';
-        let statusText = 'Ordered';
+    if (metaEl) {
+        metaEl.textContent = `${periodLabel} · ${agg.rows.length} Products · ${agg.totalOrders} Orders · ${agg.totalQty.toLocaleString('en-IN')} Units · ₹${agg.totalSales.toLocaleString('en-IN')}`;
+    }
 
-        const st = (o.order_status || '').toLowerCase();
-        if (st === 'shipped') {
-            statusBg = '#eff6ff';
-            statusColor = '#2563eb';
-            statusText = 'Shipped';
-        } else if (st === 'delivered') {
-            statusBg = '#ecfdf5';
-            statusColor = '#059669';
-            statusText = 'Delivered';
-        }
+    if (agg.rows.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
+                    No dealer product orders found for ${escapeHtml(periodLabel)}. Try selecting another month or choosing "All Months".
+                </td>
+            </tr>`;
+        if (tfoot) tfoot.style.display = 'none';
+        return;
+    }
 
-        return `
-            <tr style="border-bottom:1px solid #f1f5f9;">
-                <td style="padding:0.85rem 1rem;font-weight:700;color:#0f172a;white-space:nowrap;">${orderIdCode}</td>
-                <td style="padding:0.85rem 1rem;font-weight:600;">${dealerName}</td>
-                <td style="padding:0.85rem 1rem;color:#64748b;">${orderDate}</td>
-                <td style="padding:0.85rem 1rem;text-align:right;font-weight:700;">₹${total.toLocaleString('en-IN')}</td>
-                <td style="padding:0.85rem 1rem;text-align:right;color:#10b981;font-weight:700;">₹${paid.toLocaleString('en-IN')}</td>
-                <td style="padding:0.85rem 1rem;text-align:right;color:${balance > 0 ? '#ef4444' : '#10b981'};font-weight:700;">₹${balance.toLocaleString('en-IN')}</td>
-                <td style="padding:0.85rem 1rem;text-align:center;"><span class="status-pill" style="background:${statusBg};color:${statusColor};padding:3px 8px;border-radius:6px;font-weight:700;font-size:0.75rem;">${statusText}</span></td>
-                <td style="padding:0.85rem 1rem;color:#475569;">${o.delivery_type || 'Post office COD'}</td>
+    tbody.innerHTML = agg.rows.map((p, idx) => buildProductBreakdownRowHtml(p, idx, 'pb-s', colors)).join('');
+
+    if (tfoot) {
+        tfoot.style.display = 'table-footer-group';
+        tfoot.innerHTML = `
+            <tr>
+                <td colspan="2" style="padding:0.85rem 0.75rem;">GRAND TOTAL (${escapeHtml(periodLabel)})</td>
+                <td style="padding:0.85rem 0.75rem;text-align:center;">${agg.totalOrders}</td>
+                <td style="padding:0.85rem 0.75rem;text-align:center;">${agg.totalDealers} Dealers</td>
+                <td style="padding:0.85rem 0.75rem;text-align:right;">${agg.totalQty.toLocaleString('en-IN')}</td>
+                <td style="padding:0.85rem 0.75rem;text-align:right;color:#64748b;">—</td>
+                <td style="padding:0.85rem 0.75rem;text-align:right;">₹${agg.totalSales.toLocaleString('en-IN')}</td>
+                <td style="padding:0.85rem 0.75rem;text-align:right;">100.0%</td>
             </tr>
         `;
-    }).join('');
+    }
 }
 
 function updateTopProductsTable() {
@@ -582,45 +1010,10 @@ function updateTopProductsTable() {
     if (!tbody) return;
 
     const { orders } = getFilteredData();
+    const selectedProduct = getSelectedReportProducts();
+    const agg = aggregateProductBreakdown(orders, selectedProduct);
 
-    const productMap = new Map();
-    orders.forEach(o => {
-        if (o.items_detailed) {
-            const items = o.items_detailed.split('||');
-            items.forEach(itemStr => {
-                const parts = itemStr.split('::');
-                if (parts.length >= 2) {
-                    const pName = parts[0].trim();
-                    const qty = parseInt(parts[1].trim()) || 1;
-                    const price = parseFloat(parts[2] || 0);
-                    const total = parseFloat(parts[3] || (qty * price));
-                    if (!productMap.has(pName)) {
-                        productMap.set(pName, { qty: 0, sales: 0 });
-                    }
-                    const itemData = productMap.get(pName);
-                    itemData.qty += qty;
-                    itemData.sales += total;
-                }
-            });
-        } else if (o.items_summary) {
-            const items = o.items_summary.split('||');
-            items.forEach(itemStr => {
-                const parts = itemStr.split(' x ');
-                if (parts.length === 2) {
-                    const pName = parts[0].trim();
-                    const qty = parseInt(parts[1].trim()) || 0;
-                    if (!productMap.has(pName)) {
-                        productMap.set(pName, { qty: 0, sales: 0 });
-                    }
-                    const itemData = productMap.get(pName);
-                    itemData.qty += qty;
-                    itemData.sales += (parseFloat(o.total_amount || 0) / Math.max(1, items.length));
-                }
-            });
-        }
-    });
-
-    if (productMap.size === 0) {
+    if (agg.rows.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="3" style="text-align:center;padding:1.5rem;color:#64748b;">No product sales data available for selected filters.</td>
@@ -628,15 +1021,12 @@ function updateTopProductsTable() {
         return;
     }
 
-    const sortedProducts = Array.from(productMap.entries())
-        .map(([name, stat]) => ({ name, qty: stat.qty, sales: Math.round(stat.sales) }))
-        .sort((a, b) => b.qty - a.qty);
-
+    const sortedProducts = [...agg.rows].sort((a, b) => b.qty - a.qty);
     const colors = ['#FF6B00', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#14B8A6', '#6366F1'];
 
     tbody.innerHTML = sortedProducts.map((p, idx) => `
         <tr>
-            <td style="font-weight:700;color:#0f172a;"><i class="fa-solid fa-cubes" style="color:${colors[idx % colors.length]};margin-right:6px;"></i> ${p.name}</td>
+            <td style="font-weight:700;color:#0f172a;"><i class="fa-solid fa-cubes" style="color:${colors[idx % colors.length]};margin-right:6px;"></i> ${escapeHtml(p.name)}</td>
             <td style="text-align:center;font-weight:700;">${p.qty}</td>
             <td style="text-align:right;font-weight:800;color:#0f172a;">₹${p.sales.toLocaleString('en-IN')}</td>
         </tr>
@@ -688,8 +1078,15 @@ function updateTopDealersTable() {
 }
 
 function applyReportsFilters() {
+    const startVal = document.getElementById('repStartDate')?.value || '';
+    const endVal = document.getElementById('repEndDate')?.value || '';
+    const pbMonthSel = document.getElementById('pbMonthSelect');
+    if (pbMonthSel) {
+        pbMonthSel.disabled = Boolean(startVal || endVal);
+    }
+
     updateSummaryMetrics();
-    renderRecentOrdersTable();
+    renderProductBreakdownTable();
     updateTopDealersTable();
     updateTopProductsTable();
     updateChartsData();
@@ -698,15 +1095,19 @@ function applyReportsFilters() {
 function resetReportsFilters() {
     const dealerSelect = document.getElementById('repDealerSelect');
     const salespersonSelect = document.getElementById('repSalespersonSelect');
-    const productSelect = document.getElementById('repProductSelect');
     const startDateInput = document.getElementById('repStartDate');
     const endDateInput = document.getElementById('repEndDate');
+    const topSearch = document.getElementById('topNavSearch');
 
     if (dealerSelect) dealerSelect.value = '';
     if (salespersonSelect) salespersonSelect.value = '';
-    if (productSelect) productSelect.value = '';
+    if (repProductMultiSelect) repProductMultiSelect.clear();
     if (startDateInput) startDateInput.value = '';
     if (endDateInput) endDateInput.value = '';
+    if (topSearch) topSearch.value = '';
+
+    pbMonthInitialized = false;
+    populateProductBreakdownMonthDropdown();
 
     applyReportsFilters();
 }
@@ -735,8 +1136,8 @@ function exportReportsAnalytics() {
     const dealerText = dealerSelect && dealerSelect.selectedIndex >= 0 ? dealerSelect.options[dealerSelect.selectedIndex].text : 'All Dealers';
     const salespersonSelect = document.getElementById('repSalespersonSelect');
     const salespersonText = salespersonSelect && salespersonSelect.selectedIndex >= 0 ? salespersonSelect.options[salespersonSelect.selectedIndex].text : 'All Salespersons';
-    const productSelect = document.getElementById('repProductSelect');
-    const productText = productSelect && productSelect.selectedIndex >= 0 ? productSelect.options[productSelect.selectedIndex].text : 'All Products';
+    const selectedProducts = getSelectedReportProducts();
+    const productText = selectedProducts.length > 0 ? selectedProducts.join(', ') : 'All Products';
 
     let dateRangeStr = 'All Time';
     if (startDateVal && endDateVal) {
@@ -861,60 +1262,71 @@ function exportReportsAnalytics() {
     }
     rows.push([]);
 
-    // Top Selling Products
-    rows.push([sanitizeCell('--- TOP SELLING PRODUCTS ---')]);
+    // Top Selling Products (reusing shared aggregation helper)
+    rows.push([sanitizeCell('--- PRODUCT-WISE BREAKDOWN (B2B OVERALL) ---')]);
     rows.push([
         sanitizeCell('Product Name'),
+        sanitizeCell('Orders'),
+        sanitizeCell('Dealers'),
         sanitizeCell('Quantity Sold'),
+        sanitizeCell('Avg Rate (INR)'),
         sanitizeCell('Total Sales (INR)')
     ].join(','));
 
-    const productMap = new Map();
-    orders.forEach(o => {
-        if (o.items_detailed) {
-            const items = o.items_detailed.split('||');
-            items.forEach(itemStr => {
-                const parts = itemStr.split('::');
-                if (parts.length >= 2) {
-                    const pName = parts[0].trim();
-                    const qty = parseInt(parts[1].trim()) || 1;
-                    const price = parseFloat(parts[2] || 0);
-                    const total = parseFloat(parts[3] || (qty * price));
-                    if (!productMap.has(pName)) productMap.set(pName, { qty: 0, sales: 0 });
-                    const itemData = productMap.get(pName);
-                    itemData.qty += qty;
-                    itemData.sales += total;
-                }
-            });
-        } else if (o.items_summary) {
-            const items = o.items_summary.split('||');
-            items.forEach(itemStr => {
-                const parts = itemStr.split(' x ');
-                if (parts.length === 2) {
-                    const pName = parts[0].trim();
-                    const qty = parseInt(parts[1].trim()) || 0;
-                    if (!productMap.has(pName)) productMap.set(pName, { qty: 0, sales: 0 });
-                    const itemData = productMap.get(pName);
-                    itemData.qty += qty;
-                    itemData.sales += (parseFloat(o.total_amount || 0) / Math.max(1, items.length));
-                }
-            });
-        }
-    });
+    const selectedProduct = getSelectedReportProducts();
+    const aggOverall = aggregateProductBreakdown(orders, selectedProduct);
 
-    if (productMap.size === 0) {
+    if (aggOverall.rows.length === 0) {
         rows.push([sanitizeCell('No product sales data available for selected filters.')]);
     } else {
-        const sortedProducts = Array.from(productMap.entries())
-            .map(([name, stat]) => ({ name, qty: stat.qty, sales: Math.round(stat.sales) }))
-            .sort((a, b) => b.qty - a.qty);
-
-        sortedProducts.forEach(p => {
+        aggOverall.rows.forEach(p => {
             rows.push([
                 sanitizeCell(p.name),
+                sanitizeCell(p.orderCount),
+                sanitizeCell(p.dealerCount),
                 sanitizeCell(p.qty),
+                sanitizeCell(p.avgRate),
                 sanitizeCell(p.sales)
             ].join(','));
+        });
+    }
+    rows.push([]);
+
+    // Monthly Product-wise Summary (B2B)
+    rows.push([sanitizeCell('--- MONTHLY PRODUCT-WISE BREAKDOWN (B2B) ---')]);
+    rows.push([
+        sanitizeCell('Month'),
+        sanitizeCell('Product Name'),
+        sanitizeCell('Orders'),
+        sanitizeCell('Dealers'),
+        sanitizeCell('Quantity Sold'),
+        sanitizeCell('Avg Rate (INR)'),
+        sanitizeCell('Total Sales (INR)')
+    ].join(','));
+
+    const monthGroups = new Map();
+    orders.forEach(o => {
+        const ym = getOrderMonthKey(o.created_at) || 'Unknown';
+        if (!monthGroups.has(ym)) monthGroups.set(ym, []);
+        monthGroups.get(ym).push(o);
+    });
+    const sortedMonthKeys = Array.from(monthGroups.keys()).sort((a, b) => b.localeCompare(a));
+    if (sortedMonthKeys.length === 0) {
+        rows.push([sanitizeCell('No monthly product summary available.')]);
+    } else {
+        sortedMonthKeys.forEach(ym => {
+            const mAgg = aggregateProductBreakdown(monthGroups.get(ym), selectedProduct);
+            mAgg.rows.forEach(p => {
+                rows.push([
+                    sanitizeCell(formatMonthLabel(ym)),
+                    sanitizeCell(p.name),
+                    sanitizeCell(p.orderCount),
+                    sanitizeCell(p.dealerCount),
+                    sanitizeCell(p.qty),
+                    sanitizeCell(p.avgRate),
+                    sanitizeCell(p.sales)
+                ].join(','));
+            });
         });
     }
     rows.push([]);
@@ -957,23 +1369,100 @@ function exportReportsAnalytics() {
         });
     }
 
+    downloadCsvRows(rows, `SGB_Agro_Reports_Analytics_${new Date().toISOString().slice(0, 10)}.csv`, 'Reports & Analytics data exported successfully as CSV!');
+}
+
+function csvCell(val) {
+    if (val === null || val === undefined) return '""';
+    return `"${String(val).replace(/"/g, '""')}"`;
+}
+
+function downloadCsvRows(rows, filename, successMsg) {
     const csvContent = '\uFEFF' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    link.setAttribute('download', `SGB_Agro_Reports_Analytics_${dateStr}.csv`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    if (window.showAlert) {
-        window.showAlert('Export Successful', 'Reports & Analytics data exported successfully as CSV!', 'success');
-    } else {
-        alert('Reports & Analytics data exported successfully as CSV!');
+    if (window.recordDealerActivityClient) {
+        window.recordDealerActivityClient('EXPORT', 'DEALER_REPORT', `CSV(${rows.length - 1})`, `Exported ${filename} (${rows.length - 1} rows)`);
     }
+
+    if (window.showAlert) {
+        window.showAlert('Export Successful', successMsg, 'success');
+    } else {
+        alert(successMsg);
+    }
+}
+
+function exportProductBreakdownCSV() {
+    const { scopedOrders, selectedMonth, hasTopDateRange, selectedProduct } = getActiveBreakdownScopeOrders();
+    if (!scopedOrders || scopedOrders.length === 0) {
+        if (window.showAlert) {
+            window.showAlert('Export Notice', 'No B2B product breakdown data available to export.', 'info');
+        } else {
+            alert('No B2B product breakdown data available to export.');
+        }
+        return;
+    }
+
+    const rows = [];
+    rows.push([csvCell('SGB AGRO - PRODUCT-WISE BREAKDOWN (B2B)')].join(','));
+    rows.push([csvCell(`Exported On: ${new Date().toLocaleString('en-IN')}`)].join(','));
+
+    if (currentPbViewMode === 'monthly') {
+        rows.push([csvCell('Month'), csvCell('Product Name'), csvCell('Orders'), csvCell('Dealers Count'), csvCell('Dealer Names'), csvCell('Qty Sold'), csvCell('Avg Rate (INR)'), csvCell('Total Amount (INR)')].join(','));
+        const monthGroups = new Map();
+        scopedOrders.forEach(o => {
+            const ym = getOrderMonthKey(o.created_at) || 'Unknown';
+            if (!monthGroups.has(ym)) monthGroups.set(ym, []);
+            monthGroups.get(ym).push(o);
+        });
+        Array.from(monthGroups.keys()).sort((a, b) => b.localeCompare(a)).forEach(ym => {
+            const agg = aggregateProductBreakdown(monthGroups.get(ym), selectedProduct);
+            agg.rows.forEach(p => {
+                const dealerListStr = p.dealers.map(d => `${d.dealerName} (${d.qty})`).join('; ');
+                rows.push([
+                    csvCell(formatMonthLabel(ym)),
+                    csvCell(p.name),
+                    csvCell(p.orderCount),
+                    csvCell(p.dealerCount),
+                    csvCell(dealerListStr),
+                    csvCell(p.qty),
+                    csvCell(p.avgRate),
+                    csvCell(p.sales)
+                ].join(','));
+            });
+        });
+        downloadCsvRows(rows, `SGB_B2B_Product_Breakdown_Monthly_${new Date().toISOString().slice(0, 10)}.csv`, 'Monthly B2B Product Breakdown exported as CSV!');
+        return;
+    }
+
+    const periodLabel = hasTopDateRange ? 'Selected_Date_Range' : (selectedMonth || 'All_Months');
+    rows.push([csvCell(`Period: ${hasTopDateRange ? 'Selected Date Range' : formatMonthLabel(selectedMonth)}`)].join(','));
+    rows.push([csvCell('Product Name'), csvCell('Orders'), csvCell('Dealers Count'), csvCell('Dealer Breakdown (Qty)'), csvCell('Qty Sold'), csvCell('Avg Rate (INR)'), csvCell('Total Amount (INR)'), csvCell('Share (%)')].join(','));
+
+    const agg = aggregateProductBreakdown(scopedOrders, selectedProduct);
+    agg.rows.forEach(p => {
+        const dealerListStr = p.dealers.map(d => `${d.dealerName} (${d.qty})`).join('; ');
+        rows.push([
+            csvCell(p.name),
+            csvCell(p.orderCount),
+            csvCell(p.dealerCount),
+            csvCell(dealerListStr),
+            csvCell(p.qty),
+            csvCell(p.avgRate),
+            csvCell(p.sales),
+            csvCell(p.sharePct.toFixed(1))
+        ].join(','));
+    });
+
+    downloadCsvRows(rows, `SGB_B2B_Product_Breakdown_${periodLabel}.csv`, 'B2B Product Breakdown exported as CSV!');
 }
 
 window.switchChartTimeTab = switchChartTimeTab;
@@ -981,4 +1470,8 @@ window.toggleOverviewMetric = toggleOverviewMetric;
 window.applyReportsFilters = applyReportsFilters;
 window.resetReportsFilters = resetReportsFilters;
 window.exportReportsAnalytics = exportReportsAnalytics;
+window.switchProductBreakdownMode = switchProductBreakdownMode;
+window.toggleProductDealerDrawer = toggleProductDealerDrawer;
+window.renderProductBreakdownTable = renderProductBreakdownTable;
+window.exportProductBreakdownCSV = exportProductBreakdownCSV;
 

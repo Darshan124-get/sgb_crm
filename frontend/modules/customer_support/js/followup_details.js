@@ -114,14 +114,21 @@ function renderPhotos(photos) {
         return;
     }
 
-    container.innerHTML = photos.map(p => `
-        <div class="photo-thumb-card" style="cursor: pointer;" onclick="window.open('${p.file_url}', '_blank')">
-            <img src="${p.file_url}" alt="Fitting Photo">
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; font-size: 0.65rem; padding: 2px 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
-                ${p.file_name || 'Photo'}
+    container.innerHTML = photos.map(p => {
+        const mediaUrl = window.resolveMediaUrl ? window.resolveMediaUrl(p.file_url) : p.file_url;
+        const isVideo = window.isSupportVideoFile ? window.isSupportVideoFile(p.file_url, p.file_name) : /\.(mp4|mov|webm|avi|mkv)$/i.test(p.file_url || '');
+        const inner = isVideo
+            ? `<video src="${mediaUrl}" controls preload="metadata" style="width:100%;height:100%;object-fit:cover;background:#0f172a;"></video>`
+            : `<img src="${mediaUrl}" alt="Fitting Photo">`;
+        return `
+            <div class="photo-thumb-card" style="cursor: pointer;" onclick="window.open('${mediaUrl}', '_blank')">
+                ${inner}
+                <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; font-size: 0.65rem; padding: 2px 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                    ${p.file_name || (isVideo ? 'Video' : 'Photo')}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // ── RENDER TIMELINE ──

@@ -1,7 +1,7 @@
 /**
  * job_cards.js
- * Customer Support Job Cards Management UI Controller
- * Single-operator model: Support executive handles call, diagnosis, parts & completion.
+ * Customer Support Job Cards List & Navigation Controller
+ * Routes Create / Edit / Resume / View / Print into the structured 10-section Job Card workspace.
  */
 
 let currentPage = 1;
@@ -13,7 +13,6 @@ let currentPriority = '';
 let searchDebounceTimer = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Check URL parameters for prefill or direct action
     const urlParams = new URLSearchParams(window.location.search);
     const initialStatus = urlParams.get('status');
     const initialPhone = urlParams.get('phone');
@@ -21,13 +20,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     const initialCaseId = urlParams.get('case_id');
     const initialAction = urlParams.get('action');
 
+    // Redirect creation links (from customer_details or orders_delivered) directly to full structured page
+    if (initialAction === 'create' || initialPhone || initialOrderId || initialCaseId) {
+        const nextParams = new URLSearchParams({ mode: 'create' });
+        if (initialPhone) nextParams.set('phone', initialPhone);
+        if (initialOrderId) nextParams.set('order_id', initialOrderId);
+        if (initialCaseId) nextParams.set('case_id', initialCaseId);
+        window.location.replace(`job_card_details.html?${nextParams.toString()}`);
+        return;
+    }
+
     if (initialStatus) {
         currentStatus = initialStatus.toLowerCase();
         highlightActiveTab(currentStatus);
     }
 
+    try {
+        const flash = sessionStorage.getItem('jc_flash_toast');
+        if (flash) {
+            sessionStorage.removeItem('jc_flash_toast');
+            if (window.showToast) window.showToast(flash, 'success');
+        }
+    } catch (e) {}
 
-    // 3. Search input debouncing
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -39,19 +54,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 4. Initial load of job cards
     await loadJobCards(1);
-
-    // 5. Handle prefill from URL if coming from orders_delivered or support cases
-    if (initialAction === 'create' || initialPhone || initialOrderId || initialCaseId) {
-        openCreateJobModal({
-            phone: initialPhone || '',
-            order_id: initialOrderId || '',
-            case_id: initialCaseId || ''
-        });
-    }
 });
-
 
 /**
  * Fetch and display Job Cards list
@@ -86,21 +90,25 @@ async function loadJobCards(page = 1) {
                 <tr>
                     <td colspan="9" style="text-align: center; padding: 3rem; color: #ef4444;">
                         <i class="fas fa-exclamation-triangle" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
-                        Failed to load job cards: ${res ? res.message : 'Unknown error'}
+                        Failed to load job cards: ${escapeHtml(res ? res.message : 'Unknown error')}
                     </td>
                 </tr>
             `;
             return;
         }
 
-        // Update Tab Badges
         if (res.statusCounts) {
-            document.getElementById('badgeAll').textContent = res.statusCounts.all || 0;
-            document.getElementById('badgeOpen').textContent = res.statusCounts.open || 0;
-            document.getElementById('badgeInProgress').textContent = res.statusCounts['in progress'] || 0;
-            document.getElementById('badgeOnHold').textContent = res.statusCounts['on hold'] || 0;
-            document.getElementById('badgeCompleted').textContent = res.statusCounts.completed || 0;
-            document.getElementById('badgeCancelled').textContent = res.statusCounts.cancelled || 0;
+            const setBadge = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val || 0;
+            };
+            setBadge('badgeAll', res.statusCounts.all);
+            setBadge('badgeDraft', res.statusCounts.draft);
+            setBadge('badgeOpen', res.statusCounts.open);
+            setBadge('badgeInProgress', res.statusCounts['in progress']);
+            setBadge('badgeOnHold', res.statusCounts['on hold']);
+            setBadge('badgeCompleted', res.statusCounts.completed);
+            setBadge('badgeCancelled', res.statusCounts.cancelled);
         }
 
         const jobs = res.data || [];
@@ -112,11 +120,11 @@ async function loadJobCards(page = 1) {
                             <i class="fas fa-clipboard-check" style="font-size: 2.2rem; color: #cbd5e1; margin-bottom: 0.75rem; display: block;"></i>
                             <h4 style="font-weight: 700; color: #334155; margin-bottom: 0.35rem;">No Job Cards Found</h4>
                             <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem;">
-                                ${searchQuery ? `No jobs match "${searchQuery}".` : 'No Job Cards match the current filter criteria.'}
+                                ${searchQuery ? `No jobs match "${escapeHtml(searchQuery)}".` : 'No Job Cards match the current filter criteria.'}
                             </p>
-                            <button type="button" class="btn btn-primary btn-sm" onclick="openCreateJobModal()">
+                            <a href="job_card_details.html?mode=create" class="btn btn-primary btn-sm">
                                 <i class="fas fa-plus-circle"></i> Create Job Card
-                            </button>
+                            </a>
                         </div>
                     </td>
                 </tr>
@@ -125,7 +133,6 @@ async function loadJobCards(page = 1) {
             return;
         }
 
-        // Render Rows
         tbody.innerHTML = jobs.map(job => renderJobCardRow(job)).join('');
         updatePagination(res.pagination || { total: jobs.length, page: 1, totalPages: 1 });
 
@@ -148,33 +155,50 @@ async function loadJobCards(page = 1) {
 function renderJobCardRow(job) {
     const statusSlug = (job.status || 'open').toLowerCase().replace(/\s+/g, '-');
     const prioritySlug = (job.priority || 'medium').toLowerCase();
-    
-    // Icon by job type
+
     let jobTypeIcon = 'fa-wrench';
     if (job.job_type === 'Installation') jobTypeIcon = 'fa-tools';
     else if (job.job_type === 'Inspection') jobTypeIcon = 'fa-search';
     else if (job.job_type === 'Replacement Assessment') jobTypeIcon = 'fa-exchange-alt';
 
     const customerPhoneClean = (job.customer_phone || '').replace(/[^0-9]/g, '');
-    const formattedCreated = window.formatDate(job.created_at);
-    const formattedDue = job.due_date ? window.formatDate(job.due_date) : '—';
+    const formattedDate = window.formatDate(job.job_card_date || job.created_at);
+    const formattedPromised = job.due_date ? window.formatDate(job.due_date) : '—';
+    const machineName = job.machine_make_model || job.product_summary || '';
+    const complaintText = job.specific_complaint || job.issue_description || 'No complaint entered yet';
+    const grandTotal = parseFloat(job.grand_total || 0);
+
+    let actionLabel = 'Manage';
+    let actionIcon = 'fa-folder-open';
+    let actionBtnClass = 'btn-primary';
+    if (job.status === 'Draft') {
+        actionLabel = 'Resume / Manage';
+        actionIcon = 'fa-play-circle';
+    } else if (job.status === 'Completed' || job.status === 'Cancelled') {
+        actionLabel = 'View / Print';
+        actionIcon = 'fa-eye';
+        actionBtnClass = 'btn-outline';
+    }
 
     return `
         <tr class="job-row">
             <td>
                 <div style="font-weight: 800; color: #0284c7; display: flex; align-items: center; gap: 0.35rem;">
-                    <a href="job_card_details.html?id=${job.job_card_id}" style="color: #0284c7; text-decoration: none;" title="View details">
-                        ${job.job_card_number}
+                    <a href="job_card_details.html?id=${job.job_card_id}" style="color: #0284c7; text-decoration: none;" title="Open Job Card">
+                        ${escapeHtml(job.job_card_number)}
                     </a>
                 </div>
-                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.15rem;">
-                    <i class="far fa-calendar-alt"></i> ${formattedCreated}
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
+                    <i class="far fa-calendar-alt"></i> ${formattedDate}
+                </div>
+                <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.1rem;">
+                    <i class="fas ${jobTypeIcon}"></i> ${escapeHtml(job.job_type)}
                 </div>
             </td>
             <td>
-                <div style="font-weight: 700; color: #1e293b;">${job.customer_name || 'Customer'}</div>
+                <div style="font-weight: 700; color: #1e293b;">${escapeHtml(job.customer_name || 'Draft Customer')}</div>
                 <div style="font-size: 0.78rem; color: #475569; display: flex; align-items: center; gap: 0.4rem; margin-top: 0.15rem;">
-                    <span><i class="fas fa-phone-alt" style="font-size: 0.7rem; color: #0284c7;"></i> ${job.customer_phone || '—'}</span>
+                    <span><i class="fas fa-phone-alt" style="font-size: 0.7rem; color: #0284c7;"></i> ${escapeHtml(job.customer_phone || '—')}</span>
                     ${customerPhoneClean ? `
                         <button type="button" class="btn-call-mini" onclick="window.callCustomer('${customerPhoneClean}', '${escapeQuotes(job.customer_name)}')" title="Call Customer">
                             <i class="fas fa-phone"></i>
@@ -182,65 +206,77 @@ function renderJobCardRow(job) {
                     ` : ''}
                 </div>
                 ${job.customer_address ? `
-                    <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${job.customer_address}">
-                        <i class="fas fa-map-marker-alt" style="font-size: 0.68rem; color: #94a3b8;"></i> ${job.customer_address}
+                    <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(job.customer_address)}">
+                        <i class="fas fa-map-marker-alt" style="font-size: 0.68rem; color: #94a3b8;"></i> ${escapeHtml(job.customer_address)}
                     </div>
                 ` : ''}
             </td>
-            <td>
-                <span class="badge" style="background: #f1f5f9; color: #334155; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.3rem;">
-                    <i class="fas ${jobTypeIcon}" style="color: #64748b; font-size: 0.7rem;"></i> ${job.job_type}
-                </span>
-                ${job.order_number ? `
-                    <div style="font-size: 0.72rem; color: #0284c7; font-weight: 600; margin-top: 0.25rem;">
-                        <i class="fas fa-shopping-bag"></i> ${job.order_number}
+            <td style="max-width: 190px;">
+                <div style="font-weight: 600; color: #1e293b; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(machineName || 'N/A')}">
+                    ${machineName ? escapeHtml(machineName) : '<span style="color:#94a3b8;font-style:italic;">Not specified</span>'}
+                </div>
+                ${job.serial_vin_number ? `
+                    <div style="font-size: 0.72rem; color: #475569; font-family: monospace; margin-top: 0.15rem;">
+                        S/N: ${escapeHtml(job.serial_vin_number)}
+                    </div>
+                ` : ''}
+                ${job.hours_run ? `
+                    <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.1rem;">
+                        Hrs Run: ${escapeHtml(job.hours_run)}
                     </div>
                 ` : ''}
             </td>
-            <td style="max-width: 240px;">
-                <div style="font-weight: 600; color: #1e293b; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${job.product_summary || 'N/A'}">
-                    ${job.product_summary || '<span style="color:#94a3b8;font-style:italic;">No product specified</span>'}
-                </div>
-                <div style="font-size: 0.76rem; color: #64748b; margin-top: 0.2rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${job.issue_description}">
-                    ${job.issue_description}
+            <td style="max-width: 230px;">
+                ${job.specific_complaint ? `
+                    <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; margin-bottom: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(job.specific_complaint)}">
+                        ${escapeHtml(job.specific_complaint)}
+                    </div>
+                ` : ''}
+                <div style="font-size: 0.76rem; color: #64748b; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${escapeHtml(complaintText)}">
+                    ${escapeHtml(job.issue_description || (job.specific_complaint ? '' : 'No complaint entered yet'))}
                 </div>
             </td>
             <td>
-                <span class="priority-badge priority-${prioritySlug}">
-                    <span class="priority-dot"></span> ${job.priority}
-                </span>
+                <div style="font-weight: 800; color: #0f172a; font-size: 0.85rem;">
+                    ₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">
+                    ${parseFloat(job.shipping_charge || 0) > 0 ? `Incl. ₹${parseFloat(job.shipping_charge).toFixed(2)} shipping` : 'Billing in Billing Panel'}
+                </div>
             </td>
             <td>
-                <span class="status-pill status-${statusSlug}">
-                    ${job.status}
-                </span>
+                <div style="display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start;">
+                    <span class="status-pill status-${statusSlug}">${escapeHtml(job.status)}</span>
+                    <span class="priority-badge priority-${prioritySlug}">
+                        <span class="priority-dot"></span> ${escapeHtml(job.priority)}
+                    </span>
+                </div>
             </td>
             <td>
                 <div style="font-size: 0.82rem; font-weight: 600; color: #334155;">
-                    ${job.assigned_to_name ? `<i class="fas fa-user-circle" style="color: #64748b; font-size: 0.78rem;"></i> ${job.assigned_to_name}` : '<span style="color:#94a3b8;font-style:italic;">Unassigned</span>'}
+                    ${job.assigned_to_name ? `<i class="fas fa-user-circle" style="color: #64748b; font-size: 0.78rem;"></i> ${escapeHtml(job.assigned_to_name)}` : '<span style="color:#94a3b8;font-style:italic;">Unassigned</span>'}
                 </div>
             </td>
             <td>
                 <div style="font-size: 0.8rem; color: ${isPastDue(job.due_date, job.status) ? '#ef4444; font-weight:700;' : '#475569;'}">
-                    ${formattedDue}
+                    ${formattedPromised}
                     ${isPastDue(job.due_date, job.status) ? '<span style="font-size: 0.68rem; display: block; color: #ef4444;"><i class="fas fa-exclamation-circle"></i> Overdue</span>' : ''}
                 </div>
             </td>
             <td style="text-align: right;">
-                <a href="job_card_details.html?id=${job.job_card_id}" class="btn btn-primary btn-sm" style="font-size: 0.78rem; padding: 0.35rem 0.65rem;" title="View details and manage job card">
-                    <i class="fas fa-folder-open"></i> Manage
-                </a>
+                <div style="display: inline-flex; gap: 0.35rem; justify-content: flex-end;">
+                    <a href="job_card_details.html?id=${job.job_card_id}" class="btn ${actionBtnClass} btn-sm" style="font-size: 0.78rem; padding: 0.35rem 0.65rem;" title="${actionLabel}">
+                        <i class="fas ${actionIcon}"></i> ${actionLabel}
+                    </a>
+                </div>
             </td>
         </tr>
     `;
 }
 
-/**
- * Check if a job card is past its due date
- */
 function isPastDue(dueDateStr, status) {
     if (!dueDateStr) return false;
-    if (status === 'Completed' || status === 'Cancelled') return false;
+    if (status === 'Completed' || status === 'Cancelled' || status === 'Draft') return false;
     try {
         const due = new Date(dueDateStr);
         const today = new Date();
@@ -251,17 +287,21 @@ function isPastDue(dueDateStr, status) {
     }
 }
 
-/**
- * Escape quotes for inline JS attributes
- */
 function escapeQuotes(str) {
     if (!str) return '';
-    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
-/**
- * Update pagination UI
- */
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function updatePagination(pagination) {
     totalPages = pagination.totalPages || 1;
     currentPage = pagination.page || 1;
@@ -281,9 +321,6 @@ function updatePagination(pagination) {
     if (btnNext) btnNext.disabled = currentPage >= totalPages;
 }
 
-/**
- * Change page
- */
 window.changePage = function (delta) {
     const target = currentPage + delta;
     if (target >= 1 && target <= totalPages) {
@@ -291,9 +328,6 @@ window.changePage = function (delta) {
     }
 };
 
-/**
- * Filter by status tab
- */
 window.filterByStatus = function (status) {
     currentStatus = status.toLowerCase();
     highlightActiveTab(currentStatus);
@@ -311,9 +345,6 @@ function highlightActiveTab(status) {
     });
 }
 
-/**
- * Filter by dropdowns
- */
 window.applyFilters = function () {
     const typeSelect = document.getElementById('typeFilter');
     const prioritySelect = document.getElementById('priorityFilter');
@@ -322,9 +353,6 @@ window.applyFilters = function () {
     loadJobCards(1);
 };
 
-/**
- * Reset all filters
- */
 window.resetFilters = function () {
     const searchInput = document.getElementById('searchInput');
     const typeSelect = document.getElementById('typeFilter');
@@ -343,182 +371,11 @@ window.resetFilters = function () {
     loadJobCards(1);
 };
 
-/**
- * Modal Handling: Create Job Card
- */
+// Backwards-compatible redirect helper
 window.openCreateJobModal = function (prefill = {}) {
-    const modal = document.getElementById('createJobModal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-
-    if (prefill.phone) {
-        document.getElementById('jobCustomerPhone').value = prefill.phone;
-        lookupCustomerForJob();
-    }
-    if (prefill.order_id) {
-        const orderIdHidden = document.getElementById('jobOrderId');
-        if (orderIdHidden) orderIdHidden.value = prefill.order_id;
-    }
-    if (prefill.case_id) {
-        const caseIdHidden = document.getElementById('jobCaseId');
-        if (caseIdHidden) caseIdHidden.value = prefill.case_id;
-    }
-};
-
-window.closeCreateJobModal = function () {
-    const modal = document.getElementById('createJobModal');
-    if (!modal) return;
-    modal.style.display = 'none';
-    const form = document.getElementById('createJobForm');
-    if (form) form.reset();
-    
-    const orderIdHidden = document.getElementById('jobOrderId');
-    if (orderIdHidden) orderIdHidden.value = '';
-    const caseIdHidden = document.getElementById('jobCaseId');
-    if (caseIdHidden) caseIdHidden.value = '';
-};
-
-/**
- * Customer Auto-Lookup via Phone Number
- */
-window.lookupCustomerForJob = async function () {
-    const phoneInput = document.getElementById('jobCustomerPhone');
-    const phone = phoneInput ? phoneInput.value.trim() : '';
-
-    if (!phone || phone.length < 8) {
-        window.showToast('Please enter a valid phone number (at least 8 digits)', 'error');
-        return;
-    }
-
-    try {
-        window.showToast('Looking up customer details...', 'info');
-        const res = await window.supportFetch(`/lookup-customer?phone=${encodeURIComponent(phone)}`);
-        
-        if (res && res.success && res.customer) {
-            const cust = res.customer;
-            const nameInput = document.getElementById('jobCustomerName');
-            const addressInput = document.getElementById('jobCustomerAddress');
-
-            if (nameInput && !nameInput.value.trim() && cust.name) {
-                nameInput.value = cust.name;
-            }
-            if (addressInput && !addressInput.value.trim() && cust.address) {
-                addressInput.value = cust.address;
-            }
-
-            // Auto-fill product from prior direct orders if available
-            const orders = res.orders || [];
-            if (orders.length > 0) {
-                const productInput = document.getElementById('jobProductSummary');
-                if (productInput && (!productInput.value.trim() || productInput.value.trim() === 'SGB Chaff Cutter')) {
-                    if (orders[0].product_name) productInput.value = orders[0].product_name;
-                }
-                const orderIdHidden = document.getElementById('jobOrderId');
-                if (orderIdHidden && !orderIdHidden.value) {
-                    orderIdHidden.value = orders[0].order_id;
-                }
-            }
-
-            window.showToast(`Found record for ${cust.name || 'Customer'}.`, 'success');
-        } else {
-            window.showToast('No prior records found for this phone. You can enter details manually.', 'info');
-        }
-    } catch (err) {
-        console.error('Error looking up customer:', err);
-        window.showToast('Could not query customer data', 'error');
-    }
-};
-
-/**
- * Form Submit: Handle Create Job Card
- */
-window.handleCreateJobCard = async function (event) {
-    event.preventDefault();
-
-    const submitBtn = document.getElementById('btnSubmitJobCard');
-    const originalBtnText = submitBtn ? submitBtn.innerHTML : 'Generate Job Card';
-
-    const phone = document.getElementById('jobCustomerPhone').value.trim();
-    const name = document.getElementById('jobCustomerName').value.trim();
-    const jobType = document.getElementById('jobType').value;
-    const priority = document.getElementById('jobPriority').value;
-    const issueDesc = document.getElementById('jobIssueDescription').value.trim();
-    const address = document.getElementById('jobCustomerAddress').value.trim();
-    const productSummary = document.getElementById('jobProductSummary').value.trim();
-    const workRequired = document.getElementById('jobWorkRequired').value.trim();
-    const dueDate = document.getElementById('jobDueDate').value;
-    const notes = document.getElementById('jobNotes')?.value?.trim() || '';
-    const orderId = document.getElementById('jobOrderId')?.value || '';
-    const caseRef = document.getElementById('jobCaseId')?.value?.trim() || '';
-
-    // Validation
-    if (!phone || !name || !issueDesc) {
-        window.showToast('Please fill in customer phone, name, and issue description.', 'error');
-        return;
-    }
-
-    // Build FormData for multipart (handles photos upload)
-    const formData = new FormData();
-    formData.append('customer_name', name);
-    formData.append('customer_phone', phone);
-    formData.append('customer_address', address);
-    formData.append('job_type', jobType);
-    formData.append('priority', priority);
-    formData.append('issue_description', issueDesc);
-    formData.append('product_summary', productSummary);
-    formData.append('work_required', workRequired);
-    if (dueDate) formData.append('due_date', dueDate);
-    if (notes) formData.append('notes', notes);
-    if (orderId) formData.append('order_id', orderId);
-    if (caseRef) formData.append('case_id', caseRef);
-
-    // Photos
-    const photoInput = document.getElementById('jobPhotos');
-    if (photoInput && photoInput.files && photoInput.files.length > 0) {
-        for (let i = 0; i < photoInput.files.length; i++) {
-            formData.append('photos', photoInput.files[i]);
-        }
-    }
-
-    try {
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-        }
-
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${window.API_URL}/customer-support/job-cards`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: formData
-        });
-
-        const data = await res.json();
-
-        if (!res.ok || !data.success) {
-            // Check if duplicate job card error
-            if (data.existing_job_card_id) {
-                alert(`⚠️ DUPLICATE PREVENTED:\n\n${data.message}\n\nYou can click OK to view the existing Job Card.`);
-                window.location.href = `job_card_details.html?id=${data.existing_job_card_id}`;
-                return;
-            }
-            window.showToast(data.message || 'Failed to create Job Card', 'error');
-            return;
-        }
-
-        window.showToast(`Job Card ${data.job_card_number} created successfully!`, 'success');
-        closeCreateJobModal();
-        await loadJobCards(1);
-
-    } catch (err) {
-        console.error('Error creating job card:', err);
-        window.showToast('Network error while generating Job Card', 'error');
-    } finally {
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-        }
-    }
+    const nextParams = new URLSearchParams({ mode: 'create' });
+    if (prefill.phone) nextParams.set('phone', prefill.phone);
+    if (prefill.order_id) nextParams.set('order_id', prefill.order_id);
+    if (prefill.case_id) nextParams.set('case_id', prefill.case_id);
+    window.location.href = `job_card_details.html?${nextParams.toString()}`;
 };

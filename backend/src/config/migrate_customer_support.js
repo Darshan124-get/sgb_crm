@@ -232,6 +232,109 @@ async function migrate() {
         `);
         console.log("Table 'customer_support_job_card_logs' ready.");
 
+        // 12. Enhance Job Card tables for SGB Agro Physical Job Card Workflow (Non-destructive)
+        await db.query(`
+            ALTER TABLE customer_support_job_cards
+            MODIFY COLUMN status ENUM('Draft', 'Open', 'In Progress', 'On Hold', 'Completed', 'Cancelled') NOT NULL DEFAULT 'Open'
+        `);
+        await db.query(`
+            ALTER TABLE customer_support_job_cards
+            MODIFY COLUMN customer_name VARCHAR(150) NOT NULL DEFAULT ''
+        `);
+        await db.query(`
+            ALTER TABLE customer_support_job_cards
+            MODIFY COLUMN customer_phone VARCHAR(50) NOT NULL DEFAULT ''
+        `);
+
+        const jobCardExtraCols = [
+            "ALTER TABLE customer_support_job_cards ADD COLUMN job_card_date DATE NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN technician_name VARCHAR(150) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN machine_make_model VARCHAR(255) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN serial_vin_number VARCHAR(150) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN hours_run VARCHAR(50) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN specific_complaint VARCHAR(255) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN original_issue_description TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN initial_diagnosis TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN additional_observations TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN before_work_condition VARCHAR(255) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN initial_inspection_remarks TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN parts_replaced_summary TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN repair_details TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN additional_remarks TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN final_machine_condition VARCHAR(255) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN work_completion_remarks TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN parts_total DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN labour_total DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN taxable_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN tax_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN shipping_charge DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN grand_total DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN amount_paid DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN balance_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN payment_status ENUM('Paid', 'Partially Paid', 'Unpaid') NOT NULL DEFAULT 'Unpaid'",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN payment_mode VARCHAR(50) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN work_completion_date DATETIME NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN customer_feedback TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN technician_remarks TEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN completed_by INT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN completed_by_name VARCHAR(150) NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN customer_signature LONGTEXT NULL",
+            "ALTER TABLE customer_support_job_cards ADD COLUMN signature_date DATETIME NULL"
+        ];
+        for (const sql of jobCardExtraCols) {
+            try {
+                await db.query(sql);
+            } catch (e) {
+                if (!e.message.includes('Duplicate column')) {
+                    console.warn("job_card column notice:", e.message);
+                }
+            }
+        }
+
+        // Preserve & backfill existing historical Job Card data
+        await db.query("UPDATE customer_support_job_cards SET job_card_date = DATE(created_at) WHERE job_card_date IS NULL");
+        await db.query("UPDATE customer_support_job_cards SET machine_make_model = product_summary WHERE machine_make_model IS NULL AND product_summary IS NOT NULL");
+        await db.query("UPDATE customer_support_job_cards SET original_issue_description = issue_description WHERE original_issue_description IS NULL AND issue_description IS NOT NULL");
+        await db.query("UPDATE customer_support_job_cards SET work_completion_date = completed_at WHERE work_completion_date IS NULL AND completed_at IS NOT NULL");
+        await db.query("UPDATE customer_support_job_cards SET completed_by = assigned_to WHERE completed_by IS NULL AND status = 'Completed' AND assigned_to IS NOT NULL");
+
+        // Enhance customer_support_job_card_parts
+        await db.query("ALTER TABLE customer_support_job_card_parts MODIFY COLUMN quantity DECIMAL(10,2) NOT NULL DEFAULT 1.00");
+        try {
+            await db.query("ALTER TABLE customer_support_job_card_parts ADD COLUMN is_foc TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (e) {
+            if (!e.message.includes('Duplicate column')) console.warn("parts is_foc notice:", e.message);
+        }
+
+        // 13. customer_support_job_card_labour table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS customer_support_job_card_labour (
+                labour_id INT AUTO_INCREMENT PRIMARY KEY,
+                job_card_id INT NOT NULL,
+                labour_description VARCHAR(255) NOT NULL,
+                hours DECIMAL(10,2) NOT NULL DEFAULT 1.00,
+                rate DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                total_cost DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                remarks VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_job_card_id (job_card_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log("Table 'customer_support_job_card_labour' ready.");
+
+        // Enhance customer_support_job_card_photos (support BEFORE_WORK / AFTER_WORK while preserving legacy types)
+        await db.query(`
+            ALTER TABLE customer_support_job_card_photos
+            MODIFY COLUMN photo_type ENUM('BEFORE_WORK', 'AFTER_WORK', 'issue', 'before', 'after', 'other') NOT NULL DEFAULT 'BEFORE_WORK'
+        `);
+        try {
+            await db.query("ALTER TABLE customer_support_job_card_photos ADD COLUMN caption VARCHAR(255) NULL");
+        } catch (e) {
+            if (!e.message.includes('Duplicate column')) console.warn("photos caption notice:", e.message);
+        }
+
         console.log('✅ Customer Support Migration Completed Successfully!');
         process.exit(0);
     } catch (err) {

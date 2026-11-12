@@ -62,8 +62,8 @@ window.resolveMediaUrl = function (rawUrl) {
         return cleanPath;
     }
 
-    // If path is a bare relative storage key (e.g. "quick-replies/...", "chats/...", "chatbot-media/..."), prefix with /api/media/
-    if (cleanPath.startsWith('quick-replies/') || cleanPath.startsWith('chats/') || cleanPath.startsWith('chatbot-media/') || cleanPath.startsWith('telephony/')) {
+    // If path is a bare relative storage key (e.g. "quick-replies/...", "chats/...", "chatbot-media/...", "customer_support/..."), prefix with /api/media/
+    if (cleanPath.startsWith('quick-replies/') || cleanPath.startsWith('chats/') || cleanPath.startsWith('chatbot-media/') || cleanPath.startsWith('telephony/') || cleanPath.startsWith('customer_support/')) {
         cleanPath = `/api/media/${cleanPath}`;
     }
 

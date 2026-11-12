@@ -23,51 +23,96 @@
             background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
-            padding: 1.25rem 1.5rem;
+            padding: 0.95rem 1.15rem;
             margin-bottom: 1.5rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
 
         .filter-grid {
             display: flex;
-            align-items: center;
-            gap: 1.25rem;
-            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 0.55rem;
+            flex-wrap: nowrap;
+            width: 100%;
+        }
+
+        .filter-item {
+            position: relative;
+            min-width: 0;
         }
 
         .search-input-box {
             position: relative;
-            width: 220px;
-            min-width: 180px;
+            flex: 1.1 1 130px;
+            min-width: 110px;
         }
 
         .search-input-box input {
             width: 100%;
-            padding: 0.6rem 1rem 0.6rem 2.5rem;
+            height: 36px;
+            box-sizing: border-box;
+            padding: 0.45rem 0.65rem 0.45rem 2rem;
             border: 1px solid #cbd5e1;
             border-radius: 8px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #0f172a;
         }
 
         .search-input-box i {
             position: absolute;
-            left: 0.875rem;
+            left: 0.7rem;
             top: 50%;
             transform: translateY(-50%);
             color: #94a3b8;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
 
-        .filter-select {
-            padding: 0.6rem 2rem 0.6rem 1rem;
+        .filter-select,
+        .filter-card .filter-input {
+            width: 100%;
+            height: 36px;
+            box-sizing: border-box;
+            padding: 0.45rem 1.6rem 0.45rem 0.65rem;
             border: 1px solid #cbd5e1;
             border-radius: 8px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #334155;
             background: #ffffff;
             appearance: none;
             cursor: pointer;
+        }
+
+        .filter-card .filter-input {
+            padding: 0.42rem 0.45rem;
+            font-size: 0.78rem;
+        }
+
+        .filter-card .filter-chevron {
+            position: absolute;
+            right: 0.55rem;
+            bottom: 0.62rem;
+            color: #64748b;
+            pointer-events: none;
+            font-size: 0.7rem;
+        }
+
+        .filter-card .dealer-pm-wrap {
+            width: 100%;
+        }
+
+        .filter-card .dealer-pm-trigger {
+            min-width: 0 !important;
+            width: 100%;
+            height: 36px;
+            box-sizing: border-box;
+            padding: 0.45rem 0.65rem;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 1024px) {
+            .filter-grid {
+                flex-wrap: wrap;
+            }
         }
 
         .btn-pay-balance {
@@ -234,21 +279,19 @@
                                 placeholder="Search...">
                         </div>
 
-                        <div style="position:relative;width:200px;">
+                        <div class="filter-item" style="flex:1.1 1 125px;min-width:110px;">
                             <label
-                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Select
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">Select
                                 Dealer</label>
-                            <select id="dealerSelectFilter" class="filter-select" style="width:100%;"
-                                onchange="filterDealerOrders()">
+                            <select id="dealerSelectFilter" class="filter-select" onchange="filterDealerOrders()">
                                 <option value="">All Dealers</option>
                             </select>
-                            <i class="fa-solid fa-chevron-down"
-                                style="position:absolute;right:0.75rem;bottom:0.75rem;color:#64748b;pointer-events:none;font-size:0.75rem;"></i>
+                            <i class="fa-solid fa-chevron-down filter-chevron"></i>
                         </div>
 
-                        <div style="position:relative;">
+                        <div class="filter-item" style="flex:0.85 1 95px;min-width:85px;">
                             <label
-                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Order
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">Order
                                 Status</label>
                             <select id="statusFilter" class="filter-select" onchange="filterDealerOrders()">
                                 <option value="">All Status</option>
@@ -258,52 +301,55 @@
                                 <option value="delivered">Delivered</option>
                                 <option value="cancelled">Cancelled</option>
                             </select>
-                            <i class="fa-solid fa-chevron-down"
-                                style="position:absolute;right:0.75rem;bottom:0.75rem;color:#64748b;pointer-events:none;font-size:0.75rem;"></i>
+                            <i class="fa-solid fa-chevron-down filter-chevron"></i>
                         </div>
 
-                        <div style="position:relative;">
+                        <div class="filter-item" style="flex:1 1 115px;min-width:100px;">
                             <label
-                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Payment
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">Payment
                                 Status</label>
                             <select id="paymentStatusFilter" class="filter-select" onchange="filterDealerOrders()">
                                 <option value="">All Payment Status</option>
                                 <option value="pending">Pending</option>
                                 <option value="cleared">Cleared</option>
                             </select>
-                            <i class="fa-solid fa-chevron-down"
-                                style="position:absolute;right:0.75rem;bottom:0.75rem;color:#64748b;pointer-events:none;font-size:0.75rem;"></i>
+                            <i class="fa-solid fa-chevron-down filter-chevron"></i>
                         </div>
 
-                        <div>
+                        <div class="filter-item" style="flex:0.95 1 112px;min-width:102px;">
                             <label
-                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">From
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">From
                                 Date</label>
                             <input type="date" id="fromDateFilter" class="filter-input" onchange="filterDealerOrders()">
                         </div>
 
-                        <div>
+                        <div class="filter-item" style="flex:0.95 1 112px;min-width:102px;">
                             <label
-                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">To
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">To
                                 Date</label>
                             <input type="date" id="toDateFilter" class="filter-input" onchange="filterDealerOrders()">
                         </div>
 
-                        <div style="position:relative;width:210px;">
+                        <div class="filter-item" style="flex:1.15 1 130px;min-width:115px;">
                             <label
-                                style="font-size:0.725rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Select
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">Select
                                 Product</label>
-                            <select id="productFilter" class="filter-select" style="width:100%;"
-                                onchange="filterDealerOrders()">
-                                <option value="">All Products</option>
-                            </select>
-                            <i class="fa-solid fa-chevron-down"
-                                style="position:absolute;right:0.75rem;bottom:0.75rem;color:#64748b;pointer-events:none;font-size:0.75rem;"></i>
+                            <div id="productFilter" style="width:100%;"></div>
                         </div>
 
-                        <div style="display:flex;align-items:flex-end;gap:0.5rem;">
+                        <div id="salespersonFilterGroup" class="filter-item" style="display:none;flex:1.05 1 120px;min-width:105px;">
+                            <label
+                                style="font-size:0.7rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px;white-space:nowrap;">Select
+                                Salesperson</label>
+                            <select id="salespersonFilter" class="filter-select" onchange="filterDealerOrders()">
+                                <option value="">All Salespersons</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down filter-chevron"></i>
+                        </div>
+
+                        <div style="display:flex;align-items:flex-end;flex:0 0 auto;">
                             <button class="btn-outline-card" onclick="resetOrderFilters()"
-                                style="padding:0.6rem 0.85rem;color:#64748b;" title="Reset Filters">
+                                style="height:36px;padding:0 0.75rem;color:#64748b;display:inline-flex;align-items:center;justify-content:center;" title="Reset Filters">
                                 <i class="fa-solid fa-arrow-rotate-left"></i>
                             </button>
                         </div>
@@ -654,6 +700,7 @@
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
     <script src="js/dealer-validation.js"></script>
+    <script src="js/product_multiselect.js"></script>
     <script src="js/orders.js"></script>
 </body>
 

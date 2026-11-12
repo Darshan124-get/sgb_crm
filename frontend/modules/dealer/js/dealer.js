@@ -904,7 +904,7 @@ function updateViewUrl(view, params = {}) {
     const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
     try {
         window.history.replaceState({ view, ...params }, '', newUrl);
-        sessionStorage.setItem('dealer_active_view_state', JSON.stringify({ view, ...params }));
+        sessionStorage.removeItem('dealer_active_view_state');
     } catch (e) {}
 }
 
@@ -931,12 +931,7 @@ function restoreActiveViewState() {
         tab = urlParams.get('tab') || 'overview';
     } else {
         try {
-            const saved = JSON.parse(sessionStorage.getItem('dealer_active_view_state') || '{}');
-            if (saved && saved.view) {
-                view = saved.view;
-                id = saved.id;
-                tab = saved.tab || 'overview';
-            }
+            sessionStorage.removeItem('dealer_active_view_state');
         } catch (e) {}
     }
 
@@ -2416,6 +2411,10 @@ function exportDealersData() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+
+    if (window.recordDealerActivityClient) {
+        window.recordDealerActivityClient('EXPORT', 'DEALER', `CSV(${listToExport.length})`, `Exported ${listToExport.length} dealer record(s) to CSV`);
+    }
 }
 
 // Order Product Page Logic
@@ -3292,6 +3291,10 @@ function downloadDealerImportTemplate() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+
+    if (window.recordDealerActivityClient) {
+        window.recordDealerActivityClient('EXPORT', 'DEALER', `CSV(${listToExport.length})`, `Exported ${listToExport.length} dealer record(s) to CSV`);
+    }
 }
 
 function clearImportFileSelection() {

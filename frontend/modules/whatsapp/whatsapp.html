@@ -264,8 +264,15 @@
                                     <div id="active-avatar" class="avatar"
                                         style="width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: #666;">
                                         ?</div>
-                                    <div class="customer-info">
-                                        <h2 id="active-customer-name">Loading...</h2>
+                                    <div class="customer-info" style="display: flex; flex-direction: column;">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <h2 id="active-customer-name" style="margin: 0;">Loading...</h2>
+                                            <button type="button" id="active-chat-favorite-btn" class="header-star-btn"
+                                                title="Toggle Favorite" onclick="window.toggleActiveCustomerFavorite(event)"
+                                                style="display: none;">
+                                                <i class="far fa-star"></i>
+                                            </button>
+                                        </div>
                                         <span id="active-customer-phone">...</span>
                                     </div>
                                 </div>

@@ -522,26 +522,35 @@ function initFormEventBindings() {
     const shippingEl = document.getElementById('inputShippingCharge');
     if (shippingEl) shippingEl.addEventListener('input', () => recalculateAllFinancials(false, 'shipping'));
 
-    // Photo & Video pickers (Before Work & After Work strictly separate, max 60MB each!)
-    const validateAndQueueMedia = (files, targetArray, stage) => {
+    // Photo & Video pickers (Before Work & After Work strictly separate)
+    const validateAndQueueMedia = async (files, targetArray, stage) => {
         let added = 0;
-        files.forEach(f => {
+        for (let f of files) {
             if (window.validateSupportMediaFile) {
                 const check = window.validateSupportMediaFile(f);
                 if (!check.ok) {
                     window.showToast(check.reason, 'error');
-                    return;
+                    continue;
                 }
             } else {
                 const okType = f.type.startsWith('image/') || f.type.startsWith('video/');
-                if (!okType || f.size > 60 * 1024 * 1024) {
-                    window.showToast(`Skipped "${f.name}": Requires image/video up to 60MB.`, 'error');
-                    return;
+                if (!okType || f.size > 550 * 1024 * 1024) {
+                    window.showToast(`Skipped "${f.name}": Only images and videos are allowed.`, 'error');
+                    continue;
                 }
             }
+
+            if (window.compressSupportImageIfNeeded && f.type && f.type.startsWith('image/')) {
+                try {
+                    f = await window.compressSupportImageIfNeeded(f);
+                } catch (cErr) {
+                    console.warn('Image compress warn:', cErr);
+                }
+            }
+
             targetArray.push(f);
             added++;
-        });
+        }
         if (added > 0) {
             formIsDirty = true;
             renderPendingPhotoPreviews(stage);
@@ -550,17 +559,19 @@ function initFormEventBindings() {
 
     const beforeInput = document.getElementById('beforePhotosInput');
     if (beforeInput) {
-        beforeInput.addEventListener('change', (e) => {
-            validateAndQueueMedia(Array.from(e.target.files || []), pendingBeforeFiles, 'before');
+        beforeInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files || []);
             beforeInput.value = '';
+            await validateAndQueueMedia(files, pendingBeforeFiles, 'before');
         });
     }
 
     const afterInput = document.getElementById('afterPhotosInput');
     if (afterInput) {
-        afterInput.addEventListener('change', (e) => {
-            validateAndQueueMedia(Array.from(e.target.files || []), pendingAfterFiles, 'after');
+        afterInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files || []);
             afterInput.value = '';
+            await validateAndQueueMedia(files, pendingAfterFiles, 'after');
         });
     }
 }

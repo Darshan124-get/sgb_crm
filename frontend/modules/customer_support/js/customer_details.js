@@ -212,17 +212,26 @@ async function handleUploadPhotos(e) {
     if (files.length === 0) return;
 
     const validFiles = [];
-    for (const file of files) {
+    for (let file of files) {
         if (window.validateSupportMediaFile) {
             const check = window.validateSupportMediaFile(file);
             if (!check.ok) {
                 window.showToast(check.reason, 'error');
                 continue;
             }
-        } else if (file.size > 60 * 1024 * 1024) {
-            window.showToast(`Skipped "${file.name}": File size exceeds 60MB limit.`, 'error');
+        } else if (file.size > 550 * 1024 * 1024) {
+            window.showToast(`Skipped "${file.name}": File is too large.`, 'error');
             continue;
         }
+
+        if (window.compressSupportImageIfNeeded && file.type && file.type.startsWith('image/')) {
+            try {
+                file = await window.compressSupportImageIfNeeded(file);
+            } catch (cErr) {
+                console.warn('Image compress warn:', cErr);
+            }
+        }
+
         validFiles.push(file);
     }
 

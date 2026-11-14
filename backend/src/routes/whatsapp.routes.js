@@ -24,4 +24,8 @@ router.get('/quick-replies', authenticateToken, whatsappController.getQuickRepli
 router.post('/quick-replies', authenticateToken, whatsappController.saveQuickReply);
 router.delete('/quick-replies/:id', authenticateToken, whatsappController.deleteQuickReply);
 
+// Favorites Endpoints
+router.get('/favorites', authenticateToken, whatsappController.getFavorites);
+router.post('/favorites/toggle', authenticateToken, whatsappController.toggleFavorite);
+
 module.exports = router;

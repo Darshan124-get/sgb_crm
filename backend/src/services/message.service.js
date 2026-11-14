@@ -466,6 +466,29 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     const handoffCount = handoffLeadIdSet.size;
     const paymentCount = pendingOrders.length;
 
+    // User Favorites Lookup
+    const currentStaffUserId = user ? (user.id || user.user_id) : null;
+    const favoritePhone10Set = new Set();
+    const favoriteRawPhoneSet = new Set();
+    let favoriteCount = 0;
+    if (currentStaffUserId) {
+      try {
+        const [favRows] = await db.execute('SELECT phone FROM whatsapp_user_favorites WHERE user_id = ?', [currentStaffUserId]);
+        favRows.forEach(f => {
+          if (f.phone) {
+            favoriteRawPhoneSet.add(f.phone);
+            const digits = String(f.phone).replace(/\D/g, '');
+            if (digits.length >= 10) {
+              favoritePhone10Set.add(digits.slice(-10));
+            }
+          }
+        });
+        favoriteCount = favRows.length;
+      } catch (e) {
+        logger.error('Failed to query whatsapp_user_favorites:', e.message);
+      }
+    }
+
     // Helper to map DB row to customer response object
     const mapCustomerRow = (r) => {
       const rawPhone = r.phone_number || r.phone || '';
@@ -473,6 +496,11 @@ const getAllChatCustomers = async (user = null, options = {}) => {
 
       const paused = (r.lead_id && pausedMapByLeadId.get(r.lead_id)) || (phone10 && pausedMapByPhone10.get(phone10)) || null;
       const payment = (phone10 && orderMapByPhone10.get(phone10)) || null;
+
+      const isFav = Boolean(
+        (phone10 && favoritePhone10Set.has(phone10)) ||
+        (rawPhone && favoriteRawPhoneSet.has(rawPhone))
+      );
 
       let paymentScreenshotUrl = null;
       if (payment && payment.session_variables) {
@@ -499,6 +527,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
 
       return {
         ...r,
+        is_favorite: isFav,
         session_status: paused ? paused.status : null,
         paused_at: paused ? paused.paused_at : null,
         paused_session_variables: paused ? paused.paused_session_variables : null,
@@ -542,7 +571,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       const leadIds = matchingLeads.map(l => l.lead_id);
 
       if (leadIds.length === 0) {
-        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, page: 1, limit };
+        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, favoriteCount, page: 1, limit };
       }
 
       const inClause = leadIds.map(() => '?').join(',');
@@ -583,6 +612,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         unreadCount,
         handoffCount,
         paymentCount,
+        favoriteCount,
         page: 1,
         limit
       };
@@ -593,7 +623,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     if (options.tab === 'handoff' || options.tab === 'my_handoff') {
       const handoffIds = Array.from(handoffLeadIdSet);
       if (handoffIds.length === 0) {
-        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, page, limit };
+        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, favoriteCount, page, limit };
       }
       const inPlaceholders = handoffIds.map(() => '?').join(',');
       const [rows] = await db.execute(`
@@ -633,6 +663,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         unreadCount,
         handoffCount,
         paymentCount,
+        favoriteCount,
         page,
         limit
       };
@@ -642,7 +673,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     if (options.tab === 'payment') {
       const paymentIds = Array.from(paymentLeadIdSet);
       if (paymentIds.length === 0) {
-        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, page, limit };
+        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, favoriteCount, page, limit };
       }
       const inPlaceholders = paymentIds.map(() => '?').join(',');
       const [rows] = await db.execute(`
@@ -682,6 +713,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         unreadCount,
         handoffCount,
         paymentCount,
+        favoriteCount,
         page,
         limit
       };
@@ -702,7 +734,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       `;
       const [unviewedLeads] = await db.execute(unviewedLeadQuery, isScopedUser(user) ? [user.id] : []);
       if (unviewedLeads.length === 0) {
-        return { customers: [], totalCount: unreadCount, unreadCount, handoffCount, paymentCount, page, limit };
+        return { customers: [], totalCount: unreadCount, unreadCount, handoffCount, paymentCount, favoriteCount, page, limit };
       }
 
       const targetLeadIds = unviewedLeads.map(u => u.lead_id);
@@ -744,6 +776,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         unreadCount,
         handoffCount,
         paymentCount,
+        favoriteCount,
         page,
         limit
       };
@@ -772,7 +805,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       const [resolvedRows] = await db.execute(resolvedQuery, isScopedUser(user) ? [user.id] : []);
 
       if (resolvedRows.length === 0) {
-        return { customers: [], totalCount, unreadCount, handoffCount, paymentCount, page, limit };
+        return { customers: [], totalCount, unreadCount, handoffCount, paymentCount, favoriteCount, page, limit };
       }
 
       const resLeadIds = resolvedRows.map(r => r.lead_id);
@@ -816,6 +849,72 @@ const getAllChatCustomers = async (user = null, options = {}) => {
         unreadCount,
         handoffCount,
         paymentCount,
+        favoriteCount,
+        page,
+        limit
+      };
+    }
+
+    // Tab: favorites
+    if (options.tab === 'favorites') {
+      const favDigitsList = Array.from(favoritePhone10Set);
+      if (favDigitsList.length === 0) {
+        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, favoriteCount: 0, page, limit };
+      }
+
+      const orClauses = favDigitsList.map(() => "phone_number LIKE ?").join(" OR ");
+      let favQuery = `SELECT l.lead_id FROM leads l WHERE (${orClauses})`;
+      let favQueryParams = favDigitsList.map(ph => `%${ph}`);
+      if (isScopedUser(user)) {
+        favQuery += " AND l.assigned_to = ?";
+        favQueryParams.push(user.id);
+      }
+      const [matchedFavLeads] = await db.execute(favQuery, favQueryParams);
+      const favLeadIds = matchedFavLeads.map(l => l.lead_id);
+
+      if (favLeadIds.length === 0) {
+        return { customers: [], totalCount: 0, unreadCount, handoffCount, paymentCount, favoriteCount, page, limit };
+      }
+
+      const inPlaceholders = favLeadIds.map(() => '?').join(',');
+      const [rows] = await db.execute(`
+        SELECT 
+          l.*, 
+          l.phone_number AS phone, 
+          u.name AS assigned_name,
+          agg.last_message_at,
+          agg.last_inbound_at,
+          COALESCE(agg.unread_msg_count, 0) AS unread_msg_count,
+          cm_last.message AS last_message,
+          cm_last.sender_type AS last_message_sender_type,
+          cm_last.status AS last_message_status
+        FROM leads l
+        LEFT JOIN users u ON l.assigned_to = u.user_id
+        LEFT JOIN (
+          SELECT 
+            cs.lead_id,
+            MAX(cm.chat_id) AS max_chat_id,
+            MAX(cm.timestamp) AS last_message_at,
+            MAX(CASE WHEN cm.sender_type = 'user' THEN cm.timestamp ELSE NULL END) AS last_inbound_at,
+            SUM(CASE WHEN cm.sender_type = 'user' AND cm.status = 'sent' THEN 1 ELSE 0 END) AS unread_msg_count
+          FROM chat_sessions cs
+          JOIN chat_messages cm ON cs.session_id = cm.session_id
+          WHERE cs.lead_id IN (${inPlaceholders})
+          GROUP BY cs.lead_id
+        ) agg ON l.lead_id = agg.lead_id
+        LEFT JOIN chat_messages cm_last ON cm_last.chat_id = agg.max_chat_id
+        WHERE l.lead_id IN (${inPlaceholders})
+        ORDER BY agg.last_message_at DESC, l.created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `, [...favLeadIds, ...favLeadIds]);
+
+      return {
+        customers: rows.map(mapCustomerRow),
+        totalCount: favLeadIds.length,
+        unreadCount,
+        handoffCount,
+        paymentCount,
+        favoriteCount,
         page,
         limit
       };
@@ -831,24 +930,39 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     const [[cRow]] = await db.execute(totalCountQuery, totalCountParams);
     const totalCount = cRow ? parseInt(cRow.total) : 0;
 
-    // Scan recent messages via PK index (retrieves hundreds of distinct active leads in < 50ms)
-    let recentQuery = `
-      SELECT cs.lead_id, cs.session_id, MAX(cm.chat_id) as max_chat_id, MAX(cm.timestamp) as last_message_at
-      FROM (
-        SELECT session_id, chat_id, timestamp
-        FROM chat_messages
-        ORDER BY chat_id DESC
-        LIMIT 3000
-      ) cm
-      JOIN chat_sessions cs ON cm.session_id = cs.session_id
-      ${isScopedUser(user) ? 'JOIN leads l ON cs.lead_id = l.lead_id' : ''}
-      ${isScopedUser(user) ? 'WHERE l.assigned_to = ?' : ''}
-      GROUP BY cs.lead_id, cs.session_id
-      ORDER BY max_chat_id DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-
-    const [recentRows] = await db.execute(recentQuery, isScopedUser(user) ? [user.id] : []);
+    // Scan recent messages via index
+    let recentRows = [];
+    if (isScopedUser(user)) {
+      // Scoped user: query user's leads directly with index (fast & complete)
+      let scopedRecentQuery = `
+        SELECT l.lead_id, MAX(cm.chat_id) as max_chat_id, MAX(cm.timestamp) as last_message_at
+        FROM leads l
+        JOIN chat_sessions cs ON l.lead_id = cs.lead_id
+        JOIN chat_messages cm ON cs.session_id = cm.session_id
+        WHERE l.assigned_to = ?
+        GROUP BY l.lead_id
+        ORDER BY max_chat_id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+      const [res] = await db.execute(scopedRecentQuery, [user.id]);
+      recentRows = res;
+    } else {
+      let recentQuery = `
+        SELECT cs.lead_id, cs.session_id, MAX(cm.chat_id) as max_chat_id, MAX(cm.timestamp) as last_message_at
+        FROM (
+          SELECT session_id, chat_id, timestamp
+          FROM chat_messages
+          ORDER BY chat_id DESC
+          LIMIT 3000
+        ) cm
+        JOIN chat_sessions cs ON cm.session_id = cs.session_id
+        GROUP BY cs.lead_id, cs.session_id
+        ORDER BY max_chat_id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+      const [res] = await db.execute(recentQuery, []);
+      recentRows = res;
+    }
 
     let targetLeadIds = recentRows.map(r => r.lead_id);
 
@@ -867,7 +981,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
     }
 
     if (targetLeadIds.length === 0) {
-      return { customers: [], totalCount, unreadCount, handoffCount, paymentCount, page, limit };
+      return { customers: [], totalCount, unreadCount, handoffCount, paymentCount, favoriteCount, page, limit };
     }
 
     const inPlaceholders = targetLeadIds.map(() => '?').join(',');
@@ -909,6 +1023,7 @@ const getAllChatCustomers = async (user = null, options = {}) => {
       unreadCount,
       handoffCount,
       paymentCount,
+      favoriteCount,
       page,
       limit
     };

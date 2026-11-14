@@ -24,6 +24,8 @@ let totalLeadsCount = 0;
 let totalUnreadCount = 0;
 let totalHandoffCount = 0;
 let totalPaymentCount = 0;
+let userFavorites = new Set();
+let totalFavoritesCount = 0;
 let isLoadingMoreConversations = false;
 let currentTab = 'all';
 let salesUsers = [];
@@ -144,6 +146,115 @@ if (isTelecallerUser && transferBtnEl) {
     transferBtnEl.style.setProperty('display', 'none', 'important');
 }
 
+// ── Customer Favorites State & Helpers ──
+function isCustomerFavorite(phone) {
+    if (!phone) return false;
+    const p = String(phone).trim();
+    if (userFavorites.has(p)) return true;
+    const digits = p.replace(/\D/g, '');
+    if (digits.length >= 10 && userFavorites.has(digits.slice(-10))) return true;
+    return false;
+}
+
+function updateFavoritesPill() {
+    const pillCountEl = document.getElementById('favorites-pill-count');
+    if (pillCountEl) {
+        pillCountEl.textContent = userFavorites.size || totalFavoritesCount || 0;
+    }
+}
+
+function updateHeaderFavoriteBtn(isFav) {
+    const btn = document.getElementById('active-chat-favorite-btn');
+    if (!btn) return;
+    btn.style.display = 'inline-flex';
+    btn.className = `header-star-btn ${isFav ? 'active' : ''}`;
+    btn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+    btn.innerHTML = `<i class="${isFav ? 'fas fa-star' : 'far fa-star'}"></i>`;
+}
+
+async function loadFavorites() {
+    try {
+        const resp = await fetch(`${API_BASE}/favorites`, { headers: getAuthHeader() });
+        if (resp.ok) {
+            const data = await resp.json();
+            const favs = Array.isArray(data.favorites) ? data.favorites : [];
+            userFavorites = new Set(favs);
+            totalFavoritesCount = userFavorites.size;
+            updateFavoritesPill();
+            if (activeCustomer && activeCustomer.phone) {
+                updateHeaderFavoriteBtn(isCustomerFavorite(activeCustomer.phone) || Boolean(activeCustomer.is_favorite));
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to load favorites:', err.message);
+    }
+}
+
+window.toggleCustomerFavorite = async function(phone, event) {
+    if (event) event.stopPropagation();
+    if (!phone) return;
+    const targetPhone = String(phone).trim();
+    const wasFavorite = isCustomerFavorite(targetPhone);
+    const newStatus = !wasFavorite;
+
+    // Optimistic UI updates
+    if (newStatus) {
+        userFavorites.add(targetPhone);
+        const digits = targetPhone.replace(/\D/g, '');
+        if (digits.length >= 10) userFavorites.add(digits.slice(-10));
+    } else {
+        userFavorites.delete(targetPhone);
+        const digits = targetPhone.replace(/\D/g, '');
+        if (digits.length >= 10) userFavorites.delete(digits.slice(-10));
+    }
+    totalFavoritesCount = userFavorites.size;
+
+    // Update in-memory customer
+    const cust = (allCustomers || []).find(c => c.phone === targetPhone || (c.phone && c.phone.endsWith(targetPhone.slice(-10))));
+    if (cust) {
+        cust.is_favorite = newStatus;
+    }
+    if (activeCustomer && (activeCustomer.phone === targetPhone || (activeCustomer.phone && activeCustomer.phone.endsWith(targetPhone.slice(-10))))) {
+        activeCustomer.is_favorite = newStatus;
+        updateHeaderFavoriteBtn(newStatus);
+    }
+
+    // Update star button in customer list item
+    const custItem = customerListEl ? customerListEl.querySelector(`.customer-item[data-phone="${targetPhone}"]`) : null;
+    if (custItem) {
+        const starBtn = custItem.querySelector('.favorite-star-btn');
+        if (starBtn) {
+            starBtn.className = `favorite-star-btn ${newStatus ? 'active' : ''}`;
+            starBtn.title = newStatus ? 'Remove from favorites' : 'Add to favorites';
+            starBtn.innerHTML = `<i class="${newStatus ? 'fas fa-star' : 'far fa-star'}"></i>`;
+        }
+    }
+
+    updateFavoritesPill();
+
+    // If currently viewing favorites tab and removed, re-render
+    if (currentTab === 'favorites' && !newStatus) {
+        renderCustomerList(false);
+    }
+
+    // Sync with backend API
+    try {
+        await fetch(`${API_BASE}/favorites/toggle`, {
+            method: 'POST',
+            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: targetPhone })
+        });
+    } catch (err) {
+        console.error('Failed to sync favorite toggle with server:', err);
+    }
+};
+
+window.toggleActiveCustomerFavorite = function(event) {
+    if (event) event.stopPropagation();
+    if (!activeCustomer || !activeCustomer.phone) return;
+    window.toggleCustomerFavorite(activeCustomer.phone, event);
+};
+
 // Right Sidebar Elements
 const detailsSidebarEl = document.getElementById('details-sidebar');
 const detailsNameEl = document.getElementById('details-name');
@@ -195,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!window.requireAuth(['admin', 'sales', 'whatsapp_manager'])) return;
 
     loadCustomers();
+    loadFavorites();
     loadSalesUsers();
     loadCampaignsAndTabs();
     initResizers();
@@ -393,6 +505,8 @@ function renderSidebarTabs() {
     const isCampaignActive = activeCampaigns.some(camp => camp.tag_line === currentTab);
     const customLists = loadCustomLists();
     const isCustomListActive = customLists.some(list => list.id === currentTab) || currentTab === 'undefined' || currentTab === 'resolved';
+    const isFavoritesActive = currentTab === 'favorites';
+    const favoritesCount = userFavorites.size || totalFavoritesCount || 0;
     const isHandoffActive = currentTab === 'handoff' || currentTab === 'my_handoff';
     const isPaymentActive = currentTab === 'payment';
     const paymentCount = totalPaymentCount !== undefined ? totalPaymentCount : (allCustomers || []).filter(c => c.has_pending_payment).length;
@@ -400,6 +514,9 @@ function renderSidebarTabs() {
     let html = `
         <div class="tab-item ${currentTab === 'all' ? 'active' : ''}" data-tab="all">All <span id="all-unread-count" style="margin-left: 4px;">${totalCount}</span></div>
         <div class="tab-item ${currentTab === 'unviewed' ? 'active' : ''}" data-tab="unviewed">Unread <span id="unread-count" style="margin-left: 4px;">${unreadCount}</span></div>
+        <div class="tab-item ${isFavoritesActive ? 'active' : ''}" data-tab="favorites" id="tab-favorites-pill" style="${isFavoritesActive ? 'color: #d97706; border-color: #f59e0b; background: #fffbeb;' : 'color: #d97706; border-color: #fde68a;'} font-weight: 700;">
+            <i class="fas fa-star" style="color: #f59e0b; margin-right: 4px; font-size: 0.8rem;"></i> Favorites <span id="favorites-pill-count" style="margin-left: 4px; font-weight: 800;">${favoritesCount}</span>
+        </div>
         <div class="tab-item ${isHandoffActive ? 'active' : ''}" data-tab="${isAdminOrManager ? 'handoff' : 'my_handoff'}" id="tab-handoff-pill" style="${isHandoffActive ? 'color: #ef4444; border-color: #ef4444; background: #fef2f2;' : 'color: #ef4444; border-color: #fca5a5;'} font-weight: 700;">
             Handoff <span id="handoff-pill-count" style="margin-left: 4px; font-weight: 800;">${handoffCount}</span>
         </div>
@@ -1086,11 +1203,19 @@ async function loadCustomers(tabParam = null, searchParam = null) {
             if (rawData.unreadCount !== undefined) totalUnreadCount = parseInt(rawData.unreadCount);
             if (rawData.handoffCount !== undefined) totalHandoffCount = parseInt(rawData.handoffCount);
             if (rawData.paymentCount !== undefined) totalPaymentCount = parseInt(rawData.paymentCount);
+            if (rawData.favoriteCount !== undefined) totalFavoritesCount = parseInt(rawData.favoriteCount);
         }
 
         // Merge incoming customer records with existing in-memory allCustomers array
         const existingMap = new Map(allCustomers.map(c => [c.phone, c]));
-        data.forEach(c => existingMap.set(c.phone, c));
+        data.forEach(c => {
+            if (c.is_favorite === true) {
+                userFavorites.add(c.phone);
+                const digits = (c.phone || '').replace(/\D/g, '');
+                if (digits.length >= 10) userFavorites.add(digits.slice(-10));
+            }
+            existingMap.set(c.phone, c);
+        });
         allCustomers = Array.from(existingMap.values());
 
         if (activeCustomer && existingMap.has(activeCustomer.phone)) {
@@ -1216,6 +1341,8 @@ function renderCustomerList(shouldResetLimit = true) {
             }
         } else if (currentTab === 'payment') {
             matchesTab = Boolean(customer.has_pending_payment);
+        } else if (currentTab === 'favorites') {
+            matchesTab = isCustomerFavorite(customer.phone) || Boolean(customer.is_favorite);
         } else if (currentTab === 'undefined') {
             if (resolved) {
                 matchesTab = false;
@@ -1309,6 +1436,12 @@ function renderCustomerList(shouldResetLimit = true) {
     if (filtered.length === 0) {
         if (searchTerm) {
             customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;"><i class="fas fa-spinner fa-spin" style="margin-right: 8px; color: #00a884;"></i> Searching database for "${searchTerm}"...</div>`;
+        } else if (currentTab === 'favorites') {
+            customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">
+                <i class="fas fa-star" style="font-size: 2.2rem; color: #f59e0b; margin-bottom: 10px; display: block;"></i>
+                <strong style="color: var(--whatsapp-text); font-size: 0.95rem;">No favorite customers yet</strong><br>
+                <span style="font-size: 0.82rem; color: #94a3b8; display: inline-block; margin-top: 5px;">Click the star icon ⭐ on any chat to add them to your favorites.</span>
+            </div>`;
         } else {
             customerListEl.innerHTML = `<div style="padding: 40px 20px; text-align: center; color: #8696a0; font-size: 0.9rem;">No conversations in this tab.</div>`;
         }
@@ -1400,6 +1533,7 @@ function renderCustomerList(shouldResetLimit = true) {
         }
 
         const snippetDisplay = formatCustomerMessageSnippet(lastMsg, customer);
+        const isFav = isCustomerFavorite(customer.phone) || Boolean(customer.is_favorite);
 
         item.innerHTML = `
             <div class="avatar-wrap">
@@ -1410,6 +1544,11 @@ function renderCustomerList(shouldResetLimit = true) {
                 <div class="customer-meta-header">
                     <h3>${displayName}</h3>
                     <div style="display: flex; align-items: center; gap: 5px;">
+                        <button type="button" class="favorite-star-btn ${isFav ? 'active' : ''}" 
+                                onclick="event.stopPropagation(); window.toggleCustomerFavorite('${customer.phone}', event)" 
+                                title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            <i class="${isFav ? 'fas fa-star' : 'far fa-star'}"></i>
+                        </button>
                         <div class="customer-time" style="color: ${timeColor}; ${timeWeight}">${lastTime}</div>
                         <div class="chat-menu-trigger" onclick="event.stopPropagation(); window.showCustomerContextMenu(event, '${customer.phone}')">
                             <i class="fas fa-chevron-down"></i>
@@ -1623,6 +1762,7 @@ async function selectCustomer(customer) {
     activeCustomerPhoneEl.innerText = customer.phone;
     activeAvatarEl.innerText = getInitials(customer.customer_name);
     activeAvatarEl.style.backgroundColor = getAvatarStyle(customer.phone);
+    updateHeaderFavoriteBtn(isCustomerFavorite(customer.phone) || Boolean(customer.is_favorite));
 
     // Sidebar Details
     detailsNameEl.innerText = displayName;
@@ -4508,7 +4648,11 @@ window.showCustomerContextMenu = function (event, customerPhone) {
     menu.className = 'whatsapp-context-menu';
     menu.id = 'whatsapp-customer-context-menu';
 
+    const isFav = isCustomerFavorite(customerPhone);
     menu.innerHTML = `
+        <div class="context-menu-item" onclick="window.toggleCustomerFavorite('${customerPhone}'); closeAllContextMenus();">
+            <i class="${isFav ? 'fas fa-star' : 'far fa-star'}" style="margin-right: 8px; color: #f59e0b;"></i> ${isFav ? 'Remove from favorites' : 'Add to favorites'}
+        </div>
         <div class="context-menu-item" onclick="markCustomerAsUnread('${customerPhone}')">
             <i class="fas fa-envelope" style="margin-right: 8px;"></i> Mark as unread
         </div>
@@ -4517,8 +4661,8 @@ window.showCustomerContextMenu = function (event, customerPhone) {
     document.body.appendChild(menu);
 
     // Position the menu
-    const menuWidth = 160;
-    const menuHeight = 45;
+    const menuWidth = 180;
+    const menuHeight = 85;
     let left = event.pageX;
     let top = event.pageY;
 

@@ -23,7 +23,7 @@ const csUploadStorage = multer.diskStorage({
 
 const upload = multer({
     storage: csUploadStorage,
-    limits: { fileSize: 60 * 1024 * 1024 }, // 60MB max per image or video
+    limits: { fileSize: 550 * 1024 * 1024 }, // Allows up to 550MB per file; compressed to <60MB on ingestion
     fileFilter: (req, file, cb) => {
         const mime = (file.mimetype || '').toLowerCase();
         const ext = path.extname(file.originalname || '').toLowerCase();

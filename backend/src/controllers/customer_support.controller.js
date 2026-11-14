@@ -3,14 +3,145 @@ const customerSupportService = require('../services/customer_support.service');
 const storageService = require('../services/storage.service');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
 
 const CUSTOMER_SUPPORT_R2_FOLDER = 'customer_support';
+
+/**
+ * Probes video duration in seconds via ffprobe
+ */
+function getVideoDuration(filePath) {
+    return new Promise((resolve) => {
+        execFile('ffprobe', [
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            filePath
+        ], (err, stdout) => {
+            if (err) return resolve(null);
+            const dur = parseFloat(stdout && stdout.trim());
+            resolve(isNaN(dur) ? null : dur);
+        });
+    });
+}
+
+/**
+ * Automatically compresses large customer support media files before permanent storage:
+ * - Videos exceeding 55MB (up to 500MB+) are transcoded via FFmpeg to 720p H.264 (< 60MB).
+ * - Images exceeding 10MB are downscaled and compressed to high-efficiency JPEG (< 3MB).
+ */
+async function compressMediaIfNeeded(file) {
+    if (!file || !file.path || !fs.existsSync(file.path)) {
+        return file;
+    }
+
+    const ext = path.extname(file.originalname || file.filename || file.path).toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    const isVideo = mime.startsWith('video/') || ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v', '.3gp'].includes(ext);
+    const isImage = mime.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic'].includes(ext);
+
+    // Target threshold: 55MB (guarantees final size is strictly under 60MB)
+    const TARGET_MAX_BYTES = 55 * 1024 * 1024;
+
+    if (isVideo && file.size > TARGET_MAX_BYTES) {
+        console.log(`[CUSTOMER SUPPORT] Video "${file.originalname}" size ${(file.size / (1024*1024)).toFixed(2)}MB exceeds threshold. Compressing via FFmpeg...`);
+        const duration = await getVideoDuration(file.path);
+        const compressedPath = `${file.path}_compressed.mp4`;
+
+        let rateArgs = [];
+        if (duration && duration > 0) {
+            // Target ~48MB to have safe margin under 60MB
+            const targetBits = 48 * 8 * 1024 * 1024;
+            const targetBps = targetBits / duration;
+            const videoKbps = Math.max(300, Math.min(2200, Math.floor((targetBps - 96000) / 1000)));
+            rateArgs = [
+                '-b:v', `${videoKbps}k`,
+                '-maxrate', `${Math.round(videoKbps * 1.3)}k`,
+                '-bufsize', `${Math.round(videoKbps * 2)}k`
+            ];
+        } else {
+            rateArgs = [
+                '-crf', '28',
+                '-maxrate', '2000k',
+                '-bufsize', '4000k'
+            ];
+        }
+
+        const args = [
+            '-y',
+            '-i', file.path,
+            '-vf', "scale='min(1280,iw)':-2",
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            ...rateArgs,
+            '-c:a', 'aac',
+            '-b:a', '96k',
+            '-movflags', '+faststart',
+            compressedPath
+        ];
+
+        await new Promise((resolve) => {
+            execFile('ffmpeg', args, (err) => {
+                if (err) {
+                    console.error('[CUSTOMER SUPPORT VIDEO COMPRESS ERROR]', err.message);
+                    return resolve(false);
+                }
+                resolve(true);
+            });
+        });
+
+        if (fs.existsSync(compressedPath)) {
+            const newSize = fs.statSync(compressedPath).size;
+            console.log(`[CUSTOMER SUPPORT VIDEO COMPRESS SUCCESS] Reduced from ${(file.size / (1024*1024)).toFixed(2)}MB to ${(newSize / (1024*1024)).toFixed(2)}MB`);
+            try { fs.unlinkSync(file.path); } catch (_) {}
+            file.path = compressedPath;
+            file.size = newSize;
+            file.mimetype = 'video/mp4';
+            file.originalname = (file.originalname || 'video').replace(/\.[^.]+$/, '') + '.mp4';
+        }
+    } else if (isImage && file.size > 10 * 1024 * 1024) {
+        console.log(`[CUSTOMER SUPPORT] Large image "${file.originalname}" size ${(file.size / (1024*1024)).toFixed(2)}MB. Compressing via FFmpeg...`);
+        const compressedPath = `${file.path}_compressed.jpg`;
+        const args = [
+            '-y',
+            '-i', file.path,
+            '-vf', "scale='min(2048,iw)':-2",
+            '-q:v', '3',
+            compressedPath
+        ];
+
+        await new Promise((resolve) => {
+            execFile('ffmpeg', args, (err) => {
+                if (err) {
+                    console.error('[CUSTOMER SUPPORT IMAGE COMPRESS ERROR]', err.message);
+                    return resolve(false);
+                }
+                resolve(true);
+            });
+        });
+
+        if (fs.existsSync(compressedPath)) {
+            const newSize = fs.statSync(compressedPath).size;
+            console.log(`[CUSTOMER SUPPORT IMAGE COMPRESS SUCCESS] Reduced from ${(file.size / (1024*1024)).toFixed(2)}MB to ${(newSize / (1024*1024)).toFixed(2)}MB`);
+            try { fs.unlinkSync(file.path); } catch (_) {}
+            file.path = compressedPath;
+            file.size = newSize;
+            file.mimetype = 'image/jpeg';
+            file.originalname = (file.originalname || 'photo').replace(/\.[^.]+$/, '') + '.jpg';
+        }
+    }
+
+    return file;
+}
 
 /**
  * Persists an uploaded image or video from Customer Support into Cloudflare R2
  * under sgb-crm-media/customer_support/ and falls back to local disk only if R2 fails.
  */
 async function persistCustomerSupportMediaFile(file, keyPrefix = '') {
+    // Automatically compress large files (up to 500MB down to <60MB) before storage
+    await compressMediaIfNeeded(file);
+
     const ext = path.extname(file.originalname || file.filename || '').toLowerCase();
     const rawBase = path.basename(file.originalname || file.filename || 'media', ext)
         .replace(/[^a-zA-Z0-9_-]+/g, '_')

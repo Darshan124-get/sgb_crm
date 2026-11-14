@@ -739,8 +739,8 @@
         return /\.(mp4|mov|webm|avi|mkv|m4v|3gp)$/.test(clean);
     };
 
-    window.SUPPORT_MEDIA_MAX_MB = 60;
-    window.SUPPORT_MEDIA_MAX_BYTES = 60 * 1024 * 1024;
+    window.SUPPORT_MEDIA_MAX_MB = 550;
+    window.SUPPORT_MEDIA_MAX_BYTES = 550 * 1024 * 1024;
 
     window.isSupportMediaFile = function (file) {
         if (!file) return false;
@@ -755,9 +755,73 @@
             return { ok: false, reason: `Skipped "${file.name}": Only images and videos are allowed.` };
         }
         if (file.size > window.SUPPORT_MEDIA_MAX_BYTES) {
-            return { ok: false, reason: `Skipped "${file.name}": File size exceeds ${window.SUPPORT_MEDIA_MAX_MB}MB limit.` };
+            return { ok: false, reason: `Skipped "${file.name}": File is too large to process.` };
         }
         return { ok: true };
+    };
+
+    /**
+     * Seamless client-side image compression: reduces large high-resolution photos
+     * to a crisp, optimized web image (max 2048px, JPEG 0.82) before upload.
+     */
+    window.compressSupportImageIfNeeded = async function (file) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            return file;
+        }
+        // If image is already smaller than 1.5MB and not a raw/heic format, keep as-is
+        if (file.size <= 1.5 * 1024 * 1024 && !file.type.includes('heic')) {
+            return file;
+        }
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                const maxDim = 2048;
+                let { width, height } = img;
+                if (!width || !height) return resolve(file);
+
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (blob && blob.size < file.size) {
+                            const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+                            const compressedFile = new File([blob], newName, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            resolve(compressedFile);
+                        } else {
+                            resolve(file);
+                        }
+                    }, 'image/jpeg', 0.82);
+                } catch (drawErr) {
+                    console.warn('Canvas compress warn:', drawErr);
+                    resolve(file);
+                }
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(file);
+            };
+            img.src = objectUrl;
+        });
     };
 
 })();

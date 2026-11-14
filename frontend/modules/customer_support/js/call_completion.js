@@ -249,13 +249,11 @@ async function handleScheduleFollowup() {
 }
 
 // ── PHOTO & VIDEO STAGING & PREVIEWS ──
-function handleFilesSelected(fileList) {
-    const maxSize = window.SUPPORT_MEDIA_MAX_BYTES || (60 * 1024 * 1024);
-    const maxMb = window.SUPPORT_MEDIA_MAX_MB || 60;
-
+async function handleFilesSelected(fileList) {
+    const files = Array.from(fileList || []);
     let addedCount = 0;
-    for (let i = 0; i < fileList.length; i++) {
-        const file = fileList[i];
+    for (let i = 0; i < files.length; i++) {
+        let file = files[i];
         if (window.validateSupportMediaFile) {
             const check = window.validateSupportMediaFile(file);
             if (!check.ok) {
@@ -268,9 +266,17 @@ function handleFilesSelected(fileList) {
                 window.showToast(`Skipped "${file.name}": Unsupported format. Only images and videos allowed.`, 'error');
                 continue;
             }
-            if (file.size > maxSize) {
-                window.showToast(`Skipped "${file.name}": File size exceeds ${maxMb}MB limit.`, 'error');
+            if (file.size > 550 * 1024 * 1024) {
+                window.showToast(`Skipped "${file.name}": File is too large.`, 'error');
                 continue;
+            }
+        }
+
+        if (window.compressSupportImageIfNeeded && file.type && file.type.startsWith('image/')) {
+            try {
+                file = await window.compressSupportImageIfNeeded(file);
+            } catch (cErr) {
+                console.warn('Image compress warn:', cErr);
             }
         }
 
@@ -361,9 +367,10 @@ async function handleSaveCallOnly() {
     const installRadio = document.querySelector('input[name="installation_status"]:checked');
     const installStatus = (callOutcome === 'answered') ? (installRadio ? installRadio.value : null) : null;
 
-    const guidanceProvided = document.getElementById('guidanceProvided').value.trim();
-    const installInstructions = document.getElementById('installInstructions').value.trim();
-    const productUsageGuidance = document.getElementById('productUsageGuidance').value.trim();
+    const guidanceProvided = document.getElementById('guidanceProvided') ? document.getElementById('guidanceProvided').value.trim() : '';
+    const installInstructionsEl = document.getElementById('installInstructions');
+    const installInstructions = installInstructionsEl ? installInstructionsEl.value.trim() : null;
+    const productUsageGuidance = document.getElementById('productUsageGuidance') ? document.getElementById('productUsageGuidance').value.trim() : '';
     const customerQuestions = document.getElementById('customerQuestions').value.trim();
     const reportedProblems = document.getElementById('reportedProblems').value.trim();
     const notes = document.getElementById('notesContent').value.trim();

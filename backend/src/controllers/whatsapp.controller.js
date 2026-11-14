@@ -866,6 +866,59 @@ const getPendingPaymentSummary = async (req, res) => {
   }
 };
 
+/**
+ * Internal API: Get list of favorited phone numbers for current user
+ */
+const getFavorites = async (req, res) => {
+  try {
+    const userId = req.user ? (req.user.id || req.user.user_id) : null;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const [rows] = await pool.query(
+      'SELECT phone FROM whatsapp_user_favorites WHERE user_id = ? ORDER BY created_at DESC',
+      [userId]
+    );
+    res.json({ favorites: rows.map(r => r.phone) });
+  } catch (err) {
+    logger.error('Error fetching favorites:', err.message);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
+  }
+};
+
+/**
+ * Internal API: Toggle favorite status for a phone number
+ */
+const toggleFavorite = async (req, res) => {
+  try {
+    const userId = req.user ? (req.user.id || req.user.user_id) : null;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const rawPhone = req.body.phone;
+    if (!rawPhone) return res.status(400).json({ error: 'Phone is required' });
+    const phone = String(rawPhone).trim();
+
+    const [existing] = await pool.query(
+      'SELECT id FROM whatsapp_user_favorites WHERE user_id = ? AND phone = ?',
+      [userId, phone]
+    );
+
+    if (existing.length > 0) {
+      await pool.query(
+        'DELETE FROM whatsapp_user_favorites WHERE user_id = ? AND phone = ?',
+        [userId, phone]
+      );
+      return res.json({ isFavorite: false, phone });
+    } else {
+      await pool.query(
+        'INSERT IGNORE INTO whatsapp_user_favorites (user_id, phone) VALUES (?, ?)',
+        [userId, phone]
+      );
+      return res.json({ isFavorite: true, phone });
+    }
+  } catch (err) {
+    logger.error('Error toggling favorite:', err.message);
+    res.status(500).json({ error: 'Failed to toggle favorite' });
+  }
+};
+
 module.exports = {
   verifyWebhook,
   receiveMessage,
@@ -882,5 +935,7 @@ module.exports = {
   markUnread,
   verifyPayment,
   rejectPayment,
-  getPendingPaymentSummary
+  getPendingPaymentSummary,
+  getFavorites,
+  toggleFavorite
 };

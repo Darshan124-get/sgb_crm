@@ -8,7 +8,14 @@ const requireBilling = hasPermission('billing_billing');
 // Dashboard & Lists
 router.get('/stats', authenticateToken, requireBilling, billingController.getStats);
 router.get('/pending', authenticateToken, requireBilling, billingController.getPendingOrders);
+// Sales Orders
 router.get('/sales-orders', authenticateToken, requireBilling, billingController.getSalesOrders);
+router.post('/sales-orders', authenticateToken, requireBilling, billingController.createManualSalesOrder);
+router.get('/sales-orders/meta', authenticateToken, requireBilling, billingController.getSalesOrderMeta);
+router.get('/sales-orders/products', authenticateToken, requireBilling, billingController.getProductsForSalesOrder);
+router.get('/sales-orders/customers/search', authenticateToken, requireBilling, billingController.searchSalesOrderCustomers);
+router.get('/sales-orders/:id', authenticateToken, requireBilling, billingController.getSalesOrderDetails);
+// Orders & Invoices
 router.get('/orders', authenticateToken, requireBilling, billingController.getOrdersByStatus);
 router.get('/invoices', authenticateToken, requireBilling, billingController.getAllInvoices);
 
@@ -17,10 +24,18 @@ router.get('/orders/:id', authenticateToken, requireBilling, billingController.g
 router.patch('/orders/:id', authenticateToken, requireBilling, billingController.updateOrderItems);
 router.post('/orders/:id/approve', authenticateToken, requireBilling, billingController.approveOrder);
 router.post('/orders/:id/zoho-customer', authenticateToken, requireBilling, billingController.createZohoCustomer);
+router.post('/orders/:id/zoho-salesorder', authenticateToken, requireBilling, billingController.createOrSyncZohoSalesOrder);
+
+// Zoho Customers Directory & Details
+router.get('/customers', authenticateToken, requireBilling, billingController.getZohoCustomers);
+router.get('/customers/:contactId', authenticateToken, requireBilling, billingController.getZohoCustomerById);
+router.get('/customers/:contactId/timeline', authenticateToken, requireBilling, billingController.getZohoCustomerTimeline);
+router.post('/customers', authenticateToken, requireBilling, billingController.createDirectZohoCustomer);
 
 // Invoicing
 router.post('/orders/:id/invoice', authenticateToken, requireBilling, billingController.generateInvoice);
 router.post('/invoices/:id/finalize', authenticateToken, requireBilling, billingController.finalizeInvoice);
+router.delete('/invoices/:id', authenticateToken, requireBilling, billingController.deleteInvoice);
 router.get('/invoices/:id', authenticateToken, requireBilling, billingController.getInvoiceById);
 router.get('/invoices/:id/print', authenticateToken, requireBilling, billingController.printInvoice);
 

@@ -11,7 +11,7 @@
     <style>
         :root {
             --billing-primary: #3b82f6;
-            --billing-secondary: #6366f1;
+            --billing-secondary: #2563eb;
             --billing-accent: #f59e0b;
         }
 
@@ -20,9 +20,11 @@
         body {
             font-family: 'Inter', sans-serif;
             background: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
         }
 
-        h1, h2, h3 { font-family: 'Outfit', sans-serif; }
+        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
 
         .main-content {
             flex: 1;
@@ -35,11 +37,11 @@
             border-collapse: collapse;
             text-align: left;
             background: white;
-            min-width: 850px;
+            min-width: 950px;
         }
 
         .billing-table th {
-            padding: 0.85rem 1rem;
+            padding: 0.9rem 1.1rem;
             background: #f8fafc;
             border-bottom: 2px solid #e2e8f0;
             font-size: 0.72rem;
@@ -51,21 +53,28 @@
         }
 
         .billing-table td {
-            padding: 0.85rem 1rem;
+            padding: 0.9rem 1.1rem;
             border-bottom: 1px solid #f1f5f9;
             font-size: 0.85rem;
             color: #1e293b;
             vertical-align: middle;
         }
 
-        .billing-table tr:hover { background-color: #f8fafc; }
+        .billing-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .billing-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
 
         .premium-card {
             background: white;
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
             border: 1px solid #e2e8f0;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             overflow: hidden;
         }
 
@@ -123,23 +132,343 @@
             background: var(--billing-secondary);
         }
 
+        .btn-billing.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-billing.success:hover {
+            background: #059669;
+        }
+
+        .btn-billing.secondary {
+            background: white;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-billing.secondary:hover {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+
         .status-badge {
             display: inline-block;
             padding: 0.25rem 0.6rem;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 700;
             text-transform: uppercase;
         }
 
-        .status-dealer {
+        .status-business {
             background: #ede9fe;
             color: #6d28d9;
         }
 
-        .status-retail {
+        .status-individual {
             background: #e0f2fe;
             color: #0369a1;
+        }
+
+        /* Pagination Toolbar */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.9rem 1.5rem;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .pagination-btn {
+            padding: 0.45rem 0.9rem;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #1e293b;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* Modal Backdrop */
+        .zoho-modal-backdrop {
+            display: none !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(5px) !important;
+            -webkit-backdrop-filter: blur(5px) !important;
+            z-index: 100000 !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        .zoho-modal-backdrop.active {
+            display: flex !important;
+        }
+
+        /* Zoho Customer Details Modal */
+        .zoho-modal-container {
+            background: #f8fafc;
+            width: 95%;
+            max-width: 1280px;
+            height: 90vh;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+        }
+
+        .zoho-modal-header {
+            background: white;
+            padding: 1.1rem 1.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .zoho-modal-header h2 {
+            margin: 0;
+            font-size: 1.35rem;
+            color: #0f172a;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .zoho-nav-tabs {
+            display: flex;
+            gap: 1.5rem;
+            padding: 0 1.75rem;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .zoho-nav-tab {
+            padding: 0.75rem 0;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #64748b;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .zoho-nav-tab.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        .zoho-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 1.75rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 992px) {
+            .zoho-modal-body {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .zoho-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            margin-bottom: 1.25rem;
+        }
+
+        .zoho-card h3 {
+            margin: 0 0 1rem 0;
+            font-size: 0.95rem;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .zoho-kv-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.85rem;
+        }
+
+        .zoho-kv-row:last-child {
+            border-bottom: none;
+        }
+
+        .zoho-kv-label {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .zoho-kv-val {
+            color: #0f172a;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        /* Timeline / Activity Stream */
+        .timeline-stream {
+            position: relative;
+            padding-left: 2rem;
+            margin-top: 1rem;
+        }
+
+        .timeline-stream::before {
+            content: '';
+            position: absolute;
+            left: 0.75rem;
+            top: 0.5rem;
+            bottom: 0.5rem;
+            width: 2px;
+            background: #e2e8f0;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -2rem;
+            top: 0.2rem;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #3b82f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: #3b82f6;
+            box-shadow: 0 0 0 4px #f8fafc;
+        }
+
+        .timeline-content-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 0.85rem 1.1rem;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-bottom: 0.35rem;
+        }
+
+        .timeline-title {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .timeline-author {
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+
+        /* Form Modal (Create Customer) */
+        .create-modal-container {
+            background: white;
+            width: 95%;
+            max-width: 820px;
+            max-height: 90vh;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            gap: 1.5rem;
+        }
+
+        .form-label {
+            width: 140px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .form-input {
+            flex: 1;
+            padding: 0.6rem 0.85rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .form-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .avatar-initials {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            background: #e0f2fe;
+            color: #0369a1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            border: 1px solid #bae6fd;
         }
     </style>
 </head>
@@ -154,7 +483,7 @@
                 </div>
                 <div class="search-bar">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="globalSearch" placeholder="Search customer, phone, GSTIN..." oninput="filterCustomersTable(this.value)">
+                    <input type="text" id="globalSearch" placeholder="Search customer, phone, GSTIN..." oninput="handleSearchInput(this.value)">
                 </div>
                 <div class="profile-section">
                     <span class="profile-name" id="userName">Billing Officer</span>
@@ -166,10 +495,14 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                     <div>
                         <h1 style="font-size: 1.85rem; color: #0f172a; font-weight: 800; margin: 0;">👥 Customers & Ledger</h1>
-                        <p style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Dealers & retail farmers billing profiles, credit balances & Zoho Contacts.</p>
+                        <p style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Zoho Books customer directory, credit ledger & stage timelines.</p>
                     </div>
-                    <div style="display: flex; gap: 0.75rem;">
-                        <button class="btn-billing primary" onclick="loadCustomersList()">
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <!-- Create Customer Button LEFT OF Refresh Button -->
+                        <button class="btn-billing primary" onclick="openCreateCustomerModal()">
+                            <i class="fa-solid fa-user-plus"></i> Create Customer
+                        </button>
+                        <button class="btn-billing secondary" onclick="loadCustomersList(currentPage)">
                             <i class="fa-solid fa-rotate"></i> Refresh
                         </button>
                     </div>
@@ -182,9 +515,9 @@
                                 <th>Customer Name</th>
                                 <th>Contact / Phone</th>
                                 <th>Type</th>
-                                <th>Location</th>
-                                <th>GSTIN</th>
-                                <th>Orders Billed</th>
+                                <th>Place of Supply</th>
+                                <th>GSTIN / Treatment</th>
+                                <th>Receivables</th>
                                 <th>Zoho Status</th>
                             </tr>
                         </thead>
@@ -192,72 +525,584 @@
                             <tr>
                                 <td colspan="7" style="text-align:center; padding: 3rem;">
                                     <div class="loader"></div>
+                                    <p style="color: #64748b; margin-top: 0.5rem; font-size: 0.85rem;">Loading customers from Zoho Books...</p>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
+
+                    <!-- Pagination Controls -->
+                    <div class="pagination-container" id="paginationControls">
+                        <div id="paginationInfo">Showing 0-0 of customers</div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="pagination-btn" id="btnPrevPage" onclick="changePage(-1)" disabled>
+                                <i class="fa-solid fa-chevron-left"></i> Previous
+                            </button>
+                            <span id="pageBadge" style="padding: 0.45rem 0.85rem; font-weight: 700; color: #1e293b; background: #f1f5f9; border-radius: 8px;">Page 1</span>
+                            <button class="pagination-btn" id="btnNextPage" onclick="changePage(1)" disabled>
+                                Next <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Zoho Customer Details Modal (Matching User's Reference Screenshots) -->
+    <div class="zoho-modal-backdrop" id="customerDetailModal">
+        <div class="zoho-modal-container">
+            <div class="zoho-modal-header">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div class="avatar-initials" id="modalCustomerInitials">AR</div>
+                    <div>
+                        <h2 id="modalCustomerName">Customer Name</h2>
+                        <span id="modalCustomerCompany" style="font-size: 0.8rem; color: #64748b;">Company Name</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button class="btn-billing secondary" onclick="closeCustomerDetailModal()">
+                        <i class="fa-solid fa-xmark"></i> Close
+                    </button>
+                </div>
+            </div>
+
+            <div class="zoho-nav-tabs">
+                <div class="zoho-nav-tab active" onclick="switchDetailTab('overview')">Overview</div>
+                <div class="zoho-nav-tab" onclick="switchDetailTab('timeline')">Activity & Stages</div>
+            </div>
+
+            <div class="zoho-modal-body" id="detailModalBody">
+                <!-- Left Column: Details & Address -->
+                <div>
+                    <div class="zoho-card">
+                        <h3><i class="fa-solid fa-location-dot" style="color: #3b82f6;"></i> Address Details</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.75rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.4rem;">Billing Address</div>
+                                <div id="modalBillingAddress" style="font-size: 0.85rem; line-height: 1.5; color: #1e293b;">-</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.75rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.4rem;">Shipping Address</div>
+                                <div id="modalShippingAddress" style="font-size: 0.85rem; line-height: 1.5; color: #1e293b;">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="zoho-card">
+                        <h3><i class="fa-solid fa-circle-info" style="color: #3b82f6;"></i> Other Details</h3>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">Customer Type</span>
+                            <span class="zoho-kv-val" id="modalCustomerType">Individual</span>
+                        </div>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">Default Currency</span>
+                            <span class="zoho-kv-val" id="modalCurrency">INR - Indian Rupee</span>
+                        </div>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">GST Treatment</span>
+                            <span class="zoho-kv-val" id="modalGstTreatment">Consumer</span>
+                        </div>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">GSTIN / Tax ID</span>
+                            <span class="zoho-kv-val" id="modalGstin">-</span>
+                        </div>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">Place of Supply</span>
+                            <span class="zoho-kv-val" id="modalPlaceOfSupply">Karnataka</span>
+                        </div>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">Tax Preference</span>
+                            <span class="zoho-kv-val" id="modalTaxPreference">Taxable</span>
+                        </div>
+                        <div class="zoho-kv-row">
+                            <span class="zoho-kv-label">Portal Status</span>
+                            <span class="zoho-kv-val" id="modalPortalStatus"><span style="color: #ef4444;">● Disabled</span></span>
+                        </div>
+                    </div>
+
+                    <div class="zoho-card">
+                        <h3><i class="fa-solid fa-address-book" style="color: #3b82f6;"></i> Contact Persons</h3>
+                        <div id="modalContactPersons" style="font-size: 0.85rem; color: #64748b;">No contact persons found.</div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Receivables & Activity Stream -->
+                <div>
+                    <div class="zoho-card">
+                        <h3><i class="fa-solid fa-indian-rupee-sign" style="color: #10b981;"></i> Receivables</h3>
+                        <div style="display: flex; gap: 2rem; margin-top: 0.5rem; background: #f8fafc; padding: 1rem; border-radius: 8px;">
+                            <div>
+                                <div style="font-size: 0.72rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Outstanding Receivables</div>
+                                <div id="modalOutstanding" style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;">₹0.00</div>
+                            </div>
+                            <div style="border-left: 1px solid #e2e8f0; padding-left: 2rem;">
+                                <div style="font-size: 0.72rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Unused Credits</div>
+                                <div id="modalUnusedCredits" style="font-size: 1.25rem; font-weight: 800; color: #10b981; margin-top: 0.2rem;">₹0.00</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="zoho-card">
+                        <h3><i class="fa-solid fa-clock-rotate-left" style="color: #3b82f6;"></i> Activity & Billing Stages</h3>
+                        <div class="timeline-stream" id="modalTimelineStream">
+                            <div style="text-align: center; color: #94a3b8; padding: 2rem;">Loading activity history...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Create Customer Modal -->
+    <div class="zoho-modal-backdrop" id="createCustomerModal">
+        <div class="create-modal-container">
+            <div class="zoho-modal-header">
+                <h2><i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i> Create New Customer</h2>
+                <button class="btn-billing secondary" onclick="closeCreateCustomerModal()" style="padding: 0.4rem 0.75rem;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="createCustomerForm" onsubmit="handleCreateCustomerSubmit(event)" style="padding: 1.5rem 2rem; overflow-y: auto; flex: 1;">
+                <!-- Customer Type -->
+                <div class="form-row">
+                    <label class="form-label">Customer Type</label>
+                    <div style="display: flex; gap: 2rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                            <input type="radio" name="new_customer_type" value="individual" checked> Individual
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                            <input type="radio" name="new_customer_type" value="business"> Business
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Primary Contact -->
+                <div class="form-row">
+                    <label class="form-label">Primary Contact</label>
+                    <div style="display: flex; gap: 0.5rem; flex: 1;">
+                        <select id="newSalutation" class="form-input" style="max-width: 110px;">
+                            <option value="">Salutation</option>
+                            <option value="Mr.">Mr.</option>
+                            <option value="Mrs.">Mrs.</option>
+                            <option value="Ms.">Ms.</option>
+                            <option value="Dr.">Dr.</option>
+                        </select>
+                        <input type="text" id="newFirstName" class="form-input" placeholder="First Name">
+                        <input type="text" id="newLastName" class="form-input" placeholder="Last Name">
+                    </div>
+                </div>
+
+                <!-- Company Name -->
+                <div class="form-row">
+                    <label class="form-label">Company Name</label>
+                    <input type="text" id="newCompanyName" class="form-input" placeholder="Company Name (optional)">
+                </div>
+
+                <!-- Display Name -->
+                <div class="form-row">
+                    <label class="form-label" style="color: #ef4444;">Display Name *</label>
+                    <input type="text" id="newDisplayName" class="form-input" placeholder="Customer Display Name (Required)" required style="border-color: #93c5fd; font-weight: 700;">
+                </div>
+
+                <!-- Email & Phone -->
+                <div class="form-row">
+                    <label class="form-label">Email & Phone</label>
+                    <div style="display: flex; gap: 0.75rem; flex: 1;">
+                        <input type="email" id="newEmail" class="form-input" placeholder="email@example.com">
+                        <input type="text" id="newPhone" class="form-input" placeholder="Phone / Mobile (e.g. 9876543210)" required>
+                    </div>
+                </div>
+
+                <!-- GST Treatment & Place of Supply -->
+                <div class="form-row">
+                    <label class="form-label">GST Treatment</label>
+                    <div style="display: flex; gap: 0.75rem; flex: 1;">
+                        <select id="newGstTreatment" class="form-input">
+                            <option value="consumer">Consumer (B2C)</option>
+                            <option value="registered_business_regular">Registered Business - Regular</option>
+                            <option value="registered_business_composition">Registered Business - Composition</option>
+                            <option value="unregistered_business">Unregistered Business</option>
+                            <option value="overseas">Overseas</option>
+                            <option value="special_economic_zone">Special Economic Zone (SEZ)</option>
+                        </select>
+                        <input type="text" id="newPlaceOfSupply" class="form-input" placeholder="Place of Supply (e.g. Karnataka)" value="Karnataka">
+                    </div>
+                </div>
+
+                <!-- GSTIN & PAN -->
+                <div class="form-row">
+                    <label class="form-label">GSTIN / PAN</label>
+                    <div style="display: flex; gap: 0.75rem; flex: 1;">
+                        <input type="text" id="newGstin" class="form-input" placeholder="GST Number (optional)">
+                        <input type="text" id="newPan" class="form-input" placeholder="PAN Number (optional)">
+                    </div>
+                </div>
+
+                <!-- Billing Address -->
+                <div class="form-row" style="align-items: flex-start;">
+                    <label class="form-label" style="padding-top: 0.5rem;">Billing Address</label>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
+                        <input type="text" id="newAddress" class="form-input" placeholder="Address Line (Street, Flat/Door)">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="newCity" class="form-input" placeholder="City / District">
+                            <input type="text" id="newState" class="form-input" placeholder="State" value="Karnataka">
+                            <input type="text" id="newPincode" class="form-input" placeholder="Pincode">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                    <button type="button" class="btn-billing secondary" onclick="closeCreateCustomerModal()">Cancel</button>
+                    <button type="submit" class="btn-billing primary" id="btnSaveNewCustomer">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Save & Sync to Zoho
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="../../js/config.js"></script>
     <script src="../../js/components.js"></script>
     <script src="js/billing.js"></script>
     <script>
-        async function loadCustomersList() {
+        let currentPage = 1;
+        const pageSize = 25;
+        let searchTimeout = null;
+        let currentSearchQuery = '';
+
+        // Auto-update Display Name as First/Last Name are typed
+        document.getElementById('newFirstName').addEventListener('input', updateDisplayNamePreview);
+        document.getElementById('newLastName').addEventListener('input', updateDisplayNamePreview);
+        document.getElementById('newCompanyName').addEventListener('input', updateDisplayNamePreview);
+
+        function updateDisplayNamePreview() {
+            const comp = document.getElementById('newCompanyName').value.trim();
+            const fn = document.getElementById('newFirstName').value.trim();
+            const ln = document.getElementById('newLastName').value.trim();
+            const name = [fn, ln].filter(Boolean).join(' ');
+            const displayField = document.getElementById('newDisplayName');
+            if (!displayField.dataset.userEdited) {
+                displayField.value = comp || name || '';
+            }
+        }
+        document.getElementById('newDisplayName').addEventListener('input', () => {
+            document.getElementById('newDisplayName').dataset.userEdited = 'true';
+        });
+
+        async function loadCustomersList(page = 1) {
+            currentPage = page;
             const tbody = document.getElementById('customersBody');
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 3rem;"><div class="loader"></div><p style="color: #64748b; margin-top: 0.5rem; font-size: 0.85rem;">Fetching live customers from Zoho Books...</p></td></tr>';
+
+            const prevBtn = document.getElementById('btnPrevPage');
+            const nextBtn = document.getElementById('btnNextPage');
+            const pageBadge = document.getElementById('pageBadge');
+            const info = document.getElementById('paginationInfo');
+
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
 
             try {
-                // Fetch dealers and orders to compile customer list
-                const res = await fetch(`${window.API_URL}/dealers`, {
+                let url = `${window.API_URL}/billing/customers?page=${page}&limit=${pageSize}`;
+                if (currentSearchQuery) {
+                    url += `&search=${encodeURIComponent(currentSearchQuery)}`;
+                }
+
+                const res = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                 });
-                const dealers = await res.json();
+                const data = await res.json();
 
-                if (!dealers || dealers.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #64748b; padding: 3rem;">No customers found.</td></tr>';
+                if (!data.success || !data.contacts || data.contacts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #64748b; padding: 3rem;"><i class="fa-solid fa-users-slash" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 0.5rem; display:block;"></i>No customers found. Click <strong>Create Customer</strong> to add one.</td></tr>';
+                    info.innerText = 'No records';
+                    pageBadge.innerText = `Page ${page}`;
                     return;
                 }
 
-                tbody.innerHTML = dealers.map(d => `
-                    <tr>
-                        <td style="font-weight: 700; color: #1e293b;">
-                            <div style="font-size: 0.95rem;">${d.dealer_name || d.name || 'N/A'}</div>
-                            <span style="font-size: 0.75rem; color: #64748b;">${d.email || ''}</span>
-                        </td>
-                        <td style="font-weight: 600;">
-                            <div>${d.phone || 'N/A'}</div>
-                            <span style="font-size: 0.75rem; color: #94a3b8;">${d.contact_person || ''}</span>
-                        </td>
-                        <td><span class="status-badge status-dealer">Dealer</span></td>
-                        <td>${d.city || ''}${d.city && d.state ? ', ' : ''}${d.state || 'N/A'}</td>
-                        <td style="font-family: monospace; font-weight: 700; color: #3b82f6;">${d.gst_number || d.gst_no || 'Unregistered'}</td>
-                        <td style="font-weight: 700;">-</td>
-                        <td>
-                            <span class="status-badge" style="background: #e0f2fe; color: #0369a1;">
-                                <i class="fa-solid fa-cloud" style="margin-right: 4px;"></i> Ready for Zoho
-                            </span>
-                        </td>
-                    </tr>
-                `).join('');
+                const contacts = data.contacts;
+                const pageCtx = data.page_context || {};
+
+                tbody.innerHTML = contacts.map(c => {
+                    const initials = (c.contact_name || 'C').substring(0, 2).toUpperCase();
+                    const isBusiness = c.customer_sub_type === 'business';
+                    const receivables = parseFloat(c.outstanding_receivable_amount || 0);
+
+                    return `
+                        <tr onclick="openCustomerDetailModal('${c.contact_id}')">
+                            <td style="font-weight: 700; color: #1e293b;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="width: 34px; height: 34px; border-radius: 8px; background: #e2e8f0; color: #334155; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800;">
+                                        ${initials}
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.92rem; color: #0f172a;">${c.contact_name || 'N/A'}</div>
+                                        ${c.company_name ? `<span style="font-size: 0.75rem; color: #64748b;">${c.company_name}</span>` : ''}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; color: #1e293b;">${c.phone || c.mobile || 'N/A'}</div>
+                                <span style="font-size: 0.75rem; color: #64748b;">${c.email || ''}</span>
+                            </td>
+                            <td>
+                                <span class="status-badge ${isBusiness ? 'status-business' : 'status-individual'}">
+                                    ${isBusiness ? 'Business' : 'Individual'}
+                                </span>
+                            </td>
+                            <td style="font-weight: 600; color: #334155;">
+                                ${c.place_of_contact_formatted || c.place_of_contact || 'Karnataka'}
+                            </td>
+                            <td>
+                                <div style="font-family: monospace; font-weight: 700; color: #3b82f6;">${c.gst_no || 'Unregistered'}</div>
+                                <span style="font-size: 0.72rem; color: #64748b; text-transform: capitalize;">${(c.gst_treatment || 'consumer').replace(/_/g, ' ')}</span>
+                            </td>
+                            <td style="font-weight: 800; color: ${receivables > 0 ? '#ef4444' : '#10b981'};">
+                                ₹${receivables.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td>
+                                <span class="status-badge" style="background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-cloud-check"></i> Active in Zoho
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // Update pagination controls
+                const startIdx = (page - 1) * pageSize + 1;
+                const endIdx = startIdx + contacts.length - 1;
+                info.innerText = `Showing ${startIdx}–${endIdx} customers`;
+                pageBadge.innerText = `Page ${page}`;
+
+                prevBtn.disabled = (page <= 1);
+                nextBtn.disabled = !pageCtx.has_more_page;
+
             } catch (err) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #ef4444;">Failed to load customers.</td></tr>';
+                console.error('Failed to load customers:', err);
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: #ef4444; padding: 3rem;"><i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem; margin-bottom: 0.5rem; display:block;"></i>Failed to load customers: ${err.message}</td></tr>`;
             }
         }
 
-        function filterCustomersTable(query) {
-            const term = (query || '').toLowerCase().trim();
-            const rows = document.querySelectorAll('#customersBody tr');
-            rows.forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
-            });
+        function changePage(delta) {
+            const targetPage = currentPage + delta;
+            if (targetPage >= 1) {
+                loadCustomersList(targetPage);
+            }
         }
 
+        function handleSearchInput(value) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentSearchQuery = value.trim();
+                loadCustomersList(1);
+            }, 400);
+        }
+
+        // Customer Detail Modal Logic
+        async function openCustomerDetailModal(contactId) {
+            const modal = document.getElementById('customerDetailModal');
+            modal.classList.add('active');
+
+            document.getElementById('modalCustomerName').innerText = 'Loading...';
+            document.getElementById('modalCustomerCompany').innerText = '';
+            document.getElementById('modalCustomerInitials').innerText = '..';
+            document.getElementById('modalTimelineStream').innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 2rem;"><div class="loader"></div> Loading stages & activity...</div>';
+
+            try {
+                // Fetch full details & timeline in parallel
+                const [detailsRes, timelineRes] = await Promise.all([
+                    fetch(`${window.API_URL}/billing/customers/${contactId}`, {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    }),
+                    fetch(`${window.API_URL}/billing/customers/${contactId}/timeline`, {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    })
+                ]);
+
+                const detailsData = await detailsRes.json();
+                const timelineData = await timelineRes.json();
+
+                if (!detailsData.success || !detailsData.contact) {
+                    throw new Error(detailsData.message || 'Customer details not found');
+                }
+
+                const c = detailsData.contact;
+                document.getElementById('modalCustomerName').innerText = c.contact_name || 'N/A';
+                document.getElementById('modalCustomerCompany').innerText = c.company_name ? `Company: ${c.company_name}` : (c.customer_sub_type === 'business' ? 'Business Account' : 'Individual Account');
+                document.getElementById('modalCustomerInitials').innerText = (c.contact_name || 'C').substring(0, 2).toUpperCase();
+
+                // Addresses
+                const b = c.billing_address || {};
+                const s = c.shipping_address || {};
+                document.getElementById('modalBillingAddress').innerHTML = `
+                    <div style="font-weight: 700; color: #0f172a;">${b.attention || c.contact_name || ''}</div>
+                    <div>${[b.address, b.street2, b.city, b.state, b.zip].filter(Boolean).join(', ') || 'No billing address provided'}</div>
+                    ${b.phone ? `<div style="color: #64748b; font-size: 0.8rem; margin-top: 4px;"><i class="fa-solid fa-phone"></i> ${b.phone}</div>` : ''}
+                `;
+                document.getElementById('modalShippingAddress').innerHTML = `
+                    <div style="font-weight: 700; color: #0f172a;">${s.attention || c.contact_name || ''}</div>
+                    <div>${[s.address, s.street2, s.city, s.state, s.zip].filter(Boolean).join(', ') || 'No shipping address provided'}</div>
+                    ${s.phone ? `<div style="color: #64748b; font-size: 0.8rem; margin-top: 4px;"><i class="fa-solid fa-phone"></i> ${s.phone}</div>` : ''}
+                `;
+
+                // Other Details
+                document.getElementById('modalCustomerType').innerText = c.customer_sub_type === 'business' ? 'Business' : 'Individual';
+                document.getElementById('modalCurrency').innerText = `${c.currency_code || 'INR'} - Indian Rupee`;
+                document.getElementById('modalGstTreatment').innerText = (c.gst_treatment || 'consumer').replace(/_/g, ' ');
+                document.getElementById('modalGstin').innerText = c.gst_no || 'Unregistered';
+                document.getElementById('modalPlaceOfSupply').innerText = c.place_of_contact_formatted || c.place_of_contact || 'Karnataka';
+                document.getElementById('modalTaxPreference').innerText = c.is_taxable ? 'Taxable' : 'Tax Exempt';
+                document.getElementById('modalPortalStatus').innerHTML = c.portal_status === 'enabled' 
+                    ? '<span style="color: #10b981;">● Enabled</span>' 
+                    : '<span style="color: #ef4444;">● Disabled</span>';
+
+                // Contact Persons
+                const persons = c.contact_persons || [];
+                if (persons.length > 0) {
+                    document.getElementById('modalContactPersons').innerHTML = persons.map(p => `
+                        <div style="padding: 0.4rem 0; border-bottom: 1px solid #f1f5f9;">
+                            <div style="font-weight: 700; color: #1e293b;">${[p.salutation, p.first_name, p.last_name].filter(Boolean).join(' ')}</div>
+                            <div style="font-size: 0.78rem; color: #64748b;">${p.mobile || p.phone || ''} ${p.email ? `• ${p.email}` : ''}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('modalContactPersons').innerText = 'No contact persons found.';
+                }
+
+                // Receivables
+                const outVal = parseFloat(c.outstanding_receivable_amount || 0);
+                const credVal = parseFloat(c.unused_credits_receivable_amount || 0);
+                document.getElementById('modalOutstanding').innerText = `₹${outVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                document.getElementById('modalUnusedCredits').innerText = `₹${credVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                // Timeline / Stage Activity
+                const timeline = timelineData.timeline || [];
+                if (timeline.length === 0) {
+                    document.getElementById('modalTimelineStream').innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 2rem;">No logged stage activity found for this customer.</div>';
+                } else {
+                    document.getElementById('modalTimelineStream').innerHTML = timeline.map(item => {
+                        let icon = 'fa-comment-dots';
+                        if (item.transaction_type === 'salesorder') icon = 'fa-file-lines';
+                        else if (item.transaction_type === 'invoice') icon = 'fa-file-invoice-dollar';
+                        else if (item.transaction_type === 'customer_payment') icon = 'fa-receipt';
+                        else if (item.transaction_type === 'contact_person') icon = 'fa-user-check';
+
+                        return `
+                            <div class="timeline-item">
+                                <div class="timeline-dot"><i class="fa-solid ${icon}"></i></div>
+                                <div class="timeline-content-box">
+                                    <div class="timeline-header">
+                                        <span style="font-weight: 700; color: #3b82f6;">${item.date_description || item.date || ''}</span>
+                                        <span>${item.time || ''}</span>
+                                    </div>
+                                    <div class="timeline-title">${item.description || item.comments_html_format || 'Activity recorded'}</div>
+                                    ${item.commented_by ? `<div class="timeline-author">by <strong>${item.commented_by}</strong></div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+            } catch (err) {
+                console.error('Error opening customer modal:', err);
+                document.getElementById('modalCustomerName').innerText = 'Error';
+                document.getElementById('modalCustomerCompany').innerText = err.message;
+            }
+        }
+
+        function closeCustomerDetailModal() {
+            document.getElementById('customerDetailModal').classList.remove('active');
+        }
+
+        function switchDetailTab(tab) {
+            const tabs = document.querySelectorAll('.zoho-nav-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            if (tab === 'overview') tabs[0].classList.add('active');
+            else tabs[1].classList.add('active');
+        }
+
+        // Create Customer Modal Logic
+        function openCreateCustomerModal() {
+            document.getElementById('createCustomerModal').classList.add('active');
+            document.getElementById('createCustomerForm').reset();
+            delete document.getElementById('newDisplayName').dataset.userEdited;
+        }
+
+        function closeCreateCustomerModal() {
+            document.getElementById('createCustomerModal').classList.remove('active');
+        }
+
+        async function handleCreateCustomerSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSaveNewCustomer');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating in Zoho Books...';
+
+            const payload = {
+                customer_type: document.querySelector('input[name="new_customer_type"]:checked').value,
+                salutation: document.getElementById('newSalutation').value,
+                first_name: document.getElementById('newFirstName').value.trim(),
+                last_name: document.getElementById('newLastName').value.trim(),
+                company_name: document.getElementById('newCompanyName').value.trim(),
+                display_name: document.getElementById('newDisplayName').value.trim(),
+                email: document.getElementById('newEmail').value.trim(),
+                phone: document.getElementById('newPhone').value.trim(),
+                gst_treatment: document.getElementById('newGstTreatment').value,
+                place_of_supply: document.getElementById('newPlaceOfSupply').value.trim(),
+                gst_number: document.getElementById('newGstin').value.trim(),
+                pan_number: document.getElementById('newPan').value.trim(),
+                billing_address: document.getElementById('newAddress').value.trim(),
+                billing_city: document.getElementById('newCity').value.trim(),
+                billing_state: document.getElementById('newState').value.trim(),
+                billing_pincode: document.getElementById('newPincode').value.trim()
+            };
+
+            try {
+                const res = await fetch(`${window.API_URL}/billing/customers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to create customer');
+                }
+
+                alert(`Customer "${data.customer?.contact_name || payload.display_name}" created successfully in Zoho Books!`);
+                closeCreateCustomerModal();
+                loadCustomersList(1);
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save & Sync to Zoho';
+            }
+        }
+
+        // Close modals on clicking outside or ESC
+        document.querySelectorAll('.zoho-modal-backdrop').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeCustomerDetailModal();
+                closeCreateCustomerModal();
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
-            loadCustomersList();
+            loadCustomersList(1);
         });
     </script>
 </body>

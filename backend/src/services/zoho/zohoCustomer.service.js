@@ -223,6 +223,154 @@ class ZohoCustomerService {
             customer: zohoContact
         };
     }
+
+    /**
+     * Fetch paginated list of customers from Zoho Books
+     */
+    async getCustomersList({ page = 1, limit = 25, search = '' } = {}) {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) throw new Error('ZOHO_ORGANIZATION_ID is not configured in environment');
+
+        const headers = await zohoAuth.getAuthHeaders();
+        let url = `${zohoAuth.apiDomain}/contacts?organization_id=${orgId}&contact_type=customer&page=${page}&per_page=${limit}&sort_column=created_time&sort_order=D`;
+        
+        if (search && search.trim()) {
+            url += `&search_text=${encodeURIComponent(search.trim())}`;
+        }
+
+        const response = await axios.get(url, { headers });
+        if (response.data && response.data.code === 0) {
+            return {
+                contacts: response.data.contacts || [],
+                page_context: response.data.page_context || { page, per_page: limit, has_more_page: false }
+            };
+        } else {
+            throw new Error(response.data?.message || 'Failed to fetch contacts from Zoho Books');
+        }
+    }
+
+    /**
+     * Fetch customer full details by contact ID
+     */
+    async getCustomerDetails(contactId) {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) throw new Error('ZOHO_ORGANIZATION_ID is not configured in environment');
+
+        const headers = await zohoAuth.getAuthHeaders();
+        const response = await axios.get(`${zohoAuth.apiDomain}/contacts/${contactId}?organization_id=${orgId}`, { headers });
+        if (response.data && response.data.code === 0) {
+            return response.data.contact;
+        } else {
+            throw new Error(response.data?.message || 'Failed to fetch contact details from Zoho Books');
+        }
+    }
+
+    /**
+     * Fetch customer activity timeline / comments
+     */
+    async getCustomerTimeline(contactId) {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) throw new Error('ZOHO_ORGANIZATION_ID is not configured in environment');
+
+        const headers = await zohoAuth.getAuthHeaders();
+        const response = await axios.get(`${zohoAuth.apiDomain}/contacts/${contactId}/comments?organization_id=${orgId}`, { headers });
+        if (response.data && response.data.code === 0) {
+            return response.data.contact_comments || [];
+        } else {
+            return [];
+        }
+    }
+
+    /**
+     * Create direct customer in Zoho Books (without requiring an order)
+     */
+    async createDirectCustomer(customerData, userId = 1) {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) throw new Error('ZOHO_ORGANIZATION_ID is not configured in environment');
+
+        const headers = await zohoAuth.getAuthHeaders();
+
+        const contactName = (customerData.display_name || customerData.customer_name || 'Customer').trim();
+        const customerSubType = customerData.customer_type === 'business' ? 'business' : 'individual';
+
+        let firstName = (customerData.first_name || '').trim();
+        let lastName = (customerData.last_name || '').trim();
+        if (!firstName && customerData.customer_name) {
+            const parts = customerData.customer_name.trim().split(' ');
+            firstName = parts[0] || 'Customer';
+            lastName = parts.slice(1).join(' ') || '';
+        }
+
+        const phone = (customerData.phone || customerData.mobile || '').trim();
+        const stateName = customerData.billing_state || customerData.state || 'Karnataka';
+        const placeOfSupply = customerData.place_of_supply ? resolveStateCode(customerData.place_of_supply) : resolveStateCode(stateName);
+
+        const contactPayload = {
+            contact_name: contactName,
+            company_name: customerData.company_name || '',
+            customer_sub_type: customerSubType,
+            contact_type: 'customer',
+            contact_persons: [
+                {
+                    salutation: customerData.salutation || '',
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: customerData.email || '',
+                    phone: customerData.work_phone || '',
+                    mobile: customerData.mobile || phone || '',
+                    is_primary_contact: true
+                }
+            ],
+            gst_treatment: customerData.gst_treatment || 'consumer',
+            gst_no: customerData.gst_number || customerData.gst_no || '',
+            place_of_supply: placeOfSupply,
+            pan_no: customerData.pan_number || customerData.pan_no || '',
+            is_taxable: customerData.tax_preference !== 'tax_exempt',
+            currency_code: 'INR',
+            billing_address: {
+                attention: customerData.billing_attention || contactName,
+                address: customerData.billing_address || customerData.address || '',
+                street2: customerData.billing_street2 || customerData.village || '',
+                city: customerData.billing_city || customerData.city || customerData.district || '',
+                state: stateName,
+                zip: customerData.billing_pincode || customerData.pincode || '',
+                country: 'India',
+                phone: customerData.billing_phone || phone
+            },
+            shipping_address: {
+                attention: customerData.shipping_attention || customerData.billing_attention || contactName,
+                address: customerData.shipping_address || customerData.billing_address || customerData.address || '',
+                street2: customerData.shipping_street2 || customerData.billing_street2 || customerData.village || '',
+                city: customerData.shipping_city || customerData.billing_city || customerData.city || '',
+                state: customerData.shipping_state || stateName,
+                zip: customerData.shipping_pincode || customerData.billing_pincode || customerData.pincode || '',
+                country: 'India',
+                phone: customerData.shipping_phone || phone
+            },
+            notes: 'Created directly via SGB Agro CRM Customers Directory'
+        };
+
+        if (customerData.payment_terms !== undefined && customerData.payment_terms !== '') {
+            contactPayload.payment_terms = parseInt(customerData.payment_terms, 10) || 0;
+        }
+
+        const response = await axios.post(
+            `${zohoAuth.apiDomain}/contacts?organization_id=${orgId}`,
+            contactPayload,
+            { headers }
+        );
+
+        if (response.data && response.data.code === 0 && response.data.contact) {
+            return {
+                success: true,
+                contact_id: response.data.contact.contact_id,
+                contact_name: response.data.contact.contact_name,
+                customer: response.data.contact
+            };
+        } else {
+            throw new Error(response.data?.message || 'Failed to create customer in Zoho Books');
+        }
+    }
 }
 
 module.exports = new ZohoCustomerService();

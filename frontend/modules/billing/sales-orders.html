@@ -248,6 +248,54 @@
 
         .btn-finalize-copy.primary { background: var(--billing-primary); color: white; }
         .btn-finalize-copy.secondary { background: #f1f5f9; color: #475569; }
+    
+        /* Pagination Controls */
+        .pagination-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .pagination-btn {
+            padding: 0.45rem 0.9rem;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: #1e293b;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .per-page-select {
+            padding: 0.35rem 0.6rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #1e293b;
+            outline: none;
+            background: white;
+        }
     </style>
 </head>
 
@@ -279,7 +327,10 @@
                         <a href="pending.html" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #3b82f6; text-decoration: none;">
                             <i class="fa-solid fa-arrow-left"></i> View Pending Orders
                         </a>
-                        <button class="btn-billing primary" onclick="loadSalesOrdersList()">
+                        <button class="btn-billing primary" onclick="openDirectSalesOrderModal()" style="background: #2563eb; color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);">
+                            <i class="fa-solid fa-plus"></i> Create Sales Order
+                        </button>
+                        <button class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #475569;" onclick="loadSalesOrdersList()">
                             <i class="fa-solid fa-rotate"></i> Refresh
                         </button>
                     </div>
@@ -321,12 +372,45 @@
                             </tr>
                         </tbody>
                     </table>
+                    <!-- Pagination Controls -->
+                    <div class="pagination-container" id="paginationControls">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span id="paginationInfo">Showing 0-0 of 0 sales orders</span>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span>Show</span>
+                                <select id="perPageSelect" class="per-page-select" onchange="changePerPage(this.value)">
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                                <span>per page</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button class="pagination-btn" id="btnPrevPage" onclick="changeSoPage(-1)" disabled>
+                                <i class="fa-solid fa-chevron-left"></i> Previous
+                            </button>
+                            <span id="pageBadge" style="padding: 0.45rem 0.85rem; font-weight: 700; color: #1e293b; background: #f1f5f9; border-radius: 8px;">Page 1 of 1</span>
+                            <button class="pagination-btn" id="btnNextPage" onclick="changeSoPage(1)" disabled>
+                                Next <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
     <!-- MODAL FOR ORDER DETAILS & BILLING ACTION -->
+        <!-- 1:1 ZOHO BOOKS SALES ORDER DETAILS WORKSTATION MODAL -->
+    <div id="zohoSoDetailModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center;">
+        <div style="background: #f8fafc; width: 95%; max-width: 1200px; height: 92vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div id="zohoSoDetailContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
     <div id="billingModal" class="modal">
         <div class="modal-content">
             <div style="padding: 1.5rem 2rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
@@ -363,10 +447,15 @@
     <script src="../../js/components.js"></script>
     <script src="js/billing.js"></script>
     <script>
-        let currentTab = 'pending_invoice';
+        var salesOrderCurrentTab = 'pending_invoice';
+        var allSalesOrdersData = [];
+        var currentSoPage = 1;
+        var soPerPage = 25;
+        var filteredSalesOrders = [];
 
         function switchSalesOrderTab(tab) {
-            currentTab = tab;
+            salesOrderCurrentTab = tab;
+            currentSoPage = 1;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             if (tab === 'pending_invoice') document.getElementById('tabPendingInvoice').classList.add('active');
             else if (tab === 'invoiced') document.getElementById('tabInvoiced').classList.add('active');
@@ -379,62 +468,119 @@
             tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
 
             try {
-                const res = await fetch(`${BILLING_API_URL}/sales-orders?tab=${currentTab}`, {
+                const res = await fetch(`${BILLING_API_URL}/sales-orders?tab=${salesOrderCurrentTab}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                 });
                 const orders = await res.json();
+                allSalesOrdersData = Array.isArray(orders) ? orders : [];
+                filteredSalesOrders = [...allSalesOrdersData];
+                currentSoPage = 1;
 
-                if (!orders || orders.length === 0) {
-                    let msg = 'No sales orders found.';
-                    if (currentTab === 'pending_invoice') {
-                        msg = `No sales orders waiting for invoicing.<br><span style="font-size: 0.85rem; color: #94a3b8; margin-top: 8px; display: inline-block;">Incoming orders start in <a href="pending.html" style="color: #3b82f6; font-weight: 700; text-decoration: underline;">Pending Billing</a>. Once approved there, they automatically appear here as Sales Orders.</span>`;
-                    }
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: #64748b; padding: 3.5rem;">${msg}</td></tr>`;
-                    return;
-                }
-
-                tbody.innerHTML = orders.map(o => `
-                    <tr>
-                        <td style="font-weight: 700; color: #1e293b;">${window.formatOrderId ? window.formatOrderId(o.order_id, o.created_at) : '#SGB-' + o.order_id}</td>
-                        <td style="font-weight: 800; color: #3b82f6;">
-                            ${o.sales_order_number || ('SO-' + new Date(o.created_at).getFullYear() + '-' + String(o.order_id).padStart(5, '0'))}
-                            ${o.zoho_salesorder_id ? '<span style="font-size: 0.65rem; background: #dbeafe; color: #1e40af; padding: 2px 5px; border-radius: 4px; margin-left: 4px;">Zoho SO</span>' : ''}
-                        </td>
-                        <td style="font-weight: 600;">${o.customer_name || 'N/A'}</td>
-                        <td>${o.phone || 'N/A'}</td>
-                        <td>
-                            <span class="status-badge" style="background: ${o.order_source === 'dealer' ? '#ede9fe' : '#e0f2fe'}; color: ${o.order_source === 'dealer' ? '#6d28d9' : '#0369a1'};">
-                                ${o.order_source ? o.order_source.toUpperCase() : 'LEAD'}
-                            </span>
-                        </td>
-                        <td style="font-weight: 700;">₹${parseFloat(o.total_amount || 0).toLocaleString()}</td>
-                        <td style="font-weight: 700; color: #10b981;">₹${parseFloat(o.advance_paid || o.advance_amount || 0).toLocaleString()}</td>
-                        <td><span class="status-badge status-${o.order_status || 'approved'}">${(o.order_status || 'approved').toUpperCase()}</span></td>
-                        <td>
-                            ${o.order_status === 'approved' || o.order_status === 'so_created' ? `
-                                <button onclick="openOrderBilling(${o.order_id})" class="btn-billing primary" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">
-                                    <i class="fa-solid fa-file-invoice"></i> Generate Invoice
-                                </button>
-                            ` : `
-                                <a href="invoices.html?order_id=${o.order_id}" class="btn-billing" style="padding: 0.45rem 0.9rem; font-size: 0.78rem; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; text-decoration: none;">
-                                    <i class="fa-solid fa-circle-check"></i> Invoiced ${o.invoice_number ? '(' + o.invoice_number + ')' : ''}
-                                </a>
-                            `}
-                        </td>
-                    </tr>
-                `).join('');
+                renderPaginatedSoTable();
             } catch (err) {
                 tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444; padding: 3rem;">Failed to load sales orders.</td></tr>';
             }
         }
 
+        function renderPaginatedSoTable() {
+            const tbody = document.getElementById('salesOrdersBody');
+            const total = filteredSalesOrders.length;
+            const totalPages = Math.ceil(total / soPerPage) || 1;
+
+            if (currentSoPage > totalPages) currentSoPage = totalPages;
+            if (currentSoPage < 1) currentSoPage = 1;
+
+            const startIndex = (currentSoPage - 1) * soPerPage;
+            const endIndex = Math.min(startIndex + soPerPage, total);
+            const pageItems = filteredSalesOrders.slice(startIndex, endIndex);
+
+            // Update Pagination Controls UI
+            const paginationInfo = document.getElementById('paginationInfo');
+            if (paginationInfo) {
+                paginationInfo.innerText = total > 0 
+                    ? `Showing ${startIndex + 1}-${endIndex} of ${total} sales orders`
+                    : 'Showing 0-0 of 0 sales orders';
+            }
+
+            const pageBadge = document.getElementById('pageBadge');
+            if (pageBadge) {
+                pageBadge.innerText = `Page ${currentSoPage} of ${totalPages}`;
+            }
+
+            const btnPrev = document.getElementById('btnPrevPage');
+            if (btnPrev) btnPrev.disabled = (currentSoPage <= 1);
+
+            const btnNext = document.getElementById('btnNextPage');
+            if (btnNext) btnNext.disabled = (currentSoPage >= totalPages || total === 0);
+
+            if (total === 0) {
+                let msg = 'No sales orders found.';
+                if (salesOrderCurrentTab === 'pending_invoice') {
+                    msg = `No sales orders waiting for invoicing.<br><span style="font-size: 0.85rem; color: #94a3b8; margin-top: 8px; display: inline-block;">Incoming orders start in <a href="pending.html" style="color: #3b82f6; font-weight: 700; text-decoration: underline;">Pending Billing</a>. Once approved there, they automatically appear here as Sales Orders.</span>`;
+                }
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: #64748b; padding: 3.5rem;">${msg}</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = pageItems.map(o => `
+                <tr>
+                    <td style="font-weight: 700; color: #1e293b;">${window.formatOrderId ? window.formatOrderId(o.order_id, o.created_at) : '#SGB-' + o.order_id}</td>
+                    <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="viewSalesOrderDetails('${o.sales_order_number || o.order_id}')">
+                        <span style="text-decoration: underline; text-underline-offset: 3px;">${o.sales_order_number || ('SO-' + new Date(o.created_at).getFullYear() + '-' + String(o.order_id).padStart(5, '0'))}</span>
+                        ${o.zoho_salesorder_id ? '<span style="font-size: 0.65rem; background: #dbeafe; color: #1e40af; padding: 2px 5px; border-radius: 4px; margin-left: 4px; font-weight: 700;">Zoho SO</span>' : ''}
+                    </td>
+                    <td style="font-weight: 600;">${o.customer_name || 'N/A'}</td>
+                    <td>${o.phone || 'N/A'}</td>
+                    <td>
+                        <span class="status-badge" style="background: ${o.order_source === 'dealer' ? '#ede9fe' : '#e0f2fe'}; color: ${o.order_source === 'dealer' ? '#6d28d9' : '#0369a1'};">
+                            ${o.order_source ? o.order_source.toUpperCase() : 'LEAD'}
+                        </span>
+                    </td>
+                    <td style="font-weight: 700;">₹${parseFloat(o.total_amount || 0).toLocaleString()}</td>
+                    <td style="font-weight: 700; color: #10b981;">₹${parseFloat(o.advance_paid || o.advance_amount || 0).toLocaleString()}</td>
+                    <td><span class="status-badge status-${o.order_status || 'approved'}">${(o.order_status || 'approved').toUpperCase()}</span></td>
+                    <td>
+                        ${o.order_status === 'approved' || o.order_status === 'so_created' ? `
+                            <button onclick="openOrderBilling(${o.order_id})" class="btn-billing primary" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">
+                                <i class="fa-solid fa-file-invoice"></i> Generate Invoice
+                            </button>
+                        ` : `
+                            <a href="invoices.html?order_id=${o.order_id}" class="btn-billing" style="padding: 0.45rem 0.9rem; font-size: 0.78rem; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; text-decoration: none;">
+                                <i class="fa-solid fa-circle-check"></i> Invoiced ${o.invoice_number ? '(' + o.invoice_number + ')' : ''}
+                            </a>
+                        `}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function changeSoPage(delta) {
+            currentSoPage += delta;
+            renderPaginatedSoTable();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function changePerPage(val) {
+            soPerPage = parseInt(val, 10) || 25;
+            currentSoPage = 1;
+            renderPaginatedSoTable();
+        }
+
         function filterOrdersTable(query) {
             const term = (query || '').toLowerCase().trim();
-            const rows = document.querySelectorAll('#salesOrdersBody tr');
-            rows.forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
-            });
+            if (!term) {
+                filteredSalesOrders = [...allSalesOrdersData];
+            } else {
+                filteredSalesOrders = allSalesOrdersData.filter(o => {
+                    const idStr = String(o.order_id || '').toLowerCase();
+                    const soStr = String(o.sales_order_number || '').toLowerCase();
+                    const custStr = String(o.customer_name || '').toLowerCase();
+                    const phoneStr = String(o.phone || '').toLowerCase();
+                    return idStr.includes(term) || soStr.includes(term) || custStr.includes(term) || phoneStr.includes(term);
+                });
+            }
+            currentSoPage = 1;
+            renderPaginatedSoTable();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -442,5 +588,4 @@
         });
     </script>
 </body>
-
 </html>

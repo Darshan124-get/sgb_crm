@@ -616,125 +616,1147 @@ window.saveZohoCustomer = async function() {
     }
 };
 
-function renderSalesOrderStep(data) {
-    const items = data.items || [];
-    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity, 10)), 0);
-    const grandTotal = subtotal - (parseFloat(data.discount) || 0) + (parseFloat(data.shipping_charges) || 0) + (parseFloat(data.extra_charges) || 0);
-    const verifiedTotal = (data.payments || []).reduce((sum, p) => {
-        if (p.payment_status === 'verified' || p.verified === 'yes') return sum + parseFloat(p.amount);
-        return sum;
-    }, 0);
-    const advancePaid = Math.max(verifiedTotal, parseFloat(data.advance_amount) || 0);
-    const balanceDue = Math.max(0, grandTotal - advancePaid);
+// Cache for Sales Order metadata (Taxes, Salespersons, Delivery Methods, All Products)
+let zohoSoMeta = null;
+let allCrmProducts = [];
 
-    data.grandTotal = grandTotal;
-    data.balanceDue = balanceDue;
-    data.advance_amount = advancePaid;
+async function ensureSalesOrderMeta() {
+    if (!zohoSoMeta) {
+        try {
+            const [metaRes, prodRes] = await Promise.all([
+                fetch(`${BILLING_API_URL}/sales-orders/meta`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                }),
+                fetch(`${API_URL}/products`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                })
+            ]);
+            zohoSoMeta = await metaRes.json();
+            const prodData = await prodRes.json();
+            allCrmProducts = Array.isArray(prodData) ? prodData : (prodData.products || []);
+        } catch (err) {
+            console.warn('Could not load Sales Order metadata:', err);
+            zohoSoMeta = {
+                next_salesorder_number: 'SO-01829',
+                taxes: [],
+                salespersons: [],
+                deliveryMethods: ['Post', 'VRL', 'Offline'],
+                paymentTerms: [{ label: 'Due on Receipt', value: 0 }]
+            };
+        }
+    }
+    return zohoSoMeta;
+}
+
+function renderSalesOrderStep(data) {
+    // Ensure metadata is requested in background if not yet loaded
+    ensureSalesOrderMeta().then(() => {
+        // Populate dynamic dropdowns if rendered
+        repopulateSoDropdowns();
+    });
+
+    const items = data.items || [];
+    // Ensure all items have tax and line calculations
+    items.forEach((it, idx) => {
+        if (it.quantity === undefined) it.quantity = 1;
+        if (it.rate === undefined) it.rate = parseFloat(it.price) || 0;
+        if (it.tax_rate === undefined) it.tax_rate = 0;
+        if (it.tax_name === undefined) it.tax_name = '';
+        if (it.tax_id === undefined) it.tax_id = '';
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextShipDate = new Date();
+    nextShipDate.setDate(nextShipDate.getDate() + 2);
+    const shipmentDateStr = nextShipDate.toISOString().split('T')[0];
+
+    const soNumber = data.sales_order_number || zohoSoMeta?.next_salesorder_number || 'SO-01829';
+    const refNumber = `ORD-${data.order_id}`;
+    const contactPhone = data.phone || data.lead_phone || data.dealer_phone || '';
+    const creatorName = data.creator_name || data.sales_person_name || 'darshan';
+    const deliveryMethod = data.delivery_type || data.dispatch_through || 'Post';
 
     return `
-        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-height: 75vh; overflow-y: auto;">
-            <!-- Verified Customer Summary Card -->
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                <div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 4px;">
-                        <span style="font-size: 1.1rem; font-weight: 800; color: #0f172a;">${data.customer_name || 'Customer'}</span>
-                        <span style="font-size: 0.72rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
-                            <i class="fa-solid fa-check"></i> Zoho Contact: ${data.zoho_contact_id || 'Linked'}
-                        </span>
-                    </div>
-                    <div style="color: #64748b; font-size: 0.85rem;">
-                        <i class="fa-solid fa-phone" style="margin-right: 4px;"></i> ${data.phone || 'N/A'} &nbsp;|&nbsp; 
-                        <i class="fa-solid fa-location-dot" style="margin-right: 4px;"></i> ${data.city || ''}, ${data.state || ''} ${data.pincode ? '-' + data.pincode : ''}
+        <div class="zoho-sales-order-wrapper" style="background: white; padding: 2.25rem 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); max-height: 80vh; overflow-y: auto; font-family: 'Inter', sans-serif;">
+            
+            <!-- Zoho Page Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 1.25rem; margin-bottom: 2rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-cart-shopping" style="font-size: 1.35rem; color: #2563eb;"></i>
+                    <h2 style="margin: 0; font-size: 1.45rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">New Sales Order</h2>
+                    <span style="background: #e0f2fe; color: #0284c7; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">Order #${data.order_id}</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">
+                        <i class="fa-solid fa-cloud-check" style="color: #10b981; margin-right: 4px;"></i> Zoho Books Integration Active
+                    </span>
+                </div>
+            </div>
+
+            <!-- Primary Metadata Grid (Zoho 1:1) -->
+            <div style="display: flex; flex-direction: column; gap: 1.2rem; max-width: 900px; margin-bottom: 2.5rem;">
+                
+                <!-- Customer Name -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Customer Name *</label>
+                    <div style="flex: 1; display: flex; align-items: center; gap: 0.75rem;">
+                        <div style="flex: 1; padding: 0.6rem 0.85rem; border: 1.5px solid #93c5fd; border-radius: 8px; background: #f0fdf4; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">
+                                ${data.customer_name || 'Customer'}
+                                <span style="font-size: 0.75rem; color: #166534; font-weight: 600; margin-left: 0.5rem;">
+                                    (Zoho Contact ID: ${data.zoho_contact_id || 'Auto-linked'})
+                                </span>
+                            </span>
+                            <button type="button" onclick="switchWorkstationStep(1)" style="border: none; background: transparent; color: #2563eb; font-size: 0.78rem; font-weight: 700; cursor: pointer; text-decoration: underline;">
+                                Change
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <button type="button" onclick="switchWorkstationStep(1)" style="background: white; border: 1px solid #cbd5e1; color: #3b82f6; font-size: 0.8rem; font-weight: 700; padding: 0.45rem 0.9rem; border-radius: 8px; cursor: pointer;">
-                    <i class="fa-solid fa-pen-to-square"></i> Edit Customer
-                </button>
+                <!-- Sales Order# -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Sales Order# *</label>
+                    <div style="flex: 1; display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="text" id="soNumberInput" value="${soNumber}" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: #0f172a; outline: none;">
+                        <button type="button" title="Regenerate Sequence" onclick="refreshSoNumber()" style="border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 0.55rem 0.8rem; cursor: pointer; color: #475569;">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reference# -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Reference#</label>
+                    <input type="text" id="soReferenceInput" value="${refNumber}" placeholder="Reference Number" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                </div>
+
+                <!-- Sales Order Date -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Sales Order Date *</label>
+                    <input type="date" id="soDateInput" value="${todayStr}" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: #1e293b; outline: none;">
+                </div>
+
+                <!-- Expected Shipment Date -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Expected Shipment Date</label>
+                    <input type="date" id="soShipmentDateInput" value="${shipmentDateStr}" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                </div>
+
+                <!-- Payment Terms -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Payment Terms</label>
+                    <select id="soPaymentTermsInput" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="0" selected>Due on Receipt</option>
+                        <option value="15">Net 15</option>
+                        <option value="30">Net 30</option>
+                        <option value="45">Net 45</option>
+                        <option value="60">Net 60</option>
+                    </select>
+                </div>
+
+                <!-- Delivery Method -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Delivery Method</label>
+                    <select id="soDeliveryMethodInput" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="Post" ${deliveryMethod.toLowerCase().includes('post') ? 'selected' : ''}>Post</option>
+                        <option value="VRL" ${deliveryMethod.toLowerCase().includes('vrl') ? 'selected' : ''}>VRL</option>
+                        <option value="Offline" ${deliveryMethod.toLowerCase().includes('offline') ? 'selected' : ''}>Offline</option>
+                        <option value="ST Courier">ST Courier</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="Direct Handover">Direct Handover</option>
+                    </select>
+                </div>
+
+                <!-- Salesperson -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Salesperson *</label>
+                    <select id="soSalespersonInput" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; outline: none;">
+                        <option value="${creatorName}">${creatorName}</option>
+                    </select>
+                </div>
+
+                <!-- Contact -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Contact *</label>
+                    <input type="text" id="soContactPhoneInput" value="${contactPhone}" placeholder="Customer Phone" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; outline: none;">
+                </div>
             </div>
 
-            <!-- Product Items Section -->
-            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
-                <span><i class="fas fa-box" style="color: #10b981; margin-right: 0.5rem;"></i> Order Items</span>
-                <span style="font-size: 0.8rem; font-weight: 600; color: #64748b;">${items.length} item(s)</span>
-            </h3>
+            <!-- Item Table Section (Zoho 1:1) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">Item Table</h3>
+                <span style="font-size: 0.78rem; font-weight: 700; color: #2563eb; cursor: pointer;" onclick="openBulkItemModal()">
+                    <i class="fa-solid fa-boxes-stacked"></i> Bulk Actions
+                </span>
+            </div>
 
-            <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem;">
-                <table class="edit-table" style="margin: 0; width: 100%;">
-                    <thead style="background: #f8fafc;">
+            <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; margin-bottom: 1.25rem;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;" id="zohoItemGridTable">
+                    <thead style="background: #f8fafc; border-bottom: 1px solid #cbd5e1;">
                         <tr>
-                            <th style="padding: 0.85rem 1rem; text-align: left;">Product</th>
-                            <th style="width: 140px; text-align: right; padding: 0.85rem 1rem;">Unit Price</th>
-                            <th style="width: 100px; text-align: center; padding: 0.85rem 1rem;">Quantity</th>
-                            <th style="width: 140px; text-align: right; padding: 0.85rem 1rem;">Total</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 42%;">ITEM DETAILS</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 14%; text-align: right;">QUANTITY</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 16%; text-align: right;">RATE</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 16%;">TAX</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 12%; text-align: right;">AMOUNT</th>
+                            <th style="padding: 0.75rem 0.5rem; width: 40px;"></th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${items.length > 0 ? items.map((item, idx) => `
-                            <tr style="border-top: 1px solid #e2e8f0;">
-                                <td style="padding: 1rem; font-weight: 700;">
-                                    ${item.product_name}
-                                    <div style="font-size: 0.72rem; color: #64748b; font-weight: 500;">SKU: ${item.sku || 'N/A'}</div>
-                                </td>
-                                <td style="text-align: right; font-weight: 600; padding: 1rem;">
-                                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.25rem;">
-                                        <span>₹</span>
-                                        <input type="number" value="${item.price}" oninput="updateOrderItemPrice(${idx}, this.value)" style="width: 90px; text-align: right; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; outline: none;">
-                                    </div>
-                                </td>
-                                <td style="text-align: center; font-weight: 800; padding: 1rem;">
-                                    <input type="number" min="1" value="${item.quantity}" oninput="updateOrderItemQty(${idx}, this.value)" style="width: 60px; text-align: center; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; outline: none;">
-                                </td>
-                                <td style="text-align: right; font-weight: 800; color: #0f172a; padding: 1rem;">
-                                    ₹${(parseFloat(item.price) * parseInt(item.quantity, 10)).toLocaleString()}
-                                </td>
-                            </tr>
-                        `).join('') : `<tr><td colspan="4" style="text-align:center; padding: 2rem; color: #64748b;">No items in order.</td></tr>`}
+                    <tbody id="zohoItemGridBody">
+                        <!-- Populated by renderZohoLineItems() -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- Summary & Adjustments -->
-            <div style="display: flex; justify-content: flex-end; gap: 2.5rem; background: #f8fafc; padding: 1.5rem 2rem; border-radius: 10px; border: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap;">
-                <div style="text-align: right;">
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Discount</div>
-                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem;">
-                        <span style="font-weight: 800; color: #ef4444;">-₹</span>
-                        <input type="number" id="editableDiscount" value="${data.discount || 0}" oninput="updateDiscount(this.value)" style="width: 90px; padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; text-align: right; color: #ef4444; outline: none;">
+            <!-- Table Buttons (Add New Row / Add in Bulk) -->
+            <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                <button type="button" onclick="addNewZohoItemRow()" style="padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; font-size: 0.8rem; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-plus-circle"></i> Add New Row
+                </button>
+                <button type="button" onclick="openBulkItemModal()" style="padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; font-size: 0.8rem; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-layer-group"></i> Add Items in Bulk
+                </button>
+            </div>
+
+            <!-- Split Section: Customer Notes / Terms (Left) & Zoho Subtotals / Adjustments (Right) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; align-items: start;">
+                
+                <!-- Left: Notes & Terms -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div>
+                        <label style="display: block; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem;">Customer Notes</label>
+                        <textarea id="soCustomerNotes" rows="3" style="width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-family: inherit; outline: none;">Thank you for doing business with us.</textarea>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem;">Terms & Conditions</label>
+                        <textarea id="soTermsConditions" rows="5" style="width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.8rem; font-family: inherit; outline: none; line-height: 1.5; color: #475569;">1. Goods once sold will not be taken back or exchanged.
+2. Payment must be made within the due date mentioned on the invoice.
+3. Late payment may attract additional charges or interest as applicable.
+4. Any dispute regarding this invoice must be raised within 7 days from the invoice date.
+5. Subject to Koppa Jurisdiction.</textarea>
                     </div>
                 </div>
 
-                <div style="text-align: right;">
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Value</div>
-                    <div id="displayGrandTotal" style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">₹${grandTotal.toLocaleString()}</div>
-                </div>
+                <!-- Right: Calculations & Totals (Zoho 1:1) -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem 1.75rem; display: flex; flex-direction: column; gap: 1rem;">
+                    
+                    <!-- Sub Total -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Sub Total</span>
+                        <span id="soSubtotalDisplay" style="font-weight: 800; color: #0f172a;">₹0.00</span>
+                    </div>
 
-                <div style="text-align: right;">
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Advance Paid</div>
-                    <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">₹${advancePaid.toLocaleString()}</div>
-                </div>
+                    <!-- Discount -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Discount</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="number" step="0.01" id="soDiscountValue" value="${data.discount || 0}" oninput="recalculateZohoTotals()" style="width: 100px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
+                            <select id="soDiscountType" onchange="recalculateZohoTotals()" style="padding: 0.35rem 0.45rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 700; background: white;">
+                                <option value="flat">₹</option>
+                                <option value="percent">%</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <div style="text-align: right;">
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Balance COD Due</div>
-                    <div id="displayBalanceDue" style="font-size: 1.45rem; font-weight: 900; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">₹${balanceDue.toLocaleString()}</div>
+                    <!-- Shipping Charges -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Shipping Charges</span>
+                        <div style="display: flex; align-items: center; gap: 0.25rem;">
+                            <span style="color: #64748b;">₹</span>
+                            <input type="number" step="0.01" id="soShippingCharges" value="${data.shipping_charges || 0}" oninput="recalculateZohoTotals()" style="width: 110px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
+                        </div>
+                    </div>
+
+                    <!-- TDS / TCS Radio Selector -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;">
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <label style="display: flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer;">
+                                <input type="radio" name="so_tax_withholding" value="tds" onchange="toggleWithholdingTax()"> TDS
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer;">
+                                <input type="radio" name="so_tax_withholding" value="tcs" onchange="toggleWithholdingTax()"> TCS
+                            </label>
+                        </div>
+                        <select id="soWithholdingTaxSelect" onchange="recalculateZohoTotals()" style="width: 140px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; background: white; outline: none;">
+                            <option value="0">Select a Tax</option>
+                            <option value="0.1">0.1%</option>
+                            <option value="0.075">0.075%</option>
+                        </select>
+                    </div>
+
+                    <!-- Round off -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Round off</span>
+                        <input type="number" step="0.01" id="soRoundoffInput" value="0.00" oninput="recalculateZohoTotals(true)" style="width: 110px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
+                    </div>
+
+                    <!-- Total (₹) -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #cbd5e1; padding-top: 0.85rem; margin-top: 0.5rem;">
+                        <span style="font-size: 1.15rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">Total ( ₹ )</span>
+                        <span id="soTotalFinalDisplay" style="font-size: 1.45rem; font-weight: 900; color: #2563eb; font-family: 'Outfit', sans-serif;">₹0.00</span>
+                    </div>
+
+                    <!-- Verified Advance & Balance Info -->
+                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.5rem; font-size: 0.8rem; display: flex; justify-content: space-between;">
+                        <span style="color: #64748b;">Advance Verified: <strong style="color: #10b981;">₹${(parseFloat(data.advance_amount) || 0).toLocaleString()}</strong></span>
+                        <span style="color: #64748b;">Balance COD Due: <strong id="soBalanceCodDue" style="color: #ef4444;">₹0.00</strong></span>
+                    </div>
                 </div>
             </div>
 
-            <!-- ACTION FOOTER FOR STEP 2 -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-                <button type="button" onclick="switchWorkstationStep(1)" style="padding: 0.75rem 1.5rem; background: white; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; cursor: pointer;">
-                    ⬅ Back to Customer Info
-                </button>
-
-                <div style="display: flex; gap: 1rem;">
-                    <button type="button" onclick="approveSalesOrder()" class="btn-billing primary" style="padding: 0.75rem 2.2rem; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
-                        <i class="fa-solid fa-check-double"></i> Approve & Create Sales Order
+            <!-- Zoho Sticky Footer Action Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #f1f5f9; padding-top: 1.5rem; background: white; position: sticky; bottom: 0;">
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" onclick="submitZohoSalesOrder(true)" class="btn-billing secondary" style="padding: 0.65rem 1.4rem; font-weight: 700;">
+                        Save as Draft
                     </button>
+                    <button type="button" id="btnZohoSaveAndSend" onclick="submitZohoSalesOrder(false)" class="btn-billing primary" style="padding: 0.65rem 2rem; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Save and Send
+                    </button>
+                    <button type="button" onclick="closeModal()" class="btn-billing secondary" style="padding: 0.65rem 1.25rem;">
+                        Cancel
+                    </button>
+                </div>
+
+                <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">
+                    Total Quantity: <strong id="soTotalQtyCount" style="color: #0f172a;">0</strong>
                 </div>
             </div>
         </div>
     `;
 }
+
+// Function to populate line items dynamically into the Zoho grid
+window.renderZohoLineItems = function() {
+    const tbody = document.getElementById('zohoItemGridBody');
+    if (!tbody || !currentOrder) return;
+
+    const items = currentOrder.items || [];
+    if (items.length === 0) {
+        // Automatically add one blank line
+        items.push({
+            product_id: 14,
+            product_name: '',
+            rate: 0,
+            quantity: 1,
+            tax_rate: 0,
+            tax_name: '',
+            tax_id: ''
+        });
+    }
+
+    const taxes = zohoSoMeta?.taxes || [];
+
+    tbody.innerHTML = items.map((it, idx) => {
+        const itemAmount = (parseFloat(it.rate) || 0) * (parseFloat(it.quantity) || 1);
+
+        // Build product dropdown options
+        let productOptions = `<option value="">Type or click to select an item...</option>`;
+        allCrmProducts.forEach(p => {
+            const isSel = (it.product_id == p.product_id) || (it.product_name && it.product_name.toLowerCase() === p.name.toLowerCase());
+            productOptions += `<option value="${p.product_id}" data-rate="${p.selling_price || 0}" data-sku="${p.sku || ''}" ${isSel ? 'selected' : ''}>${p.name}</option>`;
+        });
+
+        // Build tax dropdown options
+        let taxOptions = `<option value="0" data-id="" data-name="">Select a Tax</option>`;
+        taxes.forEach(t => {
+            const isSel = (it.tax_id && it.tax_id === t.id) || (it.tax_name && it.tax_name === t.name);
+            taxOptions += `<option value="${t.rate}" data-id="${t.id}" data-name="${t.name}" ${isSel ? 'selected' : ''}>${t.name} [${t.rate}%]</option>`;
+        });
+
+        return `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 0.85rem 1rem;">
+                    <select class="form-input" style="width: 100%; font-weight: 700; margin-bottom: 4px;" onchange="onZohoProductSelected(${idx}, this)">
+                        ${productOptions}
+                    </select>
+                    <input type="text" placeholder="Add a description to your item" value="${it.description || ''}" oninput="currentOrder.items[${idx}].description = this.value" style="width: 100%; border: none; font-size: 0.78rem; color: #64748b; outline: none; background: transparent;">
+                </td>
+                <td style="padding: 0.85rem 1rem; text-align: right;">
+                    <input type="number" min="1" step="1" value="${it.quantity || 1}" oninput="onZohoItemQtyChange(${idx}, this.value)" style="width: 70px; text-align: right; padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; outline: none;">
+                </td>
+                <td style="padding: 0.85rem 1rem; text-align: right;">
+                    <input type="number" step="0.01" value="${it.rate || 0}" oninput="onZohoItemRateChange(${idx}, this.value)" style="width: 90px; text-align: right; padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; outline: none;">
+                </td>
+                <td style="padding: 0.85rem 1rem;">
+                    <select style="width: 100%; padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; outline: none;" onchange="onZohoItemTaxChange(${idx}, this)">
+                        ${taxOptions}
+                    </select>
+                </td>
+                <td style="padding: 0.85rem 1rem; text-align: right; font-weight: 800; color: #0f172a; font-size: 0.95rem;">
+                    ₹${itemAmount.toFixed(2)}
+                </td>
+                <td style="padding: 0.85rem 0.5rem; text-align: center;">
+                    ${items.length > 1 ? `
+                        <button type="button" onclick="removeZohoItemRow(${idx})" title="Delete Row" style="border: none; background: transparent; color: #ef4444; cursor: pointer; font-size: 0.9rem;">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    recalculateZohoTotals();
+};
+
+window.onZohoProductSelected = function(idx, selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    const prodId = opt.value;
+    const rate = parseFloat(opt.dataset.rate) || 0;
+    const prodName = opt.text;
+
+    if (!currentOrder.items[idx]) return;
+    currentOrder.items[idx].product_id = prodId;
+    currentOrder.items[idx].product_name = prodName;
+    currentOrder.items[idx].name = prodName;
+    currentOrder.items[idx].rate = rate;
+    currentOrder.items[idx].price = rate;
+
+    renderZohoLineItems();
+};
+
+window.onZohoItemQtyChange = function(idx, val) {
+    if (!currentOrder.items[idx]) return;
+    currentOrder.items[idx].quantity = parseFloat(val) || 1;
+    renderZohoLineItems();
+};
+
+window.onZohoItemRateChange = function(idx, val) {
+    if (!currentOrder.items[idx]) return;
+    currentOrder.items[idx].rate = parseFloat(val) || 0;
+    currentOrder.items[idx].price = parseFloat(val) || 0;
+    renderZohoLineItems();
+};
+
+window.onZohoItemTaxChange = function(idx, selectEl) {
+    if (!currentOrder.items[idx]) return;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    currentOrder.items[idx].tax_rate = parseFloat(opt.value) || 0;
+    currentOrder.items[idx].tax_id = opt.dataset.id || '';
+    currentOrder.items[idx].tax_name = opt.dataset.name || '';
+    recalculateZohoTotals();
+};
+
+window.addNewZohoItemRow = function() {
+    if (!currentOrder) return;
+    currentOrder.items = currentOrder.items || [];
+    currentOrder.items.push({
+        product_id: 14,
+        product_name: '',
+        rate: 0,
+        quantity: 1,
+        tax_rate: 0,
+        tax_name: '',
+        tax_id: ''
+    });
+    renderZohoLineItems();
+};
+
+window.removeZohoItemRow = function(idx) {
+    if (!currentOrder || !currentOrder.items) return;
+    currentOrder.items.splice(idx, 1);
+    renderZohoLineItems();
+};
+
+window.recalculateZohoTotals = function(manualRoundoff = false) {
+    if (!currentOrder) return;
+    const items = currentOrder.items || [];
+    
+    let subtotal = 0;
+    let totalQty = 0;
+
+    items.forEach(it => {
+        const lineTotal = (parseFloat(it.rate) || 0) * (parseFloat(it.quantity) || 1);
+        subtotal += lineTotal;
+        totalQty += (parseFloat(it.quantity) || 1);
+    });
+
+    const discountVal = parseFloat(document.getElementById('soDiscountValue')?.value) || 0;
+    const discountType = document.getElementById('soDiscountType')?.value || 'flat';
+    let discountAmount = discountType === 'percent' ? (subtotal * discountVal / 100) : discountVal;
+
+    const shippingCharge = parseFloat(document.getElementById('soShippingCharges')?.value) || 0;
+    
+    // Raw total before roundoff
+    const rawTotal = subtotal - discountAmount + shippingCharge;
+    
+    let roundoff = 0;
+    const roundoffEl = document.getElementById('soRoundoffInput');
+    if (manualRoundoff && roundoffEl) {
+        roundoff = parseFloat(roundoffEl.value) || 0;
+    } else if (roundoffEl) {
+        roundoff = Math.round(rawTotal) - rawTotal;
+        roundoffEl.value = roundoff.toFixed(2);
+    }
+
+    const finalTotal = Math.max(0, rawTotal + roundoff);
+    const advancePaid = parseFloat(currentOrder.advance_amount) || 0;
+    const balanceDue = Math.max(0, finalTotal - advancePaid);
+
+    // Update displays
+    if (document.getElementById('soSubtotalDisplay')) {
+        document.getElementById('soSubtotalDisplay').innerText = `₹${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (document.getElementById('soTotalFinalDisplay')) {
+        document.getElementById('soTotalFinalDisplay').innerText = `₹${finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (document.getElementById('soBalanceCodDue')) {
+        document.getElementById('soBalanceCodDue').innerText = `₹${balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (document.getElementById('soTotalQtyCount')) {
+        document.getElementById('soTotalQtyCount').innerText = totalQty;
+    }
+};
+
+window.repopulateSoDropdowns = function() {
+    const spSelect = document.getElementById('soSalespersonInput');
+    if (spSelect && zohoSoMeta?.salespersons) {
+        const currentVal = spSelect.value;
+        spSelect.innerHTML = zohoSoMeta.salespersons.map(sp => 
+            `<option value="${sp.name}" ${sp.name === currentVal ? 'selected' : ''}>${sp.name}</option>`
+        ).join('');
+    }
+
+    // Call renderZohoLineItems once dropdowns and meta are ready
+    renderZohoLineItems();
+};
+
+window.refreshSoNumber = async function() {
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/meta`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const meta = await res.json();
+        if (meta.next_salesorder_number && document.getElementById('soNumberInput')) {
+            document.getElementById('soNumberInput').value = meta.next_salesorder_number;
+        }
+    } catch (e) { }
+};
+
+window.submitZohoSalesOrder = async function(isDraft = false) {
+    if (!currentOrder) return;
+
+    const btn = document.getElementById('btnZohoSaveAndSend');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing & Syncing to Zoho...';
+    }
+
+    const payload = {
+        is_draft_only: isDraft,
+        salesorder_number: document.getElementById('soNumberInput')?.value?.trim(),
+        reference_number: document.getElementById('soReferenceInput')?.value?.trim(),
+        date: document.getElementById('soDateInput')?.value,
+        shipment_date: document.getElementById('soShipmentDateInput')?.value,
+        payment_terms: document.getElementById('soPaymentTermsInput')?.value,
+        delivery_method: document.getElementById('soDeliveryMethodInput')?.value,
+        salesperson_name: document.getElementById('soSalespersonInput')?.value,
+        contact_phone: document.getElementById('soContactPhoneInput')?.value?.trim(),
+        notes: document.getElementById('soCustomerNotes')?.value?.trim(),
+        terms: document.getElementById('soTermsConditions')?.value?.trim(),
+        discount: parseFloat(document.getElementById('soDiscountValue')?.value) || 0,
+        shipping_charge: parseFloat(document.getElementById('soShippingCharges')?.value) || 0,
+        adjustment: parseFloat(document.getElementById('soRoundoffInput')?.value) || 0,
+        items: (currentOrder.items || []).map(i => ({
+            product_id: i.product_id,
+            product_name: i.product_name || i.name,
+            name: i.product_name || i.name,
+            rate: parseFloat(i.rate || i.price) || 0,
+            quantity: parseFloat(i.quantity) || 1,
+            tax_id: i.tax_id || undefined
+        }))
+    };
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/orders/${currentOrder.order_id}/zoho-salesorder`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            closeModal();
+            alert(`✅ ${data.message}`);
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        } else {
+            alert(`Error: ${data.message || 'Failed to process Sales Order'}`);
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+};
+
+window.openBulkItemModal = function() {
+    const list = allCrmProducts.map(p => `
+        <label style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.75rem; border-bottom: 1px solid #f1f5f9; cursor: pointer;">
+            <div>
+                <input type="checkbox" class="bulk-item-cb" value="${p.product_id}" data-name="${p.name}" data-rate="${p.selling_price || 0}">
+                <strong style="margin-left: 0.5rem; font-size: 0.85rem; color: #0f172a;">${p.name}</strong>
+            </div>
+            <span style="font-weight: 700; color: #2563eb; font-size: 0.85rem;">₹${parseFloat(p.selling_price || 0).toLocaleString()}</span>
+        </label>
+    `).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'bulkItemModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+            <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.1rem; color: #0f172a;">Add Items in Bulk</h3>
+                <button type="button" onclick="document.getElementById('bulkItemModal').remove()" style="border: none; background: transparent; font-size: 1.25rem; cursor: pointer;">&times;</button>
+            </div>
+            <div style="padding: 1rem 1.25rem; overflow-y: auto; flex: 1;">
+                ${list || '<p style="color: #64748b;">No products found</p>'}
+            </div>
+            <div style="padding: 1rem 1.25rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" onclick="document.getElementById('bulkItemModal').remove()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; background: white; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button type="button" onclick="confirmBulkItemsAdd()" style="padding: 0.5rem 1.25rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">Add Selected</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.confirmBulkItemsAdd = function() {
+    const selected = document.querySelectorAll('.bulk-item-cb:checked');
+    if (!currentOrder) return;
+    currentOrder.items = currentOrder.items || [];
+    selected.forEach(cb => {
+        currentOrder.items.push({
+            product_id: cb.value,
+            product_name: cb.dataset.name,
+            name: cb.dataset.name,
+            rate: parseFloat(cb.dataset.rate) || 0,
+            quantity: 1,
+            tax_rate: 0,
+            tax_name: '',
+            tax_id: ''
+        });
+    });
+    const m = document.getElementById('bulkItemModal');
+    if (m) m.remove();
+    renderZohoLineItems();
+};
+
+// =====================================================================
+// DIRECT / STANDALONE SALES ORDER MODAL WORKSTATION
+// =====================================================================
+
+window.openDirectSalesOrderModal = async function() {
+    await ensureSalesOrderMeta();
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextShipDate = new Date();
+    nextShipDate.setDate(nextShipDate.getDate() + 2);
+    const shipmentDateStr = nextShipDate.toISOString().split('T')[0];
+    const soNumber = zohoSoMeta?.next_salesorder_number || 'SO-01841';
+
+    // Initialize standalone currentOrder
+    currentOrder = {
+        order_id: null,
+        is_direct: true,
+        customer_name: '',
+        zoho_contact_id: '',
+        phone: '',
+        advance_amount: 0,
+        discount: 0,
+        shipping_charges: 0,
+        items: [
+            {
+                product_id: allCrmProducts[0]?.product_id || 14,
+                product_name: allCrmProducts[0]?.name || '',
+                name: allCrmProducts[0]?.name || '',
+                rate: parseFloat(allCrmProducts[0]?.selling_price || 0),
+                quantity: 1,
+                tax_rate: 0,
+                tax_name: '',
+                tax_id: ''
+            }
+        ]
+    };
+
+    const modal = document.getElementById('billingModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    if (!modal || !modalBody) return;
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">
+                    + Create Sales Order
+                </span>
+                <span style="font-size: 0.75rem; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 6px; font-weight: 700;">
+                    MANUAL / DIRECT
+                </span>
+            </div>
+        `;
+    }
+
+    modalBody.innerHTML = `
+        <div class="zoho-sales-order-wrapper" style="background: white; padding: 2.25rem 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); max-height: 80vh; overflow-y: auto; font-family: 'Inter', sans-serif;">
+            
+            <!-- Zoho Page Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 1.25rem; margin-bottom: 2rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-cart-shopping" style="font-size: 1.35rem; color: #2563eb;"></i>
+                    <h2 style="margin: 0; font-size: 1.45rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">New Sales Order</h2>
+                    <span style="background: #e0f2fe; color: #0284c7; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">Direct Invoice Pipeline</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">
+                        <i class="fa-solid fa-cloud-check" style="color: #10b981; margin-right: 4px;"></i> Zoho Books Accounting Mode
+                    </span>
+                </div>
+            </div>
+
+            <!-- Primary Metadata Grid (Zoho 1:1) -->
+            <div style="display: flex; flex-direction: column; gap: 1.2rem; max-width: 900px; margin-bottom: 2.5rem;">
+                
+                <!-- Customer Name (Live Searchable Dropdown) -->
+                <div style="display: flex; align-items: flex-start; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444; margin-top: 8px;">Customer Name *</label>
+                    <div style="flex: 1; position: relative;">
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="text" id="directCustomerSearch" placeholder="Type customer or dealer name, phone..." oninput="onDirectCustomerSearch(this.value)" autocomplete="off" style="flex: 1; padding: 0.6rem 0.85rem; border: 1.5px solid #3b82f6; border-radius: 8px; font-size: 0.9rem; font-weight: 600; outline: none; background: #fff;">
+                            <button type="button" onclick="openDirectCustomerPopup()" title="Create New Customer" style="padding: 0.6rem 0.9rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; color: #3b82f6; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+                                <i class="fa-solid fa-user-plus"></i> New
+                            </button>
+                        </div>
+                        <input type="hidden" id="directCustomerId" value="">
+                        <input type="hidden" id="directZohoContactId" value="">
+                        <div id="directCustomerDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); max-height: 250px; overflow-y: auto; z-index: 1000; margin-top: 4px;">
+                            <!-- Search Results -->
+                        </div>
+                        <div id="directSelectedCustomerBadge" style="margin-top: 6px; display: none;">
+                            <!-- Selected Badge -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales Order# -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Sales Order# *</label>
+                    <div style="flex: 1; display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="text" id="soNumberInput" value="${soNumber}" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: #0f172a; outline: none;">
+                        <button type="button" title="Regenerate Sequence" onclick="refreshSoNumber()" style="border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 0.55rem 0.8rem; cursor: pointer; color: #475569;">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reference# -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Reference#</label>
+                    <input type="text" id="soReferenceInput" placeholder="Reference Number / PO" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                </div>
+
+                <!-- Sales Order Date -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Sales Order Date *</label>
+                    <input type="date" id="soDateInput" value="${todayStr}" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: #1e293b; outline: none;">
+                </div>
+
+                <!-- Expected Shipment Date -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Expected Shipment Date</label>
+                    <input type="date" id="soShipmentDateInput" value="${shipmentDateStr}" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                </div>
+
+                <!-- Payment Terms -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Payment Terms</label>
+                    <select id="soPaymentTermsInput" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="0" selected>Due on Receipt</option>
+                        <option value="15">Net 15</option>
+                        <option value="30">Net 30</option>
+                        <option value="45">Net 45</option>
+                        <option value="60">Net 60</option>
+                    </select>
+                </div>
+
+                <!-- Delivery Method -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 600; font-size: 0.85rem; color: #475569;">Delivery Method</label>
+                    <select id="soDeliveryMethodInput" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        <option value="Post" selected>Post</option>
+                        <option value="VRL">VRL</option>
+                        <option value="Offline">Offline</option>
+                        <option value="ST Courier">ST Courier</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="Direct Handover">Direct Handover</option>
+                    </select>
+                </div>
+
+                <!-- Salesperson -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Salesperson *</label>
+                    <select id="soSalespersonInput" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; outline: none;">
+                        <!-- Repopulated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Contact -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Contact *</label>
+                    <input type="text" id="soContactPhoneInput" placeholder="Customer Phone Number" style="flex: 1; max-width: 420px; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; outline: none;">
+                </div>
+            </div>
+
+            <!-- Item Table Section (Zoho 1:1) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">Item Table</h3>
+                <span style="font-size: 0.78rem; font-weight: 700; color: #2563eb; cursor: pointer;" onclick="openBulkItemModal()">
+                    <i class="fa-solid fa-boxes-stacked"></i> Bulk Actions
+                </span>
+            </div>
+
+            <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; margin-bottom: 1.25rem;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;" id="zohoItemGridTable">
+                    <thead style="background: #f8fafc; border-bottom: 1px solid #cbd5e1;">
+                        <tr>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 42%;">ITEM DETAILS</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 14%; text-align: right;">QUANTITY</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 16%; text-align: right;">RATE</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 16%;">TAX</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #475569; font-weight: 700; width: 12%; text-align: right;">AMOUNT</th>
+                            <th style="padding: 0.75rem 0.5rem; width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="zohoItemGridBody">
+                        <!-- Populated by renderZohoLineItems() -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Buttons (Add New Row / Add in Bulk) -->
+            <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                <button type="button" onclick="addNewZohoItemRow()" style="padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; font-size: 0.8rem; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-plus-circle"></i> Add New Row
+                </button>
+                <button type="button" onclick="openBulkItemModal()" style="padding: 0.5rem 1rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; font-size: 0.8rem; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-layer-group"></i> Add Items in Bulk
+                </button>
+            </div>
+
+            <!-- Split Section: Customer Notes / Terms (Left) & Zoho Subtotals / Adjustments (Right) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; align-items: start;">
+                
+                <!-- Left: Notes & Terms -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div>
+                        <label style="display: block; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem;">Customer Notes</label>
+                        <textarea id="soCustomerNotes" rows="3" style="width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-family: inherit; outline: none;">Thank you for doing business with us.</textarea>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem;">Terms & Conditions</label>
+                        <textarea id="soTermsConditions" rows="5" style="width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.8rem; font-family: inherit; outline: none; line-height: 1.5; color: #475569;">1. Goods once sold will not be taken back or exchanged.
+2. Payment must be made within the due date mentioned on the invoice.
+3. Late payment may attract additional charges or interest as applicable.
+4. Any dispute regarding this invoice must be raised within 7 days from the invoice date.
+5. Subject to Koppa Jurisdiction.</textarea>
+                    </div>
+                </div>
+
+                <!-- Right: Calculations & Totals (Zoho 1:1) -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem 1.75rem; display: flex; flex-direction: column; gap: 1rem;">
+                    
+                    <!-- Sub Total -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Sub Total</span>
+                        <span id="soSubtotalDisplay" style="font-weight: 800; color: #0f172a;">₹0.00</span>
+                    </div>
+
+                    <!-- Discount -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Discount</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="number" step="0.01" id="soDiscountValue" value="0" oninput="recalculateZohoTotals()" style="width: 100px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
+                            <select id="soDiscountType" onchange="recalculateZohoTotals()" style="padding: 0.35rem 0.45rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 700; background: white;">
+                                <option value="flat">₹</option>
+                                <option value="percent">%</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Shipping Charges -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Shipping Charges</span>
+                        <div style="display: flex; align-items: center; gap: 0.25rem;">
+                            <span style="color: #64748b;">₹</span>
+                            <input type="number" step="0.01" id="soShippingCharges" value="0" oninput="recalculateZohoTotals()" style="width: 110px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
+                        </div>
+                    </div>
+
+                    <!-- TDS / TCS Radio Selector -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;">
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <label style="display: flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer;">
+                                <input type="radio" name="so_tax_withholding" value="tds" onchange="toggleWithholdingTax()"> TDS
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer;">
+                                <input type="radio" name="so_tax_withholding" value="tcs" onchange="toggleWithholdingTax()"> TCS
+                            </label>
+                        </div>
+                        <select id="soWithholdingTaxSelect" onchange="recalculateZohoTotals()" style="width: 140px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; background: white; outline: none;">
+                            <option value="0">Select a Tax</option>
+                            <option value="0.1">0.1%</option>
+                            <option value="0.075">0.075%</option>
+                        </select>
+                    </div>
+
+                    <!-- Round off -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                        <span style="font-weight: 600; color: #475569;">Round off</span>
+                        <input type="number" step="0.01" id="soRoundoffInput" value="0.00" oninput="recalculateZohoTotals(true)" style="width: 110px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
+                    </div>
+
+                    <!-- Total (₹) -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #cbd5e1; padding-top: 0.85rem; margin-top: 0.5rem;">
+                        <span style="font-size: 1.15rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">Total ( ₹ )</span>
+                        <span id="soTotalFinalDisplay" style="font-size: 1.45rem; font-weight: 900; color: #2563eb; font-family: 'Outfit', sans-serif;">₹0.00</span>
+                    </div>
+
+                    <!-- Advance Paid Input -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;">
+                        <span style="font-weight: 600; color: #475569;">Advance Received</span>
+                        <div style="display: flex; align-items: center; gap: 0.25rem;">
+                            <span style="color: #10b981; font-weight: 700;">₹</span>
+                            <input type="number" step="0.01" id="soDirectAdvancePaid" value="0" oninput="currentOrder.advance_amount = this.value; recalculateZohoTotals();" style="width: 110px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none; color: #10b981;">
+                        </div>
+                    </div>
+
+                    <!-- Balance COD Due Display -->
+                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.5rem; font-size: 0.8rem; display: flex; justify-content: space-between;">
+                        <span style="color: #64748b;">Balance COD Due: <strong id="soBalanceCodDue" style="color: #ef4444;">₹0.00</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zoho Sticky Footer Action Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #f1f5f9; padding-top: 1.5rem; background: white; position: sticky; bottom: 0;">
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" onclick="submitDirectSalesOrder(true)" class="btn-billing secondary" style="padding: 0.65rem 1.4rem; font-weight: 700;">
+                        Save as Draft
+                    </button>
+                    <button type="button" id="btnDirectZohoSave" onclick="submitDirectSalesOrder(false)" class="btn-billing primary" style="padding: 0.65rem 2rem; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Save and Send (Zoho Sync)
+                    </button>
+                    <button type="button" onclick="closeModal()" class="btn-billing secondary" style="padding: 0.65rem 1.25rem;">
+                        Cancel
+                    </button>
+                </div>
+
+                <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">
+                    Total Quantity: <strong id="soTotalQtyCount" style="color: #0f172a;">0</strong>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+    repopulateSoDropdowns();
+};
+
+let directCustomerSearchTimer = null;
+window.onDirectCustomerSearch = function(query) {
+    clearTimeout(directCustomerSearchTimer);
+    const drop = document.getElementById('directCustomerDropdown');
+    if (!drop) return;
+
+    if (!query || query.trim().length < 2) {
+        drop.style.display = 'none';
+        return;
+    }
+
+    directCustomerSearchTimer = setTimeout(async () => {
+        drop.innerHTML = '<div style="padding: 1rem; text-align: center; color: #64748b;"><i class="fa-solid fa-spinner fa-spin"></i> Searching customers...</div>';
+        drop.style.display = 'block';
+
+        try {
+            const res = await fetch(`${BILLING_API_URL}/sales-orders/customers/search?q=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            const results = data.results || [];
+
+            if (results.length === 0) {
+                drop.innerHTML = `
+                    <div style="padding: 1rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+                        No matching customer found.
+                        <div style="margin-top: 8px;">
+                            <button type="button" onclick="useCustomTypedCustomer('${query.replace(/'/g, "\\'")}')" style="padding: 4px 10px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                                Use "${query}" as Customer
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            drop.innerHTML = results.map(r => `
+                <div onclick='selectDirectCustomer(${JSON.stringify(r).replace(/'/g, "&#39;")})' style="padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                    <div>
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">
+                            ${r.name || r.company_name}
+                            ${r.source === 'zoho' ? '<span style="font-size: 0.65rem; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700;">ZOHO</span>' : '<span style="font-size: 0.65rem; background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700;">DEALER</span>'}
+                        </div>
+                        <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                            ${r.phone ? '📞 ' + r.phone : ''} ${r.city ? '📍 ' + r.city + ', ' + r.state : ''}
+                        </div>
+                    </div>
+                    <span style="font-size: 0.78rem; color: #2563eb; font-weight: 700;">Select ➔</span>
+                </div>
+            `).join('');
+
+        } catch (err) {
+            drop.innerHTML = '<div style="padding: 1rem; text-align: center; color: #ef4444;">Failed to load results.</div>';
+        }
+    }, 250);
+};
+
+window.selectDirectCustomer = function(c) {
+    const searchInput = document.getElementById('directCustomerSearch');
+    const drop = document.getElementById('directCustomerDropdown');
+    const badge = document.getElementById('directSelectedCustomerBadge');
+    const phoneInput = document.getElementById('soContactPhoneInput');
+
+    if (searchInput) searchInput.value = c.name || c.company_name;
+    if (drop) drop.style.display = 'none';
+
+    if (currentOrder) {
+        currentOrder.customer_name = c.name || c.company_name;
+        currentOrder.zoho_contact_id = c.zoho_contact_id || null;
+        currentOrder.phone = c.phone || '';
+    }
+
+    if (phoneInput && c.phone) {
+        phoneInput.value = c.phone;
+    }
+
+    if (badge) {
+        badge.style.display = 'block';
+        badge.innerHTML = `
+            <div style="display: inline-flex; align-items: center; gap: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; color: #166534; font-weight: 600;">
+                <i class="fa-solid fa-circle-check" style="color: #10b981;"></i>
+                Selected: <strong>${c.name}</strong> ${c.zoho_contact_id ? `(Zoho ID: ${c.zoho_contact_id})` : '(Local Dealer)'}
+            </div>
+        `;
+    }
+};
+
+window.useCustomTypedCustomer = function(name) {
+    const searchInput = document.getElementById('directCustomerSearch');
+    const drop = document.getElementById('directCustomerDropdown');
+    const badge = document.getElementById('directSelectedCustomerBadge');
+
+    if (searchInput) searchInput.value = name;
+    if (drop) drop.style.display = 'none';
+
+    if (currentOrder) {
+        currentOrder.customer_name = name;
+        currentOrder.zoho_contact_id = null;
+    }
+
+    if (badge) {
+        badge.style.display = 'block';
+        badge.innerHTML = `
+            <div style="display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; border: 1px solid #bfdbfe; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; color: #1d4ed8; font-weight: 600;">
+                <i class="fa-solid fa-user"></i>
+                Customer: <strong>${name}</strong> (New / Ad-hoc)
+            </div>
+        `;
+    }
+};
+
+window.submitDirectSalesOrder = async function(isDraft = false) {
+    const custName = (document.getElementById('directCustomerSearch')?.value || '').trim();
+    if (!custName) {
+        alert('Please select or enter a Customer Name.');
+        document.getElementById('directCustomerSearch')?.focus();
+        return;
+    }
+
+    const btn = document.getElementById('btnDirectZohoSave');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing Sales Order...';
+    }
+
+    const payload = {
+        is_draft_only: isDraft,
+        customer_name: custName,
+        customer_id: currentOrder?.zoho_contact_id || undefined,
+        salesorder_number: document.getElementById('soNumberInput')?.value?.trim(),
+        reference_number: document.getElementById('soReferenceInput')?.value?.trim(),
+        date: document.getElementById('soDateInput')?.value,
+        shipment_date: document.getElementById('soShipmentDateInput')?.value,
+        payment_terms: document.getElementById('soPaymentTermsInput')?.value,
+        delivery_method: document.getElementById('soDeliveryMethodInput')?.value,
+        salesperson_name: document.getElementById('soSalespersonInput')?.value,
+        contact_phone: document.getElementById('soContactPhoneInput')?.value?.trim(),
+        notes: document.getElementById('soCustomerNotes')?.value?.trim(),
+        terms: document.getElementById('soTermsConditions')?.value?.trim(),
+        discount: parseFloat(document.getElementById('soDiscountValue')?.value) || 0,
+        shipping_charge: parseFloat(document.getElementById('soShippingCharges')?.value) || 0,
+        adjustment: parseFloat(document.getElementById('soRoundoffInput')?.value) || 0,
+        advance_amount: parseFloat(document.getElementById('soDirectAdvancePaid')?.value) || 0,
+        items: (currentOrder.items || []).map(i => ({
+            product_id: i.product_id,
+            product_name: i.product_name || i.name,
+            name: i.product_name || i.name,
+            rate: parseFloat(i.rate || i.price) || 0,
+            quantity: parseFloat(i.quantity) || 1,
+            tax_id: i.tax_id || undefined
+        }))
+    };
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            closeModal();
+            alert(`✅ ${data.message}`);
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        } else {
+            alert(`Error: ${data.message || 'Failed to create Direct Sales Order'}`);
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+};
 
 window.updateOrderItemPrice = function(idx, newPrice) {
     if (!currentOrder || !currentOrder.items || !currentOrder.items[idx]) return;
@@ -784,6 +1806,330 @@ window.approveSalesOrder = async function() {
     } catch (err) {
         alert('Error approving order: ' + err.message);
     }
+};
+
+// =====================================================================
+// 1:1 ZOHO BOOKS SALES ORDER DETAILS WORKSTATION
+// =====================================================================
+
+window.viewSalesOrderDetails = async function(identifier) {
+    const modal = document.getElementById('zohoSoDetailModal');
+    const container = document.getElementById('zohoSoDetailContent');
+    if (!modal || !container) return;
+
+    modal.style.display = 'flex';
+    container.innerHTML = `
+        <div style="text-align: center; padding: 6rem; color: #64748b;">
+            <div class="loader" style="margin: 0 auto 1.5rem auto;"></div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: #0f172a;">Loading Sales Order Details...</div>
+            <div style="font-size: 0.85rem; margin-top: 4px;">Fetching 1:1 Zoho Books record and CRM data</div>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/${encodeURIComponent(identifier)}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+            container.innerHTML = `
+                <div style="padding: 3rem; text-align: center;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;"></i>
+                    <h3 style="margin: 0; color: #0f172a;">Failed to load Sales Order</h3>
+                    <p style="color: #64748b; font-size: 0.9rem;">${data.message || 'Record not found'}</p>
+                    <button class="btn-billing secondary" onclick="closeZohoSoDetails()" style="margin-top: 1rem;">Close</button>
+                </div>
+            `;
+            return;
+        }
+
+        renderZohoSoDetailsWorkstation(data);
+    } catch (err) {
+        container.innerHTML = `
+            <div style="padding: 3rem; text-align: center;">
+                <p style="color: #ef4444;">Error connecting to server: ${err.message}</p>
+                <button class="btn-billing secondary" onclick="closeZohoSoDetails()">Close</button>
+            </div>
+        `;
+    }
+};
+
+window.closeZohoSoDetails = function() {
+    const modal = document.getElementById('zohoSoDetailModal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.renderZohoSoDetailsWorkstation = function(payload) {
+    const container = document.getElementById('zohoSoDetailContent');
+    const zSo = payload.zoho_salesorder;
+    const crmOrder = payload.order;
+
+    const soNumber = zSo?.salesorder_number || crmOrder?.sales_order_number || ('SO-' + crmOrder?.order_id);
+    const orderId = crmOrder?.order_id || null;
+    const customerName = zSo?.customer_name || crmOrder?.customer_name || 'Customer';
+    const soDate = zSo?.date || (crmOrder?.created_at ? new Date(crmOrder.created_at).toISOString().split('T')[0] : 'N/A');
+    const paymentTerms = zSo?.payment_terms_label || 'Due on Receipt';
+    const salesperson = zSo?.salesperson_name || crmOrder?.sales_person_name || 'Aravind';
+    const totalAmount = parseFloat(zSo?.total || crmOrder?.total_amount || 0);
+    const subTotal = parseFloat(zSo?.sub_total || totalAmount);
+    const discount = parseFloat(zSo?.discount_amount || crmOrder?.discount || 0);
+    const roundOff = parseFloat(zSo?.adjustment || 0);
+
+    // Address rendering
+    const bAddr = zSo?.billing_address || {};
+    const billingLines = [
+        customerName,
+        bAddr.attention || '',
+        bAddr.address || crmOrder?.address || '',
+        bAddr.street2 || '',
+        [bAddr.city || crmOrder?.city, bAddr.state || crmOrder?.state].filter(Boolean).join(', '),
+        [bAddr.country || 'India', bAddr.zip || crmOrder?.pincode].filter(Boolean).join(' - '),
+        bAddr.phone || crmOrder?.phone ? `+91-${(bAddr.phone || crmOrder?.phone).replace('+91-', '')}` : ''
+    ].filter(Boolean);
+
+    const sAddr = zSo?.shipping_address || bAddr;
+    const shippingLines = [
+        customerName,
+        sAddr.attention || '',
+        sAddr.address || crmOrder?.shipping_address || crmOrder?.address || '',
+        sAddr.street2 || '',
+        [sAddr.city || crmOrder?.shipping_city || crmOrder?.city, sAddr.state || crmOrder?.shipping_state || crmOrder?.state].filter(Boolean).join(', '),
+        [sAddr.country || 'India', sAddr.zip || crmOrder?.shipping_pincode || crmOrder?.pincode].filter(Boolean).join(' - '),
+        sAddr.phone || crmOrder?.phone ? `+91-${(sAddr.phone || crmOrder?.phone).replace('+91-', '')}` : ''
+    ].filter(Boolean);
+
+    // Line items
+    const lineItems = (zSo?.line_items && zSo.line_items.length > 0)
+        ? zSo.line_items
+        : (payload.items || []).map(it => ({
+            name: it.product_name || it.name,
+            sku: it.sku || '',
+            quantity: it.quantity || 1,
+            rate: parseFloat(it.price) || 0,
+            item_total: (parseFloat(it.price) || 0) * (it.quantity || 1),
+            quantity_packed: 0,
+            quantity_shipped: 0,
+            quantity_invoiced: 0
+        }));
+
+    // Taxes
+    const taxesList = zSo?.taxes || [];
+
+    // Order status badges
+    const isClosed = (zSo?.order_status === 'closed' || zSo?.status === 'invoiced' || crmOrder?.order_status === 'billed');
+    const invoiceStatus = isClosed ? 'Invoiced' : (zSo?.invoiced_status === 'not_invoiced' ? 'Not Invoiced' : 'Pending');
+    const paymentStatus = zSo?.paid_status === 'paid' ? 'Paid' : (zSo?.paid_status === 'partially_paid' ? 'Partially Paid' : 'Unpaid');
+    const shipmentStatus = zSo?.shipped_status === 'fulfilled' ? 'Fulfilled' : (zSo?.shipped_status || 'Pending');
+
+    container.innerHTML = `
+        <!-- Top Toolbar Header (1:1 Zoho Books) -->
+        <div style="background: white; border-bottom: 1px solid #e2e8f0; padding: 1rem 1.75rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button type="button" onclick="closeZohoSoDetails()" title="Back to Sales Orders List" style="border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 0.5rem 0.75rem; cursor: pointer; color: #475569; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-arrow-left"></i> Back
+                </button>
+                <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">
+                    ${soNumber}
+                </h2>
+                ${zSo ? '<span style="background: #e0f2fe; color: #0284c7; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">Synced with Zoho Books</span>' : ''}
+            </div>
+
+            <!-- Action Buttons Toolbar -->
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #334155; font-size: 0.8rem; padding: 0.45rem 0.85rem;" onclick="window.print()">
+                    <i class="fa-solid fa-print"></i> PDF/Print
+                </button>
+                ${orderId ? `
+                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.5rem 1.1rem; box-shadow: 0 4px 12px rgba(37,99,235,0.25);" onclick="openOrderBilling(${orderId})">
+                        <i class="fa-solid fa-file-invoice"></i> Convert to Invoice
+                    </button>
+                ` : `
+                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.5rem 1.1rem;" onclick="alert('This Sales Order has already been registered in Zoho Books and can be invoiced!')">
+                        <i class="fa-solid fa-file-invoice"></i> Convert to Invoice
+                    </button>
+                `}
+                <button type="button" onclick="closeZohoSoDetails()" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; margin-left: 0.5rem;">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable Document Viewport -->
+        <div style="flex: 1; overflow-y: auto; padding: 2rem; background: #f1f5f9;">
+            
+            <!-- What's Next Notice Banner (Zoho 1:1) -->
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #475569;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: #6366f1;"></i>
+                    <span><strong>WHAT'S NEXT?</strong> Convert the sales order into packages, shipments or invoices.</span>
+                </div>
+                ${orderId ? `
+                    <button type="button" onclick="openOrderBilling(${orderId})" style="padding: 0.4rem 0.85rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer;">
+                        Convert ▾
+                    </button>
+                ` : ''}
+            </div>
+
+            <!-- Zoho Books Paper Container -->
+            <div style="background: white; border-radius: 12px; padding: 3rem; box-shadow: 0 4px 20px rgba(0,0,0,0.04); max-width: 1050px; margin: 0 auto; border: 1px solid #e2e8f0;">
+                
+                <!-- Main Header Grid: Order info (Left) vs Addresses (Right) -->
+                <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 3rem; margin-bottom: 2.5rem;">
+                    
+                    <!-- Left Column: Title & Status Matrix -->
+                    <div>
+                        <h1 style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin: 0 0 0.5rem 0; font-family: 'Outfit', sans-serif;">SALES ORDER</h1>
+                        <div style="font-size: 0.95rem; font-weight: 700; color: #334155; margin-bottom: 1.75rem;">
+                            Sales Order# <strong>${soNumber}</strong>
+                        </div>
+
+                        <!-- Status Matrix -->
+                        <div style="margin-bottom: 2rem;">
+                            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.75rem;">STATUS</div>
+                            <div style="display: grid; grid-template-columns: 90px 1fr; row-gap: 0.6rem; font-size: 0.85rem;">
+                                <span style="color: #64748b;">Order</span>
+                                <div>
+                                    <span style="background: #0284c7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">
+                                        ${zSo?.status ? zSo.status.toUpperCase() : 'CONFIRMED'}
+                                    </span>
+                                </div>
+
+                                <span style="color: #64748b;">Invoice</span>
+                                <span style="color: ${isClosed ? '#166534' : '#64748b'}; font-weight: 600;">${invoiceStatus}</span>
+
+                                <span style="color: #64748b;">Payment</span>
+                                <span style="color: ${zSo?.paid_status === 'paid' ? '#166534' : '#65a30d'}; font-weight: 600;">${paymentStatus}</span>
+
+                                <span style="color: #64748b;">Shipment</span>
+                                <span style="color: ${shipmentStatus === 'Fulfilled' ? '#166534' : '#d97706'}; font-weight: 600;">${shipmentStatus}</span>
+                            </div>
+                        </div>
+
+                        <!-- Order Dates & Terms Grid -->
+                        <div style="display: grid; grid-template-columns: 120px 1fr; row-gap: 0.6rem; font-size: 0.85rem;">
+                            <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #94a3b8;">ORDER DATE</span>
+                            <span style="color: #0f172a; font-weight: 700;">${soDate}</span>
+
+                            <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #94a3b8;">PAYMENT TERMS</span>
+                            <span style="color: #0f172a; font-weight: 600;">${paymentTerms}</span>
+
+                            <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #94a3b8;">SALESPERSON</span>
+                            <span style="color: #0f172a; font-weight: 600;">${salesperson}</span>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Billing & Shipping Addresses (Zoho 1:1) -->
+                    <div style="display: flex; flex-direction: column; gap: 1.75rem;">
+                        <!-- Billing Address -->
+                        <div>
+                            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.5rem;">BILLING ADDRESS</div>
+                            <div style="color: #2563eb; font-weight: 800; font-size: 0.95rem; margin-bottom: 4px;">${customerName}</div>
+                            <div style="color: #334155; font-size: 0.85rem; line-height: 1.5; white-space: pre-line;">
+                                ${billingLines.slice(1).join('\n')}
+                            </div>
+                        </div>
+
+                        <!-- Shipping Address -->
+                        <div>
+                            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.5rem;">SHIPPING ADDRESS</div>
+                            <div style="color: #334155; font-size: 0.85rem; line-height: 1.5; white-space: pre-line;">
+                                ${shippingLines.slice(1).join('\n')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items & Description Table (Zoho 1:1) -->
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 2rem;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                            <tr>
+                                <th style="padding: 0.85rem 1.25rem; font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 800; width: 45%;">ITEMS & DESCRIPTION</th>
+                                <th style="padding: 0.85rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 800; text-align: center; width: 12%;">ORDERED</th>
+                                <th style="padding: 0.85rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 800; width: 15%;">STATUS</th>
+                                <th style="padding: 0.85rem 1rem; font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 800; text-align: right; width: 13%;">RATE</th>
+                                <th style="padding: 0.85rem 1.25rem; font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 800; text-align: right; width: 15%;">AMOUNT</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${lineItems.map(it => `
+                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                    <td style="padding: 1rem 1.25rem;">
+                                        <div style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">${it.name || 'Item'}</div>
+                                        ${it.sku ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">SKU: ${it.sku}</div>` : ''}
+                                    </td>
+                                    <td style="padding: 1rem; text-align: center; font-weight: 700; color: #0f172a; font-size: 0.9rem;">
+                                        ${it.quantity} <span style="font-size: 0.75rem; color: #64748b; font-weight: 500;">pcs</span>
+                                    </td>
+                                    <td style="padding: 1rem; font-size: 0.78rem; color: #475569; line-height: 1.4;">
+                                        <div>0 Packed</div>
+                                        <div>${it.quantity} Force fulfilled</div>
+                                        <div>${it.quantity_invoiced || 0} Invoiced</div>
+                                    </td>
+                                    <td style="padding: 1rem; text-align: right; font-weight: 600; color: #334155; font-size: 0.9rem;">
+                                        ₹${parseFloat(it.rate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td style="padding: 1rem 1.25rem; text-align: right; font-weight: 800; color: #0f172a; font-size: 0.95rem;">
+                                        ₹${parseFloat(it.item_total || (it.rate * it.quantity) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Subtotals & Taxes Calculation Block (Zoho 1:1) -->
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 3rem;">
+                    <div style="width: 380px; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600; color: #475569;">Sub Total</span>
+                            <span style="font-weight: 800; color: #0f172a;">₹${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        ${discount > 0 ? `
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #dc2626;">
+                                <span style="font-weight: 600;">Discount</span>
+                                <span style="font-weight: 700;">- ₹${discount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                        ` : ''}
+
+                        ${taxesList.map(t => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                                <span style="font-weight: 600;">${t.tax_name}</span>
+                                <span style="font-weight: 700; color: #0f172a;">₹${parseFloat(t.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                        `).join('')}
+
+                        ${roundOff !== 0 ? `
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #64748b;">
+                                <span style="font-weight: 600;">Round off</span>
+                                <span style="font-weight: 700;">₹${roundOff.toFixed(2)}</span>
+                            </div>
+                        ` : ''}
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #cbd5e1; padding-top: 0.85rem; margin-top: 0.25rem;">
+                            <span style="font-size: 1.15rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">Total</span>
+                            <span style="font-size: 1.35rem; font-weight: 900; color: #0f172a; font-family: 'Outfit', sans-serif;">
+                                ₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- More Information Footer Block (Zoho 1:1) -->
+                <div style="border-top: 1px solid #e2e8f0; padding-top: 1.5rem; font-size: 0.85rem;">
+                    <div style="font-weight: 800; color: #0f172a; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">More Information</div>
+                    <div style="display: flex; gap: 2rem; color: #475569;">
+                        <span>Salesperson</span>
+                        <strong style="color: #0f172a;">: ${salesperson}</strong>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    `;
 };
 
 async function generateFinalInvoice() {
@@ -858,11 +2204,15 @@ async function loadInvoices() {
                 <td><span class="status-badge status-${inv.invoice_status}">${inv.invoice_status}</span></td>
                 <td>
                     ${inv.invoice_status === 'draft' ?
-                `<button class="btn-billing success" style="width: auto; padding: 0.5rem 1rem;" onclick="finalizeInvoice(${inv.invoice_id})">Finalize</button>` :
-                `<div style="display:flex; gap:0.5rem;">
+                `<div style="display:flex; gap:0.4rem; align-items:center;">
+                            <button class="btn-billing success" style="width: auto; padding: 0.5rem 0.85rem;" onclick="finalizeInvoice(${inv.invoice_id})">Finalize</button>
+                            <button class="btn-billing" style="width: auto; padding: 0.5rem 0.75rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer;" title="Hard Delete Invoice from DB" onclick="hardDeleteInvoice(${inv.invoice_id}, '${inv.invoice_number}')"><i class="fas fa-trash-alt"></i></button>
+                          </div>` :
+                `<div style="display:flex; gap:0.4rem; align-items:center;">
                             <button class="btn-billing primary" style="width: auto; padding: 0.5rem 0.75rem;" title="View Invoice" onclick="viewInvoice(${inv.invoice_id})"><i class="fas fa-eye"></i></button>
                             <button class="btn-billing success" style="width: auto; padding: 0.5rem 0.75rem;" title="Print/Download" onclick="printInvoice(${inv.invoice_id})"><i class="fas fa-print"></i></button>
-                         </div>`}
+                            <button class="btn-billing" style="width: auto; padding: 0.5rem 0.75rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer;" title="Hard Delete Invoice from DB" onclick="hardDeleteInvoice(${inv.invoice_id}, '${inv.invoice_number}')"><i class="fas fa-trash-alt"></i></button>
+                          </div>`}
                 </td>
             </tr>
         `).join('');
@@ -1959,5 +3309,30 @@ window.autoFormatAddress = function() {
     const addressInput = document.getElementById('billCustomerAddress');
     if (addressInput) {
         addressInput.value = addressStr;
+    }
+};
+
+window.hardDeleteInvoice = async function(invoiceId, invoiceNumber) {
+    if (!confirm(`⚠️ WARNING: Are you sure you want to PERMANENTLY HARD-DELETE Invoice ${invoiceNumber} from the CRM DB?\n\nThis action CANNOT be undone. The invoice, invoice items, and related pending packing records will be completely removed from the database.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/invoices/${invoiceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert(`✅ ${data.message || 'Invoice deleted successfully'}`);
+            if (typeof loadInvoices === 'function') loadInvoices();
+        } else {
+            alert(`Error: ${data.message || 'Failed to delete invoice'}`);
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
     }
 };

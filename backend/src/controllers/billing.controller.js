@@ -632,6 +632,64 @@ const getSalesOrderDetails = async (req, res) => {
     }
 };
 
+const getSalesOrderPdf = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { pdfBuffer, salesorder_number } = await zohoSalesOrderService.getSalesOrderPdf(id);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="SalesOrder_${salesorder_number}.pdf"`);
+        res.send(pdfBuffer);
+    } catch (err) {
+        console.error('Error in getSalesOrderPdf:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const markSalesOrderFulfilled = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await zohoSalesOrderService.fulfillSalesOrder(id, req.body, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in markSalesOrderFulfilled:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const cancelSalesOrderItems = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { item_ids, reason } = req.body;
+        const result = await zohoSalesOrderService.cancelSalesOrderItems(id, item_ids, reason, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in cancelSalesOrderItems:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const updateSalesOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await zohoSalesOrderService.updateSalesOrder(id, req.body, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in updateSalesOrder:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const deleteSalesOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await zohoSalesOrderService.deleteSalesOrder(id, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in deleteSalesOrder:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 const getProductsForSalesOrder = async (req, res) => {
     try {
         const [rows] = await pool.query(`
@@ -1558,6 +1616,11 @@ module.exports = {
     createOrSyncZohoSalesOrder,
     createManualSalesOrder,
     getSalesOrderDetails,
+    getSalesOrderPdf,
+    markSalesOrderFulfilled,
+    cancelSalesOrderItems,
+    updateSalesOrder,
+    deleteSalesOrder,
     getProductsForSalesOrder,
     searchSalesOrderCustomers
 };

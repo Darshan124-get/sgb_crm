@@ -15,6 +15,11 @@ router.get('/sales-orders/meta', authenticateToken, requireBilling, billingContr
 router.get('/sales-orders/products', authenticateToken, requireBilling, billingController.getProductsForSalesOrder);
 router.get('/sales-orders/customers/search', authenticateToken, requireBilling, billingController.searchSalesOrderCustomers);
 router.get('/sales-orders/:id', authenticateToken, requireBilling, billingController.getSalesOrderDetails);
+router.get('/sales-orders/:id/pdf', authenticateToken, requireBilling, billingController.getSalesOrderPdf);
+router.post('/sales-orders/:id/fulfill', authenticateToken, requireBilling, billingController.markSalesOrderFulfilled);
+router.post('/sales-orders/:id/cancel-items', authenticateToken, requireBilling, billingController.cancelSalesOrderItems);
+router.put('/sales-orders/:id', authenticateToken, requireBilling, billingController.updateSalesOrder);
+router.delete('/sales-orders/:id', authenticateToken, requireBilling, billingController.deleteSalesOrder);
 // Orders & Invoices
 router.get('/orders', authenticateToken, requireBilling, billingController.getOrdersByStatus);
 router.get('/invoices', authenticateToken, requireBilling, billingController.getAllInvoices);

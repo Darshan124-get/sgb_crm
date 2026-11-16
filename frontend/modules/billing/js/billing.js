@@ -1935,20 +1935,54 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
                 ${zSo ? '<span style="background: #e0f2fe; color: #0284c7; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">Synced with Zoho Books</span>' : ''}
             </div>
 
-            <!-- Action Buttons Toolbar -->
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button type="button" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #334155; font-size: 0.8rem; padding: 0.45rem 0.85rem;" onclick="window.print()">
-                    <i class="fa-solid fa-print"></i> PDF/Print
+            <!-- Action Buttons Toolbar (1:1 Zoho Books Actions) -->
+            <div style="display: flex; gap: 0.5rem; align-items: center; position: relative;">
+                
+                <!-- 1. Edit Button -->
+                <button type="button" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.82rem; padding: 0.45rem 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 6px;" onclick="editCurrentSalesOrder('${soNumber}')">
+                    <i class="fa-solid fa-pen" style="color: #64748b; font-size: 0.75rem;"></i> Edit
                 </button>
+
+                <!-- 2. PDF / Print Button -->
+                <div style="position: relative; display: inline-block;">
+                    <button type="button" id="btnSoPdfPrint" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.82rem; padding: 0.45rem 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 6px;" onclick="downloadZohoSoPdf('${soNumber}')">
+                        <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> PDF/Print
+                    </button>
+                </div>
+
+                <!-- Convert to Invoice Button -->
                 ${orderId ? `
-                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.5rem 1.1rem; box-shadow: 0 4px 12px rgba(37,99,235,0.25);" onclick="openOrderBilling(${orderId})">
+                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.45rem 1.1rem; font-weight: 700; box-shadow: 0 4px 12px rgba(37,99,235,0.25);" onclick="openOrderBilling(${orderId})">
                         <i class="fa-solid fa-file-invoice"></i> Convert to Invoice
                     </button>
                 ` : `
-                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.5rem 1.1rem;" onclick="alert('This Sales Order has already been registered in Zoho Books and can be invoiced!')">
+                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.45rem 1.1rem; font-weight: 700;" onclick="alert('This Sales Order is active in Zoho Books and can be invoiced!')">
                         <i class="fa-solid fa-file-invoice"></i> Convert to Invoice
                     </button>
                 `}
+
+                <!-- 3. More (...) Dropdown Menu -->
+                <div style="position: relative; display: inline-block;">
+                    <button type="button" id="btnSoMoreActions" onclick="toggleZohoSoMoreMenu(event)" style="border: 1px solid #cbd5e1; background: white; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; color: #475569; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem;">
+                        &hellip;
+                    </button>
+                    
+                    <!-- Dropdown Content -->
+                    <div id="soMoreDropdownMenu" style="display: none; position: absolute; right: 0; top: 40px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); width: 220px; z-index: 10000; overflow: hidden; font-size: 0.85rem;">
+                        <button type="button" onclick="fulfillCurrentSalesOrder('${soNumber}')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                            <i class="fa-solid fa-truck-ramp-box" style="color: #2563eb; width: 16px;"></i> Mark shipment as fulfilled
+                        </button>
+                        <button type="button" onclick="openCancelItemsModal('${soNumber}')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                            <i class="fa-solid fa-ban" style="color: #f59e0b; width: 16px;"></i> Cancel Items
+                        </button>
+                        <div style="height: 1px; background: #e2e8f0; margin: 2px 0;"></div>
+                        <button type="button" onclick="hardDeleteSalesOrderBoth('${soNumber}', ${orderId || 'null'})" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='white'">
+                            <i class="fa-solid fa-trash-can" style="color: #ef4444; width: 16px;"></i> Delete Sales Order
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Close Modal Button -->
                 <button type="button" onclick="closeZohoSoDetails()" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; margin-left: 0.5rem;">
                     &times;
                 </button>
@@ -3334,5 +3368,293 @@ window.hardDeleteInvoice = async function(invoiceId, invoiceNumber) {
         }
     } catch (err) {
         alert('Server/Network Error: ' + err.message);
+    }
+};
+
+
+// ==========================================
+// ZOHO BOOKS 1:1 ACTIONS HANDLERS (CRM & ZOHO SYNC)
+// ==========================================
+
+let activeZohoSoPayload = null;
+
+// Store payload reference when rendering workstation
+const origRenderZohoSo = window.renderZohoSoDetailsWorkstation;
+window.renderZohoSoDetailsWorkstation = function(payload) {
+    activeZohoSoPayload = payload;
+    origRenderZohoSo(payload);
+};
+
+window.toggleZohoSoMoreMenu = function(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('soMoreDropdownMenu');
+    if (menu) {
+        menu.style.display = (menu.style.display === 'none' || !menu.style.display) ? 'block' : 'none';
+    }
+};
+
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('soMoreDropdownMenu');
+    const btn = document.getElementById('btnSoMoreActions');
+    if (menu && menu.style.display === 'block') {
+        if (!menu.contains(e.target) && !btn?.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    }
+});
+
+// 1. Download official PDF from Zoho Books
+window.downloadZohoSoPdf = async function(soNumber) {
+    const btn = document.getElementById('btnSoPdfPrint');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing PDF...';
+    }
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/${encodeURIComponent(soNumber)}/pdf`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            // Fallback to browser print if Zoho PDF not available
+            window.print();
+            return;
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SalesOrder_${soNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+    } catch (err) {
+        console.warn('PDF fetch error, falling back to print:', err.message);
+        window.print();
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+};
+
+// 2. Mark shipment as fulfilled (CRM & Zoho sync)
+window.fulfillCurrentSalesOrder = async function(soNumber) {
+    const menu = document.getElementById('soMoreDropdownMenu');
+    if (menu) menu.style.display = 'none';
+
+    if (!confirm(`Are you sure you want to mark Sales Order "${soNumber}" shipment as Fulfilled?\n\nThis will update CRM shipping/packing and synchronize fulfillment status with Zoho Books.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/${encodeURIComponent(soNumber)}/fulfill`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                delivery_method: activeZohoSoPayload?.zoho_salesorder?.delivery_method || 'Post'
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            alert(`✅ ${data.message}`);
+            // Refresh details and lists
+            viewSalesOrderDetails(soNumber);
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to mark as fulfilled'));
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    }
+};
+
+// 3. Cancel Items Modal Dialog & Handler
+window.openCancelItemsModal = function(soNumber) {
+    const menu = document.getElementById('soMoreDropdownMenu');
+    if (menu) menu.style.display = 'none';
+
+    const zSo = activeZohoSoPayload?.zoho_salesorder;
+    const items = (zSo?.line_items && zSo.line_items.length > 0)
+        ? zSo.line_items
+        : (activeZohoSoPayload?.items || []);
+
+    if (items.length === 0) {
+        alert('No line items found to cancel.');
+        return;
+    }
+
+    const itemsHtml = items.map((it, idx) => `
+        <label style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 0.6rem; cursor: pointer; background: #f8fafc;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#f8fafc'">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" class="so-cancel-item-cb" value="${it.line_item_id || it.item_id || it.product_id}" style="width: 18px; height: 18px; cursor: pointer;">
+                <div>
+                    <strong style="color: #0f172a; font-size: 0.9rem;">${it.name || it.product_name || 'Item'}</strong>
+                    <div style="font-size: 0.78rem; color: #64748b;">Qty: ${it.quantity} | Rate: ₹${parseFloat(it.rate || it.price || 0).toLocaleString()}</div>
+                </div>
+            </div>
+            <span style="font-weight: 800; color: #ef4444; font-size: 0.9rem;">
+                ₹${parseFloat(it.item_total || (it.rate * it.quantity) || 0).toLocaleString()}
+            </span>
+        </label>
+    `).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'cancelItemsModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 100000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);';
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 14px; width: 90%; max-width: 520px; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.25); display: flex; flex-direction: column;">
+            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-ban" style="color: #f59e0b;"></i> Cancel Items - ${soNumber}
+                </h3>
+                <button type="button" onclick="document.getElementById('cancelItemsModal')?.remove()" style="border: none; background: transparent; font-size: 1.5rem; color: #94a3b8; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="padding: 1.5rem; max-height: 55vh; overflow-y: auto;">
+                <p style="font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 1rem;">
+                    Select the line item(s) you wish to cancel. The order totals will be re-calculated and synchronized with Zoho Books:
+                </p>
+                <div id="cancelItemsList">
+                    ${itemsHtml}
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="font-size: 0.8rem; font-weight: 700; color: #475569;">Cancellation Reason (Optional)</label>
+                    <input type="text" id="soCancelReasonInput" placeholder="e.g. Out of stock, customer requested removal" style="width: 100%; padding: 0.55rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; font-size: 0.85rem; box-sizing: border-box; outline: none;">
+                </div>
+            </div>
+
+            <div style="padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" onclick="document.getElementById('cancelItemsModal')?.remove()" class="btn-billing secondary" style="padding: 0.55rem 1.25rem;">Cancel</button>
+                <button type="button" id="btnConfirmCancelItems" onclick="submitCancelItems('${soNumber}')" class="btn-billing" style="padding: 0.55rem 1.5rem; background: #ef4444; color: white; font-weight: 700; border: none; border-radius: 8px; cursor: pointer;">
+                    Confirm & Cancel Items
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+window.submitCancelItems = async function(soNumber) {
+    const checkboxes = document.querySelectorAll('.so-cancel-item-cb:checked');
+    if (checkboxes.length === 0) {
+        alert('Please check at least one item to cancel.');
+        return;
+    }
+
+    const itemIds = Array.from(checkboxes).map(cb => cb.value);
+    const reason = document.getElementById('soCancelReasonInput')?.value?.trim();
+
+    const btn = document.getElementById('btnConfirmCancelItems');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelling...';
+    }
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/${encodeURIComponent(soNumber)}/cancel-items`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ item_ids: itemIds, reason })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('cancelItemsModal')?.remove();
+            alert(`✅ ${data.message}`);
+            viewSalesOrderDetails(soNumber);
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to cancel items'));
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Confirm & Cancel Items';
+        }
+    }
+};
+
+// 4. Hard Delete Sales Order (2-way sync: CRM DB & Zoho Books)
+window.hardDeleteSalesOrderBoth = async function(soNumber, orderId) {
+    const menu = document.getElementById('soMoreDropdownMenu');
+    if (menu) menu.style.display = 'none';
+
+    const confirmMsg = `⚠️ PERMANENT DELETE WARNING:
+Are you sure you want to hard delete Sales Order "${soNumber}"?
+
+This will permanently:
+1. Delete the Sales Order from Zoho Books.
+2. Delete the Sales Order records from CRM database.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/${encodeURIComponent(soNumber)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            closeZohoSoDetails();
+            alert(`✅ ${data.message}`);
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+        } else {
+            alert('Delete Error: ' + (data.message || 'Failed to delete Sales Order'));
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    }
+};
+
+// 5. Edit Sales Order (Opens Edit Workstation)
+window.editCurrentSalesOrder = function(soNumber) {
+    if (!activeZohoSoPayload) return;
+    const crmOrder = activeZohoSoPayload.order;
+    const zSo = activeZohoSoPayload.zoho_salesorder;
+
+    // Set currentOrder context for editing
+    window.currentOrder = crmOrder || {
+        order_id: null,
+        sales_order_number: soNumber,
+        zoho_salesorder_id: zSo?.salesorder_id,
+        customer_name: zSo?.customer_name,
+        phone: zSo?.cf_contact || zSo?.billing_address?.phone || '',
+        advance_amount: 0,
+        items: (zSo?.line_items || []).map(li => ({
+            product_id: 14,
+            product_name: li.name,
+            name: li.name,
+            rate: li.rate,
+            quantity: li.quantity,
+            tax_id: li.tax_id
+        }))
+    };
+
+    closeZohoSoDetails();
+    if (crmOrder && crmOrder.order_id) {
+        window.switchWorkstationStep(2);
+        const modal = document.getElementById('billingModal');
+        if (modal) modal.style.display = 'flex';
+    } else {
+        window.openDirectSalesOrderModal();
     }
 };

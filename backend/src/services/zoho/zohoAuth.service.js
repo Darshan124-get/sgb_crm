@@ -76,6 +76,15 @@ class ZohoAuthService {
             return this.cachedAccessToken;
         }
 
+        try {
+            const [dbTokens] = await pool.query('SELECT access_token, expires_at FROM zoho_oauth_tokens ORDER BY id DESC LIMIT 1');
+            if (dbTokens && dbTokens.length > 0 && Number(dbTokens[0].expires_at) > now + 60000) {
+                this.cachedAccessToken = dbTokens[0].access_token;
+                this.tokenExpiresAt = Number(dbTokens[0].expires_at);
+                return this.cachedAccessToken;
+            }
+        } catch(e) {}
+
         const refreshToken = this.refreshToken || process.env.ZOHO_REFRESH_TOKEN;
         const clientId = this.clientId || process.env.ZOHO_CLIENT_ID;
         const clientSecret = this.clientSecret || process.env.ZOHO_CLIENT_SECRET;
@@ -102,6 +111,11 @@ class ZohoAuthService {
         const { access_token, expires_in } = response.data;
         this.cachedAccessToken = access_token;
         this.tokenExpiresAt = Date.now() + ((expires_in || 3600) - 300) * 1000;
+
+        try {
+            await pool.query('CREATE TABLE IF NOT EXISTS zoho_oauth_tokens (id INT PRIMARY KEY AUTO_INCREMENT, access_token TEXT, expires_at BIGINT)');
+            await pool.query('INSERT INTO zoho_oauth_tokens (access_token, expires_at) VALUES (?, ?)', [this.cachedAccessToken, this.tokenExpiresAt]);
+        } catch(e) {}
 
         return access_token;
     }

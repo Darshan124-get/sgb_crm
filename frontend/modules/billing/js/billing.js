@@ -1935,55 +1935,9 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
                 ${zSo ? '<span style="background: #e0f2fe; color: #0284c7; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">Synced with Zoho Books</span>' : ''}
             </div>
 
-            <!-- Action Buttons Toolbar (1:1 Zoho Books Actions) -->
-            <div style="display: flex; gap: 0.5rem; align-items: center; position: relative;">
-                
-                <!-- 1. Edit Button -->
-                <button type="button" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.82rem; padding: 0.45rem 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 6px;" onclick="editCurrentSalesOrder('${soNumber}')">
-                    <i class="fa-solid fa-pen" style="color: #64748b; font-size: 0.75rem;"></i> Edit
-                </button>
-
-                <!-- 2. PDF / Print Button -->
-                <div style="position: relative; display: inline-block;">
-                    <button type="button" id="btnSoPdfPrint" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.82rem; padding: 0.45rem 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 6px;" onclick="downloadZohoSoPdf('${soNumber}')">
-                        <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> PDF/Print
-                    </button>
-                </div>
-
-                <!-- Convert to Invoice Button -->
-                ${orderId ? `
-                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.45rem 1.1rem; font-weight: 700; box-shadow: 0 4px 12px rgba(37,99,235,0.25);" onclick="openOrderBilling(${orderId})">
-                        <i class="fa-solid fa-file-invoice"></i> Convert to Invoice
-                    </button>
-                ` : `
-                    <button type="button" class="btn-billing primary" style="background: #2563eb; color: white; font-size: 0.82rem; padding: 0.45rem 1.1rem; font-weight: 700;" onclick="alert('This Sales Order is active in Zoho Books and can be invoiced!')">
-                        <i class="fa-solid fa-file-invoice"></i> Convert to Invoice
-                    </button>
-                `}
-
-                <!-- 3. More (...) Dropdown Menu -->
-                <div style="position: relative; display: inline-block;">
-                    <button type="button" id="btnSoMoreActions" onclick="toggleZohoSoMoreMenu(event)" style="border: 1px solid #cbd5e1; background: white; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; color: #475569; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem;">
-                        &hellip;
-                    </button>
-                    
-                    <!-- Dropdown Content -->
-                    <div id="soMoreDropdownMenu" style="display: none; position: absolute; right: 0; top: 40px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); width: 220px; z-index: 10000; overflow: hidden; font-size: 0.85rem;">
-                        <button type="button" onclick="fulfillCurrentSalesOrder('${soNumber}')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
-                            <i class="fa-solid fa-truck-ramp-box" style="color: #2563eb; width: 16px;"></i> Mark shipment as fulfilled
-                        </button>
-                        <button type="button" onclick="openCancelItemsModal('${soNumber}')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
-                            <i class="fa-solid fa-ban" style="color: #f59e0b; width: 16px;"></i> Cancel Items
-                        </button>
-                        <div style="height: 1px; background: #e2e8f0; margin: 2px 0;"></div>
-                        <button type="button" onclick="hardDeleteSalesOrderBoth('${soNumber}', ${orderId || 'null'})" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='white'">
-                            <i class="fa-solid fa-trash-can" style="color: #ef4444; width: 16px;"></i> Delete Sales Order
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Close Modal Button -->
-                <button type="button" onclick="closeZohoSoDetails()" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; margin-left: 0.5rem;">
+            <!-- Top Bar Actions (Close & Back only) -->
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" onclick="closeZohoSoDetails()" style="background: transparent; border: none; font-size: 1.6rem; cursor: pointer; color: #94a3b8; padding: 0 0.5rem; line-height: 1;">
                     &times;
                 </button>
             </div>
@@ -1992,17 +1946,69 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
         <!-- Scrollable Document Viewport -->
         <div style="flex: 1; overflow-y: auto; padding: 2rem; background: #f1f5f9;">
             
-            <!-- What's Next Notice Banner (Zoho 1:1) -->
-            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <!-- What's Next Notice Banner (with Action Controls on the Marked Place) -->
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.75rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #475569;">
                     <i class="fa-solid fa-wand-magic-sparkles" style="color: #6366f1;"></i>
                     <span><strong>WHAT'S NEXT?</strong> Convert the sales order into packages, shipments or invoices.</span>
                 </div>
-                ${orderId ? `
-                    <button type="button" onclick="openOrderBilling(${orderId})" style="padding: 0.4rem 0.85rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer;">
-                        Convert ▾
+                
+                <!-- Action Controls Group (Exact Marked Place) -->
+                <div style="display: flex; gap: 0.45rem; align-items: center; position: relative;">
+                    
+                    <!-- 1. Edit Button -->
+                    <button type="button" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.8rem; padding: 0.45rem 0.85rem; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="editCurrentSalesOrder('${soNumber}')">
+                        <i class="fa-solid fa-pen" style="color: #64748b; font-size: 0.75rem;"></i> Edit
                     </button>
-                ` : ''}
+
+                    <!-- 2. PDF / Print Button -->
+                    <button type="button" id="btnSoPdfPrint" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.8rem; padding: 0.45rem 0.85rem; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="downloadZohoSoPdf('${soNumber}')">
+                        <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> PDF/Print
+                    </button>
+
+                    <!-- 3. Convert Button / Dropdown -->
+                    <div style="position: relative; display: inline-block;">
+                        ${orderId ? `
+                            <button type="button" onclick="toggleConvertDropdown(event)" style="padding: 0.45rem 1rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+                                <i class="fa-solid fa-file-invoice"></i> Convert ▾
+                            </button>
+                            <div id="soConvertDropdownMenu" style="display: none; position: absolute; right: 0; top: 38px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); width: 190px; z-index: 10000; overflow: hidden; font-size: 0.85rem;">
+                                <button type="button" onclick="openOrderBilling(${orderId})" style="width: 100%; text-align: left; padding: 0.7rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
+                                    <i class="fa-solid fa-file-invoice" style="color: #2563eb;"></i> Convert to Invoice
+                                </button>
+                                <button type="button" onclick="fulfillCurrentSalesOrder('${soNumber}')" style="width: 100%; text-align: left; padding: 0.7rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
+                                    <i class="fa-solid fa-box" style="color: #10b981;"></i> Create Package
+                                </button>
+                            </div>
+                        ` : `
+                            <button type="button" onclick="alert('This Sales Order has already been synced with Zoho Books and is ready for invoicing!')" style="padding: 0.45rem 1rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-file-invoice"></i> Convert ▾
+                            </button>
+                        `}
+                    </div>
+
+                    <!-- 4. More (...) Dropdown Menu -->
+                    <div style="position: relative; display: inline-block;">
+                        <button type="button" id="btnSoMoreActions" onclick="toggleZohoSoMoreMenu(event)" style="border: 1px solid #cbd5e1; background: white; border-radius: 6px; width: 32px; height: 32px; cursor: pointer; color: #475569; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem;">
+                            &hellip;
+                        </button>
+                        
+                        <!-- Dropdown Content (Zoho 1:1) -->
+                        <div id="soMoreDropdownMenu" style="display: none; position: absolute; right: 0; top: 38px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); width: 230px; z-index: 10000; overflow: hidden; font-size: 0.85rem;">
+                            <button type="button" onclick="fulfillCurrentSalesOrder('${soNumber}')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                                <i class="fa-solid fa-truck-ramp-box" style="color: #2563eb; width: 16px;"></i> Mark shipment as fulfilled
+                            </button>
+                            <button type="button" onclick="openCancelItemsModal('${soNumber}')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                                <i class="fa-solid fa-ban" style="color: #f59e0b; width: 16px;"></i> Cancel Items
+                            </button>
+                            <div style="height: 1px; background: #e2e8f0; margin: 2px 0;"></div>
+                            <button type="button" onclick="hardDeleteSalesOrderBoth('${soNumber}', ${orderId || 'null'})" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: white; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='white'">
+                                <i class="fa-solid fa-trash-can" style="color: #ef4444; width: 16px;"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
             </div>
 
             <!-- Zoho Books Paper Container -->
@@ -3658,3 +3664,18 @@ window.editCurrentSalesOrder = function(soNumber) {
         window.openDirectSalesOrderModal();
     }
 };
+
+window.toggleConvertDropdown = function(e) {
+    if (e) e.stopPropagation();
+    const drop = document.getElementById('soConvertDropdownMenu');
+    if (drop) {
+        drop.style.display = (drop.style.display === 'none' || !drop.style.display) ? 'block' : 'none';
+    }
+};
+
+document.addEventListener('click', function(e) {
+    const drop = document.getElementById('soConvertDropdownMenu');
+    if (drop && drop.style.display === 'block') {
+        drop.style.display = 'none';
+    }
+});

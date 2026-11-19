@@ -384,6 +384,25 @@
         </main>
     </div>
 
+    <!-- 1:1 ZOHO BOOKS SALES ORDER DETAILS WORKSTATION MODAL -->
+    <div id="zohoSoDetailModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center;">
+        <div style="background: #f8fafc; width: 95%; max-width: 1200px; height: 92vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div id="zohoSoDetailContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Dedicated Pending Order Details Modal -->
+    <div id="pendingOrderDetailModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: #ffffff; border-radius: 16px; width: 100%; max-width: 820px; max-height: 90vh; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; display: flex; flex-direction: column;">
+            <div id="pendingOrderDetailContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL FOR ORDER DETAILS & BILLING ACTION -->
     <div id="billingModal" class="modal">
         <div class="modal-content">
@@ -425,6 +444,16 @@
             loadPendingOrders();
         });
     </script>
+
+    <!-- 1:1 ZOHO BOOKS INVOICE WORKSTATION MODAL -->
+    <div id="zohoInvoiceModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: #f8fafc; width: 100%; max-width: 1280px; height: 94vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div id="zohoInvoiceContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

@@ -8,14 +8,19 @@ const requireBilling = hasPermission('billing_billing');
 // Dashboard & Lists
 router.get('/stats', authenticateToken, requireBilling, billingController.getStats);
 router.get('/pending', authenticateToken, requireBilling, billingController.getPendingOrders);
+router.post('/orders/:id/cancel', authenticateToken, requireBilling, billingController.cancelPendingOrder);
+router.delete('/orders/:id', authenticateToken, requireBilling, billingController.hardDeletePendingOrder);
 // Sales Orders
 router.get('/sales-orders', authenticateToken, requireBilling, billingController.getSalesOrders);
 router.post('/sales-orders', authenticateToken, requireBilling, billingController.createManualSalesOrder);
 router.get('/sales-orders/meta', authenticateToken, requireBilling, billingController.getSalesOrderMeta);
+router.get('/sales-orders/gst-taxes', authenticateToken, requireBilling, billingController.getGstTaxesConfig);
+router.get('/sales-orders/resolve-tax', authenticateToken, requireBilling, billingController.resolveGstTax);
 router.get('/sales-orders/products', authenticateToken, requireBilling, billingController.getProductsForSalesOrder);
 router.get('/sales-orders/customers/search', authenticateToken, requireBilling, billingController.searchSalesOrderCustomers);
 router.get('/sales-orders/:id', authenticateToken, requireBilling, billingController.getSalesOrderDetails);
 router.get('/sales-orders/:id/pdf', authenticateToken, requireBilling, billingController.getSalesOrderPdf);
+router.post('/sales-orders/:id/sync', authenticateToken, requireBilling, billingController.retrySyncSalesOrder);
 router.post('/sales-orders/:id/fulfill', authenticateToken, requireBilling, billingController.markSalesOrderFulfilled);
 router.post('/sales-orders/:id/cancel-items', authenticateToken, requireBilling, billingController.cancelSalesOrderItems);
 router.put('/sales-orders/:id', authenticateToken, requireBilling, billingController.updateSalesOrder);
@@ -23,6 +28,9 @@ router.delete('/sales-orders/:id', authenticateToken, requireBilling, billingCon
 // Orders & Invoices
 router.get('/orders', authenticateToken, requireBilling, billingController.getOrdersByStatus);
 router.get('/invoices', authenticateToken, requireBilling, billingController.getAllInvoices);
+router.get('/invoices/prepare-from-so/:soId', authenticateToken, requireBilling, billingController.prepareInvoiceFromSalesOrder);
+router.post('/invoices/create-zoho-invoice', authenticateToken, requireBilling, billingController.createZohoInvoice);
+router.get('/invoices/:id/zoho-pdf', authenticateToken, requireBilling, billingController.getZohoInvoicePdf);
 
 // Order specifics
 router.get('/orders/:id', authenticateToken, requireBilling, billingController.getOrderForBilling);
@@ -35,6 +43,8 @@ router.post('/orders/:id/zoho-salesorder', authenticateToken, requireBilling, bi
 router.get('/customers', authenticateToken, requireBilling, billingController.getZohoCustomers);
 router.get('/customers/:contactId', authenticateToken, requireBilling, billingController.getZohoCustomerById);
 router.get('/customers/:contactId/timeline', authenticateToken, requireBilling, billingController.getZohoCustomerTimeline);
+router.put('/customers/:contactId', authenticateToken, requireBilling, billingController.updateZohoCustomer);
+router.delete('/customers/:contactId', authenticateToken, requireBilling, billingController.deleteZohoCustomer);
 router.post('/customers', authenticateToken, requireBilling, billingController.createDirectZohoCustomer);
 
 // Invoicing

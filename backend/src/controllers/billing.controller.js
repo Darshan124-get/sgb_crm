@@ -1,3 +1,4 @@
+const zohoInvoiceService = require('../services/zoho/zohoInvoice.service');
 const pool = require('../config/db');
 
 // Helper to log actions
@@ -570,11 +571,44 @@ const createDirectZohoCustomer = async (req, res) => {
         });
     } catch (err) {
         console.error('Error in createDirectZohoCustomer:', err);
+        if (err.is_duplicate || err.code === 3062) {
+            return res.status(409).json({
+                success: false,
+                is_duplicate: true,
+                code: 3062,
+                message: err.message,
+                existing_contact: err.existing_contact || null,
+                entered_phone: err.entered_phone || null,
+                suggested_name: err.suggested_name || null
+            });
+        }
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
 const zohoSalesOrderService = require('../services/zoho/zohoSalesOrder.service');
+const zohoGstService = require('../services/zoho/zohoGst.service');
+
+const getGstTaxesConfig = async (req, res) => {
+    try {
+        const config = await zohoGstService.getGstConfig();
+        res.json({ success: true, ...config });
+    } catch (err) {
+        console.error('Error in getGstTaxesConfig:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const resolveGstTax = async (req, res) => {
+    try {
+        const { rate = 5, place_of_supply = 'KA', gst_treatment = 'consumer' } = req.query;
+        const tax = await zohoGstService.resolveApplicableTax(rate, place_of_supply, gst_treatment);
+        res.json({ success: true, ...tax });
+    } catch (err) {
+        console.error('Error in resolveGstTax:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
 
 const getSalesOrderMeta = async (req, res) => {
     try {
@@ -693,7 +727,7 @@ const deleteSalesOrder = async (req, res) => {
 const getProductsForSalesOrder = async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT product_id, name, sku, selling_price, category
+            SELECT product_id, name, sku, hsn_code, zoho_item_id, gst_rate, is_taxable, selling_price, category
             FROM products
             WHERE status = 1 OR status = 'active' OR status IS NULL
             ORDER BY name ASC
@@ -713,18 +747,51 @@ const searchSalesOrderCustomers = async (req, res) => {
         if (query.length >= 2) {
             try {
                 const zRes = await zohoCustomerService.getCustomersList({ search: query, limit: 10 });
-                zohoMatches = (zRes.contacts || []).map(c => ({
-                    source: 'zoho',
-                    id: c.contact_id,
-                    zoho_contact_id: c.contact_id,
-                    name: c.contact_name,
-                    company_name: c.company_name,
-                    phone: c.phone || c.mobile,
-                    email: c.email,
-                    city: c.billing_address?.city || '',
-                    state: c.billing_address?.state || c.place_of_supply || '',
-                    gst_treatment: c.gst_treatment || 'consumer',
-                    place_of_supply: c.place_of_supply || 'Karnataka'
+                const contacts = zRes.contacts || [];
+                // Enrich contacts with full address details if available
+                zohoMatches = await Promise.all(contacts.map(async c => {
+                    try {
+                        const d = await zohoCustomerService.getCustomerDetails(c.contact_id);
+                        const bAddr = d.billing_address || {};
+                        const sAddr = d.shipping_address || bAddr;
+                        const bState = bAddr.state || '';
+                        const pos = d.place_of_contact || (bState ? zohoCustomerService.resolveStateCode(bState) : 'KA');
+
+                        return {
+                            source: 'zoho',
+                            id: d.contact_id,
+                            zoho_contact_id: d.contact_id,
+                            name: d.contact_name,
+                            company_name: d.company_name || '',
+                            phone: d.phone || d.mobile || c.phone || c.mobile || '',
+                            email: d.email || c.email || '',
+                            city: bAddr.city || '',
+                            state: bState,
+                            billing_address: bAddr,
+                            shipping_address: sAddr,
+                            gst_treatment: d.gst_treatment || c.gst_treatment || 'consumer',
+                            gst_no: d.gst_no || c.gst_no || '',
+                            place_of_supply: pos,
+                            remarks: d.notes || ''
+                        };
+                    } catch (detailErr) {
+                        return {
+                            source: 'zoho',
+                            id: c.contact_id,
+                            zoho_contact_id: c.contact_id,
+                            name: c.contact_name,
+                            company_name: c.company_name,
+                            phone: c.phone || c.mobile,
+                            email: c.email,
+                            city: c.billing_address?.city || '',
+                            state: c.billing_address?.state || c.place_of_supply || '',
+                            billing_address: c.billing_address || {},
+                            shipping_address: c.shipping_address || {},
+                            gst_treatment: c.gst_treatment || 'consumer',
+                            gst_no: c.gst_no || '',
+                            place_of_supply: c.place_of_contact || (c.billing_address?.state ? zohoCustomerService.resolveStateCode(c.billing_address.state) : 'KA')
+                        };
+                    }
                 }));
             } catch (zErr) {
                 console.warn('Zoho search fallback to DB:', zErr.message);
@@ -1181,55 +1248,13 @@ const finalizeInvoice = async (req, res) => {
 };
 
 const deleteInvoice = async (req, res) => {
-    const { id } = req.params; // invoice_id
-    const connection = await pool.getConnection();
-
+    const { id } = req.params;
     try {
-        await connection.beginTransaction();
-
-        // 1. Fetch invoice and related order
-        const [invoices] = await connection.query('SELECT * FROM invoices WHERE invoice_id = ? FOR UPDATE', [id]);
-        if (!invoices.length) {
-            throw new Error('Invoice not found');
-        }
-        const invoice = invoices[0];
-        const orderId = invoice.order_id;
-
-        // 2. Hard delete foreign-key referencing records
-        await connection.query('DELETE FROM invoice_items WHERE invoice_id = ?', [id]);
-        await connection.query('DELETE FROM invoice_logs WHERE invoice_id = ?', [id]);
-
-        // 3. Hard delete packing records tied to this order if not yet shipped
-        if (orderId) {
-            await connection.query('DELETE FROM packing WHERE order_id = ? AND status != "shipped"', [orderId]);
-        }
-
-        // 4. Hard delete the invoice itself from invoices table
-        await connection.query('DELETE FROM invoices WHERE invoice_id = ?', [id]);
-
-        // 5. Revert order status back to 'approved' (Sales Order ready for invoicing)
-        if (orderId) {
-            await connection.query(`
-                UPDATE orders 
-                SET order_status = 'approved',
-                    is_locked = 0,
-                    billing_done_by = NULL
-                WHERE order_id = ?
-            `, [orderId]);
-        }
-
-        await connection.commit();
-
-        res.json({
-            success: true,
-            message: `Invoice #${invoice.invoice_number} has been permanently deleted from CRM DB. Order #${orderId} reverted to approved Sales Order.`
-        });
+        const result = await zohoInvoiceService.deleteInvoice(id, req.user?.id || 1);
+        res.json(result);
     } catch (err) {
-        try { if (connection) await connection.rollback(); } catch (re) { }
         console.error('Error hard deleting invoice:', err);
         res.status(500).json({ success: false, message: 'Failed to delete invoice: ' + err.message });
-    } finally {
-        if (connection) connection.release();
     }
 };
 
@@ -1392,18 +1417,48 @@ const verifyPayment = async (req, res) => {
 
 const getAllInvoices = async (req, res) => {
     try {
-        const [rows] = await pool.query(`
-            SELECT i.*, o.customer_name as order_customer, o.delivery_type, o.village, o.district, o.state, o.pincode,
-                   (SELECT SUM(amount) FROM payments WHERE order_id = o.order_id AND payment_status = 'verified') as advance_paid
-            FROM invoices i 
-            LEFT JOIN orders o ON i.order_id = o.order_id 
-            ORDER BY i.created_at DESC
-        `);
-        res.json(rows);
+        const invoices = await zohoInvoiceService.getInvoicesList(req.query);
+        res.json(invoices);
     } catch (err) {
+        console.error('Error fetching invoices list:', err);
         res.status(500).json({ message: 'Error fetching invoices: ' + err.message });
     }
 };
+
+const prepareInvoiceFromSalesOrder = async (req, res) => {
+    try {
+        const { soId } = req.params;
+        const result = await zohoInvoiceService.prepareInvoiceFromSalesOrder(soId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in prepareInvoiceFromSalesOrder:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const createZohoInvoice = async (req, res) => {
+    try {
+        const result = await zohoInvoiceService.createInvoice(req.body, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in createZohoInvoice:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const getZohoInvoicePdf = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pdfBuffer = await zohoInvoiceService.getInvoicePdf(id);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="invoice-' + id + '.pdf"');
+        res.send(pdfBuffer);
+    } catch (err) {
+        console.error('Error in getZohoInvoicePdf:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 
 const getInvoiceById = async (req, res) => {
     const { id } = req.params;
@@ -1587,7 +1642,217 @@ const numberToWords = (num) => {
     return 'INR ' + res;
 };
 
+
+const updateZohoCustomer = async (req, res) => {
+    try {
+        const { contactId } = req.params;
+        const result = await zohoCustomerService.updateCustomer(contactId, req.body, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in updateZohoCustomer:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const deleteZohoCustomer = async (req, res) => {
+    try {
+        const { contactId } = req.params;
+        const { action } = req.query;
+        const result = await zohoCustomerService.deleteCustomer(contactId, action, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in deleteZohoCustomer:', err);
+        if (err.has_transactions || err.code === 3000) {
+            return res.status(400).json({
+                success: false,
+                code: 3000,
+                has_transactions: true,
+                message: err.message
+            });
+        }
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const cancelPendingOrder = async (req, res) => {
+    const { id } = req.params;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [orders] = await connection.query("SELECT * FROM orders WHERE order_id = ? FOR UPDATE", [id]);
+        if (orders.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        const order = orders[0];
+        const currentStatus = order.order_status;
+
+        // Release reserved inventory
+        const [items] = await connection.query("SELECT product_id, quantity FROM order_items WHERE order_id = ?", [id]);
+        for (const item of items) {
+            await connection.query(
+                "UPDATE inventory SET reserved_stock = GREATEST(0, reserved_stock - ?) WHERE product_id = ?",
+                [item.quantity, item.product_id]
+            );
+        }
+
+        // If order had a Zoho Sales Order, attempt to void/cancel in Zoho
+        if (order.zoho_salesorder_id) {
+            try {
+                const orgId = process.env.ZOHO_ORGANIZATION_ID;
+                if (orgId) {
+                    const headers = await zohoAuth.getAuthHeaders();
+                    await axios.post(
+                        `${zohoAuth.apiDomain}/salesorders/${order.zoho_salesorder_id}/status/void?organization_id=${orgId}`,
+                        {},
+                        { headers }
+                    ).catch(() => {});
+                }
+            } catch (zErr) {
+                console.warn('Could not void Sales Order in Zoho:', zErr.message);
+            }
+        }
+
+        // Update status to cancelled
+        await connection.query("UPDATE orders SET order_status = 'cancelled' WHERE order_id = ?", [id]);
+
+        // If lead was converted, restore lead status to 'follow_up'
+        if (order.lead_id) {
+            await connection.query("UPDATE leads SET status = 'follow_up' WHERE lead_id = ? AND status = 'converted'", [order.lead_id]).catch(() => {});
+        }
+
+        // Recalculate dealer status if applicable
+        if (order.dealer_id) {
+            try {
+                const { recalculateDealerStatus } = require('./dealer.controller');
+                if (recalculateDealerStatus) await recalculateDealerStatus(order.dealer_id, connection);
+            } catch (e) {}
+        }
+
+        // Audit log
+        try {
+            await connection.query(
+                "INSERT INTO invoice_logs (order_id, action, old_value, new_value, changed_by) VALUES (?, 'ORDER_CANCELLED', ?, 'cancelled', ?)",
+                [id, currentStatus, req.user?.id || 1]
+            );
+        } catch (e) {}
+
+        await connection.commit();
+
+        res.json({
+            success: true,
+            message: `Order #${id} has been cancelled successfully.`
+        });
+    } catch (err) {
+        await connection.rollback();
+        console.error('Error in cancelPendingOrder:', err);
+        res.status(500).json({ success: false, message: err.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const hardDeletePendingOrder = async (req, res) => {
+    const { id } = req.params;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [orders] = await connection.query("SELECT * FROM orders WHERE order_id = ? FOR UPDATE", [id]);
+        if (orders.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        const order = orders[0];
+
+        // Release inventory reservation
+        const [items] = await connection.query("SELECT product_id, quantity FROM order_items WHERE order_id = ?", [id]);
+        for (const item of items) {
+            await connection.query(
+                "UPDATE inventory SET reserved_stock = GREATEST(0, reserved_stock - ?) WHERE product_id = ?",
+                [item.quantity, item.product_id]
+            );
+        }
+
+        // If order had a Zoho Sales Order, delete from Zoho Books
+        if (order.zoho_salesorder_id) {
+            try {
+                const orgId = process.env.ZOHO_ORGANIZATION_ID;
+                if (orgId) {
+                    const headers = await zohoAuth.getAuthHeaders();
+                    await axios.delete(
+                        `${zohoAuth.apiDomain}/salesorders/${order.zoho_salesorder_id}?organization_id=${orgId}`,
+                        { headers }
+                    ).catch(() => {});
+                }
+            } catch (zErr) {
+                console.warn('Could not delete Sales Order in Zoho:', zErr.message);
+            }
+        }
+
+        // Clean up child tables
+        try { await connection.query("DELETE FROM order_items WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM order_payments WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM payments WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM packing WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM shipments WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM invoice_logs WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM notifications WHERE order_id = ?", [id]); } catch (e) {}
+        try { await connection.query("DELETE FROM invoices WHERE order_id = ?", [id]); } catch (e) {}
+
+        // Delete order from orders table
+        await connection.query("DELETE FROM orders WHERE order_id = ?", [id]);
+
+        // If lead was converted for this order, restore lead status to 'contacted'
+        if (order.lead_id) {
+            await connection.query("UPDATE leads SET status = 'contacted' WHERE lead_id = ? AND status = 'converted'", [order.lead_id]).catch(() => {});
+        }
+
+        // Recalculate dealer status if applicable
+        if (order.dealer_id) {
+            try {
+                const { recalculateDealerStatus } = require('./dealer.controller');
+                if (recalculateDealerStatus) await recalculateDealerStatus(order.dealer_id, connection);
+            } catch (e) {}
+        }
+
+        await connection.commit();
+
+        res.json({
+            success: true,
+            message: `Order #${id} has been permanently deleted from CRM and database.`
+        });
+    } catch (err) {
+        await connection.rollback();
+        console.error('Error in hardDeletePendingOrder:', err);
+        res.status(500).json({ success: false, message: err.message });
+    } finally {
+        connection.release();
+    }
+};
+
+
+const retrySyncSalesOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await zohoSalesOrderService.retrySyncSalesOrderWithZoho(id, req.user?.id || 1);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in retrySyncSalesOrder:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 module.exports = {
+    retrySyncSalesOrder,
+    prepareInvoiceFromSalesOrder,
+    createZohoInvoice,
+    getZohoInvoicePdf,
+    cancelPendingOrder,
+    hardDeletePendingOrder,
     getStats,
     getPendingOrders,
     getOrderForBilling,
@@ -1611,6 +1876,8 @@ module.exports = {
     getZohoCustomers,
     getZohoCustomerById,
     getZohoCustomerTimeline,
+    updateZohoCustomer,
+    deleteZohoCustomer,
     createDirectZohoCustomer,
     getSalesOrderMeta,
     createOrSyncZohoSalesOrder,
@@ -1622,5 +1889,7 @@ module.exports = {
     updateSalesOrder,
     deleteSalesOrder,
     getProductsForSalesOrder,
-    searchSalesOrderCustomers
+    searchSalesOrderCustomers,
+    getGstTaxesConfig,
+    resolveGstTax
 };

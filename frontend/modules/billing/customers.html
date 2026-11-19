@@ -457,6 +457,91 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
+        
+        /* Zoho Style Search Autocomplete Dropdown */
+        .search-bar-container {
+            position: relative;
+            width: 380px;
+        }
+
+        .search-suggestions-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            z-index: 9999;
+            overflow: hidden;
+            display: none;
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        .suggestion-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s ease;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover, .suggestion-item.active {
+            background: #f8fafc;
+        }
+
+        .suggestion-item-main {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .suggestion-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .suggestion-subtitle {
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+
+        .suggestion-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #0369a1;
+            font-weight: 600;
+        }
+
+        .search-clear-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px;
+            display: none;
+            font-size: 0.85rem;
+        }
+
+        .search-clear-btn:hover {
+            color: #ef4444;
+        }
+
         .avatar-initials {
             width: 44px;
             height: 44px;
@@ -481,9 +566,13 @@
                 <div class="hamburger" onclick="window.toggleMobileSidebar()">
                     <i class="fas fa-bars"></i>
                 </div>
-                <div class="search-bar">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="globalSearch" placeholder="Search customer, phone, GSTIN..." oninput="handleSearchInput(this.value)">
+                <div class="search-bar-container" style="position: relative; width: 380px;">
+                    <div class="search-bar" style="width: 100%; position: relative;">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="globalSearch" placeholder="Search customer, phone, GSTIN..." oninput="handleSearchInput(this.value)" onfocus="handleSearchFocus()" autocomplete="off">
+                        <button type="button" class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="search-suggestions-dropdown" id="searchSuggestionsDropdown"></div>
                 </div>
                 <div class="profile-section">
                     <span class="profile-name" id="userName">Billing Officer</span>
@@ -567,9 +656,19 @@
                 </div>
             </div>
 
-            <div class="zoho-nav-tabs">
-                <div class="zoho-nav-tab active" onclick="switchDetailTab('overview')">Overview</div>
-                <div class="zoho-nav-tab" onclick="switchDetailTab('timeline')">Activity & Stages</div>
+            <div class="zoho-nav-tabs" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; gap: 1.5rem;">
+                    <div class="zoho-nav-tab active" onclick="switchDetailTab('overview')">Overview</div>
+                    <div class="zoho-nav-tab" onclick="switchDetailTab('timeline')">Activity & Stages</div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center; padding-right: 0.5rem;">
+                    <button class="btn-billing" onclick="openEditCustomerModal()" style="padding: 0.4rem 0.9rem; font-size: 0.82rem; background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b; border-radius: 8px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
+                        <i class="fa-solid fa-pen-to-square" style="color: #2563eb;"></i> Edit
+                    </button>
+                    <button class="btn-billing" onclick="confirmDeleteCustomer()" style="padding: 0.4rem 0.9rem; font-size: 0.82rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
+                        <i class="fa-solid fa-trash-can"></i> Delete
+                    </button>
+                </div>
             </div>
 
             <div class="zoho-modal-body" id="detailModalBody">
@@ -651,6 +750,117 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+
+    <!-- Edit Customer Modal -->
+    <div class="zoho-modal-backdrop" id="editCustomerModal">
+        <div class="create-modal-container">
+            <div class="zoho-modal-header">
+                <h2><i class="fa-solid fa-pen-to-square" style="color: #2563eb;"></i> Edit Customer</h2>
+                <button class="btn-billing secondary" onclick="closeEditCustomerModal()" style="padding: 0.4rem 0.75rem;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="editCustomerForm" onsubmit="handleEditCustomerSubmit(event)" style="padding: 1.5rem 2rem; overflow-y: auto; flex: 1;">
+                <input type="hidden" id="editContactId">
+
+                <!-- Customer Type -->
+                <div class="form-row">
+                    <label class="form-label">Customer Type</label>
+                    <div style="display: flex; gap: 2rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                            <input type="radio" name="edit_customer_type" value="individual" id="editTypeIndividual"> Individual
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                            <input type="radio" name="edit_customer_type" value="business" id="editTypeBusiness"> Business
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Primary Contact -->
+                <div class="form-row">
+                    <label class="form-label">Primary Contact</label>
+                    <div style="display: flex; gap: 0.5rem; flex: 1;">
+                        <select id="editSalutation" class="form-input" style="max-width: 110px;">
+                            <option value="">Salutation</option>
+                            <option value="Mr.">Mr.</option>
+                            <option value="Mrs.">Mrs.</option>
+                            <option value="Ms.">Ms.</option>
+                            <option value="Dr.">Dr.</option>
+                        </select>
+                        <input type="text" id="editFirstName" class="form-input" placeholder="First Name">
+                        <input type="text" id="editLastName" class="form-input" placeholder="Last Name">
+                    </div>
+                </div>
+
+                <!-- Company Name -->
+                <div class="form-row">
+                    <label class="form-label">Company Name</label>
+                    <input type="text" id="editCompanyName" class="form-input" placeholder="Company Name (optional)">
+                </div>
+
+                <!-- Display Name -->
+                <div class="form-row">
+                    <label class="form-label" style="color: #ef4444;">Display Name *</label>
+                    <input type="text" id="editDisplayName" class="form-input" placeholder="Customer Display Name" required style="border-color: #93c5fd; font-weight: 700;">
+                </div>
+
+                <!-- Email & Phone -->
+                <div class="form-row">
+                    <label class="form-label">Email & Phone</label>
+                    <div style="display: flex; gap: 0.75rem; flex: 1;">
+                        <input type="email" id="editEmail" class="form-input" placeholder="email@example.com">
+                        <input type="text" id="editPhone" class="form-input" placeholder="Phone / Mobile" required>
+                    </div>
+                </div>
+
+                <!-- GST Treatment & Place of Supply -->
+                <div class="form-row">
+                    <label class="form-label">GST Treatment</label>
+                    <div style="display: flex; gap: 0.75rem; flex: 1;">
+                        <select id="editGstTreatment" class="form-input">
+                            <option value="consumer">Consumer (B2C)</option>
+                            <option value="registered_business_regular">Registered Business - Regular</option>
+                            <option value="registered_business_composition">Registered Business - Composition</option>
+                            <option value="unregistered_business">Unregistered Business</option>
+                            <option value="overseas">Overseas</option>
+                            <option value="special_economic_zone">Special Economic Zone (SEZ)</option>
+                        </select>
+                        <input type="text" id="editPlaceOfSupply" class="form-input" placeholder="Place of Supply" value="Karnataka">
+                    </div>
+                </div>
+
+                <!-- GSTIN & PAN -->
+                <div class="form-row">
+                    <label class="form-label">GSTIN / PAN</label>
+                    <div style="display: flex; gap: 0.75rem; flex: 1;">
+                        <input type="text" id="editGstin" class="form-input" placeholder="GST Number (optional)">
+                        <input type="text" id="editPan" class="form-input" placeholder="PAN Number (optional)">
+                    </div>
+                </div>
+
+                <!-- Billing Address -->
+                <div class="form-row" style="align-items: flex-start;">
+                    <label class="form-label" style="padding-top: 0.5rem;">Billing Address</label>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
+                        <input type="text" id="editAddress" class="form-input" placeholder="Address Line (Street, Flat/Door)">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="editCity" class="form-input" placeholder="City / District">
+                            <input type="text" id="editState" class="form-input" placeholder="State" value="Karnataka">
+                            <input type="text" id="editPincode" class="form-input" placeholder="Pincode">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                    <button type="button" class="btn-billing secondary" onclick="closeEditCustomerModal()">Cancel</button>
+                    <button type="submit" class="btn-billing primary" id="btnSaveEditCustomer">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Update & Sync in Zoho
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -759,6 +969,77 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    
+    <!-- Customer Duplicate / Conflict Resolution Modal -->
+    <div class="zoho-modal-backdrop" id="customerConflictModal" style="z-index: 10500;">
+        <div class="create-modal-container" style="max-width: 580px;">
+            <div class="zoho-modal-header" style="background: #fffbeb; border-bottom: 1px solid #fef3c7;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <h2 style="font-size: 1.1rem; color: #92400e; margin: 0;">Customer Already Exists</h2>
+                        <span style="font-size: 0.8rem; color: #b45309;">Zoho Books Duplicate Detection</span>
+                    </div>
+                </div>
+                <button class="btn-billing secondary" onclick="closeCustomerConflictModal()" style="padding: 0.35rem 0.65rem;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div style="padding: 1.5rem 1.75rem;">
+                <p id="conflictModalLead" style="font-size: 0.92rem; color: #334155; line-height: 1.5; margin-bottom: 1rem;">
+                    A customer with the display name <strong id="conflictCustomerName">test 1</strong> already exists in Zoho Books.
+                </p>
+
+                <!-- Comparison Card -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: 0.86rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px dashed #cbd5e1; padding-bottom: 0.75rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; margin-bottom: 0.25rem;">Existing in Zoho Books</div>
+                            <div style="font-weight: 700; color: #1e293b;" id="conflictExistingName">-</div>
+                            <div style="color: #475569;" id="conflictExistingPhone"><i class="fa-solid fa-phone" style="font-size: 0.75rem; color: #94a3b8;"></i> -</div>
+                            <div style="color: #64748b; font-size: 0.8rem;" id="conflictExistingEmail">-</div>
+                        </div>
+                        <div>
+                            <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; margin-bottom: 0.25rem;">You Are Submitting</div>
+                            <div style="font-weight: 700; color: #2563eb;" id="conflictSubmittedName">-</div>
+                            <div style="color: #475569;" id="conflictSubmittedPhone"><i class="fa-solid fa-phone" style="font-size: 0.75rem; color: #94a3b8;"></i> -</div>
+                            <div style="color: #64748b; font-size: 0.8rem;" id="conflictSubmittedEmail">-</div>
+                        </div>
+                    </div>
+                    <div id="conflictPhoneVerdict" style="font-weight: 600; font-size: 0.82rem; padding: 0.4rem 0.75rem; border-radius: 6px;"></div>
+                </div>
+
+                <!-- Action Options -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Option 1: Update Existing -->
+                    <button type="button" id="btnConflictUpdate" onclick="handleConflictUpdateExisting()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.15rem; background: #ffffff; border: 2px solid #3b82f6; border-radius: 10px; cursor: pointer; text-align: left; transition: all 0.2s;">
+                        <div>
+                            <div style="font-weight: 700; color: #1d4ed8; font-size: 0.92rem;"><i class="fa-solid fa-user-pen" style="margin-right: 0.5rem;"></i> Update Existing Customer</div>
+                            <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.2rem;">Same person: Keep this customer ID and update their address/phone with the new data.</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color: #3b82f6;"></i>
+                    </button>
+
+                    <!-- Option 2: Create as New Customer with unique name -->
+                    <button type="button" id="btnConflictCreateNew" onclick="handleConflictCreateDistinct()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.15rem; background: #ffffff; border: 2px solid #10b981; border-radius: 10px; cursor: pointer; text-align: left; transition: all 0.2s;">
+                        <div>
+                            <div style="font-weight: 700; color: #047857; font-size: 0.92rem;"><i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Create as New Customer (<span id="conflictSuggestedName">test 1 (phone)</span>)</div>
+                            <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.2rem;">Different person with same name: Distinguishes name with phone number so Zoho accepts it.</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color: #10b981;"></i>
+                    </button>
+                </div>
+
+                <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn-billing secondary" onclick="closeCustomerConflictModal()" style="padding: 0.45rem 1rem;">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -892,13 +1173,122 @@
             }
         }
 
+        let suggestionAbortController = null;
+
+        function clearSearch() {
+            const input = document.getElementById('globalSearch');
+            input.value = '';
+            const clearBtn = document.getElementById('searchClearBtn');
+            if (clearBtn) clearBtn.style.display = 'none';
+            hideSuggestions();
+            currentSearchQuery = '';
+            loadCustomersList(1);
+        }
+
+        function handleSearchFocus() {
+            const val = document.getElementById('globalSearch').value.trim();
+            if (val.length >= 1) {
+                fetchAndShowSuggestions(val);
+            }
+        }
+
+        function hideSuggestions() {
+            const dropdown = document.getElementById('searchSuggestionsDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }
+
+        async function fetchAndShowSuggestions(query) {
+            const dropdown = document.getElementById('searchSuggestionsDropdown');
+            if (!dropdown) return;
+            if (!query || query.length < 1) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            if (suggestionAbortController) {
+                suggestionAbortController.abort();
+            }
+            suggestionAbortController = new AbortController();
+
+            try {
+                const res = await fetch(`${window.API_URL}/billing/customers?page=1&limit=8&search=${encodeURIComponent(query)}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    signal: suggestionAbortController.signal
+                });
+                const data = await res.json();
+                const contacts = data.contacts || [];
+
+                if (contacts.length === 0) {
+                    dropdown.innerHTML = `
+                        <div style="padding: 0.85rem 1rem; color: #64748b; font-size: 0.85rem; text-align: center;">
+                            No matching customers found for "<strong>${query}</strong>"
+                        </div>
+                    `;
+                    dropdown.style.display = 'block';
+                    return;
+                }
+
+                dropdown.innerHTML = contacts.map(c => {
+                    const phone = c.phone || c.mobile || '';
+                    const company = c.company_name || '';
+                    const subText = [phone, company, c.email].filter(Boolean).join(' • ');
+
+                    return `
+                        <div class="suggestion-item" onclick="selectSuggestedCustomer('${c.contact_id}', '${(c.contact_name || '').replace(/'/g, "\\'")}')">
+                            <div class="suggestion-item-main">
+                                <span class="suggestion-title">${highlightMatch(c.contact_name, query)}</span>
+                                <span class="suggestion-subtitle">${subText || 'No phone / email'}</span>
+                            </div>
+                            <span class="suggestion-badge">${c.customer_sub_type === 'business' ? 'Business' : 'Individual'}</span>
+                        </div>
+                    `;
+                }).join('');
+
+                dropdown.style.display = 'block';
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.warn('Suggestions error:', err);
+                }
+            }
+        }
+
+        function highlightMatch(text, query) {
+            if (!text || !query) return text || '';
+            const idx = text.toLowerCase().indexOf(query.toLowerCase());
+            if (idx === -1) return text;
+            const matched = text.substring(idx, idx + query.length);
+            return text.substring(0, idx) + '<strong style="color: #2563eb; font-weight: 800;">' + matched + '</strong>' + text.substring(idx + query.length);
+        }
+
+        function selectSuggestedCustomer(contactId, contactName) {
+            const input = document.getElementById('globalSearch');
+            input.value = contactName;
+            const clearBtn = document.getElementById('searchClearBtn');
+            if (clearBtn) clearBtn.style.display = 'block';
+            hideSuggestions();
+            currentSearchQuery = contactName;
+            loadCustomersList(1);
+            openCustomerDetailModal(contactId);
+        }
+
         function handleSearchInput(value) {
+            const clearBtn = document.getElementById('searchClearBtn');
+            if (clearBtn) clearBtn.style.display = value ? 'block' : 'none';
+
+            fetchAndShowSuggestions(value.trim());
+
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 currentSearchQuery = value.trim();
                 loadCustomersList(1);
             }, 400);
         }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-bar-container')) {
+                hideSuggestions();
+            }
+        });
 
         // Customer Detail Modal Logic
         async function openCustomerDetailModal(contactId) {
@@ -929,6 +1319,7 @@
                 }
 
                 const c = detailsData.contact;
+                activeCustomerData = c;
                 document.getElementById('modalCustomerName').innerText = c.contact_name || 'N/A';
                 document.getElementById('modalCustomerCompany').innerText = c.company_name ? `Company: ${c.company_name}` : (c.customer_sub_type === 'business' ? 'Business Account' : 'Individual Account');
                 document.getElementById('modalCustomerInitials').innerText = (c.contact_name || 'C').substring(0, 2).toUpperCase();
@@ -1023,6 +1414,160 @@
             else tabs[1].classList.add('active');
         }
 
+
+        let activeCustomerData = null;
+
+        function openEditCustomerModal() {
+            if (!activeCustomerData) {
+                alert('Customer data not loaded yet. Please wait a moment.');
+                return;
+            }
+            const c = activeCustomerData;
+            document.getElementById('editContactId').value = c.contact_id || '';
+            
+            if (c.customer_sub_type === 'business') {
+                document.getElementById('editTypeBusiness').checked = true;
+            } else {
+                document.getElementById('editTypeIndividual').checked = true;
+            }
+
+            const p = (c.contact_persons && c.contact_persons[0]) || {};
+            document.getElementById('editSalutation').value = p.salutation || '';
+            document.getElementById('editFirstName').value = p.first_name || '';
+            document.getElementById('editLastName').value = p.last_name || '';
+            document.getElementById('editCompanyName').value = c.company_name || '';
+            document.getElementById('editDisplayName').value = c.contact_name || '';
+            document.getElementById('editEmail').value = c.email || p.email || '';
+            document.getElementById('editPhone').value = c.phone || c.mobile || p.mobile || p.phone || '';
+            document.getElementById('editGstTreatment').value = c.gst_treatment || 'consumer';
+            document.getElementById('editPlaceOfSupply').value = c.place_of_contact_formatted || c.place_of_contact || 'Karnataka';
+            document.getElementById('editGstin').value = c.gst_no || '';
+            document.getElementById('editPan').value = c.pan_no || '';
+
+            const b = c.billing_address || {};
+            document.getElementById('editAddress').value = b.address || '';
+            document.getElementById('editCity').value = b.city || '';
+            document.getElementById('editState').value = b.state || 'Karnataka';
+            document.getElementById('editPincode').value = b.zip || '';
+
+            document.getElementById('editCustomerModal').classList.add('active');
+        }
+
+        function closeEditCustomerModal() {
+            document.getElementById('editCustomerModal').classList.remove('active');
+        }
+
+        async function handleEditCustomerSubmit(e) {
+            e.preventDefault();
+            const contactId = document.getElementById('editContactId').value;
+            if (!contactId) return;
+
+            const btn = document.getElementById('btnSaveEditCustomer');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating in Zoho & CRM...';
+
+            const payload = {
+                customer_type: document.querySelector('input[name="edit_customer_type"]:checked').value,
+                salutation: document.getElementById('editSalutation').value,
+                first_name: document.getElementById('editFirstName').value.trim(),
+                last_name: document.getElementById('editLastName').value.trim(),
+                company_name: document.getElementById('editCompanyName').value.trim(),
+                display_name: document.getElementById('editDisplayName').value.trim(),
+                email: document.getElementById('editEmail').value.trim(),
+                phone: document.getElementById('editPhone').value.trim(),
+                gst_treatment: document.getElementById('editGstTreatment').value,
+                place_of_supply: document.getElementById('editPlaceOfSupply').value.trim(),
+                gst_number: document.getElementById('editGstin').value.trim(),
+                pan_number: document.getElementById('editPan').value.trim(),
+                billing_address: document.getElementById('editAddress').value.trim(),
+                billing_city: document.getElementById('editCity').value.trim(),
+                billing_state: document.getElementById('editState').value.trim(),
+                billing_pincode: document.getElementById('editPincode').value.trim()
+            };
+
+            try {
+                const res = await fetch(`${window.API_URL}/billing/customers/${contactId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to update customer');
+                }
+
+                alert('Customer updated successfully in Zoho Books and CRM!');
+                closeEditCustomerModal();
+                // Refresh modal and list
+                openCustomerDetailModal(contactId);
+                loadCustomersList(currentPage);
+            } catch (err) {
+                alert('Error updating customer: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Update & Sync in Zoho';
+            }
+        }
+
+        async function confirmDeleteCustomer() {
+            if (!activeCustomerData || !activeCustomerData.contact_id) {
+                alert('No active customer selected.');
+                return;
+            }
+            const contactName = activeCustomerData.contact_name || 'this customer';
+            const contactId = activeCustomerData.contact_id;
+
+            const confirmMsg = `Are you sure you want to permanently delete customer "${contactName}"?\n\nThis will:\n1. Permanently delete the customer in Zoho Books\n2. Unlink the customer in CRM Database\n\nThis action CANNOT be undone!`;
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const res = await fetch(`${window.API_URL}/billing/customers/${contactId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    if (data.has_transactions || data.code === 3000) {
+                        const offerInactive = confirm(
+                            `⚠️ Cannot Hard Delete Customer:\n"${contactName}" is associated with existing documents/transactions (Sales Orders or Invoices) in Zoho Books, so Zoho Books will not allow permanent deletion.\n\nWould you like to MARK THIS CUSTOMER AS INACTIVE in Zoho Books and unlink them from the CRM instead?`
+                        );
+                        if (offerInactive) {
+                            const inactRes = await fetch(`${window.API_URL}/billing/customers/${contactId}?action=mark_inactive`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                }
+                            });
+                            const inactData = await inactRes.json();
+                            if (inactData.success) {
+                                alert(`Customer "${contactName}" marked as INACTIVE in Zoho Books and unlinked from CRM.`);
+                                closeCustomerDetailModal();
+                                loadCustomersList(1);
+                                return;
+                            } else {
+                                throw new Error(inactData.message || 'Failed to mark customer inactive');
+                            }
+                        }
+                        return;
+                    }
+                    throw new Error(data.message || 'Failed to delete customer');
+                }
+
+                alert(`Customer "${contactName}" has been deleted successfully from Zoho Books and unlinked from CRM.`);
+                closeCustomerDetailModal();
+                loadCustomersList(1);
+            } catch (err) {
+                alert('Error deleting customer: ' + err.message);
+            }
+        }
+
         // Create Customer Modal Logic
         function openCreateCustomerModal() {
             document.getElementById('createCustomerModal').classList.add('active');
@@ -1032,6 +1577,135 @@
 
         function closeCreateCustomerModal() {
             document.getElementById('createCustomerModal').classList.remove('active');
+        }
+
+        let pendingCustomerPayload = null;
+        let conflictDetails = null;
+
+        function closeCustomerConflictModal() {
+            document.getElementById('customerConflictModal').classList.remove('active');
+        }
+
+        function showCustomerConflictModal(data, payload) {
+            pendingCustomerPayload = payload;
+            conflictDetails = data;
+            const existing = data.existing_contact || {};
+            const isPhoneMatch = Boolean(existing.is_phone_match);
+
+            document.getElementById('conflictCustomerName').innerText = payload.display_name;
+            document.getElementById('conflictExistingName').innerText = existing.contact_name || payload.display_name;
+            document.getElementById('conflictExistingPhone').innerHTML = `<i class="fa-solid fa-phone" style="font-size: 0.75rem; color: #94a3b8;"></i> ${existing.mobile || existing.phone || 'No phone recorded'}`;
+            document.getElementById('conflictExistingEmail').innerText = existing.email || 'No email';
+
+            document.getElementById('conflictSubmittedName').innerText = payload.display_name;
+            document.getElementById('conflictSubmittedPhone').innerHTML = `<i class="fa-solid fa-phone" style="font-size: 0.75rem; color: #94a3b8;"></i> ${payload.phone || 'None'}`;
+            document.getElementById('conflictSubmittedEmail').innerText = payload.email || 'None';
+
+            const verdictEl = document.getElementById('conflictPhoneVerdict');
+            const suggestedName = data.suggested_name || (payload.phone ? `${payload.display_name} (${payload.phone})` : `${payload.display_name} (2)`);
+            document.getElementById('conflictSuggestedName').innerText = suggestedName;
+
+            if (isPhoneMatch) {
+                verdictEl.style.background = '#eff6ff';
+                verdictEl.style.color = '#1d4ed8';
+                verdictEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Phone numbers match! This is likely the exact same customer. We recommend updating their existing record.';
+                document.getElementById('btnConflictUpdate').style.boxShadow = '0 0 0 2px #3b82f6';
+                document.getElementById('btnConflictCreateNew').style.boxShadow = 'none';
+            } else {
+                verdictEl.style.background = '#fef2f2';
+                verdictEl.style.color = '#b91c1c';
+                verdictEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Phone numbers differ! This is likely a different customer who happens to share the same name. We recommend creating as a new customer with the suggested distinctive name.';
+                document.getElementById('btnConflictCreateNew').style.boxShadow = '0 0 0 2px #10b981';
+                document.getElementById('btnConflictUpdate').style.boxShadow = 'none';
+            }
+
+            document.getElementById('customerConflictModal').classList.add('active');
+        }
+
+        async function handleConflictUpdateExisting() {
+            if (!conflictDetails?.existing_contact?.contact_id || !pendingCustomerPayload) {
+                alert('Existing customer contact ID not found.');
+                return;
+            }
+            const contactId = conflictDetails.existing_contact.contact_id;
+            const updateBtn = document.getElementById('btnConflictUpdate');
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<div><div style="font-weight:700;"><i class="fa-solid fa-spinner fa-spin"></i> Updating in Zoho...</div></div>';
+
+            try {
+                const res = await fetch(`${window.API_URL}/billing/customers/${contactId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(pendingCustomerPayload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to update customer');
+                }
+
+                alert(`Existing Customer "${pendingCustomerPayload.display_name}" updated successfully in Zoho Books!`);
+                closeCustomerConflictModal();
+                closeCreateCustomerModal();
+                loadCustomersList(1);
+            } catch (err) {
+                alert('Error updating customer: ' + err.message);
+            } finally {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = `
+                    <div>
+                        <div style="font-weight: 700; color: #1d4ed8; font-size: 0.92rem;"><i class="fa-solid fa-user-pen" style="margin-right: 0.5rem;"></i> Update Existing Customer</div>
+                        <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.2rem;">Same person: Keep this customer ID and update their address/phone with the new data.</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #3b82f6;"></i>
+                `;
+            }
+        }
+
+        async function handleConflictCreateDistinct() {
+            if (!pendingCustomerPayload) return;
+            const suggestedName = conflictDetails?.suggested_name || (pendingCustomerPayload.phone ? `${pendingCustomerPayload.display_name} (${pendingCustomerPayload.phone})` : `${pendingCustomerPayload.display_name} (2)`);
+            
+            // Set payload display name to suggested distinctive name
+            pendingCustomerPayload.display_name = suggestedName;
+            document.getElementById('newDisplayName').value = suggestedName;
+
+            const createBtn = document.getElementById('btnConflictCreateNew');
+            createBtn.disabled = true;
+            createBtn.innerHTML = '<div><div style="font-weight:700;"><i class="fa-solid fa-spinner fa-spin"></i> Creating distinctive customer...</div></div>';
+
+            try {
+                const res = await fetch(`${window.API_URL}/billing/customers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(pendingCustomerPayload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to create customer');
+                }
+
+                alert(`Customer "${suggestedName}" created successfully in Zoho Books!`);
+                closeCustomerConflictModal();
+                closeCreateCustomerModal();
+                loadCustomersList(1);
+            } catch (err) {
+                alert('Error creating customer: ' + err.message);
+            } finally {
+                createBtn.disabled = false;
+                createBtn.innerHTML = `
+                    <div>
+                        <div style="font-weight: 700; color: #047857; font-size: 0.92rem;"><i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Create as New Customer (<span id="conflictSuggestedName">${suggestedName}</span>)</div>
+                        <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.2rem;">Different person with same name: Distinguishes name with phone number so Zoho accepts it.</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #10b981;"></i>
+                `;
+            }
         }
 
         async function handleCreateCustomerSubmit(e) {
@@ -1070,7 +1744,11 @@
                 });
                 const data = await res.json();
 
-                if (!data.success) {
+                if (!res.ok || !data.success) {
+                    if (res.status === 409 || data.is_duplicate || data.code === 3062) {
+                        showCustomerConflictModal(data, payload);
+                        return;
+                    }
                     throw new Error(data.message || 'Failed to create customer');
                 }
 
@@ -1105,6 +1783,16 @@
             loadCustomersList(1);
         });
     </script>
+
+    <!-- 1:1 ZOHO BOOKS INVOICE WORKSTATION MODAL -->
+    <div id="zohoInvoiceModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: #f8fafc; width: 100%; max-width: 1280px; height: 94vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div id="zohoInvoiceContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

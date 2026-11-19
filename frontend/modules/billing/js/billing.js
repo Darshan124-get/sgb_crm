@@ -1,6 +1,7 @@
 window.BILLING_API_URL = window.BILLING_API_URL || (window.API_URL ? `${window.API_URL}/billing` : 'http://127.0.0.1:5000/api/billing');
 var BILLING_API_URL = window.BILLING_API_URL;
-let currentOrder = null;
+var currentOrder = null;
+window.currentOrder = null;
 
 window.openOrderBilling = async function (orderId) {
     const modal = document.getElementById('billingModal');
@@ -116,6 +117,21 @@ const INDIAN_STATES = [
     { code: 'LD', name: 'Lakshadweep' },
     { code: 'PY', name: 'Puducherry' }
 ];
+
+window.normalizeIndianStateCode = function(input) {
+    if (!input) return 'KA';
+    const str = String(input).trim();
+    const bracketMatch = str.match(/\[([A-Za-z]{2})\]/);
+    if (bracketMatch) return bracketMatch[1].toUpperCase();
+
+    const clean = str.toUpperCase();
+    const found = INDIAN_STATES.find(s => s.code === clean || s.name.toUpperCase() === clean);
+    if (found) return found.code;
+
+    // Partial/heuristic match
+    const partial = INDIAN_STATES.find(s => clean.includes(s.name.toUpperCase()) || s.name.toUpperCase().includes(clean));
+    return partial ? partial.code : 'KA';
+};
 
 let currentWorkstationStep = 1;
 let currentZohoSubTab = 'other_details';
@@ -623,17 +639,22 @@ let allCrmProducts = [];
 async function ensureSalesOrderMeta() {
     if (!zohoSoMeta) {
         try {
-            const [metaRes, prodRes] = await Promise.all([
+            const [metaRes, prodRes, gstRes] = await Promise.all([
                 fetch(`${BILLING_API_URL}/sales-orders/meta`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                 }),
-                fetch(`${API_URL}/products`, {
+                fetch(BILLING_API_URL + '/sales-orders/products', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                }),
+                fetch(BILLING_API_URL + '/sales-orders/gst-taxes', {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                 })
             ]);
             zohoSoMeta = await metaRes.json();
             const prodData = await prodRes.json();
+            const gstData = await gstRes.json();
             allCrmProducts = Array.isArray(prodData) ? prodData : (prodData.products || []);
+            window.zohoGstConfig = gstData;
         } catch (err) {
             console.warn('Could not load Sales Order metadata:', err);
             zohoSoMeta = {
@@ -649,8 +670,25 @@ async function ensureSalesOrderMeta() {
 }
 
 function renderSalesOrderStep(data) {
+    // Resolve Place of Supply for this order (prefer order.place_of_supply or normalized order.state)
+    const initialPos = window.normalizeIndianStateCode(data.place_of_supply || data.state || 'Karnataka');
+    data.place_of_supply = initialPos;
+    if (currentOrder) currentOrder.place_of_supply = initialPos;
+
     // Ensure metadata is requested in background if not yet loaded
     ensureSalesOrderMeta().then(() => {
+        // Automatically resolve GST for all items if not set
+        const normPos = (document.getElementById('soPlaceOfSupplyInput')?.value || data.place_of_supply || 'KA').toUpperCase();
+        if (data.items) {
+            data.items.forEach(it => {
+                const prod = allCrmProducts.find(p => p.product_id == it.product_id || (it.name && p.name && p.name.toLowerCase() === it.name.toLowerCase()));
+                const prodGst = prod ? (parseFloat(prod.gst_rate) || 5) : (parseFloat(it.tax_rate) || 5);
+                const resolved = window.resolveTaxForState(prodGst, normPos);
+                it.tax_rate = resolved.rate;
+                it.tax_name = resolved.name;
+                it.tax_id = resolved.id;
+            });
+        }
         // Populate dynamic dropdowns if rendered
         repopulateSoDropdowns();
     });
@@ -660,9 +698,12 @@ function renderSalesOrderStep(data) {
     items.forEach((it, idx) => {
         if (it.quantity === undefined) it.quantity = 1;
         if (it.rate === undefined) it.rate = parseFloat(it.price) || 0;
-        if (it.tax_rate === undefined) it.tax_rate = 0;
-        if (it.tax_name === undefined) it.tax_name = '';
-        if (it.tax_id === undefined) it.tax_id = '';
+        const prod = allCrmProducts.find(p => p.product_id == it.product_id || (it.name && p.name && p.name.toLowerCase() === it.name.toLowerCase()));
+        const prodGst = prod ? (parseFloat(prod.gst_rate) || 5) : 5;
+        const resolved = window.resolveTaxForState(prodGst, initialPos);
+        if (it.tax_rate === undefined || it.tax_rate === 0) it.tax_rate = resolved.rate;
+        if (!it.tax_name) it.tax_name = resolved.name;
+        if (!it.tax_id) it.tax_id = resolved.id;
     });
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -675,6 +716,9 @@ function renderSalesOrderStep(data) {
     const contactPhone = data.phone || data.lead_phone || data.dealer_phone || '';
     const creatorName = data.creator_name || data.sales_person_name || 'darshan';
     const deliveryMethod = data.delivery_type || data.dispatch_through || 'Post';
+
+    const bAddressStr = [data.address, data.street2, data.city, data.district, data.state, data.pincode].filter(Boolean).join(', ');
+    const sAddressStr = [data.shipping_address || data.address, data.shipping_city || data.city, data.shipping_state || data.state, data.shipping_pincode || data.pincode].filter(Boolean).join(', ');
 
     return `
         <div class="zoho-sales-order-wrapper" style="background: white; padding: 2.25rem 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); max-height: 80vh; overflow-y: auto; font-family: 'Inter', sans-serif;">
@@ -711,6 +755,40 @@ function renderSalesOrderStep(data) {
                                 Change
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Live Address Display (Zoho 1:1) -->
+                ${(bAddressStr || sAddressStr) ? `
+                    <div style="margin-left: 170px; padding-left: 2rem; margin-top: -0.5rem; margin-bottom: 0.5rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem;">
+                            <div>
+                                <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-file-invoice" style="color: #3b82f6;"></i> BILLING ADDRESS
+                                </div>
+                                <div style="font-size: 0.85rem; color: #1e293b; line-height: 1.5;">${bAddressStr || '-'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-truck" style="color: #10b981;"></i> SHIPPING ADDRESS
+                                </div>
+                                <div style="font-size: 0.85rem; color: #1e293b; line-height: 1.5;">${sAddressStr || bAddressStr || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Place of Supply (Zoho 1:1) -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Place of Supply *</label>
+                    <div style="flex: 1; max-width: 420px;">
+                        <select id="soPlaceOfSupplyInput" onchange="updateAllItemsTaxForPlaceOfSupply(this.value)" style="width: 100%; padding: 0.55rem 0.85rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: #0f172a; outline: none; background: white;">
+                            ${INDIAN_STATES.map(s => `
+                                <option value="${s.code}" ${s.code === initialPos ? 'selected' : ''}>
+                                    [${s.code}] - ${s.name}
+                                </option>
+                            `).join('')}
+                        </select>
                     </div>
                 </div>
 
@@ -860,13 +938,28 @@ function renderSalesOrderStep(data) {
                         </div>
                     </div>
 
-                    <!-- Shipping Charges -->
+                    <!-- Shipping Charges & Tax -->
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
                         <span style="font-weight: 600; color: #475569;">Shipping Charges</span>
                         <div style="display: flex; align-items: center; gap: 0.25rem;">
                             <span style="color: #64748b;">₹</span>
                             <input type="number" step="0.01" id="soShippingCharges" value="${data.shipping_charges || 0}" oninput="recalculateZohoTotals()" style="width: 110px; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; text-align: right; outline: none;">
                         </div>
+                    </div>
+
+                    <!-- Shipping Charge Tax Selector (Shown only when Shipping Charges > 0) -->
+                    <div id="soShippingTaxRow" style="display: none; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                        <span style="font-weight: 600; color: #64748b; font-size: 0.82rem;">Shipping Charge Tax</span>
+                        <select id="soShippingTaxSelect" onchange="onShippingTaxChange(this.value)" style="width: 140px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 600; background: white; outline: none;">
+                            <option value="0">Select a Tax</option>
+                            <!-- Dynamically loaded -->
+                        </select>
+                    </div>
+
+                    <!-- Shipping Charges SAC -->
+                    <div id="soShippingSacRow" style="display: none; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                        <span style="font-weight: 700; color: #dc2626; font-size: 0.82rem;">Shipping Charges SAC*</span>
+                        <input type="text" id="soShippingSacInput" value="996811" style="width: 140px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 700; color: #0f172a; text-align: left; outline: none;">
                     </div>
 
                     <!-- TDS / TCS Radio Selector -->
@@ -884,6 +977,11 @@ function renderSalesOrderStep(data) {
                             <option value="0.1">0.1%</option>
                             <option value="0.075">0.075%</option>
                         </select>
+                    </div>
+
+                    <!-- Dynamic GST Rows (CGST/SGST or IGST [5%]) -->
+                    <div id="soDynamicGstRows" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed #cbd5e1; border-bottom: 1px dashed #cbd5e1; padding: 0.65rem 0;">
+                        <!-- Injected by recalculateZohoTotals() -->
                     </div>
 
                     <!-- Round off -->
@@ -928,6 +1026,70 @@ function renderSalesOrderStep(data) {
     `;
 }
 
+
+// Resolve tax object and name for a given rate & Place of Supply
+window.resolveTaxForState = function(ratePct = 5, placeOfSupply = 'KA') {
+    const normPos = (placeOfSupply || 'KA').toUpperCase().trim();
+    const isIntraState = (normPos === 'KA');
+    const rate = Math.round(parseFloat(ratePct) || 0);
+
+    const config = window.zohoGstConfig;
+    if (config) {
+        if (isIntraState && config.intra_state_taxes && config.intra_state_taxes[rate]) {
+            const match = config.intra_state_taxes[rate];
+            return { id: match.id, name: match.name, rate: match.rate, is_intra: true };
+        } else if (!isIntraState && config.inter_state_taxes && config.inter_state_taxes[rate]) {
+            const match = config.inter_state_taxes[rate];
+            return { id: match.id, name: match.name, rate: match.rate, is_intra: false };
+        }
+    }
+
+    // Direct fallbacks
+    const intraMap = {
+        0: { id: '3580403000000032424', name: 'GST0', rate: 0 },
+        5: { id: '3580403000000032428', name: 'GST5', rate: 5 },
+        12: { id: '3580403000000032432', name: 'GST12', rate: 12 },
+        18: { id: '3580403000000032436', name: 'GST18', rate: 18 },
+        28: { id: '3580403000000032444', name: 'GST28', rate: 28 },
+        40: { id: '3580403000000032440', name: 'GST40', rate: 40 }
+    };
+    const interMap = {
+        0: { id: '3580403000000032352', name: 'IGST0', rate: 0 },
+        5: { id: '3580403000000032354', name: 'IGST5', rate: 5 },
+        12: { id: '3580403000000032356', name: 'IGST12', rate: 12 },
+        18: { id: '3580403000000032360', name: 'IGST18', rate: 18 },
+        28: { id: '3580403000000032362', name: 'IGST28', rate: 28 },
+        40: { id: '3580403000000032358', name: 'IGST40', rate: 40 }
+    };
+
+    if (isIntraState) {
+        return intraMap[rate] || intraMap[5];
+    } else {
+        return interMap[rate] || interMap[5];
+    }
+};
+
+// Auto-update all item rows when Place of Supply changes
+window.updateAllItemsTaxForPlaceOfSupply = function(pos) {
+    if (!currentOrder || !currentOrder.items) return;
+    const normPos = (pos || document.getElementById('soPlaceOfSupplyInput')?.value || 'KA').toUpperCase();
+    currentOrder.place_of_supply = normPos;
+
+    currentOrder.items.forEach(it => {
+        const prod = allCrmProducts.find(p => p.product_id == it.product_id);
+        const ratePct = prod ? (parseFloat(prod.gst_rate) || 5) : (parseFloat(it.tax_rate) || 5);
+        const resolved = window.resolveTaxForState(ratePct, normPos);
+        it.tax_id = resolved.id;
+        it.tax_name = resolved.name;
+        it.tax_rate = resolved.rate;
+    });
+
+    if (typeof window.populateShippingTaxDropdown === 'function') {
+        window.populateShippingTaxDropdown();
+    }
+    renderZohoLineItems();
+};
+
 // Function to populate line items dynamically into the Zoho grid
 window.renderZohoLineItems = function() {
     const tbody = document.getElementById('zohoItemGridBody');
@@ -937,8 +1099,9 @@ window.renderZohoLineItems = function() {
     if (items.length === 0) {
         // Automatically add one blank line
         items.push({
-            product_id: 14,
+            product_id: '',
             product_name: '',
+            name: '',
             rate: 0,
             quantity: 1,
             tax_rate: 0,
@@ -948,9 +1111,22 @@ window.renderZohoLineItems = function() {
     }
 
     const taxes = zohoSoMeta?.taxes || [];
+    const currentPos = (document.getElementById('soPlaceOfSupplyInput')?.value || currentOrder?.place_of_supply || 'KA').toUpperCase();
+    const isIntraState = (currentPos === 'KA');
+    const statePrefix = isIntraState ? 'GST' : 'IGST';
 
     tbody.innerHTML = items.map((it, idx) => {
         const itemAmount = (parseFloat(it.rate) || 0) * (parseFloat(it.quantity) || 1);
+
+        // If item doesn't have tax resolved yet, resolve it automatically from product or default
+        if (!it.tax_id || !it.tax_rate) {
+            const prod = allCrmProducts.find(p => p.product_id == it.product_id || (it.name && p.name && p.name.toLowerCase() === it.name.toLowerCase()));
+            const prodRate = prod ? (parseFloat(prod.gst_rate) || 5) : 5;
+            const resolved = window.resolveTaxForState(prodRate, currentPos);
+            it.tax_rate = resolved.rate;
+            it.tax_name = resolved.name;
+            it.tax_id = resolved.id;
+        }
 
         // Build product dropdown options
         let productOptions = `<option value="">Type or click to select an item...</option>`;
@@ -959,11 +1135,13 @@ window.renderZohoLineItems = function() {
             productOptions += `<option value="${p.product_id}" data-rate="${p.selling_price || 0}" data-sku="${p.sku || ''}" ${isSel ? 'selected' : ''}>${p.name}</option>`;
         });
 
-        // Build tax dropdown options
+        // Build tax dropdown options tailored to current Place of Supply (Intra GST vs Inter IGST)
         let taxOptions = `<option value="0" data-id="" data-name="">Select a Tax</option>`;
-        taxes.forEach(t => {
-            const isSel = (it.tax_id && it.tax_id === t.id) || (it.tax_name && it.tax_name === t.name);
-            taxOptions += `<option value="${t.rate}" data-id="${t.id}" data-name="${t.name}" ${isSel ? 'selected' : ''}>${t.name} [${t.rate}%]</option>`;
+        const rates = [0, 5, 12, 18, 28, 40];
+        rates.forEach(r => {
+            const taxObj = window.resolveTaxForState(r, currentPos);
+            const isSel = (it.tax_id && it.tax_id === taxObj.id) || (it.tax_name && it.tax_name === taxObj.name) || (parseFloat(it.tax_rate) === r);
+            taxOptions += `<option value="${r}" data-id="${taxObj.id}" data-name="${taxObj.name}" ${isSel ? 'selected' : ''}>${taxObj.name} [${r}%]</option>`;
         });
 
         return `
@@ -985,7 +1163,7 @@ window.renderZohoLineItems = function() {
                         ${taxOptions}
                     </select>
                 </td>
-                <td style="padding: 0.85rem 1rem; text-align: right; font-weight: 800; color: #0f172a; font-size: 0.95rem;">
+                <td style="padding: 0.85rem 1rem; text-align: right; font-weight: 800; color: #0f172a; font-size: 0.95rem;" id="zohoItemAmount_${idx}">
                     ₹${itemAmount.toFixed(2)}
                 </td>
                 <td style="padding: 0.85rem 0.5rem; text-align: center;">
@@ -1015,20 +1193,46 @@ window.onZohoProductSelected = function(idx, selectEl) {
     currentOrder.items[idx].rate = rate;
     currentOrder.items[idx].price = rate;
 
+    // Auto resolve GST based on product gst_rate & Place of Supply
+    const prod = allCrmProducts.find(p => p.product_id == prodId);
+    const prodGstRate = prod ? (parseFloat(prod.gst_rate) || 5) : 5;
+    const pos = document.getElementById('soPlaceOfSupplyInput')?.value || currentOrder?.place_of_supply || 'KA';
+    const taxMatch = window.resolveTaxForState(prodGstRate, pos);
+
+    currentOrder.items[idx].tax_rate = taxMatch.rate;
+    currentOrder.items[idx].tax_id = taxMatch.id;
+    currentOrder.items[idx].tax_name = taxMatch.name;
+
     renderZohoLineItems();
 };
 
 window.onZohoItemQtyChange = function(idx, val) {
-    if (!currentOrder.items[idx]) return;
-    currentOrder.items[idx].quantity = parseFloat(val) || 1;
-    renderZohoLineItems();
+    if (!currentOrder || !currentOrder.items || !currentOrder.items[idx]) return;
+    const qty = parseFloat(val) || 0;
+    currentOrder.items[idx].quantity = qty;
+    
+    // Update line amount display without re-rendering entire table (so cursor/focus stays)
+    const rate = parseFloat(currentOrder.items[idx].rate) || 0;
+    const amtEl = document.getElementById(`zohoItemAmount_${idx}`);
+    if (amtEl) {
+        amtEl.innerText = `₹${(qty * rate).toFixed(2)}`;
+    }
+    recalculateZohoTotals();
 };
 
 window.onZohoItemRateChange = function(idx, val) {
-    if (!currentOrder.items[idx]) return;
-    currentOrder.items[idx].rate = parseFloat(val) || 0;
-    currentOrder.items[idx].price = parseFloat(val) || 0;
-    renderZohoLineItems();
+    if (!currentOrder || !currentOrder.items || !currentOrder.items[idx]) return;
+    const rate = parseFloat(val) || 0;
+    currentOrder.items[idx].rate = rate;
+    currentOrder.items[idx].price = rate;
+
+    // Update line amount display without re-rendering entire table (so cursor/focus stays)
+    const qty = parseFloat(currentOrder.items[idx].quantity) || 1;
+    const amtEl = document.getElementById(`zohoItemAmount_${idx}`);
+    if (amtEl) {
+        amtEl.innerText = `₹${(qty * rate).toFixed(2)}`;
+    }
+    recalculateZohoTotals();
 };
 
 window.onZohoItemTaxChange = function(idx, selectEl) {
@@ -1044,8 +1248,9 @@ window.addNewZohoItemRow = function() {
     if (!currentOrder) return;
     currentOrder.items = currentOrder.items || [];
     currentOrder.items.push({
-        product_id: 14,
+        product_id: '',
         product_name: '',
+        name: '',
         rate: 0,
         quantity: 1,
         tax_rate: 0,
@@ -1080,8 +1285,78 @@ window.recalculateZohoTotals = function(manualRoundoff = false) {
 
     const shippingCharge = parseFloat(document.getElementById('soShippingCharges')?.value) || 0;
     
-    // Raw total before roundoff
-    const rawTotal = subtotal - discountAmount + shippingCharge;
+    // Toggle Shipping Charge Tax & SAC visibility based on whether Shipping Charges > 0
+    const shipTaxRow = document.getElementById('soShippingTaxRow');
+    const shipSacRow = document.getElementById('soShippingSacRow');
+    if (shipTaxRow) {
+        shipTaxRow.style.display = shippingCharge > 0 ? 'flex' : 'none';
+    }
+    if (shipSacRow) {
+        const currentShipTax = parseFloat(document.getElementById('soShippingTaxSelect')?.value) || 0;
+        shipSacRow.style.display = (shippingCharge > 0 && currentShipTax > 0) ? 'flex' : 'none';
+    }
+    
+    // Place of Supply & Tax Calculations
+    const pos = (document.getElementById('soPlaceOfSupplyInput')?.value || currentOrder?.place_of_supply || 'KA').toUpperCase();
+    const isIntraState = (pos === 'KA');
+    const taxBuckets = {};
+    let totalTax = 0;
+
+    items.forEach(it => {
+        const itemLineTotal = (parseFloat(it.rate) || 0) * (parseFloat(it.quantity) || 1);
+        const taxPct = parseFloat(it.tax_rate) || 0;
+        if (taxPct > 0) {
+            const lineTax = (itemLineTotal * taxPct) / 100;
+            taxBuckets[taxPct] = (taxBuckets[taxPct] || 0) + lineTax;
+            totalTax += lineTax;
+        }
+    });
+
+    // Shipping Charge Tax Calculation
+    const shippingTaxSelect = document.getElementById('soShippingTaxSelect');
+    const shippingTaxRate = parseFloat(shippingTaxSelect?.value) || 0;
+
+    if (shippingCharge > 0 && shippingTaxRate > 0) {
+        const shipTaxAmount = (shippingCharge * shippingTaxRate) / 100;
+        taxBuckets[shippingTaxRate] = (taxBuckets[shippingTaxRate] || 0) + shipTaxAmount;
+        totalTax += shipTaxAmount;
+    }
+
+    // Render dynamic tax rows in SO modal
+    let taxContainer = document.getElementById('soDynamicGstRows');
+    if (taxContainer) {
+        let taxRowsHtml = '';
+        Object.keys(taxBuckets).forEach(pctStr => {
+            const pct = parseFloat(pctStr);
+            const amt = taxBuckets[pct];
+            if (isIntraState) {
+                const halfPct = pct / 2;
+                const halfAmt = amt / 2;
+                taxRowsHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: #475569;">
+                        <span>CGST${halfPct} (${halfPct}%)</span>
+                        <span style="font-weight: 700; color: #0f172a;">₹${halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: #475569;">
+                        <span>SGST${halfPct} (${halfPct}%)</span>
+                        <span style="font-weight: 700; color: #0f172a;">₹${halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                `;
+            } else {
+                taxRowsHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: #475569;">
+                        <span>IGST${pct} [${pct}%]</span>
+                        <span style="font-weight: 700; color: #0f172a;">₹${amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                `;
+            }
+        });
+        taxContainer.innerHTML = taxRowsHtml;
+        taxContainer.style.display = taxRowsHtml ? 'flex' : 'none';
+    }
+
+    // Raw total with GST
+    const rawTotal = (subtotal - discountAmount) + shippingCharge + totalTax;
     
     let roundoff = 0;
     const roundoffEl = document.getElementById('soRoundoffInput');
@@ -1120,9 +1395,55 @@ window.repopulateSoDropdowns = function() {
         ).join('');
     }
 
+    // Populate shipping tax select
+    window.populateShippingTaxDropdown();
+
     // Call renderZohoLineItems once dropdowns and meta are ready
     renderZohoLineItems();
 };
+
+window.populateShippingTaxDropdown = function() {
+    const selectEl = document.getElementById('soShippingTaxSelect');
+    if (!selectEl) return;
+
+    const pos = (document.getElementById('soPlaceOfSupplyInput')?.value || currentOrder?.place_of_supply || 'KA').toUpperCase();
+    const isIntra = (pos === 'KA');
+    const prefix = isIntra ? 'GST' : 'IGST';
+
+    const savedRate = currentOrder?.shipping_charge_tax_rate !== undefined ? currentOrder.shipping_charge_tax_rate : null;
+    const currentVal = (savedRate !== null && savedRate !== undefined) ? savedRate : (selectEl.value || '0');
+    const rates = [0, 5, 12, 18, 28];
+
+    let html = '<option value="0" data-id="" data-name="">Select a Tax</option>';
+    rates.forEach(r => {
+        const taxObj = window.resolveTaxForState(r, pos);
+        const isSel = (currentVal == r);
+        html += `<option value="${r}" data-id="${taxObj.id}" data-name="${taxObj.name}" ${isSel ? 'selected' : ''}>${taxObj.name} [${r}%]</option>`;
+    });
+
+    selectEl.innerHTML = html;
+};
+
+window.onShippingTaxChange = function(taxRate) {
+    const selectEl = document.getElementById('soShippingTaxSelect');
+    const sacRow = document.getElementById('soShippingSacRow');
+    const rate = parseFloat(taxRate) || 0;
+
+    if (sacRow) {
+        sacRow.style.display = rate > 0 ? 'flex' : 'none';
+    }
+
+    if (currentOrder) {
+        const opt = selectEl ? selectEl.options[selectEl.selectedIndex] : null;
+        currentOrder.shipping_charge_tax_rate = rate;
+        currentOrder.shipping_charge_tax_id = opt?.dataset.id || '';
+        currentOrder.shipping_charge_tax_name = opt?.dataset.name || '';
+        currentOrder.shipping_charge_sac_code = document.getElementById('soShippingSacInput')?.value || '996811';
+    }
+
+    recalculateZohoTotals();
+};
+
 
 window.refreshSoNumber = async function() {
     try {
@@ -1156,19 +1477,28 @@ window.submitZohoSalesOrder = async function(isDraft = false) {
         delivery_method: document.getElementById('soDeliveryMethodInput')?.value,
         salesperson_name: document.getElementById('soSalespersonInput')?.value,
         contact_phone: document.getElementById('soContactPhoneInput')?.value?.trim(),
+        place_of_supply: document.getElementById('soPlaceOfSupplyInput')?.value || currentOrder?.place_of_supply || 'KA',
+        billing_address: currentOrder?.billing_address || {},
+        shipping_address: currentOrder?.shipping_address || currentOrder?.billing_address || {},
+        gst_treatment: currentOrder?.gst_treatment || 'consumer',
         notes: document.getElementById('soCustomerNotes')?.value?.trim(),
         terms: document.getElementById('soTermsConditions')?.value?.trim(),
         discount: parseFloat(document.getElementById('soDiscountValue')?.value) || 0,
         shipping_charge: parseFloat(document.getElementById('soShippingCharges')?.value) || 0,
+        shipping_charge_tax_id: document.getElementById('soShippingTaxSelect')?.selectedOptions?.[0]?.dataset.id || undefined,
+        shipping_charge_sac_code: document.getElementById('soShippingSacInput')?.value || undefined,
         adjustment: parseFloat(document.getElementById('soRoundoffInput')?.value) || 0,
-        items: (currentOrder.items || []).map(i => ({
-            product_id: i.product_id,
-            product_name: i.product_name || i.name,
-            name: i.product_name || i.name,
-            rate: parseFloat(i.rate || i.price) || 0,
-            quantity: parseFloat(i.quantity) || 1,
-            tax_id: i.tax_id || undefined
-        }))
+        items: (currentOrder.items || [])
+            .filter(i => (i.product_name || i.name || i.description || '').trim().length > 0)
+            .map(i => ({
+                product_id: i.product_id,
+                product_name: i.product_name || i.name,
+                name: i.product_name || i.name,
+                description: i.description || '',
+                rate: parseFloat(i.rate || i.price) || 0,
+                quantity: parseFloat(i.quantity) || 1,
+                tax_id: i.tax_id || undefined
+            }))
     };
 
     try {
@@ -1350,6 +1680,67 @@ window.openDirectSalesOrderModal = async function() {
                     </div>
                 </div>
 
+                <!-- Live Address Display (Zoho 1:1) -->
+                <div id="soDirectAddressContainer" style="display: none; margin-left: 170px; padding-left: 2rem; margin-top: -0.5rem; margin-bottom: 0.5rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem;">
+                        <!-- Billing Address -->
+                        <div>
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-file-invoice" style="color: #3b82f6;"></i> BILLING ADDRESS
+                            </div>
+                            <div id="soDirectBillingAddressText" style="font-size: 0.85rem; color: #1e293b; line-height: 1.5;">-</div>
+                        </div>
+                        <!-- Shipping Address -->
+                        <div>
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-truck" style="color: #10b981;"></i> SHIPPING ADDRESS
+                            </div>
+                            <div id="soDirectShippingAddressText" style="font-size: 0.85rem; color: #1e293b; line-height: 1.5;">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Place of Supply (Zoho 1:1) -->
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Place of Supply *</label>
+                    <div style="flex: 1; max-width: 420px;">
+                        <select id="soPlaceOfSupplyInput" onchange="updateAllItemsTaxForPlaceOfSupply(this.value)" style="width: 100%; padding: 0.55rem 0.85rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: #0f172a; outline: none; background: white;">
+                            <option value="AP">[AP] - Andhra Pradesh</option>
+                            <option value="AR">[AR] - Arunachal Pradesh</option>
+                            <option value="AS">[AS] - Assam</option>
+                            <option value="BR">[BR] - Bihar</option>
+                            <option value="CG">[CG] - Chhattisgarh</option>
+                            <option value="GA">[GA] - Goa</option>
+                            <option value="GJ">[GJ] - Gujarat</option>
+                            <option value="HR">[HR] - Haryana</option>
+                            <option value="HP">[HP] - Himachal Pradesh</option>
+                            <option value="JH">[JH] - Jharkhand</option>
+                            <option value="KA" selected>[KA] - Karnataka</option>
+                            <option value="KL">[KL] - Kerala</option>
+                            <option value="MP">[MP] - Madhya Pradesh</option>
+                            <option value="MH">[MH] - Maharashtra</option>
+                            <option value="MN">[MN] - Manipur</option>
+                            <option value="ML">[ML] - Meghalaya</option>
+                            <option value="MZ">[MZ] - Mizoram</option>
+                            <option value="NL">[NL] - Nagaland</option>
+                            <option value="OR">[OR] - Odisha</option>
+                            <option value="PB">[PB] - Punjab</option>
+                            <option value="RJ">[RJ] - Rajasthan</option>
+                            <option value="SK">[SK] - Sikkim</option>
+                            <option value="TN">[TN] - Tamil Nadu</option>
+                            <option value="TG">[TG] - Telangana</option>
+                            <option value="TR">[TR] - Tripura</option>
+                            <option value="UP">[UP] - Uttar Pradesh</option>
+                            <option value="UK">[UK] - Uttarakhand</option>
+                            <option value="WB">[WB] - West Bengal</option>
+                            <option value="DL">[DL] - Delhi</option>
+                            <option value="JK">[JK] - Jammu & Kashmir</option>
+                            <option value="LA">[LA] - Ladakh</option>
+                            <option value="PY">[PY] - Puducherry</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Sales Order# -->
                 <div style="display: flex; align-items: center; gap: 2rem;">
                     <label style="width: 170px; font-weight: 700; font-size: 0.85rem; color: #ef4444;">Sales Order# *</label>
@@ -1505,6 +1896,26 @@ window.openDirectSalesOrderModal = async function() {
                         </div>
                     </div>
 
+                    <!-- Shipping Charge Tax Selector (Shown only when Shipping Charges > 0) -->
+                    <div id="soShippingTaxRow" style="display: none; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                        <span style="font-weight: 600; color: #64748b; font-size: 0.82rem;">Shipping Charge Tax</span>
+                        <select id="soShippingTaxSelect" onchange="onShippingTaxChange(this.value)" style="width: 140px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 600; background: white; outline: none;">
+                            <option value="0">Select a Tax</option>
+                            <!-- Dynamically loaded -->
+                        </select>
+                    </div>
+
+                    <!-- Shipping Charges SAC -->
+                    <div id="soShippingSacRow" style="display: none; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                        <span style="font-weight: 700; color: #dc2626; font-size: 0.82rem;">Shipping Charges SAC*</span>
+                        <input type="text" id="soShippingSacInput" value="996811" style="width: 140px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 700; color: #0f172a; text-align: left; outline: none;">
+                    </div>
+
+                    <!-- Dynamic GST Rows (CGST/SGST or IGST [5%]) -->
+                    <div id="soDynamicGstRows" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed #cbd5e1; border-bottom: 1px dashed #cbd5e1; padding: 0.65rem 0;">
+                        <!-- Injected by recalculateZohoTotals() -->
+                    </div>
+
                     <!-- TDS / TCS Radio Selector -->
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;">
                         <div style="display: flex; gap: 1rem; align-items: center;">
@@ -1637,18 +2048,72 @@ window.selectDirectCustomer = function(c) {
     const drop = document.getElementById('directCustomerDropdown');
     const badge = document.getElementById('directSelectedCustomerBadge');
     const phoneInput = document.getElementById('soContactPhoneInput');
+    const addrContainer = document.getElementById('soDirectAddressContainer');
+    const billAddrText = document.getElementById('soDirectBillingAddressText');
+    const shipAddrText = document.getElementById('soDirectShippingAddressText');
+    const posSelect = document.getElementById('soPlaceOfSupplyInput');
 
     if (searchInput) searchInput.value = c.name || c.company_name;
     if (drop) drop.style.display = 'none';
 
+    const b = c.billing_address || {};
+    const s = c.shipping_address || b;
+
     if (currentOrder) {
         currentOrder.customer_name = c.name || c.company_name;
         currentOrder.zoho_contact_id = c.zoho_contact_id || null;
-        currentOrder.phone = c.phone || '';
+        currentOrder.phone = c.phone || b.phone || '';
+        currentOrder.billing_address = b;
+        currentOrder.shipping_address = s;
+        currentOrder.place_of_supply = c.place_of_supply || 'KA';
+        currentOrder.gst_treatment = c.gst_treatment || 'consumer';
     }
 
-    if (phoneInput && c.phone) {
-        phoneInput.value = c.phone;
+    if (phoneInput && (c.phone || b.phone)) {
+        phoneInput.value = c.phone || b.phone;
+    }
+
+    // Set Place of Supply
+    if (posSelect) {
+        const targetPos = (c.place_of_supply || 'KA').toUpperCase();
+        posSelect.value = targetPos;
+        // If not found directly, try finding option by state name
+        if (!posSelect.value && b.state) {
+            for (let opt of posSelect.options) {
+                if (opt.text.toLowerCase().includes(b.state.toLowerCase())) {
+                    posSelect.value = opt.value;
+                    break;
+                }
+            }
+        }
+        if (typeof window.updateAllItemsTaxForPlaceOfSupply === 'function') {
+            window.updateAllItemsTaxForPlaceOfSupply(posSelect.value || targetPos);
+        }
+    }
+
+    // Populate Address Cards
+    if (addrContainer && billAddrText && shipAddrText) {
+        const bLines = [
+            b.attention || c.name || '',
+            b.address || '',
+            b.street2 || '',
+            [b.city, b.state, b.zip || b.pincode].filter(Boolean).join(', '),
+            b.country || 'India',
+            (b.phone || c.phone) ? ('Phone: ' + (b.phone || c.phone)) : ''
+        ].filter(Boolean);
+
+        const sLines = [
+            s.attention || c.name || '',
+            s.address || '',
+            s.street2 || '',
+            [s.city, s.state, s.zip || s.pincode].filter(Boolean).join(', '),
+            s.country || 'India',
+            (s.phone || c.phone) ? ('Phone: ' + (s.phone || c.phone)) : ''
+        ].filter(Boolean);
+
+        billAddrText.innerHTML = bLines.length > 0 ? bLines.join('<br>') : '<em style="color:#94a3b8;">No billing address on file</em>';
+        shipAddrText.innerHTML = sLines.length > 0 ? sLines.join('<br>') : '<em style="color:#94a3b8;">No shipping address on file</em>';
+        addrContainer.style.display = 'block';
     }
 
     if (badge) {
@@ -1657,6 +2122,7 @@ window.selectDirectCustomer = function(c) {
             <div style="display: inline-flex; align-items: center; gap: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; color: #166534; font-weight: 600;">
                 <i class="fa-solid fa-circle-check" style="color: #10b981;"></i>
                 Selected: <strong>${c.name}</strong> ${c.zoho_contact_id ? `(Zoho ID: ${c.zoho_contact_id})` : '(Local Dealer)'}
+                ${c.gst_treatment ? `<span style="margin-left: 6px; padding: 1px 6px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 0.72rem; text-transform: uppercase;">${c.gst_treatment}</span>` : ''}
             </div>
         `;
     }
@@ -1713,20 +2179,29 @@ window.submitDirectSalesOrder = async function(isDraft = false) {
         delivery_method: document.getElementById('soDeliveryMethodInput')?.value,
         salesperson_name: document.getElementById('soSalespersonInput')?.value,
         contact_phone: document.getElementById('soContactPhoneInput')?.value?.trim(),
+        place_of_supply: document.getElementById('soPlaceOfSupplyInput')?.value || currentOrder?.place_of_supply || 'KA',
+        billing_address: currentOrder?.billing_address || {},
+        shipping_address: currentOrder?.shipping_address || currentOrder?.billing_address || {},
+        gst_treatment: currentOrder?.gst_treatment || 'consumer',
         notes: document.getElementById('soCustomerNotes')?.value?.trim(),
         terms: document.getElementById('soTermsConditions')?.value?.trim(),
         discount: parseFloat(document.getElementById('soDiscountValue')?.value) || 0,
         shipping_charge: parseFloat(document.getElementById('soShippingCharges')?.value) || 0,
+        shipping_charge_tax_id: document.getElementById('soShippingTaxSelect')?.selectedOptions?.[0]?.dataset.id || undefined,
+        shipping_charge_sac_code: document.getElementById('soShippingSacInput')?.value || undefined,
         adjustment: parseFloat(document.getElementById('soRoundoffInput')?.value) || 0,
         advance_amount: parseFloat(document.getElementById('soDirectAdvancePaid')?.value) || 0,
-        items: (currentOrder.items || []).map(i => ({
-            product_id: i.product_id,
-            product_name: i.product_name || i.name,
-            name: i.product_name || i.name,
-            rate: parseFloat(i.rate || i.price) || 0,
-            quantity: parseFloat(i.quantity) || 1,
-            tax_id: i.tax_id || undefined
-        }))
+        items: (currentOrder.items || [])
+            .filter(i => (i.product_name || i.name || i.description || '').trim().length > 0)
+            .map(i => ({
+                product_id: i.product_id,
+                product_name: i.product_name || i.name,
+                name: i.product_name || i.name,
+                description: i.description || '',
+                rate: parseFloat(i.rate || i.price) || 0,
+                quantity: parseFloat(i.quantity) || 1,
+                tax_id: i.tax_id || undefined
+            }))
     };
 
     try {
@@ -1865,7 +2340,7 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
     const zSo = payload.zoho_salesorder;
     const crmOrder = payload.order;
 
-    const soNumber = zSo?.salesorder_number || crmOrder?.sales_order_number || ('SO-' + crmOrder?.order_id);
+    const soNumber = zSo?.salesorder_number || crmOrder?.sales_order_number || (crmOrder?.order_id ? ('SO-' + crmOrder.order_id) : 'N/A');
     const orderId = crmOrder?.order_id || null;
     const customerName = zSo?.customer_name || crmOrder?.customer_name || 'Customer';
     const soDate = zSo?.date || (crmOrder?.created_at ? new Date(crmOrder.created_at).toISOString().split('T')[0] : 'N/A');
@@ -1875,6 +2350,11 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
     const subTotal = parseFloat(zSo?.sub_total || totalAmount);
     const discount = parseFloat(zSo?.discount_amount || crmOrder?.discount || 0);
     const roundOff = parseFloat(zSo?.adjustment || 0);
+
+    // Shipping & Quantity Calculation (Zoho 1:1)
+    const shippingCharge = parseFloat(zSo?.shipping_charge || crmOrder?.shipping_charges || 0);
+    const shippingTaxName = zSo?.shipping_charge_tax_name || (shippingCharge > 0 ? (zSo?.place_of_supply === 'KA' ? 'GST18 (18%)' : 'IGST18 (18%)') : '');
+    const totalQty = zSo?.total_quantity || (zSo?.line_items || payload.items || []).reduce((sum, it) => sum + (parseFloat(it.quantity) || 0), 0);
 
     // Address rendering
     const bAddr = zSo?.billing_address || {};
@@ -1955,6 +2435,12 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
                 
                 <!-- Action Controls Group (Exact Marked Place) -->
                 <div style="display: flex; gap: 0.45rem; align-items: center; position: relative;">
+                    ${!zSo ? `
+                        <!-- Retry Sync Button if not yet synced with Zoho -->
+                        <button type="button" class="btn-billing" style="background: #eff6ff; border: 1.5px solid #3b82f6; color: #1d4ed8; font-size: 0.8rem; padding: 0.45rem 0.85rem; font-weight: 800; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="syncCurrentSalesOrderToZoho('${soNumber}')">
+                            <i class="fa-solid fa-cloud-arrow-up" style="color: #2563eb;"></i> Sync to Zoho
+                        </button>
+                    ` : ''}
                     
                     <!-- 1. Edit Button -->
                     <button type="button" class="btn-billing" style="background: white; border: 1px solid #cbd5e1; color: #1e293b; font-size: 0.8rem; padding: 0.45rem 0.85rem; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="editCurrentSalesOrder('${soNumber}')">
@@ -1973,7 +2459,7 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
                                 <i class="fa-solid fa-file-invoice"></i> Convert ▾
                             </button>
                             <div id="soConvertDropdownMenu" style="display: none; position: absolute; right: 0; top: 38px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); width: 190px; z-index: 10000; overflow: hidden; font-size: 0.85rem;">
-                                <button type="button" onclick="openOrderBilling(${orderId})" style="width: 100%; text-align: left; padding: 0.7rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
+                                <button type="button" onclick="openZohoInvoiceWorkstation('${soNumber}')" style="width: 100%; text-align: left; padding: 0.7rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
                                     <i class="fa-solid fa-file-invoice" style="color: #2563eb;"></i> Convert to Invoice
                                 </button>
                                 <button type="button" onclick="fulfillCurrentSalesOrder('${soNumber}')" style="width: 100%; text-align: left; padding: 0.7rem 1rem; border: none; background: white; color: #1e293b; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
@@ -2123,18 +2609,33 @@ window.renderZohoSoDetailsWorkstation = function(payload) {
                 <div style="display: flex; justify-content: flex-end; margin-bottom: 3rem;">
                     <div style="width: 380px; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
                         
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: 600; color: #475569;">Sub Total</span>
+                        <!-- Sub Total & Total Quantity -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <span style="font-weight: 600; color: #475569;">Sub Total</span>
+                                <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Total Quantity : ${totalQty}</div>
+                            </div>
                             <span style="font-weight: 800; color: #0f172a;">₹${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
-                        ${discount > 0 ? `
-                            <div style="display: flex; justify-content: space-between; align-items: center; color: #dc2626;">
-                                <span style="font-weight: 600;">Discount</span>
-                                <span style="font-weight: 700;">- ₹${discount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <!-- Shipping Charges & Applied Tax Name (Zoho 1:1) -->
+                        ${shippingCharge > 0 ? `
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; color: #475569;">
+                                <div>
+                                    <span style="font-weight: 600;">Shipping Charges</span>
+                                    ${shippingTaxName ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">( ${shippingTaxName} )</div>` : ''}
+                                </div>
+                                <span style="font-weight: 700; color: #0f172a;">₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         ` : ''}
 
+                        <!-- Discount (Always show like Zoho 1:1) -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                            <span style="font-weight: 600;">Discount</span>
+                            <span style="font-weight: 700; color: ${discount > 0 ? '#dc2626' : '#475569'};">- ₹${discount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <!-- Item Taxes & Shipping GST Lines -->
                         ${taxesList.map(t => `
                             <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
                                 <span style="font-weight: 600;">${t.tax_name}</span>
@@ -2226,7 +2727,8 @@ async function generateFinalInvoice() {
 
 async function loadInvoices() {
     const tbody = document.getElementById('invoicesBody');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
 
     try {
         const res = await fetch(`${BILLING_API_URL}/invoices`, {
@@ -2234,30 +2736,90 @@ async function loadInvoices() {
         });
         const invoices = await res.json();
 
-        tbody.innerHTML = invoices.map(inv => `
-            <tr>
-                <td style="font-weight: 800; color: var(--billing-primary);">${inv.invoice_number}</td>
-                <td>${window.formatOrderId(inv.order_id, inv.created_at)}</td>
-                <td style="font-weight: 600;">${inv.order_customer}</td>
-                <td>${new Date(inv.created_at).toLocaleDateString()}</td>
-                <td style="font-weight: 700;">₹${parseFloat(inv.total_amount).toLocaleString()}</td>
-                <td><span class="status-badge status-${inv.invoice_status}">${inv.invoice_status}</span></td>
+        if (!Array.isArray(invoices) || invoices.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem; color: #64748b;">No invoices found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = invoices.map(inv => {
+            const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : (inv.created_time ? new Date(inv.created_time).toLocaleDateString('en-GB') : '—');
+            const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
+            const totalAmt = parseFloat(inv.total || inv.total_amount || 0);
+            const balanceDue = parseFloat(inv.balance !== undefined ? inv.balance : (inv.balance_due !== undefined ? inv.balance_due : totalAmt));
+            
+            // Format status badge matching Zoho Books (Paid, Partially Paid, Overdue, Draft, Sent)
+            const st = (inv.status || inv.invoice_status || 'draft').toLowerCase();
+            let statusBadge = '<span class="status-badge" style="background:#f1f5f9; color:#475569; font-weight:700;">' + st.toUpperCase() + '</span>';
+            if (st === 'paid') {
+                statusBadge = '<span class="status-badge" style="background:#dcfce7; color:#15803d; font-weight:700;">PAID</span>';
+            } else if (st === 'partially_paid') {
+                statusBadge = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">PARTIALLY PAID</span>';
+            } else if (st === 'overdue') {
+                statusBadge = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
+            } else if (st === 'sent') {
+                statusBadge = '<span class="status-badge" style="background:#eff6ff; color:#2563eb; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
+            } else if (st === 'draft') {
+                statusBadge = '<span class="status-badge" style="background:#fef3c7; color:#b45309; font-weight:700;">DRAFT</span>';
+            }
+
+            const invIdParam = inv.zoho_invoice_id || inv.invoice_id;
+
+            return `
+            <tr style="transition: background 0.15s ease;">
+                <!-- 1. DATE -->
+                <td style="color: #64748b; font-weight: 500; white-space: nowrap;">${invDate}</td>
+
+                <!-- 2. INVOICE# -->
+                <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="openZohoInvoicePdf('${invIdParam}')" title="View Official PDF">
+                    <span style="text-decoration: underline; text-underline-offset: 3px;">${inv.invoice_number || '—'}</span>
+                </td>
+
+                <!-- 3. ORDER NUMBER -->
+                <td style="font-weight: 600; color: #0f172a;">
+                    ${inv.salesorder_number && inv.salesorder_number !== '—' ? 
+                        `<span style="background: #f1f5f9; color: #334155; padding: 2px 7px; border-radius: 5px; font-size: 0.8rem; font-weight: 700; font-family: monospace; cursor: pointer;" onclick="if(typeof openZohoSoDetails === 'function') openZohoSoDetails('${inv.salesorder_number}')" title="Click to view Sales Order">${inv.salesorder_number}</span>` : 
+                        '<span style="color:#94a3b8;">—</span>'}
+                </td>
+
+                <!-- 4. CUSTOMER NAME -->
+                <td style="font-weight: 600; color: #0f172a;">${inv.customer_name || 'Customer'}</td>
+
+                <!-- 5. STATUS -->
+                <td>${statusBadge}</td>
+
+                <!-- 6. DUE DATE -->
+                <td style="color: #475569; font-size: 0.82rem; white-space: nowrap;">
+                    <div>${dueDate}</div>
+                    ${inv.due_days && st !== 'overdue' && st !== 'paid' ? `<div style="font-size: 0.72rem; color: #64748b;">${inv.due_days}</div>` : ''}
+                </td>
+
+                <!-- 7. AMOUNT -->
+                <td style="font-weight: 800; color: #0f172a; white-space: nowrap;">
+                    ₹${totalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+
+                <!-- 8. BALANCE DUE -->
+                <td style="font-weight: 800; color: ${balanceDue > 0 ? '#b91c1c' : '#15803d'}; white-space: nowrap;">
+                    ₹${balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+
+                <!-- 9. ACTIONS -->
                 <td>
-                    ${inv.invoice_status === 'draft' ?
-                `<div style="display:flex; gap:0.4rem; align-items:center;">
-                            <button class="btn-billing success" style="width: auto; padding: 0.5rem 0.85rem;" onclick="finalizeInvoice(${inv.invoice_id})">Finalize</button>
-                            <button class="btn-billing" style="width: auto; padding: 0.5rem 0.75rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer;" title="Hard Delete Invoice from DB" onclick="hardDeleteInvoice(${inv.invoice_id}, '${inv.invoice_number}')"><i class="fas fa-trash-alt"></i></button>
-                          </div>` :
-                `<div style="display:flex; gap:0.4rem; align-items:center;">
-                            <button class="btn-billing primary" style="width: auto; padding: 0.5rem 0.75rem;" title="View Invoice" onclick="viewInvoice(${inv.invoice_id})"><i class="fas fa-eye"></i></button>
-                            <button class="btn-billing success" style="width: auto; padding: 0.5rem 0.75rem;" title="Print/Download" onclick="printInvoice(${inv.invoice_id})"><i class="fas fa-print"></i></button>
-                            <button class="btn-billing" style="width: auto; padding: 0.5rem 0.75rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer;" title="Hard Delete Invoice from DB" onclick="hardDeleteInvoice(${inv.invoice_id}, '${inv.invoice_number}')"><i class="fas fa-trash-alt"></i></button>
-                          </div>`}
+                    <div style="display:flex; gap: 0.4rem; align-items:center;">
+                        <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem;" title="View / Print PDF" onclick="openZohoInvoicePdf('${invIdParam}')">
+                            <i class="fas fa-file-pdf"></i>
+                        </button>
+                        <button class="btn-billing" style="width: auto; padding: 0.4rem 0.65rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer; font-size: 0.78rem;" title="Delete Invoice from Zoho Books & DB" onclick="hardDeleteInvoiceBoth('${invIdParam}', '${inv.invoice_number}')">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
     } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #ef4444;">Error loading invoices.</td></tr>';
+        console.error('Error in loadInvoices:', err);
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444; padding: 2rem;">Error loading invoices: ' + (err.message || 'Server error') + '</td></tr>';
     }
 }
 
@@ -2409,9 +2971,17 @@ function printInvoice(invoiceId) {
 
 function setupSearch() {
     const searchInput = document.getElementById('globalSearch');
-    if (searchInput) {
-        searchInput.oninput = (e) => {
-        };
+    if (!searchInput) return;
+
+    // Check if the page already defined its own oninput (e.g. sales-orders.html, invoices.html, pending.html)
+    if (typeof filterOrdersTable === 'function') {
+        searchInput.oninput = (e) => filterOrdersTable(e.target.value);
+    } else if (typeof filterInvoicesTable === 'function') {
+        searchInput.oninput = (e) => filterInvoicesTable(e.target.value);
+    } else if (typeof filterPaymentsTable === 'function') {
+        searchInput.oninput = (e) => filterPaymentsTable(e.target.value);
+    } else if (typeof applyPendingFilters === 'function') {
+        searchInput.oninput = () => applyPendingFilters();
     }
 }
 
@@ -3140,6 +3710,211 @@ window.loadPendingOrders = async function() {
     }
 };
 
+
+// ==========================================
+// PENDING ORDER DETAILS MODAL (Order Details: Products, Customer Name, Address, & Create Customer)
+// ==========================================
+window.openPendingOrderDetails = async function(orderId) {
+    const modal = document.getElementById('pendingOrderDetailModal');
+    const container = document.getElementById('pendingOrderDetailContent');
+    if (!modal || !container) {
+        // Fallback to direct billing workstation if modal container not present
+        return window.openOrderBilling(orderId);
+    }
+
+    modal.style.display = 'flex';
+    container.innerHTML = `
+        <div style="text-align: center; padding: 5rem; color: #64748b;">
+            <div class="loader" style="margin: 0 auto 1.25rem auto;"></div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: #0f172a;">Loading Order Details...</div>
+            <div style="font-size: 0.85rem; margin-top: 4px;">Fetching customer, address, and product information</div>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/orders/${orderId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (!res.ok) throw new Error('Order not found');
+        const o = await res.json();
+
+        const orderIdText = window.formatOrderId ? window.formatOrderId(o.order_id, o.created_at) : '#SGB-' + o.order_id;
+        const placedDate = o.created_at ? new Date(o.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+        const totalVal = parseFloat(o.total_amount || 0);
+        const advVal = parseFloat(o.advance_amount || o.advance_paid || 0);
+        const balVal = Math.max(0, totalVal - advVal);
+
+        // Address resolution
+        const addressLines = [
+            o.address,
+            [o.village, o.sub_district || o.taluk].filter(Boolean).join(', '),
+            [o.city || o.district, o.state].filter(Boolean).join(', '),
+            o.pincode ? ('PIN: ' + o.pincode) : ''
+        ].filter(Boolean);
+        const displayAddress = addressLines.length > 0 ? addressLines.join('<br>') : '<span style="color:#94a3b8; font-style:italic;">No detailed address provided</span>';
+
+        // Items rows
+        const items = o.items || [];
+        const itemsHtml = items.map((it, idx) => {
+            const price = parseFloat(it.price || it.rate || 0);
+            const qty = parseInt(it.quantity || 1, 10);
+            const lineTotal = price * qty;
+            return `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 0.75rem 1rem; color: #64748b; font-weight: 600; width: 40px;">${idx + 1}</td>
+                    <td style="padding: 0.75rem 1rem;">
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.92rem;">${it.product_name || it.name || 'Agri Product'}</div>
+                        ${it.sku ? `<div style="font-size: 0.75rem; color: #64748b; font-family: monospace;">SKU: ${it.sku}</div>` : ''}
+                    </td>
+                    <td style="padding: 0.75rem 1rem; text-align: center; font-weight: 700; color: #0f172a;">${qty}</td>
+                    <td style="padding: 0.75rem 1rem; text-align: right; color: #475569; font-weight: 600;">₹${price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 800; color: #0f172a;">₹${lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <!-- Modal Header -->
+            <div style="padding: 1.25rem 1.75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 0.85rem;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 0; font-family: 'Outfit', sans-serif;">
+                                Order ${orderIdText}
+                            </h3>
+                            <span class="status-badge status-${o.order_status || 'draft'}" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 6px;">
+                                ${(o.order_status || 'draft').toUpperCase()}
+                            </span>
+                        </div>
+                        <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: #64748b;">
+                            Placed on: ${placedDate} &bull; Sales: <strong>${o.sales_person_name || 'Staff'}</strong>
+                        </p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <button type="button" onclick="cancelPendingOrderAction(${o.order_id})" class="btn-billing" style="padding: 0.4rem 0.85rem; font-size: 0.82rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 8px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: all 0.2s;" title="Cancel this order">
+                        <i class="fa-solid fa-ban" style="color: #ea580c;"></i> Cancel Order
+                    </button>
+                    <button type="button" onclick="hardDeletePendingOrderAction(${o.order_id})" class="btn-billing" style="padding: 0.4rem 0.85rem; font-size: 0.82rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: all 0.2s;" title="Hard delete permanently from database">
+                        <i class="fa-solid fa-trash-can" style="color: #dc2626;"></i> Delete
+                    </button>
+                    <button type="button" onclick="closePendingOrderDetails()" style="background: transparent; border: none; font-size: 1.6rem; cursor: pointer; color: #94a3b8; line-height: 1; padding: 4px; margin-left: 0.25rem;">
+                        &times;
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div style="padding: 1.75rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.5rem; background: #ffffff;">
+                
+                <!-- Customer & Address Information Cards -->
+                <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.25rem;">
+                    
+                    <!-- Customer Card -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem;">
+                        <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #0284c7; letter-spacing: 0.05em; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-user"></i> Customer Information
+                        </div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin-bottom: 0.35rem;">
+                            ${o.customer_name || 'Customer'}
+                        </div>
+                        <div style="font-size: 0.85rem; color: #334155; display: flex; align-items: center; gap: 8px; margin-bottom: 0.3rem;">
+                            <i class="fa-solid fa-phone" style="color: #64748b; font-size: 0.75rem;"></i>
+                            <a href="tel:${o.phone}" style="color: #2563eb; font-weight: 700; text-decoration: none;">${o.phone || 'N/A'}</a>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="background: #e2e8f0; color: #334155; padding: 2px 7px; border-radius: 4px; font-weight: 600;">Source: ${(o.order_source || 'lead').toUpperCase()}</span>
+                            ${o.delivery_type ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 7px; border-radius: 4px; font-weight: 600;">Delivery: ${o.delivery_type}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Delivery & Address Card -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem;">
+                        <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #10b981; letter-spacing: 0.05em; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-location-dot"></i> Delivery Address
+                        </div>
+                        <div style="font-size: 0.88rem; color: #1e293b; line-height: 1.55;">
+                            ${displayAddress}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Table Section -->
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-boxes-stacked" style="color: #3b82f6; margin-right: 6px;"></i> Ordered Products (${items.length})</span>
+                    </div>
+                    <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 700;">
+                                    <th style="padding: 0.65rem 1rem;">#</th>
+                                    <th style="padding: 0.65rem 1rem;">Product Name</th>
+                                    <th style="padding: 0.65rem 1rem; text-align: center;">Qty</th>
+                                    <th style="padding: 0.65rem 1rem; text-align: right;">Price</th>
+                                    <th style="padding: 0.65rem 1rem; text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.length > 0 ? itemsHtml : '<tr><td colspan="5" style="padding: 1.5rem; text-align: center; color: #94a3b8;">No products found in this order.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Financial Summary Box -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Advance Payment Status</div>
+                        <div style="font-size: 1.1rem; font-weight: 800; color: #10b981; margin-top: 2px;">
+                            ₹${advVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Paid
+                        </div>
+                        <div style="font-size: 0.78rem; color: #ef4444; font-weight: 600; margin-top: 2px;">
+                            Balance Due: ₹${balVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Order Value</div>
+                        <div style="font-size: 1.6rem; font-weight: 900; color: #2563eb; font-family: 'Outfit', sans-serif;">
+                            ₹${totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer (Actions) -->
+            <div style="padding: 1rem 1.75rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <button type="button" onclick="closePendingOrderDetails()" class="btn-billing secondary" style="padding: 0.6rem 1.25rem;">
+                    Close
+                </button>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button type="button" class="btn-billing primary" onclick="closePendingOrderDetails(); openOrderBilling(${o.order_id});" style="padding: 0.65rem 1.75rem; font-weight: 800; font-size: 0.9rem; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);">
+                        <i class="fa-solid fa-user-plus"></i> Create Customer in Zoho & Process ➔
+                    </button>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        container.innerHTML = `
+            <div style="padding: 3rem; text-align: center;">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 2.5rem; color: #ef4444; margin-bottom: 1rem;"></i>
+                <h3 style="margin: 0; color: #0f172a;">Failed to load order details</h3>
+                <p style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem;">${err.message}</p>
+                <button class="btn-billing secondary" onclick="closePendingOrderDetails()" style="margin-top: 1.25rem;">Close</button>
+            </div>
+        `;
+    }
+};
+
+window.closePendingOrderDetails = function() {
+    const modal = document.getElementById('pendingOrderDetailModal');
+    if (modal) modal.style.display = 'none';
+};
+
 window.applyPendingFilters = function() {
     const tbody = document.getElementById('pendingOrdersBody');
     if (!tbody) return;
@@ -3194,9 +3969,9 @@ window.applyPendingFilters = function() {
     }
 
     tbody.innerHTML = filtered.map(order => `
-        <tr>
-            <td style="font-weight: 700;">${window.formatOrderId ? window.formatOrderId(order.order_id, order.created_at) : '#SGB-' + order.order_id}</td>
-            <td style="font-weight: 600;">${order.customer_name || 'N/A'}</td>
+        <tr style="transition: background 0.15s ease;">
+            <td style="font-weight: 700; color: #2563eb; cursor: pointer;" onclick="openPendingOrderDetails(${order.order_id})" title="Click to view full order details"><span style="text-decoration: underline; text-underline-offset: 3px;">${window.formatOrderId ? window.formatOrderId(order.order_id, order.created_at) : '#SGB-' + order.order_id}</span></td>
+            <td style="font-weight: 600; cursor: pointer; color: #0f172a;" onclick="openPendingOrderDetails(${order.order_id})" title="Click to view full order details"><span style="border-bottom: 1px dashed #94a3b8;">${order.customer_name || 'N/A'}</span></td>
             <td>${order.phone || 'N/A'}</td>
             <td>${order.sales_person_name || 'Staff'}</td>
             <td style="font-weight: 700; color: #10b981;">₹${parseFloat(order.advance_paid || 0).toLocaleString()}</td>
@@ -3208,9 +3983,17 @@ window.applyPendingFilters = function() {
             <td style="font-weight: 800; color: var(--billing-primary);">₹${parseFloat(order.total_amount || 0).toLocaleString()}</td>
             <td><span class="status-badge status-${order.order_status || 'draft'}">${(order.order_status || 'draft').toUpperCase()}</span></td>
             <td>
-                <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.85rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap;" onclick="openOrderBilling(${order.order_id})">
-                    <i class="fa-solid fa-user-plus"></i> Create Customer
-                </button>
+                <div style="display: flex; gap: 0.35rem; align-items: center;">
+                    <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap;" onclick="openOrderBilling(${order.order_id})">
+                        <i class="fa-solid fa-user-plus"></i> Create Customer
+                    </button>
+                    <button class="btn-billing" style="width: auto; padding: 0.4rem 0.55rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 6px; cursor: pointer;" title="Cancel Order" onclick="cancelPendingOrderAction(${order.order_id})">
+                        <i class="fa-solid fa-ban"></i>
+                    </button>
+                    <button class="btn-billing" style="width: auto; padding: 0.4rem 0.55rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 6px; cursor: pointer;" title="Hard Delete Order" onclick="hardDeletePendingOrderAction(${order.order_id})">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
             </td>
 
         </tr>
@@ -3382,7 +4165,8 @@ window.hardDeleteInvoice = async function(invoiceId, invoiceNumber) {
 // ZOHO BOOKS 1:1 ACTIONS HANDLERS (CRM & ZOHO SYNC)
 // ==========================================
 
-let activeZohoSoPayload = null;
+var activeZohoSoPayload = null;
+window.activeZohoSoPayload = null;
 
 // Store payload reference when rendering workstation
 const origRenderZohoSo = window.renderZohoSoDetailsWorkstation;
@@ -3410,6 +4194,32 @@ document.addEventListener('click', function(e) {
 });
 
 // 1. Download official PDF from Zoho Books
+
+window.syncCurrentSalesOrderToZoho = async function(soNumber) {
+    if (!confirm(`Push and sync Sales Order ${soNumber} with Zoho Books now?`)) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${BILLING_API_URL}/sales-orders/${encodeURIComponent(soNumber)}/sync`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert(`✅ ${data.message}`);
+            openZohoSalesOrderDetails(soNumber);
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+        } else {
+            alert(`Zoho Sync Notice: ${data.message || 'Failed to sync with Zoho Books'}`);
+        }
+    } catch (err) {
+        alert('Network or Server error: ' + err.message);
+    }
+};
+
 window.downloadZohoSoPdf = async function(soNumber) {
     const btn = document.getElementById('btnSoPdfPrint');
     const originalText = btn ? btn.innerHTML : '';
@@ -3631,37 +4441,113 @@ This will permanently:
     }
 };
 
-// 5. Edit Sales Order (Opens Edit Workstation)
-window.editCurrentSalesOrder = function(soNumber) {
+// 5. Edit Sales Order (Opens Full Workstation)
+window.editCurrentSalesOrder = async function(soNumber) {
     if (!activeZohoSoPayload) return;
     const crmOrder = activeZohoSoPayload.order;
     const zSo = activeZohoSoPayload.zoho_salesorder;
 
-    // Set currentOrder context for editing
-    window.currentOrder = crmOrder || {
-        order_id: null,
-        sales_order_number: soNumber,
-        zoho_salesorder_id: zSo?.salesorder_id,
-        customer_name: zSo?.customer_name,
-        phone: zSo?.cf_contact || zSo?.billing_address?.phone || '',
-        advance_amount: 0,
-        items: (zSo?.line_items || []).map(li => ({
-            product_id: 14,
-            product_name: li.name,
-            name: li.name,
-            rate: li.rate,
-            quantity: li.quantity,
-            tax_id: li.tax_id
-        }))
-    };
-
     closeZohoSoDetails();
+
     if (crmOrder && crmOrder.order_id) {
-        window.switchWorkstationStep(2);
         const modal = document.getElementById('billingModal');
+        const modalBody = document.getElementById('modalBody');
         if (modal) modal.style.display = 'flex';
+        if (modalBody) modalBody.innerHTML = '<div style="text-align:center; padding: 5rem;"><div class="loader"></div><p style="margin-top:1rem; color:#64748b; font-weight:600;">Loading Sales Order Workstation...</p></div>';
+
+        try {
+            const res = await fetch(`${BILLING_API_URL}/orders/${crmOrder.order_id}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            currentOrder = await res.json();
+            if (zSo) {
+                if (zSo.shipping_charge_tax_percentage) {
+                    currentOrder.shipping_charge_tax_rate = parseFloat(zSo.shipping_charge_tax_percentage);
+                } else if (zSo.shipping_charge_tax_name && zSo.shipping_charge_tax_name.includes('18')) {
+                    currentOrder.shipping_charge_tax_rate = 18;
+                }
+                if (zSo.shipping_charge_tax_id) {
+                    currentOrder.shipping_charge_tax_id = zSo.shipping_charge_tax_id;
+                }
+            }
+            window.currentOrder = currentOrder;
+            await ensureSalesOrderMeta();
+            window.renderWorkstation(2);
+        } catch (e) {
+            console.error('Error loading order for edit:', e);
+            currentOrder = crmOrder;
+            if (zSo) {
+                if (zSo.shipping_charge_tax_percentage) {
+                    currentOrder.shipping_charge_tax_rate = parseFloat(zSo.shipping_charge_tax_percentage);
+                } else if (zSo.shipping_charge_tax_name && zSo.shipping_charge_tax_name.includes('18')) {
+                    currentOrder.shipping_charge_tax_rate = 18;
+                }
+                if (zSo.shipping_charge_tax_id) {
+                    currentOrder.shipping_charge_tax_id = zSo.shipping_charge_tax_id;
+                }
+            }
+            window.currentOrder = currentOrder;
+            await ensureSalesOrderMeta();
+            window.renderWorkstation(2);
+        }
     } else {
-        window.openDirectSalesOrderModal();
+        // Direct manual or synced-only Sales Order: load into Direct Workstation
+        await window.openDirectSalesOrderModal();
+
+        // Populate fields from zSo
+        if (zSo) {
+            const custInput = document.getElementById('directCustomerSearch');
+            if (custInput) custInput.value = zSo.customer_name || '';
+
+            const soNumInput = document.getElementById('soNumberInput');
+            if (soNumInput) soNumInput.value = zSo.salesorder_number || soNumber;
+
+            const dateInput = document.getElementById('soDateInput');
+            if (dateInput && zSo.date) dateInput.value = zSo.date;
+
+            const shipDateInput = document.getElementById('soShipmentDateInput');
+            if (shipDateInput && zSo.shipment_date) shipDateInput.value = zSo.shipment_date;
+
+            const delivInput = document.getElementById('soDeliveryMethodInput');
+            if (delivInput && zSo.delivery_method) delivInput.value = zSo.delivery_method;
+
+            const spInput = document.getElementById('soSalespersonInput');
+            if (spInput && zSo.salesperson_name) spInput.value = zSo.salesperson_name;
+
+            const phoneInput = document.getElementById('soContactPhoneInput');
+            if (phoneInput) phoneInput.value = zSo.cf_contact || zSo.billing_address?.phone || '';
+
+            const notesInput = document.getElementById('soCustomerNotes');
+            if (notesInput && zSo.notes) notesInput.value = zSo.notes;
+
+            const termsInput = document.getElementById('soTermsConditions');
+            if (termsInput && zSo.terms) termsInput.value = zSo.terms;
+
+            const discInput = document.getElementById('soDiscountValue');
+            if (discInput) discInput.value = zSo.discount_amount || zSo.discount || 0;
+
+            const shipChargeInput = document.getElementById('soShippingCharges');
+            if (shipChargeInput) shipChargeInput.value = zSo.shipping_charge || 0;
+
+            const roundInput = document.getElementById('soRoundoffInput');
+            if (roundInput) roundInput.value = zSo.adjustment || 0;
+
+            if (zSo.line_items && zSo.line_items.length > 0) {
+                window.currentOrder.items = zSo.line_items.map(li => ({
+                    product_id: 14,
+                    product_name: li.name,
+                    name: li.name,
+                    rate: parseFloat(li.rate || 0),
+                    price: parseFloat(li.rate || 0),
+                    quantity: parseFloat(li.quantity || 1),
+                    tax_id: li.tax_id || '',
+                    tax_rate: 0
+                }));
+                if (typeof renderZohoLineItems === 'function') {
+                    renderZohoLineItems();
+                }
+            }
+        }
     }
 };
 
@@ -3679,3 +4565,920 @@ document.addEventListener('click', function(e) {
         drop.style.display = 'none';
     }
 });
+
+// Action to Cancel Pending Order (Order Cancel)
+window.cancelPendingOrderAction = async function(orderId) {
+    if (!orderId) return;
+    const confirmMsg = "Are you sure you want to CANCEL Order #" + orderId + "?\n\nThis will:\n1. Update order status to 'cancelled'\n2. Release reserved product stock back to inventory\n3. Restore connected lead status";
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(BILLING_API_URL + "/orders/" + orderId + "/cancel", {
+            method: 'POST',
+            headers: {
+                'Authorization': "Bearer " + localStorage.getItem('token'),
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("✅ " + (data.message || 'Order cancelled successfully'));
+            if (typeof closePendingOrderDetails === 'function') closePendingOrderDetails();
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+        } else {
+            alert("Error: " + (data.message || 'Failed to cancel order'));
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    }
+};
+
+// Action to Hard Delete Pending Order (Permanently removes from database)
+window.hardDeletePendingOrderAction = async function(orderId) {
+    if (!orderId) return;
+    const confirmMsg = "⚠️ PERMANENT HARD DELETE WARNING:\n\nAre you sure you want to permanently HARD DELETE Order #" + orderId + "?\n\nThis will:\n1. Completely wipe the order & line items from the CRM Database\n2. Release reserved stock\n3. This action CANNOT be undone!";
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(BILLING_API_URL + "/orders/" + orderId, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': "Bearer " + localStorage.getItem('token')
+            }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("🗑️ " + (data.message || 'Order permanently deleted'));
+            if (typeof closePendingOrderDetails === 'function') closePendingOrderDetails();
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+        } else {
+            alert("Delete Error: " + (data.message || 'Failed to delete order'));
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    }
+};
+
+// Open Official Zoho Invoice PDF
+window.openZohoInvoicePdf = async function(invId) {
+    if (!invId) return;
+    const url = `${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/zoho-pdf`;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) {
+            // Fallback to local invoice print view
+            return window.printInvoice(invId);
+        }
+        const blob = await res.blob();
+        const fileUrl = URL.createObjectURL(blob);
+        window.open(fileUrl, '_blank');
+    } catch (e) {
+        window.printInvoice(invId);
+    }
+};
+
+// Hard Delete Invoice (Zoho Books & CRM Database Sync)
+window.hardDeleteInvoiceBoth = async function(invId, invNumber) {
+    const confirmMsg = `⚠️ PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete Invoice "${invNumber || invId}"?\n\nThis will:\n1. Delete the invoice from Zoho Books\n2. Delete the invoice records from CRM Database\n3. Revert order status to approved if applicable\n\nThis action CANNOT be undone!`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert(`✅ ${data.message || 'Invoice deleted successfully'}`);
+            if (typeof loadInvoices === 'function') loadInvoices();
+        } else {
+            alert(`Delete Error: ${data.message || 'Failed to delete invoice'}`);
+        }
+    } catch (err) {
+        alert('Server/Network Error: ' + err.message);
+    }
+};
+
+// ==========================================
+// 1:1 ZOHO BOOKS INVOICE WORKSTATION
+// ==========================================
+
+var currentZohoInvoiceData = null;
+window.currentZohoInvoiceData = null;
+
+window.openZohoInvoiceWorkstation = async function(soId) {
+    // Close SO convert dropdown if open
+    const drop = document.getElementById('soConvertDropdownMenu');
+    if (drop) drop.style.display = 'none';
+
+    // Show modal
+    const modal = document.getElementById('zohoInvoiceModal');
+    const container = document.getElementById('zohoInvoiceContent');
+    if (!modal || !container) {
+        alert('Invoice workstation container not found on this page.');
+        return;
+    }
+
+    modal.style.display = 'flex';
+    container.innerHTML = `
+        <div style="text-align: center; padding: 6rem; color: #64748b;">
+            <div class="loader" style="margin: 0 auto 1.5rem auto;"></div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">Loading Zoho Books Invoice Workstation...</div>
+            <div style="font-size: 0.85rem; margin-top: 6px;">Fetching Sales Order details, next invoice sequence, tax rates, and customer particulars...</div>
+        </div>
+    `;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${BILLING_API_URL}/invoices/prepare-from-so/${encodeURIComponent(soId)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Failed to prepare invoice from Sales Order');
+        }
+
+        currentZohoInvoiceData = data;
+        window.currentZohoInvoiceData = data;
+        renderZohoInvoiceWorkstation(data);
+    } catch (err) {
+        container.innerHTML = `
+            <div style="padding: 4rem; text-align: center;">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;"></i>
+                <h3 style="margin: 0; color: #0f172a; font-size: 1.3rem;">Error Loading Invoice Workstation</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-top: 0.5rem; max-width: 500px; margin-left: auto; margin-right: auto;">${err.message}</p>
+                <button type="button" class="btn-billing secondary" onclick="closeZohoInvoiceModal()" style="margin-top: 1.5rem;">Close</button>
+            </div>
+        `;
+    }
+};
+
+window.closeZohoInvoiceModal = function() {
+    const modal = document.getElementById('zohoInvoiceModal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.renderZohoInvoiceWorkstation = function(data) {
+    const container = document.getElementById('zohoInvoiceContent');
+    if (!container) return;
+
+    // Address strings
+    const bAddr = data.billing_address || {};
+    const sAddr = data.shipping_address || bAddr;
+    const bStr = [bAddr.address, bAddr.street2, bAddr.city, bAddr.state, bAddr.zipcode ? 'PIN: ' + bAddr.zipcode : '', bAddr.country, bAddr.phone ? 'Phone: ' + bAddr.phone : ''].filter(Boolean).join('<br>');
+    const sStr = [sAddr.address, sAddr.street2, sAddr.city, sAddr.state, sAddr.zipcode ? 'PIN: ' + sAddr.zipcode : '', sAddr.country, sAddr.phone ? 'Phone: ' + sAddr.phone : ''].filter(Boolean).join('<br>');
+
+    // Payment terms options
+    const termsOptions = (data.payment_terms_list || [
+        { payment_terms: 0, payment_terms_label: 'Due on Receipt' },
+        { payment_terms: 15, payment_terms_label: 'Net 15' },
+        { payment_terms: 30, payment_terms_label: 'Net 30' },
+        { payment_terms: 45, payment_terms_label: 'Net 45' },
+        { payment_terms: 60, payment_terms_label: 'Net 60' }
+    ]).map(t => `<option value="${t.payment_terms}" ${t.payment_terms == data.payment_terms ? 'selected' : ''}>${t.payment_terms_label}</option>`).join('');
+
+    // Salespersons options
+    const salesOptions = (data.salespersons_list || []).map(s => 
+        `<option value="${s.salesperson_id}" ${s.salesperson_id == data.salesperson_id || s.salesperson_name == data.salesperson_name ? 'selected' : ''}>${s.salesperson_name}</option>`
+    ).join('') || `<option value="" selected>${data.salesperson_name || 'Staff'}</option>`;
+
+    // Indian States List for Place of Supply
+    const states = [
+        ['AP', 'Andhra Pradesh'], ['AR', 'Arunachal Pradesh'], ['AS', 'Assam'], ['BR', 'Bihar'],
+        ['CG', 'Chhattisgarh'], ['GA', 'Goa'], ['GJ', 'Gujarat'], ['HR', 'Haryana'],
+        ['HP', 'Himachal Pradesh'], ['JH', 'Jharkhand'], ['KA', 'Karnataka'], ['KL', 'Kerala'],
+        ['MP', 'Madhya Pradesh'], ['MH', 'Maharashtra'], ['MN', 'Manipur'], ['ML', 'Meghalaya'],
+        ['MZ', 'Mizoram'], ['NL', 'Nagaland'], ['OR', 'Odisha'], ['PB', 'Punjab'],
+        ['RJ', 'Rajasthan'], ['SK', 'Sikkim'], ['TN', 'Tamil Nadu'], ['TG', 'Telangana'],
+        ['TR', 'Tripura'], ['UP', 'Uttar Pradesh'], ['UK', 'Uttarakhand'], ['WB', 'West Bengal'],
+        ['DL', 'Delhi'], ['JK', 'Jammu & Kashmir'], ['LA', 'Ladakh'], ['PY', 'Puducherry']
+    ];
+    const posOptions = states.map(([code, name]) => 
+        `<option value="${code}" ${(data.place_of_supply || 'KA') === code ? 'selected' : ''}>[${code}] - ${name}</option>`
+    ).join('');
+
+    container.innerHTML = `
+        <!-- Header (Zoho 1:1) -->
+        <div style="padding: 1rem 1.75rem; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <i class="fa-solid fa-file-invoice" style="font-size: 1.4rem; color: #2563eb;"></i>
+                <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">
+                    New Invoice
+                </h2>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span style="font-size: 0.8rem; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 700;">
+                    <i class="fa-solid fa-link"></i> Sales Order: ${data.salesorder_number || 'SO'}
+                </span>
+                <button type="button" onclick="closeZohoInvoiceModal()" style="background: transparent; border: none; font-size: 1.6rem; cursor: pointer; color: #94a3b8; line-height: 1; padding: 4px;">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Form Body (Scrollable) -->
+        <div style="flex: 1; overflow-y: auto; padding: 2rem 2.5rem; background: #f8fafc; font-family: 'Inter', sans-serif;">
+            
+            <form id="zohoInvoiceForm" onsubmit="event.preventDefault();" style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.75rem;">
+                
+                <!-- CUSTOMER & ADDRESS DETAILS CARD -->
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        
+                        <!-- Customer Display -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #dc2626; margin-bottom: 0.4rem;">
+                                Customer Name*
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="flex: 1; padding: 0.6rem 0.85rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; color: #0f172a; font-size: 0.92rem;">
+                                    ${data.customer_name || 'Customer'}
+                                </div>
+                                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 0.55rem 0.85rem; border-radius: 8px; font-weight: 800; font-size: 0.8rem;">
+                                    ₹ INR
+                                </span>
+                            </div>
+
+                            <!-- REMARKS -->
+                            <div style="margin-top: 1.25rem;">
+                                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.35rem;">Remarks</label>
+                                <input type="text" id="invRemarks" class="zoho-input" value="Created via SGB Agro CRM from ${data.salesorder_number || 'SO'}" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.85rem; background: #f8fafc;" />
+                            </div>
+
+                            <!-- GST Treatment -->
+                            <div style="margin-top: 1rem; display: flex; gap: 1.5rem; font-size: 0.82rem; color: #475569;">
+                                <div>GST Treatment: <strong style="color: #0f172a;">${(data.gst_treatment || 'consumer').toUpperCase()}</strong></div>
+                                <div>GSTIN: <strong style="color: #0f172a;">${data.gst_no || 'Unregistered'}</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- Addresses -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                            <!-- Billing Address -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; font-size: 0.82rem; line-height: 1.5;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.35rem;">
+                                    <strong style="color: #334155;"><i class="fa-solid fa-file-invoice"></i> BILLING ADDRESS</strong>
+                                </div>
+                                <div id="invBillingAddrDisplay" style="color: #475569;">${bStr || 'No billing address provided'}</div>
+                            </div>
+
+                            <!-- Shipping Address -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; font-size: 0.82rem; line-height: 1.5;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.35rem;">
+                                    <strong style="color: #334155;"><i class="fa-solid fa-truck"></i> SHIPPING ADDRESS</strong>
+                                </div>
+                                <div id="invShippingAddrDisplay" style="color: #475569;">${sStr || 'No shipping address provided'}</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- INVOICE PARAMETERS & DATES CARD -->
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem;">
+                        
+                        <!-- Place of Supply -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #dc2626; margin-bottom: 0.4rem;">
+                                Place of Supply*
+                            </label>
+                            <select id="invPlaceOfSupply" onchange="updateZohoInvoicePlaceOfSupply(this.value)" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #0f172a; background: white;">
+                                ${posOptions}
+                            </select>
+                        </div>
+
+                        <!-- Invoice# -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #dc2626; margin-bottom: 0.4rem;">
+                                Invoice#*
+                            </label>
+                            <input type="text" id="invNumber" value="${data.invoice_number || ''}" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; color: #2563eb;" required />
+                        </div>
+
+                        <!-- Order Number -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+                                Order Number
+                            </label>
+                            <input type="text" id="invOrderNumber" value="${data.salesorder_number || ''}" readonly style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 700; color: #334155; background: #f8fafc;" />
+                        </div>
+
+                        <!-- Invoice Date -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #dc2626; margin-bottom: 0.4rem;">
+                                Invoice Date*
+                            </label>
+                            <input type="date" id="invDate" value="${data.date || new Date().toISOString().split('T')[0]}" onchange="updateZohoDueDate()" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600;" required />
+                        </div>
+
+                        <!-- Terms -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+                                Terms
+                            </label>
+                            <select id="invTerms" onchange="updateZohoDueDate()" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; background: white;">
+                                ${termsOptions}
+                            </select>
+                        </div>
+
+                        <!-- Due Date -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+                                Due Date
+                            </label>
+                            <input type="date" id="invDueDate" value="${data.due_date || data.date || new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600;" />
+                        </div>
+
+                        <!-- Salesperson -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+                                Salesperson
+                            </label>
+                            <select id="invSalesperson" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; background: white;">
+                                ${salesOptions}
+                            </select>
+                        </div>
+
+                        <!-- Destination (Custom Field) -->
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #dc2626; margin-bottom: 0.4rem;">
+                                Destination*
+                            </label>
+                            <input type="text" id="invDestination" value="${data.cf_destination || 'Pincode'}" placeholder="e.g. Pincode 582118" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600;" required />
+                        </div>
+
+                        <!-- Terms of Delivery (Custom Field) -->
+                        <div style="grid-column: span 2;">
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+                                Terms of Delivery
+                            </label>
+                            <input type="text" id="invTermsOfDelivery" value="${data.cf_terms_of_delivery || ''}" placeholder="e.g. 1000058107/Cod Amount-3500" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;" />
+                        </div>
+
+                        <!-- Contact No (Custom Field) -->
+                        <div style="grid-column: span 2;">
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+                                Contact No
+                            </label>
+                            <input type="text" id="invContactNo" value="${data.cf_contact_no || ''}" placeholder="e.g. 9964833009" style="width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;" />
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ITEM TABLE CARD -->
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #0f172a;">Item Table</h3>
+                        <span style="font-size: 0.8rem; color: #64748b;">Prices and taxes matching Zoho Books standard configuration</span>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;" id="zohoInvoiceItemsTable">
+                        <thead>
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left; color: #475569; font-weight: 700; font-size: 0.78rem;">
+                                <th style="padding: 0.75rem 1rem;">ITEM DETAILS</th>
+                                <th style="padding: 0.75rem 0.75rem; text-align: center; width: 80px;">ORDERED</th>
+                                <th style="padding: 0.75rem 0.75rem; text-align: center; width: 80px;">INVOICED</th>
+                                <th style="padding: 0.75rem 0.75rem; text-align: center; width: 80px;">PACKED</th>
+                                <th style="padding: 0.75rem 0.75rem; text-align: center; width: 90px; color: #dc2626;">QUANTITY*</th>
+                                <th style="padding: 0.75rem 0.75rem; text-align: right; width: 110px;">RATE (₹)</th>
+                                <th style="padding: 0.75rem 0.75rem; width: 140px;">TAX</th>
+                                <th style="padding: 0.75rem 1rem; text-align: right; width: 120px;">AMOUNT (₹)</th>
+                                <th style="padding: 0.75rem 0.5rem; width: 40px; text-align: center;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="zohoInvoiceItemsBody">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 1rem; display: flex; gap: 0.75rem;">
+                        <button type="button" onclick="addZohoInvoiceRow()" class="btn-billing" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; font-weight: 700; border-radius: 6px; cursor: pointer;">
+                            <i class="fa-solid fa-plus"></i> Add New Row
+                        </button>
+                    </div>
+
+                    <!-- TOTALS CALCULATION SECTION -->
+                    <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                        <div style="width: 440px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem;">
+                            
+                            <!-- Sub Total -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                                <span style="font-weight: 600;">Sub Total</span>
+                                <span style="font-weight: 700; color: #0f172a;" id="invCalcSubTotal">₹0.00</span>
+                            </div>
+
+                            <!-- Discount -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                                <span style="font-weight: 600;">Discount</span>
+                                <div style="display: flex; align-items: center; gap: 0.4rem; width: 160px;">
+                                    <input type="number" id="invDiscountVal" value="${data.discount || 0}" step="any" oninput="recalculateZohoInvoiceTotals()" style="width: 100%; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; font-weight: 600;" />
+                                </div>
+                            </div>
+
+                            <!-- Shipping Charges -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                                <span style="font-weight: 600;">Shipping Charges</span>
+                                <div style="display: flex; align-items: center; gap: 0.4rem; width: 160px;">
+                                    <input type="number" id="invShippingVal" value="${data.shipping_charge || 0}" step="any" oninput="recalculateZohoInvoiceTotals()" style="width: 100%; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; font-weight: 600;" />
+                                </div>
+                            </div>
+
+                            <!-- Shipping Charge Tax Selector (Shown only when Shipping Charges > 0) -->
+                            <div id="invShippingTaxRow" style="display: ${parseFloat(data.shipping_charge || 0) > 0 ? 'flex' : 'none'}; justify-content: space-between; align-items: center; color: #475569;">
+                                <span style="font-weight: 600; font-size: 0.82rem;">Shipping Charge Tax</span>
+                                <select id="invShippingTaxSelect" onchange="onInvoiceShippingTaxChange(this.value)" style="width: 160px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 600; background: white;">
+                                    <option value="0">Select a Tax</option>
+                                </select>
+                            </div>
+
+                            <!-- Shipping Charges SAC -->
+                            <div id="invShippingSacRow" style="display: ${parseFloat(data.shipping_charge || 0) > 0 && data.shipping_charge_tax_id ? 'flex' : 'none'}; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 700; color: #dc2626; font-size: 0.82rem;">Shipping Charges SAC*</span>
+                                <input type="text" id="invShippingSacInput" value="${data.shipping_charge_sac_code || '996811'}" style="width: 160px; padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 700; color: #0f172a; text-align: left;" />
+                            </div>
+
+                            <!-- Dynamic Tax Rows (CGST/SGST or IGST) -->
+                            <div id="invDynamicTaxRows" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed #cbd5e1; border-bottom: 1px dashed #cbd5e1; padding: 0.65rem 0;">
+                                <!-- Injected in recalculate -->
+                            </div>
+
+                            <!-- Round Off -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                                <span style="font-weight: 600;">Round off</span>
+                                <div style="width: 160px;">
+                                    <input type="number" id="invRoundOffVal" value="0.00" step="any" oninput="recalculateZohoInvoiceTotals(false)" style="width: 100%; padding: 0.35rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; font-weight: 600;" />
+                                </div>
+                            </div>
+
+                            <!-- TOTAL -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.15rem; font-weight: 800; color: #0f172a; border-top: 2px solid #cbd5e1; padding-top: 0.75rem;">
+                                <span>Total ( ₹ )</span>
+                                <span id="invCalcGrandTotal" style="color: #2563eb;">₹0.00</span>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- NOTES & TERMS CARD -->
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div>
+                        <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">Customer Notes</label>
+                        <textarea id="invCustomerNotes" rows="4" style="width: 100%; padding: 0.6rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-family: inherit;">${data.notes || 'Thanks for doing business with us.'}</textarea>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">Will be displayed on the invoice</span>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">Terms & Conditions</label>
+                        <textarea id="invTermsConditions" rows="4" style="width: 100%; padding: 0.6rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-family: inherit;">${data.terms || ''}</textarea>
+                    </div>
+                </div>
+
+            </form>
+
+        </div>
+
+        <!-- Sticky Footer with Action Buttons (1:1 Zoho Books) -->
+        <div style="padding: 1.25rem 2.5rem; background: #ffffff; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.03);">
+            <button type="button" onclick="closeZohoInvoiceModal()" class="btn-billing secondary" style="padding: 0.65rem 1.5rem; font-weight: 700;">
+                Cancel
+            </button>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button type="button" id="btnSaveInvoiceDraft" onclick="submitZohoInvoiceForm('draft')" class="btn-billing" style="padding: 0.65rem 1.75rem; background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b; font-weight: 700; border-radius: 8px; cursor: pointer;">
+                    Save as Draft
+                </button>
+                <button type="button" id="btnSaveInvoiceSend" onclick="submitZohoInvoiceForm('sent')" class="btn-billing primary" style="padding: 0.65rem 2rem; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);">
+                    <i class="fa-solid fa-paper-plane"></i> Save and Send ➔
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Populate initial invoice shipping tax dropdown
+    const invPos = (data.place_of_supply || 'KA').toUpperCase();
+    const invShipSelect = document.getElementById('invShippingTaxSelect');
+    if (invShipSelect) {
+        const initialTaxRate = data.shipping_charge_tax_percentage || 0;
+        let shipHtml = '<option value="0" data-id="" data-name="">Select a Tax</option>';
+        [0, 5, 12, 18, 28].forEach(r => {
+            const taxObj = window.resolveTaxForState(r, invPos);
+            shipHtml += `<option value="${r}" data-id="${taxObj.id}" data-name="${taxObj.name}" ${initialTaxRate == r ? 'selected' : ''}>${taxObj.name} [${r}%]</option>`;
+        });
+        invShipSelect.innerHTML = shipHtml;
+    }
+
+    // Render items and run initial totals calculation
+    renderZohoInvoiceItems(data.line_items || []);
+};
+
+window.renderZohoInvoiceItems = function(items) {
+    const tbody = document.getElementById('zohoInvoiceItemsBody');
+    if (!tbody) return;
+
+    if (!items || items.length === 0) {
+        items = [{
+            name: 'Agri Product',
+            sku: '',
+            quantity_ordered: 1,
+            quantity_invoiced: 0,
+            quantity_packed: 0,
+            quantity: 1,
+            rate: 1000,
+            tax_percentage: 5,
+            amount: 1000
+        }];
+    }
+
+    tbody.innerHTML = items.map((it, idx) => {
+        const qtyOrdered = it.quantity_ordered !== undefined ? it.quantity_ordered : (it.quantity || 1);
+        const qtyInvoiced = it.quantity_invoiced || 0;
+        const qtyPacked = it.quantity_packed || 0;
+        const qty = it.quantity || 1;
+        const rate = parseFloat(it.rate || 0);
+        const amt = rate * qty;
+        const taxPct = it.tax_percentage !== undefined ? it.tax_percentage : 5;
+
+        return `
+        <tr data-index="${idx}" style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 0.85rem 1rem;">
+                <input type="text" class="inv-item-name" value="${it.name || ''}" placeholder="Product Name" style="width: 100%; font-weight: 700; color: #0f172a; border: 1px solid transparent; background: transparent; padding: 4px; border-radius: 4px;" onfocus="this.style.border='1px solid #cbd5e1'; this.style.background='white';" onblur="this.style.border='1px solid transparent'; this.style.background='transparent';" />
+                <div style="display: flex; gap: 0.5rem; margin-top: 3px;">
+                    <input type="text" class="inv-item-sku" value="${it.sku || ''}" placeholder="SKU" style="font-size: 0.75rem; color: #64748b; font-family: monospace; border: none; background: transparent; width: 100px;" />
+                    <input type="text" class="inv-item-hsn" value="${it.hsn_or_sac || ''}" placeholder="HSN/SAC" style="font-size: 0.75rem; color: #64748b; font-family: monospace; border: none; background: transparent; width: 100px;" />
+                </div>
+                <input type="hidden" class="inv-item-so-id" value="${it.salesorder_item_id || it.line_item_id || ''}" />
+            </td>
+            <td style="padding: 0.85rem 0.75rem; text-align: center; color: #64748b; font-weight: 600;">${qtyOrdered}</td>
+            <td style="padding: 0.85rem 0.75rem; text-align: center; color: #64748b; font-weight: 600;">${qtyInvoiced}</td>
+            <td style="padding: 0.85rem 0.75rem; text-align: center; color: #64748b; font-weight: 600;">${qtyPacked}</td>
+            <td style="padding: 0.85rem 0.75rem; text-align: center;">
+                <input type="number" class="inv-item-qty" value="${qty}" min="1" step="1" oninput="recalculateZohoInvoiceTotals()" style="width: 70px; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; font-weight: 700; color: #0f172a;" required />
+            </td>
+            <td style="padding: 0.85rem 0.75rem; text-align: right;">
+                <input type="number" class="inv-item-rate" value="${rate}" step="any" oninput="recalculateZohoInvoiceTotals()" style="width: 100px; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; font-weight: 700; color: #0f172a;" required />
+            </td>
+            <td style="padding: 0.85rem 0.75rem;">
+                <select class="inv-item-tax" onchange="recalculateZohoInvoiceTotals()" style="width: 100%; padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; font-weight: 600; background: white;">
+                    ${(function() {
+                        const pos = (document.getElementById('invPlaceOfSupply')?.value || 'KA').toUpperCase();
+                        const isIntra = (pos === 'KA');
+                        const prefix = isIntra ? 'GST' : 'IGST';
+                        return [5, 12, 18, 28, 0].map(r => 
+                            `<option value="${r}" ${taxPct == r ? 'selected' : ''}>${prefix}${r} [${r}%]</option>`
+                        ).join('');
+                    })()}
+                </select>
+            </td>
+            <td style="padding: 0.85rem 1rem; text-align: right; font-weight: 800; color: #0f172a;">
+                <span class="inv-item-amount">₹${amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </td>
+            <td style="padding: 0.85rem 0.5rem; text-align: center;">
+                <button type="button" onclick="removeZohoInvoiceRow(this)" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 0.9rem;" title="Remove row">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        </tr>
+        `;
+    }).join('');
+
+    recalculateZohoInvoiceTotals();
+};
+
+window.addZohoInvoiceRow = function() {
+    const tbody = document.getElementById('zohoInvoiceItemsBody');
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid #f1f5f9';
+    tr.innerHTML = `
+        <td style="padding: 0.85rem 1rem;">
+            <input type="text" class="inv-item-name" value="" placeholder="Type product name..." style="width: 100%; font-weight: 700; color: #0f172a; border: 1px solid #cbd5e1; background: white; padding: 4px; border-radius: 4px;" required />
+            <div style="display: flex; gap: 0.5rem; margin-top: 3px;">
+                <input type="text" class="inv-item-sku" value="" placeholder="SKU" style="font-size: 0.75rem; color: #64748b; font-family: monospace; border: none; background: transparent; width: 100px;" />
+                <input type="text" class="inv-item-hsn" value="" placeholder="HSN/SAC" style="font-size: 0.75rem; color: #64748b; font-family: monospace; border: none; background: transparent; width: 100px;" />
+            </div>
+            <input type="hidden" class="inv-item-so-id" value="" />
+        </td>
+        <td style="padding: 0.85rem 0.75rem; text-align: center; color: #64748b; font-weight: 600;">1</td>
+        <td style="padding: 0.85rem 0.75rem; text-align: center; color: #64748b; font-weight: 600;">0</td>
+        <td style="padding: 0.85rem 0.75rem; text-align: center; color: #64748b; font-weight: 600;">0</td>
+        <td style="padding: 0.85rem 0.75rem; text-align: center;">
+            <input type="number" class="inv-item-qty" value="1" min="1" step="1" oninput="recalculateZohoInvoiceTotals()" style="width: 70px; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; font-weight: 700; color: #0f172a;" required />
+        </td>
+        <td style="padding: 0.85rem 0.75rem; text-align: right;">
+            <input type="number" class="inv-item-rate" value="0.00" step="any" oninput="recalculateZohoInvoiceTotals()" style="width: 100px; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; font-weight: 700; color: #0f172a;" required />
+        </td>
+        <td style="padding: 0.85rem 0.75rem;">
+            <select class="inv-item-tax" onchange="recalculateZohoInvoiceTotals()" style="width: 100%; padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; font-weight: 600; background: white;">
+                <option value="5" selected>GST5 [5%]</option>
+                <option value="12">GST12 [12%]</option>
+                <option value="18">GST18 [18%]</option>
+                <option value="28">GST28 [28%]</option>
+                <option value="0">GST0 [0%]</option>
+            </select>
+        </td>
+        <td style="padding: 0.85rem 1rem; text-align: right; font-weight: 800; color: #0f172a;">
+            <span class="inv-item-amount">₹0.00</span>
+        </td>
+        <td style="padding: 0.85rem 0.5rem; text-align: center;">
+            <button type="button" onclick="removeZohoInvoiceRow(this)" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 0.9rem;" title="Remove row">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+    recalculateZohoInvoiceTotals();
+};
+
+window.removeZohoInvoiceRow = function(btn) {
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const tbody = document.getElementById('zohoInvoiceItemsBody');
+    if (tbody.querySelectorAll('tr').length <= 1) {
+        alert('An invoice must contain at least one line item.');
+        return;
+    }
+    tr.remove();
+    recalculateZohoInvoiceTotals();
+};
+
+window.updateZohoDueDate = function() {
+    const invDateInput = document.getElementById('invDate');
+    const termsSelect = document.getElementById('invTerms');
+    const dueDateInput = document.getElementById('invDueDate');
+    if (!invDateInput || !termsSelect || !dueDateInput) return;
+
+    const baseDate = new Date(invDateInput.value || Date.now());
+    const days = parseInt(termsSelect.value) || 0;
+
+    if (days === 0) {
+        dueDateInput.value = invDateInput.value;
+    } else if (days > 0) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + days);
+        dueDateInput.value = d.toISOString().split('T')[0];
+    }
+};
+
+
+window.updateZohoInvoicePlaceOfSupply = function(pos) {
+    const normPos = (pos || 'KA').toUpperCase();
+    const isIntra = normPos === 'KA';
+    const prefix = isIntra ? 'GST' : 'IGST';
+
+    // Update tax dropdown labels in all invoice rows
+    document.querySelectorAll('#zohoInvoiceItemsBody .inv-item-tax').forEach(sel => {
+        const currentVal = parseFloat(sel.value) || 0;
+        sel.innerHTML = [5, 12, 18, 28, 0].map(r => 
+            `<option value="${r}" ${currentVal == r ? 'selected' : ''}>${prefix}${r} [${r}%]</option>`
+        ).join('');
+    });
+
+    // Update shipping tax dropdown
+    const shipSelect = document.getElementById('invShippingTaxSelect');
+    if (shipSelect) {
+        const currentVal = parseFloat(shipSelect.value) || 0;
+        let html = '<option value="0" data-id="" data-name="">Select a Tax</option>';
+        [0, 5, 12, 18, 28].forEach(r => {
+            const taxObj = window.resolveTaxForState(r, normPos);
+            html += `<option value="${r}" data-id="${taxObj.id}" data-name="${taxObj.name}" ${currentVal == r ? 'selected' : ''}>${taxObj.name} [${r}%]</option>`;
+        });
+        shipSelect.innerHTML = html;
+    }
+
+    recalculateZohoInvoiceTotals();
+};
+
+
+window.onInvoiceShippingTaxChange = function(taxRate) {
+    const sacRow = document.getElementById('invShippingSacRow');
+    const rate = parseFloat(taxRate) || 0;
+    if (sacRow) {
+        sacRow.style.display = rate > 0 ? 'flex' : 'none';
+    }
+    recalculateZohoInvoiceTotals();
+};
+
+window.recalculateZohoInvoiceTotals = function(autoRoundOff = true) {
+    const rows = document.querySelectorAll('#zohoInvoiceItemsBody tr');
+    let subtotal = 0;
+    const taxBuckets = {};
+
+    // Get Place of Supply (KA is Karnataka = Intra-state)
+    const pos = (document.getElementById('invPlaceOfSupply')?.value || 'KA').toUpperCase();
+    const isIntraState = (pos === 'KA');
+
+    rows.forEach(row => {
+        const qty = parseFloat(row.querySelector('.inv-item-qty')?.value || 0);
+        const rate = parseFloat(row.querySelector('.inv-item-rate')?.value || 0);
+        const taxPct = parseFloat(row.querySelector('.inv-item-tax')?.value || 0);
+
+        const lineAmount = qty * rate;
+        subtotal += lineAmount;
+
+        const amtSpan = row.querySelector('.inv-item-amount');
+        if (amtSpan) {
+            amtSpan.innerText = '₹' + lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        if (taxPct > 0) {
+            const lineTax = (lineAmount * taxPct) / 100;
+            taxBuckets[taxPct] = (taxBuckets[taxPct] || 0) + lineTax;
+        }
+    });
+
+    const subTotalEl = document.getElementById('invCalcSubTotal');
+    if (subTotalEl) {
+        subTotalEl.innerText = '₹' + subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    const discountVal = parseFloat(document.getElementById('invDiscountVal')?.value || 0);
+    const shippingVal = parseFloat(document.getElementById('invShippingVal')?.value || 0);
+    const shippingTaxRate = parseFloat(document.getElementById('invShippingTaxSelect')?.value || 0);
+
+    // Toggle Invoice Shipping Tax & SAC visibility
+    const invShipTaxRow = document.getElementById('invShippingTaxRow');
+    const invShipSacRow = document.getElementById('invShippingSacRow');
+    if (invShipTaxRow) {
+        invShipTaxRow.style.display = shippingVal > 0 ? 'flex' : 'none';
+    }
+    if (invShipSacRow) {
+        invShipSacRow.style.display = (shippingVal > 0 && shippingTaxRate > 0) ? 'flex' : 'none';
+    }
+
+    if (shippingVal > 0 && shippingTaxRate > 0) {
+        const shipTaxAmount = (shippingVal * shippingTaxRate) / 100;
+        taxBuckets[shippingTaxRate] = (taxBuckets[shippingTaxRate] || 0) + shipTaxAmount;
+    }
+
+    // Build Tax Rows: CGST + SGST (intra) OR IGST (inter)
+    const taxRowsContainer = document.getElementById('invDynamicTaxRows');
+    let totalTax = 0;
+    let taxRowsHtml = '';
+
+    Object.keys(taxBuckets).forEach(pctStr => {
+        const pct = parseFloat(pctStr);
+        const amount = taxBuckets[pct];
+        totalTax += amount;
+
+        if (isIntraState) {
+            const halfPct = pct / 2;
+            const halfAmt = amount / 2;
+            taxRowsHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                    <span>CGST${halfPct} (${halfPct}%)</span>
+                    <span style="font-weight: 700; color: #0f172a;">₹${halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                    <span>SGST${halfPct} (${halfPct}%)</span>
+                    <span style="font-weight: 700; color: #0f172a;">₹${halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+            `;
+        } else {
+            taxRowsHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #475569;">
+                    <span>IGST${pct} (${pct}%)</span>
+                    <span style="font-weight: 700; color: #0f172a;">₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+            `;
+        }
+    });
+
+    if (taxRowsContainer) {
+        taxRowsContainer.innerHTML = taxRowsHtml || '<div style="color: #94a3b8; font-style: italic; font-size: 0.8rem;">No GST applied</div>';
+    }
+
+    // Exact raw total
+    const rawTotal = (subtotal - discountVal) + shippingVal + totalTax;
+
+    const roundOffInput = document.getElementById('invRoundOffVal');
+    let roundOff = 0;
+    if (autoRoundOff && roundOffInput) {
+        const roundedInt = Math.round(rawTotal);
+        roundOff = Math.round((roundedInt - rawTotal) * 100) / 100;
+        roundOffInput.value = roundOff.toFixed(2);
+    } else if (roundOffInput) {
+        roundOff = parseFloat(roundOffInput.value || 0);
+    }
+
+    const finalTotal = Math.max(0, rawTotal + roundOff);
+    const grandTotalEl = document.getElementById('invCalcGrandTotal');
+    if (grandTotalEl) {
+        grandTotalEl.innerText = '₹' + finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+};
+
+window.submitZohoInvoiceForm = async function(status = 'sent') {
+    const data = currentZohoInvoiceData;
+    if (!data) return;
+
+    const form = document.getElementById('zohoInvoiceForm');
+    if (form && !form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    const btnDraft = document.getElementById('btnSaveInvoiceDraft');
+    const btnSend = document.getElementById('btnSaveInvoiceSend');
+    if (btnDraft) btnDraft.disabled = true;
+    if (btnSend) {
+        btnSend.disabled = true;
+        btnSend.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px;"></div> Syncing with Zoho...';
+    }
+
+    // Gather line items
+    const rows = document.querySelectorAll('#zohoInvoiceItemsBody tr');
+    const lineItems = [];
+    rows.forEach(row => {
+        const name = row.querySelector('.inv-item-name')?.value?.trim();
+        const sku = row.querySelector('.inv-item-sku')?.value?.trim();
+        const hsn = row.querySelector('.inv-item-hsn')?.value?.trim();
+        const soItemId = row.querySelector('.inv-item-so-id')?.value;
+        const qty = parseFloat(row.querySelector('.inv-item-qty')?.value || 1);
+        const rate = parseFloat(row.querySelector('.inv-item-rate')?.value || 0);
+        const taxPct = parseFloat(row.querySelector('.inv-item-tax')?.value || 5);
+
+        if (name) {
+            lineItems.push({
+                name,
+                sku,
+                hsn_or_sac: hsn,
+                salesorder_item_id: soItemId || undefined,
+                quantity: qty,
+                rate: rate,
+                tax_percentage: taxPct
+            });
+        }
+    });
+
+    const payload = {
+        customer_id: data.customer_id,
+        customer_name: data.customer_name,
+        salesorder_id: data.salesorder_id,
+        salesorder_number: data.salesorder_number,
+        order_id: data.order_id,
+        invoice_number: document.getElementById('invNumber')?.value?.trim(),
+        date: document.getElementById('invDate')?.value,
+        due_date: document.getElementById('invDueDate')?.value,
+        payment_terms: document.getElementById('invTerms')?.value || 0,
+        payment_terms_label: document.getElementById('invTerms')?.selectedOptions?.[0]?.text || 'Due on Receipt',
+        place_of_supply: document.getElementById('invPlaceOfSupply')?.value || 'KA',
+        salesperson_id: document.getElementById('invSalesperson')?.value || undefined,
+        salesperson_name: document.getElementById('invSalesperson')?.selectedOptions?.[0]?.text || undefined,
+        cf_destination: document.getElementById('invDestination')?.value?.trim() || 'Pincode',
+        cf_terms_of_delivery: document.getElementById('invTermsOfDelivery')?.value?.trim() || '',
+        cf_contact_no: document.getElementById('invContactNo')?.value?.trim() || '',
+        discount: parseFloat(document.getElementById('invDiscountVal')?.value || 0),
+        shipping_charge: parseFloat(document.getElementById('invShippingVal')?.value || 0),
+        shipping_charge_tax_id: document.getElementById('invShippingTaxSelect')?.selectedOptions?.[0]?.dataset.id || undefined,
+        shipping_charge_sac_code: document.getElementById('invShippingSacInput')?.value || undefined,
+        adjustment: parseFloat(document.getElementById('invRoundOffVal')?.value || 0),
+        notes: document.getElementById('invCustomerNotes')?.value?.trim(),
+        terms: document.getElementById('invTermsConditions')?.value?.trim(),
+        line_items: lineItems,
+        status: status
+    };
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${BILLING_API_URL}/invoices/create-zoho-invoice`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+
+        if (res.ok && result.success) {
+            alert(`🎉 ${result.message || 'Invoice generated and synced successfully!'}`);
+            closeZohoInvoiceModal();
+
+            // Refresh invoices list if on invoices page
+            if (typeof loadInvoices === 'function') loadInvoices();
+            // Refresh SO workstation if open
+            if (data.salesorder_number && typeof openZohoSoDetails === 'function') {
+                openZohoSoDetails(data.salesorder_number);
+            }
+            if (typeof loadSalesOrdersList === 'function') loadSalesOrdersList();
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+        } else {
+            alert(`Error generating invoice: ${result.message || 'Unknown error'}`);
+        }
+    } catch (err) {
+        alert('Server / Network Error: ' + err.message);
+    } finally {
+        if (btnDraft) btnDraft.disabled = false;
+        if (btnSend) {
+            btnSend.disabled = false;
+            btnSend.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Save and Send ➔';
+        }
+    }
+};

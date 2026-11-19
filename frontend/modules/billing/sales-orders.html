@@ -525,7 +525,7 @@
             tbody.innerHTML = pageItems.map(o => `
                 <tr>
                     <td style="font-weight: 700; color: #1e293b;">${window.formatOrderId ? window.formatOrderId(o.order_id, o.created_at) : '#SGB-' + o.order_id}</td>
-                    <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="viewSalesOrderDetails('${o.sales_order_number || o.order_id}')">
+                    <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="viewSalesOrderDetails('${o.order_id || o.sales_order_number}')">
                         <span style="text-decoration: underline; text-underline-offset: 3px;">${o.sales_order_number || ('SO-' + new Date(o.created_at).getFullYear() + '-' + String(o.order_id).padStart(5, '0'))}</span>
                         ${o.zoho_salesorder_id ? '<span style="font-size: 0.65rem; background: #dbeafe; color: #1e40af; padding: 2px 5px; border-radius: 4px; margin-left: 4px; font-weight: 700;">Zoho SO</span>' : ''}
                     </td>
@@ -541,7 +541,7 @@
                     <td><span class="status-badge status-${o.order_status || 'approved'}">${(o.order_status || 'approved').toUpperCase()}</span></td>
                     <td>
                         ${o.order_status === 'approved' || o.order_status === 'so_created' ? `
-                            <button onclick="openOrderBilling(${o.order_id})" class="btn-billing primary" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">
+                            <button onclick="openZohoInvoiceWorkstation('${o.sales_order_number || o.order_id}')" class="btn-billing primary" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">
                                 <i class="fa-solid fa-file-invoice"></i> Generate Invoice
                             </button>
                         ` : `
@@ -573,10 +573,13 @@
             } else {
                 filteredSalesOrders = allSalesOrdersData.filter(o => {
                     const idStr = String(o.order_id || '').toLowerCase();
-                    const soStr = String(o.sales_order_number || '').toLowerCase();
+                    const formattedId = window.formatOrderId ? window.formatOrderId(o.order_id, o.created_at).toLowerCase() : ('#sgb-' + idStr);
+                    const soStr = String(o.sales_order_number || ('so-' + new Date(o.created_at).getFullYear() + '-' + String(o.order_id).padStart(5, '0'))).toLowerCase();
                     const custStr = String(o.customer_name || '').toLowerCase();
                     const phoneStr = String(o.phone || '').toLowerCase();
-                    return idStr.includes(term) || soStr.includes(term) || custStr.includes(term) || phoneStr.includes(term);
+                    const salespersonStr = String(o.sales_person_name || '').toLowerCase();
+                    const sourceStr = String(o.order_source || '').toLowerCase();
+                    return idStr.includes(term) || formattedId.includes(term) || soStr.includes(term) || custStr.includes(term) || phoneStr.includes(term) || salespersonStr.includes(term) || sourceStr.includes(term);
                 });
             }
             currentSoPage = 1;
@@ -587,5 +590,15 @@
             loadSalesOrdersList();
         });
     </script>
+
+    <!-- 1:1 ZOHO BOOKS INVOICE WORKSTATION MODAL -->
+    <div id="zohoInvoiceModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: #f8fafc; width: 100%; max-width: 1280px; height: 94vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div id="zohoInvoiceContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

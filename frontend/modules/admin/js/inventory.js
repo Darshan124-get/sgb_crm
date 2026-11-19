@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         productSets: [],
         inventory: [],
         logs: [],
+        zohoItems: [],
         filters: {
             search: '',
             category: 'all',
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchProductSets(),
             fetchInventory(),
             fetchLogs(),
+            fetchZohoItems(),
             checkLowStock()
         ]);
         populateCategoryFilter();
@@ -86,6 +88,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     await refreshAll();
 
     // ─── API Fetchers ───────────────────────────────────────────
+    
+    async function fetchZohoItems() {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${window.API_URL}/products/zoho-items`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                state.zohoItems = data.items || [];
+            }
+        } catch (e) { console.error('Error fetching Zoho items:', e); }
+    }
+
     async function fetchProducts() {
         try {
             const token = localStorage.getItem('token');
@@ -206,7 +222,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div>
                             <span style="font-size:0.65rem; font-weight:700; color:#94a3b8; text-transform:uppercase;">${p.category_name || 'No Category'}</span>
                             <h3 style="font-size:1rem; font-weight:700; margin:0.25rem 0;">${p.name}</h3>
-                            <p style="font-size:0.75rem; color:#64748b; margin-top:-2px;">#${p.sku || 'No SKU'}</p>
+                            <div style="display:flex; align-items:center; gap:6px; margin-top:-2px;">
+                                <p style="font-size:0.75rem; color:#64748b; margin:0;">#${p.sku || 'No SKU'}</p>
+                                ${p.zoho_item_id ? '<span style="font-size:0.65rem; background:#dcfce7; color:#166534; padding:1px 6px; border-radius:4px; font-weight:700;">Zoho Linked</span>' : '<span style="font-size:0.65rem; background:#fee2e2; color:#991b1b; padding:1px 6px; border-radius:4px; font-weight:700;">No Zoho</span>'}
+                            </div>
                         </div>
                         <span class="stock-badge ${stockStatus}">${stockLabel}</span>
                     </div>
@@ -357,9 +376,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         const catOptions = flattenCategories(state.categories).map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
         const content = `
             <form id="productForm" style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; padding:0.5rem;">
+                <div style="grid-column:1 / -1; background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:1rem;">
+                    <label class="premium-label" style="color:#166534; font-weight:800; display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                        <span>🔗 Link with Zoho Item (Auto-fills Name & SKU)</span>
+                        <span style="font-size:0.75rem; color:#15803d; font-weight:600;">Optional</span>
+                    </label>
+                    <select id="addZohoItemSelect" name="zoho_item_id" class="form-control-premium" onchange="window.onZohoItemSelectChange(this, 'add')" style="background:white; border-color:#86efac; font-weight:600;">
+                        <option value="">-- Select Zoho Books Item to Map --</option>
+                        ${(state.zohoItems || []).map(z => `<option value="${z.item_id}" data-name="${z.name.replace(/"/g, '&quot;')}" data-sku="${(z.sku || '').replace(/"/g, '&quot;')}" data-rate="${z.rate || 0}">${z.name} ${z.sku ? '[' + z.sku + ']' : ''}</option>`).join('')}
+                    </select>
+                </div>
+
                 <div style="grid-column:1 / -1;">
                     <label class="premium-label">Product Name</label>
-                    <input type="text" name="name" class="form-control-premium" required placeholder="e.g. Battery Sprayer 16L">
+                    <input type="text" id="addProductNameInput" name="name" class="form-control-premium" required placeholder="e.g. Battery Sprayer 16L">
                 </div>
                 
                 <div>
@@ -370,8 +400,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </select>
                 </div>
                 <div>
-                    <label class="premium-label">SKU (Auto-generated if empty)</label>
-                    <input type="text" name="sku" class="form-control-premium" placeholder="Leave empty for auto">
+                    <label class="premium-label">SKU (Zoho SKU)</label>
+                    <input type="text" id="addProductSkuInput" name="sku" class="form-control-premium" placeholder="Leave empty for auto">
                 </div>
                 <div>
                     <label class="premium-label">HSN/SAC Code</label>
@@ -600,9 +630,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const content = `
             <form id="editProductForm" style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; padding:0.5rem;">
+                <div style="grid-column:1 / -1; background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:1rem;">
+                    <label class="premium-label" style="color:#166534; font-weight:800; display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                        <span>🔗 Linked Zoho Item (Auto-maps to Zoho Books)</span>
+                        <span style="font-size:0.75rem; color:#15803d; font-weight:600;">${p.zoho_item_id ? '✅ Currently Linked' : '⚠️ Not Linked'}</span>
+                    </label>
+                    <select id="editZohoItemSelect" name="zoho_item_id" class="form-control-premium" onchange="window.onZohoItemSelectChange(this, 'edit')" style="background:white; border-color:#86efac; font-weight:600;">
+                        <option value="">-- Select Zoho Books Item to Map --</option>
+                        ${(state.zohoItems || []).map(z => {
+                            const isSel = (p.zoho_item_id && p.zoho_item_id === z.item_id);
+                            return `<option value="${z.item_id}" data-name="${z.name.replace(/"/g, '&quot;')}" data-sku="${(z.sku || '').replace(/"/g, '&quot;')}" data-rate="${z.rate || 0}" ${isSel ? 'selected' : ''}>${z.name} ${z.sku ? '[' + z.sku + ']' : ''}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+
                 <div style="grid-column:1 / -1;">
                     <label class="premium-label">Product Name</label>
-                    <input type="text" name="name" class="form-control-premium" required value="${p.name}">
+                    <input type="text" id="editProductNameInput" name="name" class="form-control-premium" required value="${p.name}">
                 </div>
                 
                 <div>
@@ -613,8 +657,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </select>
                 </div>
                 <div>
-                    <label class="premium-label">SKU</label>
-                    <input type="text" name="sku" class="form-control-premium" value="${p.sku || ''}">
+                    <label class="premium-label">SKU (Zoho SKU)</label>
+                    <input type="text" id="editProductSkuInput" name="sku" class="form-control-premium" value="${p.sku || ''}">
                 </div>
                 <div>
                     <label class="premium-label">HSN/SAC Code</label>
@@ -1141,3 +1185,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.onSetProductInputChange = onSetProductInputChange;
     window.deleteProductSet = deleteProductSet;
 });
+
+
+    window.onZohoItemSelectChange = function(selectEl, mode) {
+        const opt = selectEl.options[selectEl.selectedIndex];
+        if (!opt || !opt.value) return;
+        const zSku = opt.dataset.sku;
+        const zName = opt.dataset.name;
+        const zRate = parseFloat(opt.dataset.rate) || 0;
+
+        const nameInput = document.getElementById(mode === 'add' ? 'addProductNameInput' : 'editProductNameInput');
+        const skuInput = document.getElementById(mode === 'add' ? 'addProductSkuInput' : 'editProductSkuInput');
+
+        if (skuInput && zSku) {
+            skuInput.value = zSku;
+        }
+        if (nameInput && mode === 'add' && !nameInput.value.trim()) {
+            nameInput.value = zName;
+        }
+    };

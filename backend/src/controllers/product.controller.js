@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const zohoAuth = require('../services/zoho/zohoAuth.service');
+const axios = require('axios');
 
 // Helper to generate SKU
 const generateSKU = (name) => {
@@ -6,6 +8,32 @@ const generateSKU = (name) => {
     const timestamp = Date.now().toString().slice(-4);
     const random = Math.floor(100 + Math.random() * 899);
     return `${prefix}-${timestamp}${random}`;
+};
+
+// Fetch Zoho items catalog for dropdown mapping
+exports.getZohoItems = async (req, res) => {
+    try {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) return res.json({ success: true, items: [] });
+        const headers = await zohoAuth.getAuthHeaders();
+        let allItems = [];
+        for (let page = 1; page <= 3; page++) {
+            const zRes = await axios.get(`${zohoAuth.apiDomain}/items?organization_id=${orgId}&page=${page}&per_page=200`, { headers });
+            allItems = allItems.concat(zRes.data?.items || []);
+            if (!zRes.data?.page_context?.has_more_page) break;
+        }
+        const cleanItems = allItems.map(i => ({
+            item_id: i.item_id,
+            name: i.name,
+            sku: i.sku || '',
+            rate: i.rate || 0,
+            status: i.status || 'active'
+        }));
+        res.json({ success: true, items: cleanItems });
+    } catch (err) {
+        console.error('Error fetching Zoho items for dropdown:', err);
+        res.status(500).json({ success: false, message: err.message, items: [] });
+    }
 };
 
 exports.getProducts = async (req, res) => {
@@ -28,7 +56,7 @@ exports.createProduct = async (req, res) => {
     const { 
         name, category_id, description, unit, selling_price, 
         dealer_price, min_stock_alert, status, image_url, 
-        discount_percentage, opening_stock, hsn_code 
+        discount_percentage, opening_stock, hsn_code, zoho_item_id 
     } = req.body;
 
     const sku = req.body.sku || generateSKU(name);
@@ -42,12 +70,13 @@ exports.createProduct = async (req, res) => {
             `INSERT INTO products (
                 name, category_id, description, sku, unit, 
                 selling_price, dealer_price, min_stock_alert, 
-                status, image_url, discount_percentage, hsn_code
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                status, image_url, discount_percentage, hsn_code, zoho_item_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 name, category_id || null, description, sku, unit, 
                 selling_price || 0, dealer_price || 0, min_stock_alert || 10,
-                status || 'active', image_url || null, discount_percentage || 0, hsn_code || ''
+                status || 'active', image_url || null, discount_percentage || 0, hsn_code || '',
+                zoho_item_id || null
             ]
         );
 
@@ -81,7 +110,7 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     const { 
         name, category_id, description, sku, unit, selling_price, 
-        dealer_price, min_stock_alert, status, image_url, discount_percentage, hsn_code 
+        dealer_price, min_stock_alert, status, image_url, discount_percentage, hsn_code, zoho_item_id 
     } = req.body;
 
     try {
@@ -89,12 +118,12 @@ exports.updateProduct = async (req, res) => {
             `UPDATE products SET 
                 name = ?, category_id = ?, description = ?, sku = ?, unit = ?, 
                 selling_price = ?, dealer_price = ?, min_stock_alert = ?, 
-                status = ?, image_url = ?, discount_percentage = ?, hsn_code = ? 
+                status = ?, image_url = ?, discount_percentage = ?, hsn_code = ?, zoho_item_id = ? 
              WHERE product_id = ?`,
             [
                 name, category_id || null, description, sku, unit, 
                 selling_price, dealer_price, min_stock_alert, 
-                status, image_url, discount_percentage, hsn_code, req.params.id
+                status, image_url, discount_percentage, hsn_code, zoho_item_id || null, req.params.id
             ]
         );
         res.json({ message: 'Product updated successfully' });
@@ -105,8 +134,6 @@ exports.updateProduct = async (req, res) => {
 
 exports.deleteProduct = async (req, res) => {
     try {
-        // Soft delete or status change is often better, but for now we'll stick to DELETE
-        // The DB has ON DELETE CASCADE for inventory record.
         await pool.query('DELETE FROM products WHERE product_id = ?', [req.params.id]);
         res.json({ message: 'Product deleted successfully' });
     } catch (err) {

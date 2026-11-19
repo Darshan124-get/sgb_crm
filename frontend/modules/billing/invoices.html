@@ -199,13 +199,15 @@
                     <table class="billing-table">
                         <thead>
                             <tr>
-                                <th>Invoice #</th>
-                                <th>Order ID</th>
-                                <th>Customer</th>
-                                <th>Date</th>
-                                <th>Total Amount</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th>DATE</th>
+                                <th>INVOICE#</th>
+                                <th>ORDER NUMBER</th>
+                                <th>CUSTOMER NAME</th>
+                                <th>STATUS</th>
+                                <th>DUE DATE</th>
+                                <th>AMOUNT</th>
+                                <th>BALANCE DUE</th>
+                                <th>ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody id="invoicesBody">
@@ -234,6 +236,16 @@
             });
         }
     </script>
+
+    <!-- 1:1 ZOHO BOOKS INVOICE WORKSTATION MODAL -->
+    <div id="zohoInvoiceModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: #f8fafc; width: 100%; max-width: 1280px; height: 94vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div id="zohoInvoiceContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="text-align: center; padding: 5rem;"><div class="loader"></div></div>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

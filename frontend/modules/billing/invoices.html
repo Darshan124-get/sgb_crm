@@ -26,8 +26,11 @@
 
         .main-content {
             flex: 1;
-            padding: 1.5rem;
+            padding: 1.25rem 1.5rem;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
 
         .billing-table {
@@ -62,10 +65,9 @@
 
         .premium-card {
             background: white;
-            border-radius: 16px;
+            border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
             border: 1px solid #e2e8f0;
-            margin-bottom: 2rem;
             overflow: hidden;
         }
 
@@ -80,6 +82,8 @@
             position: sticky;
             top: 0;
             z-index: 1000;
+            border-radius: 12px;
+            margin-bottom: 1rem;
         }
 
         .search-bar {
@@ -101,17 +105,17 @@
         }
 
         .btn-billing {
-            padding: 0.6rem 1.2rem;
-            border-radius: 10px;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             cursor: pointer;
             transition: all 0.2s;
             border: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.45rem;
         }
 
         .btn-billing.primary {
@@ -123,43 +127,167 @@
             background: var(--billing-secondary);
         }
 
-        .btn-billing.success {
-            background: #10b981;
-            color: white;
+        .btn-billing.secondary {
+            background: white;
+            border: 1px solid #cbd5e1;
+            color: #334155;
         }
 
-        .btn-billing.success:hover {
-            background: #059669;
-        }
-
-        .filter-input-v2 {
-            border: 1px solid #e2e8f0;
-            padding: 0.6rem 1rem;
-            border-radius: 10px;
-            font-size: 0.875rem;
-            color: #1e293b;
-            font-weight: 600;
-            outline: none;
+        .btn-billing.secondary:hover {
             background: #f8fafc;
         }
 
         .status-badge {
             display: inline-block;
-            padding: 0.25rem 0.6rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 5px;
+            font-size: 0.72rem;
             font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.02em;
         }
 
-        .status-finalized, .status-billed, .status-paid {
-            background: #dcfce7;
-            color: #166534;
+        /* 1:1 Zoho Books Split-View Layout */
+        .zoho-split-wrapper {
+            display: flex;
+            height: calc(100vh - 110px);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
         }
 
-        .status-draft {
-            background: #fef3c7;
-            color: #92400e;
+        .zoho-sidebar {
+            width: 330px;
+            min-width: 300px;
+            max-width: 360px;
+            border-right: 1px solid #e2e8f0;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .zoho-sidebar-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .zoho-sidebar-search {
+            padding: 0.5rem 0.85rem;
+            border-bottom: 1px solid #f1f5f9;
+            background: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .zoho-sidebar-search input {
+            width: 100%;
+            padding: 0.45rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            outline: none;
+            background: #f8fafc;
+        }
+
+        .zoho-sidebar-search input:focus {
+            border-color: #3b82f6;
+            background: #ffffff;
+        }
+
+        .zoho-sidebar-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .zoho-sidebar-item {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            position: relative;
+        }
+
+        .zoho-sidebar-item:hover {
+            background: #f8fafc;
+        }
+
+        .zoho-sidebar-item.active {
+            background: #eff6ff;
+            border-left: 4px solid #2563eb;
+        }
+
+        .zoho-preview-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #f8fafc;
+        }
+
+        .zoho-preview-topbar {
+            padding: 0.75rem 1.5rem;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-shrink: 0;
+        }
+
+        .zoho-preview-viewport {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 2rem 3rem 2rem;
+            background: #f1f5f9;
+        }
+
+        /* Ribbon style for Paid status */
+        .zoho-ribbon-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 85px;
+            height: 85px;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .zoho-ribbon-paid {
+            font-size: 10px;
+            font-weight: 800;
+            color: #fff;
+            text-transform: uppercase;
+            text-align: center;
+            line-height: 22px;
+            transform: rotate(-45deg);
+            width: 120px;
+            display: block;
+            background: #10b981;
+            box-shadow: 0 3px 10px -5px rgba(0, 0, 0, 1);
+            position: absolute;
+            top: 17px;
+            left: -32px;
+            letter-spacing: 0.05em;
+        }
+
+        .zoho-paper {
+            background: white;
+            border-radius: 4px;
+            padding: 2.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            max-width: 950px;
+            margin: 0 auto;
+            border: 1px solid #e2e8f0;
+            position: relative;
         }
     </style>
 </head>
@@ -174,7 +302,7 @@
                 </div>
                 <div class="search-bar">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="globalSearch" placeholder="Search invoice #, customer, order ID..." oninput="filterInvoicesTable(this.value)">
+                    <input type="text" id="globalSearch" placeholder="Search invoice #, customer, order ID..." oninput="onGlobalInvoiceSearch(this.value)">
                 </div>
                 <div class="profile-section">
                     <span class="profile-name" id="userName">Billing Officer</span>
@@ -182,62 +310,82 @@
                 </div>
             </header>
 
-            <div style="padding: 1.5rem 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-                    <div>
-                        <h1 style="font-size: 1.85rem; color: #0f172a; font-weight: 800; margin: 0;">📑 Invoices</h1>
-                        <p style="color: #64748b; font-size: 0.875rem; margin-top: 4px;">Official GST Tax Invoices generated & reconciled with Zoho Books.</p>
+            <!-- 1:1 ZOHO BOOKS SPLIT VIEW CONTAINER -->
+            <div id="zohoSplitLayout" class="zoho-split-wrapper">
+                
+                <!-- LEFT COLUMN: All Invoices Sub Side Menu (Zoho 1:1) -->
+                <div class="zoho-sidebar">
+                    <div class="zoho-sidebar-header">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 0.95rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">All Invoices</span>
+                            <span id="invoicesCountBadge" style="background: #f1f5f9; color: #64748b; font-size: 0.72rem; padding: 2px 6px; border-radius: 10px; font-weight: 700;">—</span>
+                        </div>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <button class="btn-billing secondary" style="padding: 0.35rem 0.55rem; font-size: 0.75rem;" onclick="loadInvoices()" title="Refresh List">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 0.75rem;">
-                        <button class="btn-billing primary" onclick="loadInvoices()">
-                            <i class="fa-solid fa-rotate"></i> Refresh
-                        </button>
+
+                    <div class="zoho-sidebar-search">
+                        <input type="text" id="sidebarSearchInput" placeholder="Search in Invoices ( / )" oninput="filterSidebarInvoices(this.value)">
+                    </div>
+
+                    <div id="sidebarInvoicesList" class="zoho-sidebar-list">
+                        <div style="text-align: center; padding: 3rem 1rem; color: #94a3b8;">
+                            <div class="loader" style="margin: 0 auto 0.75rem auto; width: 24px; height: 24px;"></div>
+                            <span style="font-size: 0.8rem;">Loading invoices...</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="premium-card" style="padding: 0; overflow-x: auto;">
-                    <table class="billing-table">
-                        <thead>
-                            <tr>
-                                <th>DATE</th>
-                                <th>INVOICE#</th>
-                                <th>ORDER NUMBER</th>
-                                <th>CUSTOMER NAME</th>
-                                <th>STATUS</th>
-                                <th>DUE DATE</th>
-                                <th>AMOUNT</th>
-                                <th>BALANCE DUE</th>
-                                <th>ACTIONS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="invoicesBody">
-                            <tr>
-                                <td colspan="7" style="text-align:center; padding: 3rem;">
-                                    <div class="loader"></div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- RIGHT MAIN PANEL: Zoho Books Live Interactive Preview -->
+                <div class="zoho-preview-pane">
+                    
+                    <!-- Preview Top Action Bar -->
+                    <div id="previewTopBar" class="zoho-preview-topbar" style="display: none;">
+                        <!-- Left: Invoice Number -->
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <h2 id="previewInvoiceNum" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">
+                                —
+                            </h2>
+                            <span id="previewHeaderStatusBadge"></span>
+                        </div>
+
+                        <!-- Right: Action Buttons (1:1 Zoho Books) -->
+                        <div style="display: flex; gap: 0.4rem; align-items: center; position: relative;">
+                            <!-- PDF / Print -->
+                            <button type="button" class="btn-billing secondary" onclick="downloadSelectedInvoicePdf()" id="btnPreviewPdfPrint" title="Print or Download Official PDF">
+                                <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> PDF/Print ▾
+                            </button>
+
+                            <!-- Delete -->
+                            <button type="button" class="btn-billing" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;" onclick="deleteSelectedInvoice()" title="Delete Invoice">
+                                <i class="fa-solid fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Scrollable Viewport -->
+                    <div id="previewViewport" class="zoho-preview-viewport">
+                        <div id="previewEmptyPlaceholder" style="text-align: center; padding: 8rem 2rem; color: #94a3b8;">
+                            <i class="fa-solid fa-file-invoice" style="font-size: 3.5rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <h3 style="font-size: 1.2rem; color: #64748b; margin: 0;">Select an invoice to preview</h3>
+                            <p style="font-size: 0.85rem; margin-top: 6px;">Click on any invoice from the left panel to view its full Zoho Books details.</p>
+                        </div>
+
+                        <div id="previewDetailContent" style="display: none;">
+                            <!-- Dynamic Zoho Books 1:1 Invoice Preview -->
+                        </div>
+                    </div>
+
                 </div>
+
             </div>
         </main>
     </div>
 
-    <script src="../../js/config.js"></script>
-    <script src="../../js/components.js"></script>
-    <script src="js/billing.js"></script>
-    <script>
-        function filterInvoicesTable(query) {
-            const term = (query || '').toLowerCase().trim();
-            const rows = document.querySelectorAll('#invoicesBody tr');
-            rows.forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
-            });
-        }
-    </script>
-
-    <!-- 1:1 ZOHO BOOKS INVOICE WORKSTATION MODAL -->
+    <!-- 1:1 ZOHO BOOKS INVOICE WORKSTATION MODAL (For Creating Invoice) -->
     <div id="zohoInvoiceModal" class="zoho-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 100000; align-items: center; justify-content: center; padding: 1rem;">
         <div style="background: #f8fafc; width: 100%; max-width: 1280px; height: 94vh; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
             <div id="zohoInvoiceContent" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
@@ -246,6 +394,9 @@
         </div>
     </div>
 
+    <script src="../../js/config.js"></script>
+    <script src="../../js/components.js"></script>
+    <script src="js/billing.js"></script>
 </body>
 
 </html>

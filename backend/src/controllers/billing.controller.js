@@ -1459,6 +1459,17 @@ const getZohoInvoicePdf = async (req, res) => {
     }
 };
 
+const getZohoInvoiceDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await zohoInvoiceService.getInvoiceDetails(id);
+        res.json(result);
+    } catch (err) {
+        console.error('Error in getZohoInvoiceDetails:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 
 const getInvoiceById = async (req, res) => {
     const { id } = req.params;
@@ -1851,6 +1862,7 @@ module.exports = {
     prepareInvoiceFromSalesOrder,
     createZohoInvoice,
     getZohoInvoicePdf,
+    getZohoInvoiceDetails,
     cancelPendingOrder,
     hardDeletePendingOrder,
     getStats,

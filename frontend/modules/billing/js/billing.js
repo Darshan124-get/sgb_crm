@@ -2725,10 +2725,21 @@ async function generateFinalInvoice() {
     }
 }
 
+// Global cache for split-view invoices list
+let allInvoicesCache = [];
+let selectedInvoiceId = null;
+
 async function loadInvoices() {
     const tbody = document.getElementById('invoicesBody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
+    const sidebarList = document.getElementById('sidebarInvoicesList');
+    const countBadge = document.getElementById('invoicesCountBadge');
+
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem;"><div class="loader"></div></td></tr>';
+    }
+    if (sidebarList) {
+        sidebarList.innerHTML = '<div style="text-align: center; padding: 3rem 1rem; color: #94a3b8;"><div class="loader" style="margin: 0 auto 0.75rem auto; width: 24px; height: 24px;"></div><span style="font-size: 0.8rem;">Loading invoices...</span></div>';
+    }
 
     try {
         const res = await fetch(`${BILLING_API_URL}/invoices`, {
@@ -2737,91 +2748,545 @@ async function loadInvoices() {
         const invoices = await res.json();
 
         if (!Array.isArray(invoices) || invoices.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem; color: #64748b;">No invoices found.</td></tr>';
+            allInvoicesCache = [];
+            if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 3rem; color: #64748b;">No invoices found.</td></tr>';
+            if (sidebarList) sidebarList.innerHTML = '<div style="text-align:center; padding: 3rem 1rem; color: #94a3b8; font-size: 0.85rem;">No invoices found.</div>';
+            if (countBadge) countBadge.textContent = '0';
             return;
         }
 
-        tbody.innerHTML = invoices.map(inv => {
-            const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : (inv.created_time ? new Date(inv.created_time).toLocaleDateString('en-GB') : '—');
-            const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
-            const totalAmt = parseFloat(inv.total || inv.total_amount || 0);
-            const balanceDue = parseFloat(inv.balance !== undefined ? inv.balance : (inv.balance_due !== undefined ? inv.balance_due : totalAmt));
-            
-            // Format status badge matching Zoho Books (Paid, Partially Paid, Overdue, Draft, Sent)
-            const st = (inv.status || inv.invoice_status || 'draft').toLowerCase();
-            let statusBadge = '<span class="status-badge" style="background:#f1f5f9; color:#475569; font-weight:700;">' + st.toUpperCase() + '</span>';
-            if (st === 'paid') {
-                statusBadge = '<span class="status-badge" style="background:#dcfce7; color:#15803d; font-weight:700;">PAID</span>';
-            } else if (st === 'partially_paid') {
-                statusBadge = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">PARTIALLY PAID</span>';
-            } else if (st === 'overdue') {
-                statusBadge = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
-            } else if (st === 'sent') {
-                statusBadge = '<span class="status-badge" style="background:#eff6ff; color:#2563eb; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
-            } else if (st === 'draft') {
-                statusBadge = '<span class="status-badge" style="background:#fef3c7; color:#b45309; font-weight:700;">DRAFT</span>';
+        allInvoicesCache = invoices;
+        if (countBadge) countBadge.textContent = invoices.length;
+
+        // Render Table (if present)
+        if (tbody) {
+            tbody.innerHTML = invoices.map(inv => {
+                const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : (inv.created_time ? new Date(inv.created_time).toLocaleDateString('en-GB') : '—');
+                const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
+                const totalAmt = parseFloat(inv.total || inv.total_amount || 0);
+                const balanceDue = parseFloat(inv.balance !== undefined ? inv.balance : (inv.balance_due !== undefined ? inv.balance_due : totalAmt));
+                
+                const st = (inv.status || inv.invoice_status || 'draft').toLowerCase();
+                let statusBadge = '<span class="status-badge" style="background:#f1f5f9; color:#475569; font-weight:700;">' + st.toUpperCase() + '</span>';
+                if (st === 'paid') {
+                    statusBadge = '<span class="status-badge" style="background:#dcfce7; color:#15803d; font-weight:700;">PAID</span>';
+                } else if (st === 'partially_paid') {
+                    statusBadge = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">PARTIALLY PAID</span>';
+                } else if (st === 'overdue') {
+                    statusBadge = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
+                } else if (st === 'sent') {
+                    statusBadge = '<span class="status-badge" style="background:#eff6ff; color:#2563eb; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
+                } else if (st === 'draft') {
+                    statusBadge = '<span class="status-badge" style="background:#fef3c7; color:#b45309; font-weight:700;">DRAFT</span>';
+                }
+
+                const invIdParam = inv.zoho_invoice_id || inv.invoice_id;
+
+                return `
+                <tr style="transition: background 0.15s ease;">
+                    <td style="color: #64748b; font-weight: 500; white-space: nowrap;">${invDate}</td>
+                    <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="selectInvoiceForPreview('${invIdParam}')" title="View Zoho Invoice">
+                        <span style="text-decoration: underline; text-underline-offset: 3px;">${inv.invoice_number || '—'}</span>
+                    </td>
+                    <td style="font-weight: 600; color: #0f172a;">
+                        ${inv.salesorder_number && inv.salesorder_number !== '—' ? 
+                            `<span style="background: #f1f5f9; color: #334155; padding: 2px 7px; border-radius: 5px; font-size: 0.8rem; font-weight: 700; font-family: monospace; cursor: pointer;" onclick="if(typeof openZohoSoDetails === 'function') openZohoSoDetails('${inv.salesorder_number}')" title="Click to view Sales Order">${inv.salesorder_number}</span>` : 
+                            '<span style="color:#94a3b8;">—</span>'}
+                    </td>
+                    <td style="font-weight: 600; color: #0f172a;">${inv.customer_name || 'Customer'}</td>
+                    <td>${statusBadge}</td>
+                    <td style="color: #475569; font-size: 0.82rem; white-space: nowrap;">
+                        <div>${dueDate}</div>
+                        ${inv.due_days && st !== 'overdue' && st !== 'paid' ? `<div style="font-size: 0.72rem; color: #64748b;">${inv.due_days}</div>` : ''}
+                    </td>
+                    <td style="font-weight: 800; color: #0f172a; white-space: nowrap;">
+                        ₹${totalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style="font-weight: 800; color: ${balanceDue > 0 ? '#b91c1c' : '#15803d'}; white-space: nowrap;">
+                        ₹${balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap: 0.4rem; align-items:center;">
+                            <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem;" title="View / Print PDF" onclick="selectInvoiceForPreview('${invIdParam}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-billing" style="width: auto; padding: 0.4rem 0.65rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer; font-size: 0.78rem;" title="Delete Invoice from Zoho Books & DB" onclick="hardDeleteInvoiceBoth('${invIdParam}', '${inv.invoice_number}')">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        // Render Sidebar List (1:1 Zoho Books Split-View)
+        if (sidebarList) {
+            renderSidebarInvoices(invoices);
+            // Auto-select first invoice or currently selected invoice
+            const targetId = selectedInvoiceId || (invoices[0]?.zoho_invoice_id || invoices[0]?.invoice_id);
+            if (targetId) {
+                selectInvoiceForPreview(targetId);
             }
-
-            const invIdParam = inv.zoho_invoice_id || inv.invoice_id;
-
-            return `
-            <tr style="transition: background 0.15s ease;">
-                <!-- 1. DATE -->
-                <td style="color: #64748b; font-weight: 500; white-space: nowrap;">${invDate}</td>
-
-                <!-- 2. INVOICE# -->
-                <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="openZohoInvoicePdf('${invIdParam}')" title="View Official PDF">
-                    <span style="text-decoration: underline; text-underline-offset: 3px;">${inv.invoice_number || '—'}</span>
-                </td>
-
-                <!-- 3. ORDER NUMBER -->
-                <td style="font-weight: 600; color: #0f172a;">
-                    ${inv.salesorder_number && inv.salesorder_number !== '—' ? 
-                        `<span style="background: #f1f5f9; color: #334155; padding: 2px 7px; border-radius: 5px; font-size: 0.8rem; font-weight: 700; font-family: monospace; cursor: pointer;" onclick="if(typeof openZohoSoDetails === 'function') openZohoSoDetails('${inv.salesorder_number}')" title="Click to view Sales Order">${inv.salesorder_number}</span>` : 
-                        '<span style="color:#94a3b8;">—</span>'}
-                </td>
-
-                <!-- 4. CUSTOMER NAME -->
-                <td style="font-weight: 600; color: #0f172a;">${inv.customer_name || 'Customer'}</td>
-
-                <!-- 5. STATUS -->
-                <td>${statusBadge}</td>
-
-                <!-- 6. DUE DATE -->
-                <td style="color: #475569; font-size: 0.82rem; white-space: nowrap;">
-                    <div>${dueDate}</div>
-                    ${inv.due_days && st !== 'overdue' && st !== 'paid' ? `<div style="font-size: 0.72rem; color: #64748b;">${inv.due_days}</div>` : ''}
-                </td>
-
-                <!-- 7. AMOUNT -->
-                <td style="font-weight: 800; color: #0f172a; white-space: nowrap;">
-                    ₹${totalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-
-                <!-- 8. BALANCE DUE -->
-                <td style="font-weight: 800; color: ${balanceDue > 0 ? '#b91c1c' : '#15803d'}; white-space: nowrap;">
-                    ₹${balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-
-                <!-- 9. ACTIONS -->
-                <td>
-                    <div style="display:flex; gap: 0.4rem; align-items:center;">
-                        <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem;" title="View / Print PDF" onclick="openZohoInvoicePdf('${invIdParam}')">
-                            <i class="fas fa-file-pdf"></i>
-                        </button>
-                        <button class="btn-billing" style="width: auto; padding: 0.4rem 0.65rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer; font-size: 0.78rem;" title="Delete Invoice from Zoho Books & DB" onclick="hardDeleteInvoiceBoth('${invIdParam}', '${inv.invoice_number}')">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-            `;
-        }).join('');
+        }
     } catch (err) {
         console.error('Error in loadInvoices:', err);
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444; padding: 2rem;">Error loading invoices: ' + (err.message || 'Server error') + '</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: #ef4444; padding: 2rem;">Error loading invoices: ' + (err.message || 'Server error') + '</td></tr>';
+        if (sidebarList) sidebarList.innerHTML = '<div style="text-align:center; color:#ef4444; padding: 2rem 1rem; font-size: 0.85rem;">Error loading invoices.</div>';
     }
 }
+
+function renderSidebarInvoices(list) {
+    const sidebarList = document.getElementById('sidebarInvoicesList');
+    if (!sidebarList) return;
+
+    if (!list || list.length === 0) {
+        sidebarList.innerHTML = '<div style="text-align: center; padding: 3rem 1rem; color: #94a3b8; font-size: 0.85rem;">No invoices match search</div>';
+        return;
+    }
+
+    sidebarList.innerHTML = list.map(inv => {
+        const invId = inv.zoho_invoice_id || inv.invoice_id;
+        const isActive = (selectedInvoiceId === invId);
+        const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : (inv.created_time ? new Date(inv.created_time).toLocaleDateString('en-GB') : '—');
+        const totalAmt = parseFloat(inv.total || inv.total_amount || 0);
+
+        // Status badge styling
+        const st = (inv.status || inv.invoice_status || 'draft').toLowerCase();
+        let statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase;">' + st.toUpperCase() + '</span>';
+        if (st === 'paid') {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#16a34a; text-transform:uppercase;">PAID</span>';
+        } else if (st === 'partially_paid') {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#0284c7; text-transform:uppercase;">PARTIALLY PAID</span>';
+        } else if (st === 'overdue') {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#dc2626; text-transform:uppercase;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
+        } else if (st === 'sent') {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#2563eb; text-transform:uppercase;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
+        } else if (st === 'draft') {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#d97706; text-transform:uppercase;">DRAFT</span>';
+        }
+
+        return `
+        <div class="zoho-sidebar-item ${isActive ? 'active' : ''}" id="sidebar-inv-${invId}" onclick="selectInvoiceForPreview('${invId}')">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+                    ${inv.customer_name || 'Customer'}
+                </div>
+                <div style="font-weight: 800; font-size: 0.85rem; color: #0f172a; white-space: nowrap;">
+                    ₹${totalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 0.75rem; color: #64748b;">
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-weight: 600; color: #2563eb;">${inv.invoice_number || '—'}</span>
+                    <span>•</span>
+                    <span>${invDate}</span>
+                </div>
+            </div>
+            <div style="margin-top: 5px;">
+                ${statusBadge}
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+window.filterSidebarInvoices = function(query) {
+    const term = (query || '').toLowerCase().trim();
+    if (!term) {
+        renderSidebarInvoices(allInvoicesCache);
+        return;
+    }
+    const filtered = allInvoicesCache.filter(inv => {
+        const num = (inv.invoice_number || '').toLowerCase();
+        const cust = (inv.customer_name || '').toLowerCase();
+        const so = (inv.salesorder_number || '').toLowerCase();
+        return num.includes(term) || cust.includes(term) || so.includes(term);
+    });
+    renderSidebarInvoices(filtered);
+};
+
+window.onGlobalInvoiceSearch = function(query) {
+    window.filterSidebarInvoices(query);
+};
+
+let currentSelectedInvoiceData = null;
+
+window.selectInvoiceForPreview = async function(invId) {
+    selectedInvoiceId = invId;
+
+    // Update active highlight on sidebar items
+    document.querySelectorAll('.zoho-sidebar-item').forEach(el => el.classList.remove('active'));
+    const activeEl = document.getElementById(`sidebar-inv-${invId}`);
+    if (activeEl) activeEl.classList.add('active');
+
+    const topBar = document.getElementById('previewTopBar');
+    const placeholder = document.getElementById('previewEmptyPlaceholder');
+    const content = document.getElementById('previewDetailContent');
+
+    if (!content) return;
+
+    if (placeholder) placeholder.style.display = 'none';
+    if (topBar) topBar.style.display = 'flex';
+    content.style.display = 'block';
+
+    content.innerHTML = `
+        <div style="text-align: center; padding: 6rem 2rem; color: #64748b;">
+            <div class="loader" style="margin: 0 auto 1.5rem auto; width: 36px; height: 36px;"></div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: #0f172a;">Loading Invoice Preview...</div>
+            <div style="font-size: 0.85rem; margin-top: 4px;">Fetching 1:1 Zoho Books record, payments, and GST breakdowns</div>
+        </div>
+    `;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/details`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success || !data.invoice) {
+            content.innerHTML = `
+                <div style="padding: 4rem 2rem; text-align: center;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;"></i>
+                    <h3 style="margin: 0; color: #0f172a;">Unable to load Invoice details</h3>
+                    <p style="color: #64748b; font-size: 0.9rem; margin-top: 6px;">${data.message || 'Invoice record not found in Zoho Books'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        currentSelectedInvoiceData = data;
+        renderInvoicePreviewWorkstation(data);
+    } catch (err) {
+        content.innerHTML = `
+            <div style="padding: 4rem 2rem; text-align: center;">
+                <p style="color: #ef4444;">Error connecting to server: ${err.message}</p>
+            </div>
+        `;
+    }
+};
+
+window.renderInvoicePreviewWorkstation = function(payload) {
+    const content = document.getElementById('previewDetailContent');
+    const inv = payload.invoice || {};
+    const payments = payload.payments || [];
+
+    // Header values
+    const invNumEl = document.getElementById('previewInvoiceNum');
+    if (invNumEl) invNumEl.textContent = inv.invoice_number || '—';
+
+    const headerStatusBadge = document.getElementById('previewHeaderStatusBadge');
+    const st = (inv.status || 'draft').toLowerCase();
+    if (headerStatusBadge) {
+        if (st === 'paid') {
+            headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#dcfce7; color:#15803d;">PAID</span>';
+        } else if (st === 'partially_paid') {
+            headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1;">PARTIALLY PAID</span>';
+        } else if (st === 'overdue') {
+            headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c;">OVERDUE</span>';
+        } else {
+            headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#eff6ff; color:#2563eb;">' + (inv.status || 'DRAFT').toUpperCase() + '</span>';
+        }
+    }
+
+    // Dates & Terms
+    const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—';
+    const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
+    const terms = inv.payment_terms_label || (inv.payment_terms === 0 ? 'Due on Receipt' : (inv.payment_terms ? `Net ${inv.payment_terms}` : 'Due on Receipt'));
+
+    // Customer & Addresses
+    const customerName = inv.customer_name || 'Customer';
+    const bAddr = inv.billing_address || {};
+    const sAddr = inv.shipping_address || bAddr;
+
+    // Place of Supply
+    const pos = inv.place_of_supply ? `${inv.place_of_supply}` : 'KA';
+
+    // Payments Received Bar
+    let paymentsBarHtml = '';
+    if (payments.length > 0) {
+        paymentsBarHtml = `
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 1.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="padding: 0.75rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-receipt" style="color: #10b981;"></i>
+                    Payments Received <span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 10px; font-size: 0.72rem;">${payments.length}</span>
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 0.7rem; text-transform: uppercase;">
+                            <th style="padding: 0.5rem 1.25rem;">DATE</th>
+                            <th style="padding: 0.5rem 1.25rem;">PAYMENT #</th>
+                            <th style="padding: 0.5rem 1.25rem;">REFERENCE#</th>
+                            <th style="padding: 0.5rem 1.25rem;">PAYMENT MODE</th>
+                            <th style="padding: 0.5rem 1.25rem; text-align: right;">AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${payments.map(p => {
+                            const pDate = p.date ? new Date(p.date).toLocaleDateString('en-GB') : '—';
+                            const pAmt = parseFloat(p.amount || 0);
+                            return `
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 0.6rem 1.25rem; color: #334155;">${pDate}</td>
+                                <td style="padding: 0.6rem 1.25rem; font-weight: 700; color: #2563eb;">${p.payment_number || '—'}</td>
+                                <td style="padding: 0.6rem 1.25rem; color: #64748b;">${p.reference_number || '—'}</td>
+                                <td style="padding: 0.6rem 1.25rem; color: #334155; font-weight: 600;">${p.payment_mode || 'Bank'}</td>
+                                <td style="padding: 0.6rem 1.25rem; text-align: right; font-weight: 800; color: #16a34a;">₹${pAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        `;
+    }
+
+    // Line Items
+    const lineItems = inv.line_items || [];
+
+    // Taxes
+    const taxes = inv.taxes || [];
+    const subTotal = parseFloat(inv.sub_total || 0);
+    const shippingCharge = parseFloat(inv.shipping_charge || 0);
+    const roundOff = parseFloat(inv.adjustment || 0);
+    const totalAmount = parseFloat(inv.total || 0);
+    const balance = parseFloat(inv.balance !== undefined ? inv.balance : totalAmount);
+    const paymentMade = parseFloat(inv.payment_made || (totalAmount - balance));
+
+    content.innerHTML = `
+        <!-- Payments Bar (if any) -->
+        ${paymentsBarHtml}
+
+        <!-- Zoho Books Paper Container (1:1 Layout) -->
+        <div class="zoho-paper">
+            
+            <!-- Diagonal PAID Ribbon (Matching Zoho Books) -->
+            ${st === 'paid' ? `
+            <div class="zoho-ribbon-wrapper">
+                <div class="zoho-ribbon-paid">PAID</div>
+            </div>
+            ` : ''}
+
+            <!-- Company Header + TAX INVOICE Title -->
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; margin-bottom: 2rem; align-items: flex-start;">
+                <!-- Company Info with Logo -->
+                <div style="display: flex; gap: 1.25rem; align-items: flex-start;">
+                    <img src="../../assets/logo.png" alt="SGB Agro Logo" style="width: 75px; height: 75px; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+                    <div style="font-size: 0.82rem; color: #334155; line-height: 1.45;">
+                        <h2 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">
+                            Sri Gowri Bhargav Private Limited
+                        </h2>
+                        <div>Kelapet,</div>
+                        <div>Koppa Road,</div>
+                        <div>Koppa Karnataka 577126</div>
+                        <div>India</div>
+                        <div style="margin-top: 3px;"><strong>GSTIN:</strong> 29ABDCS5673G1ZY</div>
+                        <div><strong>PAN:</strong> ABDCS5673G</div>
+                        <div>sgb.koppa@gmail.com</div>
+                        <div>sgbagroindustries.com</div>
+                    </div>
+                </div>
+
+                <!-- TAX INVOICE Title -->
+                <div style="text-align: right;">
+                    <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">
+                        TAX INVOICE
+                    </h1>
+                </div>
+            </div>
+
+            <!-- Invoice Particulars Matrix (Matching Zoho Books) -->
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; margin-bottom: 2rem; font-size: 0.85rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
+                
+                <!-- Left: Invoice Meta -->
+                <div style="display: grid; grid-template-columns: 130px 1fr; row-gap: 0.4rem; color: #334155;">
+                    <span style="color: #64748b;">Invoice Number</span>
+                    <span style="font-weight: 700; color: #0f172a;">: ${inv.invoice_number || '—'}</span>
+
+                    <span style="color: #64748b;">Invoice Date</span>
+                    <span style="font-weight: 600; color: #0f172a;">: ${invDate}</span>
+
+                    <span style="color: #64748b;">Terms</span>
+                    <span style="font-weight: 600; color: #0f172a;">: ${terms}</span>
+
+                    <span style="color: #64748b;">Due Date</span>
+                    <span style="font-weight: 600; color: #0f172a;">: ${dueDate}</span>
+
+                    ${inv.salesorder_number ? `
+                    <span style="color: #64748b;">Order Number</span>
+                    <span style="font-weight: 700; color: #2563eb;">: ${inv.salesorder_number}</span>
+                    ` : ''}
+                </div>
+
+                <!-- Right: Place of Supply -->
+                <div style="display: grid; grid-template-columns: 120px 1fr; row-gap: 0.4rem; color: #334155;">
+                    <span style="color: #64748b;">Place Of Supply</span>
+                    <span style="font-weight: 700; color: #0f172a;">: ${pos}</span>
+                </div>
+            </div>
+
+            <!-- Bill To & Ship To Boxes (Matching Zoho Books) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 2rem;">
+                <!-- Bill To -->
+                <div style="padding: 1rem 1.25rem; border-right: 1px solid #e2e8f0; font-size: 0.82rem; color: #334155; line-height: 1.45;">
+                    <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 0.5rem;">BILL TO</div>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #2563eb; margin-bottom: 4px;">
+                        ${customerName}
+                    </div>
+                    ${bAddr.address ? `<div>${bAddr.address}</div>` : ''}
+                    ${bAddr.street2 ? `<div>${bAddr.street2}</div>` : ''}
+                    <div>${[bAddr.city, bAddr.state].filter(Boolean).join(', ')}</div>
+                    <div>${[bAddr.country || 'India', bAddr.zip].filter(Boolean).join(' - ')}</div>
+                    ${bAddr.phone ? `<div style="margin-top: 4px; color: #64748b;"><i class="fa-solid fa-phone" style="font-size:0.75rem;"></i> ${bAddr.phone}</div>` : ''}
+                </div>
+
+                <!-- Ship To -->
+                <div style="padding: 1rem 1.25rem; font-size: 0.82rem; color: #334155; line-height: 1.45;">
+                    <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 0.5rem;">SHIP TO</div>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #0f172a; margin-bottom: 4px;">
+                        ${customerName}
+                    </div>
+                    ${sAddr.address ? `<div>${sAddr.address}</div>` : ''}
+                    ${sAddr.street2 ? `<div>${sAddr.street2}</div>` : ''}
+                    <div>${[sAddr.city, sAddr.state].filter(Boolean).join(', ')}</div>
+                    <div>${[sAddr.country || 'India', sAddr.zip].filter(Boolean).join(' - ')}</div>
+                    ${sAddr.phone ? `<div style="margin-top: 4px; color: #64748b;"><i class="fa-solid fa-phone" style="font-size:0.75rem;"></i> ${sAddr.phone}</div>` : ''}
+                </div>
+            </div>
+
+            <!-- Items Table (1:1 Zoho Books Columns: #, Item & Description, HSN/SAC, Qty, Rate, Discount, Tax, Amount) -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 1.5rem;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">
+                            <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">#</th>
+                            <th style="padding: 0.75rem 1rem;">ITEM & DESCRIPTION</th>
+                            <th style="padding: 0.75rem 0.75rem; width: 90px; text-align: center;">HSN/SAC</th>
+                            <th style="padding: 0.75rem 0.75rem; width: 70px; text-align: right;">QTY</th>
+                            <th style="padding: 0.75rem 0.75rem; width: 100px; text-align: right;">RATE</th>
+                            <th style="padding: 0.75rem 0.75rem; width: 80px; text-align: right;">DISCOUNT</th>
+                            <th style="padding: 0.75rem 0.75rem; width: 90px; text-align: right;">TAX</th>
+                            <th style="padding: 0.75rem 1rem; width: 110px; text-align: right;">AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${lineItems.map((item, idx) => {
+                            const rate = parseFloat(item.rate || 0);
+                            const qty = parseFloat(item.quantity || 1);
+                            const discount = parseFloat(item.discount || 0);
+                            const itemTotal = parseFloat(item.item_total !== undefined ? item.item_total : (rate * qty - discount));
+                            const taxLabel = item.tax_name || (item.tax_percentage ? `${item.tax_percentage}%` : '—');
+
+                            return `
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 0.75rem 1rem; text-align: center; color: #94a3b8; font-weight: 600;">${idx + 1}</td>
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="font-weight: 700; color: #0f172a;">${item.name || 'Item'}</div>
+                                    ${item.description ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${item.description}</div>` : ''}
+                                </td>
+                                <td style="padding: 0.75rem 0.75rem; text-align: center; color: #64748b; font-family: monospace;">${item.hsn_or_sac || '—'}</td>
+                                <td style="padding: 0.75rem 0.75rem; text-align: right; font-weight: 600; color: #0f172a;">${qty}</td>
+                                <td style="padding: 0.75rem 0.75rem; text-align: right; color: #334155;">₹${rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style="padding: 0.75rem 0.75rem; text-align: right; color: #64748b;">${discount > 0 ? `₹${discount.toFixed(2)}` : '0'}</td>
+                                <td style="padding: 0.75rem 0.75rem; text-align: right; color: #475569; font-size: 0.75rem;">${taxLabel}</td>
+                                <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 700; color: #0f172a;">₹${itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bottom Breakdown Grid: Notes & Terms (Left) vs Totals (Right) -->
+            <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 3rem; margin-top: 1.5rem; align-items: flex-start;">
+                
+                <!-- Left: Customer Notes & Terms -->
+                <div style="font-size: 0.8rem; color: #475569; line-height: 1.5;">
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">Customer Notes</div>
+                        <div style="color: #64748b;">${inv.notes || 'Thanks for doing business with us.'}</div>
+                    </div>
+
+                    <div>
+                        <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">Terms & Conditions</div>
+                        <div style="color: #64748b; font-size: 0.75rem; line-height: 1.45; white-space: pre-line;">${inv.terms || '1. Goods once sold will not be taken back or exchanged.\n2. Payment must be made within the due date mentioned on the invoice.\n3. Late payment may attract additional charges or interest as applicable.\n4. Subject to Koppa Jurisdiction.'}</div>
+                    </div>
+                </div>
+
+                <!-- Right: Calculations Breakdown (Sub Total, Shipping, Taxes, Total, Payment Made, Balance) -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; font-size: 0.82rem;">
+                    
+                    <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; color: #475569;">
+                        <span>Sub Total</span>
+                        <span style="font-weight: 700; color: #0f172a;">₹${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    ${shippingCharge > 0 ? `
+                    <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; color: #475569;">
+                        <span>Shipping Charges</span>
+                        <span style="font-weight: 600; color: #0f172a;">₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    ` : ''}
+
+                    <!-- Taxes Breakdown -->
+                    ${taxes.map(t => `
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569; font-size: 0.8rem;">
+                        <span>${t.tax_name}</span>
+                        <span style="font-weight: 600; color: #0f172a;">₹${parseFloat(t.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    `).join('')}
+
+                    ${roundOff !== 0 ? `
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569; font-size: 0.8rem;">
+                        <span>Round Off</span>
+                        <span style="color: #64748b;">${roundOff > 0 ? '+' : ''}₹${roundOff.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+
+                    <div style="display: flex; justify-content: space-between; padding: 0.75rem 0 0.5rem 0; border-top: 2px solid #e2e8f0; margin-top: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #0f172a;">
+                        <span>Total</span>
+                        <span>₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; color: #16a34a; font-weight: 700;">
+                        <span>Payment Made</span>
+                        <span>(-) ₹${paymentMade.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; padding: 0.6rem 0 0.2rem 0; border-top: 1px dashed #cbd5e1; margin-top: 0.4rem; font-size: 1rem; font-weight: 800; color: ${balance > 0 ? '#dc2626' : '#16a34a'};">
+                        <span>Balance Due</span>
+                        <span>₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+};
+
+window.downloadSelectedInvoicePdf = function() {
+    if (!selectedInvoiceId) {
+        alert('Please select an invoice first');
+        return;
+    }
+    openZohoInvoicePdf(selectedInvoiceId);
+};
+
+window.deleteSelectedInvoice = function() {
+    if (!selectedInvoiceId || !currentSelectedInvoiceData) {
+        alert('Please select an invoice first');
+        return;
+    }
+    const invNum = currentSelectedInvoiceData.invoice?.invoice_number || selectedInvoiceId;
+    hardDeleteInvoiceBoth(selectedInvoiceId, invNum);
+};
 
 async function finalizeInvoice(invoiceId) {
     if (!confirm('Once finalized, this invoice becomes immutable and the order moves to Packing. Proceed?')) return;

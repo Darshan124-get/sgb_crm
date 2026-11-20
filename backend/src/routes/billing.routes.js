@@ -30,6 +30,7 @@ router.get('/orders', authenticateToken, requireBilling, billingController.getOr
 router.get('/invoices', authenticateToken, requireBilling, billingController.getAllInvoices);
 router.get('/invoices/prepare-from-so/:soId', authenticateToken, requireBilling, billingController.prepareInvoiceFromSalesOrder);
 router.post('/invoices/create-zoho-invoice', authenticateToken, requireBilling, billingController.createZohoInvoice);
+router.get('/invoices/:id/details', authenticateToken, requireBilling, billingController.getZohoInvoiceDetails);
 router.get('/invoices/:id/zoho-pdf', authenticateToken, requireBilling, billingController.getZohoInvoicePdf);
 
 // Order specifics

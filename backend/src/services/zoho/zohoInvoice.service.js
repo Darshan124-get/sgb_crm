@@ -602,6 +602,89 @@ class ZohoInvoiceService {
 
         return response.data;
     }
+
+    /**
+     * Get complete details of a single invoice from Zoho Books and CRM
+     * @param {string|number} invoiceId
+     */
+    async getInvoiceDetails(invoiceId) {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) throw new Error('ZOHO_ORGANIZATION_ID is not configured');
+
+        let zohoInvId = invoiceId;
+        let crmInvoice = null;
+        let crmOrder = null;
+
+        // Try lookup in CRM DB first
+        const [invRows] = await pool.query(
+            'SELECT * FROM invoices WHERE invoice_id = ? OR zoho_invoice_id = ? OR invoice_number = ? LIMIT 1',
+            [invoiceId, invoiceId, invoiceId]
+        );
+        if (invRows.length > 0) {
+            crmInvoice = invRows[0];
+            if (crmInvoice.zoho_invoice_id) {
+                zohoInvId = crmInvoice.zoho_invoice_id;
+            }
+            if (crmInvoice.order_id) {
+                const [orderRows] = await pool.query('SELECT * FROM orders WHERE order_id = ?', [crmInvoice.order_id]);
+                if (orderRows.length > 0) crmOrder = orderRows[0];
+            }
+        }
+
+        const headers = await zohoAuth.getAuthHeaders();
+        let zohoInvoice = null;
+        let payments = [];
+
+        try {
+            const invRes = await axios.get(
+                `${zohoAuth.apiDomain}/invoices/${zohoInvId}?organization_id=${orgId}`,
+                { headers }
+            );
+            if (invRes.data?.invoice) {
+                zohoInvoice = invRes.data.invoice;
+            }
+        } catch (err) {
+            // Try lookup by invoice_number
+            try {
+                const searchRes = await axios.get(
+                    `${zohoAuth.apiDomain}/invoices?invoice_number=${encodeURIComponent(invoiceId)}&organization_id=${orgId}`,
+                    { headers }
+                );
+                const list = searchRes.data?.invoices || [];
+                if (list.length > 0) {
+                    const fullRes = await axios.get(
+                        `${zohoAuth.apiDomain}/invoices/${list[0].invoice_id}?organization_id=${orgId}`,
+                        { headers }
+                    );
+                    zohoInvoice = fullRes.data?.invoice;
+                    zohoInvId = zohoInvoice?.invoice_id || zohoInvId;
+                }
+            } catch (err2) {
+                console.warn('Could not fetch invoice from Zoho Books:', err2.message);
+            }
+        }
+
+        // Fetch payments list associated with this invoice
+        if (zohoInvId) {
+            try {
+                const payRes = await axios.get(
+                    `${zohoAuth.apiDomain}/invoices/${zohoInvId}/payments?organization_id=${orgId}`,
+                    { headers }
+                );
+                payments = payRes.data?.payments || [];
+            } catch (payErr) {
+                console.warn('Error fetching invoice payments:', payErr.message);
+            }
+        }
+
+        return {
+            success: true,
+            invoice: zohoInvoice,
+            crm_invoice: crmInvoice,
+            order: crmOrder,
+            payments: payments
+        };
+    }
 }
 
 module.exports = new ZohoInvoiceService();

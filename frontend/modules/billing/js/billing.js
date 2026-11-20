@@ -3058,13 +3058,35 @@ window.renderInvoicePreviewWorkstation = function(payload) {
     const bAddr = inv.billing_address || {};
     const sAddr = inv.shipping_address || bAddr;
 
-    // Place of Supply with state name & code
-    const pos = inv.place_of_supply_with_state_code || (inv.place_of_supply ? `${inv.place_of_supply}` : 'Karnataka (29)');
+    // Format Place of Supply (e.g. KA -> Karnataka (29), MH -> Maharashtra (27))
+    const STATE_CODE_MAP = {
+        'KA': 'Karnataka (29)',
+        'MH': 'Maharashtra (27)',
+        'TN': 'Tamil Nadu (33)',
+        'KL': 'Kerala (32)',
+        'AP': 'Andhra Pradesh (37)',
+        'TG': 'Telangana (36)',
+        'GA': 'Goa (30)',
+        'GJ': 'Gujarat (24)',
+        'MP': 'Madhya Pradesh (23)',
+        'RJ': 'Rajasthan (08)',
+        'UP': 'Uttar Pradesh (09)',
+        'DL': 'Delhi (07)',
+        'HR': 'Haryana (06)',
+        'PB': 'Punjab (03)',
+        'WB': 'West Bengal (19)',
+        'BR': 'Bihar (10)',
+        'OR': 'Odisha (21)',
+        'AS': 'Assam (18)'
+    };
+    const rawPos = (inv.place_of_supply || 'KA').toUpperCase().trim();
+    const pos = inv.place_of_supply_with_state_code || STATE_CODE_MAP[rawPos] || (rawPos.length === 2 ? `${rawPos}` : inv.place_of_supply || 'Karnataka (29)');
 
-    // Custom Fields (Terms of Delivery, Contact No, etc.)
+    // Custom Fields (Terms of Delivery, Contact No, Destination, etc.)
     const customFields = inv.custom_fields || [];
     const termsOfDelivery = customFields.find(f => (f.label || '').toLowerCase().includes('delivery') || (f.placeholder || '').includes('delivery'))?.value || '';
     const contactNo = customFields.find(f => (f.label || '').toLowerCase().includes('contact') || (f.placeholder || '').includes('contact'))?.value || bAddr.phone || '';
+    const destination = customFields.find(f => (f.label || '').toLowerCase().includes('destination') || (f.placeholder || '').includes('destination'))?.value || '';
 
     // Payments Received Bar
     let paymentsBarHtml = '';
@@ -3197,6 +3219,11 @@ window.renderInvoicePreviewWorkstation = function(payload) {
                     <span style="color: #64748b;">Contact No</span>
                     <span style="font-weight: 600; color: #000000;">: ${contactNo}</span>
                     ` : ''}
+
+                    ${destination ? `
+                    <span style="color: #64748b;">Destination</span>
+                    <span style="font-weight: 600; color: #000000;">: ${destination}</span>
+                    ` : ''}
                 </div>
             </div>
 
@@ -3290,7 +3317,7 @@ window.renderInvoicePreviewWorkstation = function(payload) {
             <!-- Bottom Breakdown Grid: Total in words, Terms, Bank Details (Left) vs Totals (Right) -->
             <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 2.5rem; margin-top: 1.5rem; align-items: flex-start;">
                 
-                <!-- Left: In Words, Delivery, Bank Details -->
+                <!-- Left: In Words, Delivery, Terms, Bank Details -->
                 <div style="font-size: 0.78rem; color: #334155; line-height: 1.5;">
                     <div style="margin-bottom: 1.25rem;">
                         <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total in Words</div>
@@ -3311,61 +3338,96 @@ window.renderInvoicePreviewWorkstation = function(payload) {
                     </div>
 
                     <!-- Official Bank Details (1:1 Zoho Books) -->
-                    <div style="border-top: 1px solid #e2e8f0; padding-top: 0.75rem; color: #334155; font-size: 0.75rem;">
+                    <div style="margin-bottom: 1.25rem; color: #334155; font-size: 0.75rem;">
                         <div style="font-weight: 700; color: #000000; margin-bottom: 2px;">Bank Details</div>
                         <div>Bank Name: <strong>State Bank of India</strong></div>
                         <div>Account No.: <strong>00000039342203072</strong></div>
-                        <div>IFSC: <strong>SBIN0000860</strong></div>
+                        <div>IFSC: <strong>SBIN0015059</strong></div>
                         <div>Branch: <strong>Koppa</strong></div>
                     </div>
+
+                    <!-- Terms & Conditions (1:1 Zoho Books) -->
+                    <div style="font-size: 0.72rem; color: #475569; line-height: 1.45;">
+                        <div style="font-weight: 700; color: #000000; margin-bottom: 3px;">Terms & Conditions</div>
+                        <div style="white-space: pre-line;">${inv.terms || '1. Goods once sold will not be taken back or exchanged.\n2. Payment must be made within the due date mentioned on the invoice.\n3. Late payment may attract additional charges or interest as applicable.\n4. Any dispute regarding this invoice must be raised within 7 days from the invoice date.\n5. Warranty, if any, will be applicable as per company policy.\n6. Subject to Koppa Jurisdiction.'}</div>
+                    </div>
                 </div>
 
-                <!-- Right: Calculations Breakdown (1:1 Zoho Books Format) -->
-                <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1rem 1.25rem; font-size: 0.82rem;">
-                    
-                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569;">
-                        <span>Sub Total</span>
-                        <span style="font-weight: 700; color: #000000;">${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <!-- Right: Calculations Breakdown & Signature Box (1:1 Zoho Books Format) -->
+                <div>
+                    <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1rem 1.25rem; font-size: 0.82rem; margin-bottom: 1.5rem;">
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569;">
+                            <span>Sub Total</span>
+                            <span style="font-weight: 700; color: #000000;">${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        ${shippingCharge > 0 ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569;">
+                            <div>
+                                <div>Shipping Charges</div>
+                                ${inv.shipping_charge_tax_name ? `<div style="font-size: 0.7rem; color: #64748b;">(${inv.shipping_charge_tax_name})</div>` : ''}
+                                ${inv.shipping_charge_sac_code ? `<div style="font-size: 0.68rem; color: #64748b; font-family: monospace;">SAC: ${inv.shipping_charge_sac_code}</div>` : ''}
+                            </div>
+                            <span style="font-weight: 600; color: #000000;">${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        ` : ''}
+
+                        <!-- Taxes Breakdown -->
+                        ${taxes.map(t => `
+                        <div style="display: flex; justify-content: space-between; padding: 0.3rem 0; color: #475569; font-size: 0.8rem;">
+                            <span>${t.tax_name}</span>
+                            <span style="font-weight: 600; color: #000000;">${parseFloat(t.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        `).join('')}
+
+                        ${roundOff !== 0 ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.3rem 0; color: #475569; font-size: 0.8rem;">
+                            <span>Round off</span>
+                            <span style="color: #64748b;">${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+
+                        <div style="display: flex; justify-content: space-between; padding: 0.6rem 0 0.4rem 0; border-top: 1px solid #cbd5e1; margin-top: 0.4rem; font-size: 0.95rem; font-weight: 800; color: #000000;">
+                            <span>Total</span>
+                            <span>₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        ${paymentMade > 0 ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #dc2626; font-weight: 700;">
+                            <span>Payment Made</span>
+                            <span>(-) ${paymentMade.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        ` : ''}
+
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0 0.2rem 0; border-top: 1px dashed #cbd5e1; margin-top: 0.35rem; font-size: 0.92rem; font-weight: 800; color: ${balance > 0 ? '#000000' : '#16a34a'};">
+                            <span>Balance Due</span>
+                            <span>₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
                     </div>
 
-                    ${shippingCharge > 0 ? `
-                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569;">
-                        <span>Shipping Charges</span>
-                        <span style="font-weight: 600; color: #000000;">${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <!-- Authorized Signature Box (1:1 Zoho Books) -->
+                    <div style="border: 1px solid #cbd5e1; border-radius: 4px; padding: 1rem 1.25rem; text-align: center; background: white;">
+                        <div style="font-size: 0.75rem; color: #475569; text-align: left; margin-bottom: 0.5rem;">Gowrav Bhargav</div>
+                        <div style="height: 70px; display: flex; align-items: center; justify-content: center;">
+                            <svg width="150" height="60" viewBox="0 0 150 60" style="overflow: visible;">
+                                <path d="M20,40 Q35,5 50,30 T80,20 Q100,50 120,25 Q135,10 145,35 M50,25 C40,45 60,55 70,35 C80,15 110,30 130,45" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div style="border-top: 1px solid #e2e8f0; padding-top: 0.4rem; font-size: 0.72rem; color: #64748b; font-weight: 600;">
+                            Authorized Signature
+                        </div>
                     </div>
-                    ` : ''}
-
-                    <!-- Taxes Breakdown -->
-                    ${taxes.map(t => `
-                    <div style="display: flex; justify-content: space-between; padding: 0.3rem 0; color: #475569; font-size: 0.8rem;">
-                        <span>${t.tax_name}</span>
-                        <span style="font-weight: 600; color: #000000;">${parseFloat(t.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    `).join('')}
-
-                    ${roundOff !== 0 ? `
-                    <div style="display: flex; justify-content: space-between; padding: 0.3rem 0; color: #475569; font-size: 0.8rem;">
-                        <span>Round off</span>
-                        <span style="color: #64748b;">${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span>
-                    </div>
-                    ` : ''}
-
-                    <div style="display: flex; justify-content: space-between; padding: 0.6rem 0 0.4rem 0; border-top: 1px solid #cbd5e1; margin-top: 0.4rem; font-size: 0.95rem; font-weight: 800; color: #000000;">
-                        <span>Total</span>
-                        <span>₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #dc2626; font-weight: 700;">
-                        <span>Payment Made</span>
-                        <span>(-) ${paymentMade.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0 0.2rem 0; border-top: 1px dashed #cbd5e1; margin-top: 0.35rem; font-size: 0.92rem; font-weight: 800; color: ${balance > 0 ? '#000000' : '#16a34a'};">
-                        <span>Balance Due</span>
-                        <span>₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-
                 </div>
+
+            </div>
+
+            <!-- Bottom QR Code (UPI Scan to Pay - 1:1 Zoho Books) -->
+            <div style="margin-top: 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=upi://pay?pa=gowribhargavapvtltd@sbi&pn=Sri%20Gowri%20Bhargav%20Pvt%20Ltd" alt="UPI QR Code" style="width: 65px; height: 65px; border: 1px solid #e2e8f0; padding: 3px; border-radius: 4px;" onerror="this.style.display='none'">
+                <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Scan to Pay</span>
+            </div>
 
             </div>
 

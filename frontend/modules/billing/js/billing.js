@@ -2990,6 +2990,25 @@ window.selectInvoiceForPreview = async function(invId) {
     }
 };
 
+// Number to words helper (Indian English format)
+function getIndianWords(amount) {
+    const num = Math.round(parseFloat(amount) || 0);
+    if (!num || num === 0) return 'Zero Only';
+    const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const format = (n) => {
+        if (n < 20) return a[n];
+        if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+        if (n < 1000) return a[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + format(n % 100) : '');
+        if (n < 100000) return format(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + format(n % 1000) : '');
+        if (n < 10000000) return format(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + format(n % 100000) : '');
+        return format(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + format(n % 10000000) : '');
+    };
+
+    return 'Indian Rupee ' + format(num) + ' Only';
+}
+
 window.renderInvoicePreviewWorkstation = function(payload) {
     const content = document.getElementById('previewDetailContent');
     const inv = payload.invoice || {};
@@ -3013,6 +3032,22 @@ window.renderInvoicePreviewWorkstation = function(payload) {
         }
     }
 
+    // Ribbon Color & Label (Paid -> Green, Overdue -> Orange/Amber)
+    let ribbonHtml = '';
+    if (st === 'paid') {
+        ribbonHtml = `
+        <div class="zoho-ribbon-wrapper">
+            <div class="zoho-ribbon-paid" style="background: #10b981;">PAID</div>
+        </div>
+        `;
+    } else if (st === 'overdue') {
+        ribbonHtml = `
+        <div class="zoho-ribbon-wrapper">
+            <div class="zoho-ribbon-paid" style="background: #f59e0b;">OVERDUE</div>
+        </div>
+        `;
+    }
+
     // Dates & Terms
     const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : '—';
     const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
@@ -3023,8 +3058,13 @@ window.renderInvoicePreviewWorkstation = function(payload) {
     const bAddr = inv.billing_address || {};
     const sAddr = inv.shipping_address || bAddr;
 
-    // Place of Supply
-    const pos = inv.place_of_supply ? `${inv.place_of_supply}` : 'KA';
+    // Place of Supply with state name & code
+    const pos = inv.place_of_supply_with_state_code || (inv.place_of_supply ? `${inv.place_of_supply}` : 'Karnataka (29)');
+
+    // Custom Fields (Terms of Delivery, Contact No, etc.)
+    const customFields = inv.custom_fields || [];
+    const termsOfDelivery = customFields.find(f => (f.label || '').toLowerCase().includes('delivery') || (f.placeholder || '').includes('delivery'))?.value || '';
+    const contactNo = customFields.find(f => (f.label || '').toLowerCase().includes('contact') || (f.placeholder || '').includes('contact'))?.value || bAddr.phone || '';
 
     // Payments Received Bar
     let paymentsBarHtml = '';
@@ -3072,7 +3112,7 @@ window.renderInvoicePreviewWorkstation = function(payload) {
     // Line Items
     const lineItems = inv.line_items || [];
 
-    // Taxes
+    // Taxes & Totals
     const taxes = inv.taxes || [];
     const subTotal = parseFloat(inv.sub_total || 0);
     const shippingCharge = parseFloat(inv.shipping_charge || 0);
@@ -3080,28 +3120,25 @@ window.renderInvoicePreviewWorkstation = function(payload) {
     const totalAmount = parseFloat(inv.total || 0);
     const balance = parseFloat(inv.balance !== undefined ? inv.balance : totalAmount);
     const paymentMade = parseFloat(inv.payment_made || (totalAmount - balance));
+    const amountInWords = getIndianWords(totalAmount);
 
     content.innerHTML = `
         <!-- Payments Bar (if any) -->
         ${paymentsBarHtml}
 
-        <!-- Zoho Books Paper Container (1:1 Layout) -->
-        <div class="zoho-paper">
+        <!-- Zoho Books Paper Container (1:1 Exact Zoho Books Layout) -->
+        <div class="zoho-paper" style="background: white; border-radius: 2px; padding: 2.75rem 3rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); max-width: 960px; margin: 0 auto; border: 1px solid #cbd5e1; position: relative;">
             
-            <!-- Diagonal PAID Ribbon (Matching Zoho Books) -->
-            ${st === 'paid' ? `
-            <div class="zoho-ribbon-wrapper">
-                <div class="zoho-ribbon-paid">PAID</div>
-            </div>
-            ` : ''}
+            <!-- Diagonal Ribbon (PAID or OVERDUE) -->
+            ${ribbonHtml}
 
             <!-- Company Header + TAX INVOICE Title -->
-            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; margin-bottom: 2rem; align-items: flex-start;">
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; margin-bottom: 1.75rem; align-items: flex-start;">
                 <!-- Company Info with Logo -->
                 <div style="display: flex; gap: 1.25rem; align-items: flex-start;">
-                    <img src="../../assets/logo.png" alt="SGB Agro Logo" style="width: 75px; height: 75px; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
-                    <div style="font-size: 0.82rem; color: #334155; line-height: 1.45;">
-                        <h2 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">
+                    <img src="../../assets/logo.png" alt="SGB Agro Logo" style="width: 80px; height: 80px; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+                    <div style="font-size: 0.8rem; color: #1e293b; line-height: 1.45;">
+                        <h2 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: #000000; font-family: 'Outfit', sans-serif;">
                             Sri Gowri Bhargav Private Limited
                         </h2>
                         <div>Kelapet,</div>
@@ -3117,107 +3154,132 @@ window.renderInvoicePreviewWorkstation = function(payload) {
 
                 <!-- TAX INVOICE Title -->
                 <div style="text-align: right;">
-                    <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">
+                    <h1 style="font-size: 2.1rem; font-weight: 800; color: #000000; margin: 0; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">
                         TAX INVOICE
                     </h1>
                 </div>
             </div>
 
-            <!-- Invoice Particulars Matrix (Matching Zoho Books) -->
-            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; margin-bottom: 2rem; font-size: 0.85rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
+            <!-- Invoice Particulars Matrix (Matching Zoho Books 1:1) -->
+            <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem; margin-bottom: 1.5rem; display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; font-size: 0.82rem;">
                 
-                <!-- Left: Invoice Meta -->
-                <div style="display: grid; grid-template-columns: 130px 1fr; row-gap: 0.4rem; color: #334155;">
+                <!-- Left Details -->
+                <div style="display: grid; grid-template-columns: 120px 1fr; row-gap: 0.35rem; color: #334155;">
                     <span style="color: #64748b;">Invoice Number</span>
-                    <span style="font-weight: 700; color: #0f172a;">: ${inv.invoice_number || '—'}</span>
+                    <span style="font-weight: 700; color: #000000;">: ${inv.invoice_number || '—'}</span>
 
                     <span style="color: #64748b;">Invoice Date</span>
-                    <span style="font-weight: 600; color: #0f172a;">: ${invDate}</span>
+                    <span style="font-weight: 600; color: #000000;">: ${invDate}</span>
 
                     <span style="color: #64748b;">Terms</span>
-                    <span style="font-weight: 600; color: #0f172a;">: ${terms}</span>
+                    <span style="font-weight: 600; color: #000000;">: ${terms}</span>
 
                     <span style="color: #64748b;">Due Date</span>
-                    <span style="font-weight: 600; color: #0f172a;">: ${dueDate}</span>
+                    <span style="font-weight: 600; color: #000000;">: ${dueDate}</span>
 
                     ${inv.salesorder_number ? `
-                    <span style="color: #64748b;">Order Number</span>
+                    <span style="color: #64748b;">P.O.#</span>
                     <span style="font-weight: 700; color: #2563eb;">: ${inv.salesorder_number}</span>
                     ` : ''}
                 </div>
 
-                <!-- Right: Place of Supply -->
-                <div style="display: grid; grid-template-columns: 120px 1fr; row-gap: 0.4rem; color: #334155;">
+                <!-- Right Details -->
+                <div style="display: grid; grid-template-columns: 130px 1fr; row-gap: 0.35rem; color: #334155;">
                     <span style="color: #64748b;">Place Of Supply</span>
-                    <span style="font-weight: 700; color: #0f172a;">: ${pos}</span>
+                    <span style="font-weight: 700; color: #000000;">: ${pos}</span>
+
+                    ${termsOfDelivery ? `
+                    <span style="color: #64748b;">Terms of Delivery</span>
+                    <span style="font-weight: 600; color: #000000;">: ${termsOfDelivery}</span>
+                    ` : ''}
+
+                    ${contactNo ? `
+                    <span style="color: #64748b;">Contact No</span>
+                    <span style="font-weight: 600; color: #000000;">: ${contactNo}</span>
+                    ` : ''}
                 </div>
             </div>
 
             <!-- Bill To & Ship To Boxes (Matching Zoho Books) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 2rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; margin-bottom: 1.5rem;">
                 <!-- Bill To -->
-                <div style="padding: 1rem 1.25rem; border-right: 1px solid #e2e8f0; font-size: 0.82rem; color: #334155; line-height: 1.45;">
-                    <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 0.5rem;">BILL TO</div>
-                    <div style="font-weight: 700; font-size: 0.95rem; color: #2563eb; margin-bottom: 4px;">
+                <div style="padding: 0.85rem 1.15rem; border-right: 1px solid #cbd5e1; font-size: 0.82rem; color: #334155; line-height: 1.45;">
+                    <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 0.4rem;">BILL TO</div>
+                    <div style="font-weight: 700; font-size: 0.92rem; color: #2563eb; margin-bottom: 3px;">
                         ${customerName}
                     </div>
                     ${bAddr.address ? `<div>${bAddr.address}</div>` : ''}
                     ${bAddr.street2 ? `<div>${bAddr.street2}</div>` : ''}
                     <div>${[bAddr.city, bAddr.state].filter(Boolean).join(', ')}</div>
                     <div>${[bAddr.country || 'India', bAddr.zip].filter(Boolean).join(' - ')}</div>
-                    ${bAddr.phone ? `<div style="margin-top: 4px; color: #64748b;"><i class="fa-solid fa-phone" style="font-size:0.75rem;"></i> ${bAddr.phone}</div>` : ''}
+                    ${bAddr.phone ? `<div style="margin-top: 3px; color: #64748b;"><i class="fa-solid fa-phone" style="font-size:0.75rem;"></i> ${bAddr.phone}</div>` : ''}
                 </div>
 
                 <!-- Ship To -->
-                <div style="padding: 1rem 1.25rem; font-size: 0.82rem; color: #334155; line-height: 1.45;">
-                    <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 0.5rem;">SHIP TO</div>
-                    <div style="font-weight: 700; font-size: 0.95rem; color: #0f172a; margin-bottom: 4px;">
+                <div style="padding: 0.85rem 1.15rem; font-size: 0.82rem; color: #334155; line-height: 1.45;">
+                    <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 0.4rem;">SHIP TO</div>
+                    <div style="font-weight: 700; font-size: 0.92rem; color: #0f172a; margin-bottom: 3px;">
                         ${customerName}
                     </div>
                     ${sAddr.address ? `<div>${sAddr.address}</div>` : ''}
                     ${sAddr.street2 ? `<div>${sAddr.street2}</div>` : ''}
                     <div>${[sAddr.city, sAddr.state].filter(Boolean).join(', ')}</div>
                     <div>${[sAddr.country || 'India', sAddr.zip].filter(Boolean).join(' - ')}</div>
-                    ${sAddr.phone ? `<div style="margin-top: 4px; color: #64748b;"><i class="fa-solid fa-phone" style="font-size:0.75rem;"></i> ${sAddr.phone}</div>` : ''}
+                    ${sAddr.phone ? `<div style="margin-top: 3px; color: #64748b;"><i class="fa-solid fa-phone" style="font-size:0.75rem;"></i> ${sAddr.phone}</div>` : ''}
                 </div>
             </div>
 
-            <!-- Items Table (1:1 Zoho Books Columns: #, Item & Description, HSN/SAC, Qty, Rate, Discount, Tax, Amount) -->
-            <div style="border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 1.5rem;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+            <!-- Items Table (1:1 Zoho Books Format: #, Item & Description, HSN/SAC, Qty, Rate, CGST %, Amt, SGST %, Amt, Amount) -->
+            <div style="border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; margin-bottom: 1.5rem;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
                     <thead>
-                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">
-                            <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">#</th>
-                            <th style="padding: 0.75rem 1rem;">ITEM & DESCRIPTION</th>
-                            <th style="padding: 0.75rem 0.75rem; width: 90px; text-align: center;">HSN/SAC</th>
-                            <th style="padding: 0.75rem 0.75rem; width: 70px; text-align: right;">QTY</th>
-                            <th style="padding: 0.75rem 0.75rem; width: 100px; text-align: right;">RATE</th>
-                            <th style="padding: 0.75rem 0.75rem; width: 80px; text-align: right;">DISCOUNT</th>
-                            <th style="padding: 0.75rem 0.75rem; width: 90px; text-align: right;">TAX</th>
-                            <th style="padding: 0.75rem 1rem; width: 110px; text-align: right;">AMOUNT</th>
+                        <tr style="background: #f8fafc; border-bottom: 1px solid #cbd5e1; color: #475569; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;">
+                            <th rowspan="2" style="padding: 0.55rem 0.65rem; width: 35px; text-align: center; border-right: 1px solid #cbd5e1;">#</th>
+                            <th rowspan="2" style="padding: 0.55rem 0.75rem; border-right: 1px solid #cbd5e1;">ITEM & DESCRIPTION</th>
+                            <th rowspan="2" style="padding: 0.55rem 0.65rem; width: 85px; text-align: center; border-right: 1px solid #cbd5e1;">HSN/SAC</th>
+                            <th rowspan="2" style="padding: 0.55rem 0.65rem; width: 65px; text-align: right; border-right: 1px solid #cbd5e1;">QTY</th>
+                            <th rowspan="2" style="padding: 0.55rem 0.65rem; width: 85px; text-align: right; border-right: 1px solid #cbd5e1;">RATE</th>
+                            <th colspan="2" style="padding: 0.35rem 0.5rem; text-align: center; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;">CGST</th>
+                            <th colspan="2" style="padding: 0.35rem 0.5rem; text-align: center; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;">SGST</th>
+                            <th rowspan="2" style="padding: 0.55rem 0.75rem; width: 95px; text-align: right;">AMOUNT</th>
+                        </tr>
+                        <tr style="background: #f8fafc; border-bottom: 1px solid #cbd5e1; color: #64748b; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;">
+                            <th style="padding: 0.25rem 0.4rem; text-align: right; width: 45px; border-right: 1px solid #cbd5e1;">%</th>
+                            <th style="padding: 0.25rem 0.4rem; text-align: right; width: 55px; border-right: 1px solid #cbd5e1;">AMT</th>
+                            <th style="padding: 0.25rem 0.4rem; text-align: right; width: 45px; border-right: 1px solid #cbd5e1;">%</th>
+                            <th style="padding: 0.25rem 0.4rem; text-align: right; width: 55px; border-right: 1px solid #cbd5e1;">AMT</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${lineItems.map((item, idx) => {
                             const rate = parseFloat(item.rate || 0);
                             const qty = parseFloat(item.quantity || 1);
-                            const discount = parseFloat(item.discount || 0);
-                            const itemTotal = parseFloat(item.item_total !== undefined ? item.item_total : (rate * qty - discount));
-                            const taxLabel = item.tax_name || (item.tax_percentage ? `${item.tax_percentage}%` : '—');
+                            const unit = item.unit ? `<div style="font-size:0.68rem; color:#64748b;">${item.unit}</div>` : '';
+                            const itemTotal = parseFloat(item.item_total !== undefined ? item.item_total : (rate * qty));
+                            
+                            // CGST & SGST (half of total tax rate if intra-state)
+                            const taxRate = parseFloat(item.tax_percentage || 0);
+                            const halfRate = (taxRate / 2);
+                            const halfAmt = ((rate * qty) * (halfRate / 100));
 
                             return `
                             <tr style="border-bottom: 1px solid #f1f5f9;">
-                                <td style="padding: 0.75rem 1rem; text-align: center; color: #94a3b8; font-weight: 600;">${idx + 1}</td>
-                                <td style="padding: 0.75rem 1rem;">
-                                    <div style="font-weight: 700; color: #0f172a;">${item.name || 'Item'}</div>
-                                    ${item.description ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${item.description}</div>` : ''}
+                                <td style="padding: 0.65rem 0.65rem; text-align: center; color: #94a3b8; font-weight: 600; border-right: 1px solid #f1f5f9;">${idx + 1}</td>
+                                <td style="padding: 0.65rem 0.75rem; border-right: 1px solid #f1f5f9;">
+                                    <div style="font-weight: 700; color: #000000;">${item.name || 'Item'}</div>
+                                    ${item.description ? `<div style="font-size: 0.73rem; color: #64748b; margin-top: 2px;">${item.description}</div>` : ''}
                                 </td>
-                                <td style="padding: 0.75rem 0.75rem; text-align: center; color: #64748b; font-family: monospace;">${item.hsn_or_sac || '—'}</td>
-                                <td style="padding: 0.75rem 0.75rem; text-align: right; font-weight: 600; color: #0f172a;">${qty}</td>
-                                <td style="padding: 0.75rem 0.75rem; text-align: right; color: #334155;">₹${rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                <td style="padding: 0.75rem 0.75rem; text-align: right; color: #64748b;">${discount > 0 ? `₹${discount.toFixed(2)}` : '0'}</td>
-                                <td style="padding: 0.75rem 0.75rem; text-align: right; color: #475569; font-size: 0.75rem;">${taxLabel}</td>
-                                <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 700; color: #0f172a;">₹${itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style="padding: 0.65rem 0.65rem; text-align: center; color: #475569; font-family: monospace; border-right: 1px solid #f1f5f9;">${item.hsn_or_sac || '—'}</td>
+                                <td style="padding: 0.65rem 0.65rem; text-align: right; font-weight: 600; color: #000000; border-right: 1px solid #f1f5f9;">
+                                    <div>${qty.toFixed(2)}</div>
+                                    ${unit}
+                                </td>
+                                <td style="padding: 0.65rem 0.65rem; text-align: right; color: #334155; border-right: 1px solid #f1f5f9;">${rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style="padding: 0.65rem 0.4rem; text-align: right; color: #64748b; border-right: 1px solid #f1f5f9;">${halfRate > 0 ? halfRate + '%' : '—'}</td>
+                                <td style="padding: 0.65rem 0.4rem; text-align: right; color: #334155; border-right: 1px solid #f1f5f9;">${halfAmt > 0 ? halfAmt.toFixed(2) : '—'}</td>
+                                <td style="padding: 0.65rem 0.4rem; text-align: right; color: #64748b; border-right: 1px solid #f1f5f9;">${halfRate > 0 ? halfRate + '%' : '—'}</td>
+                                <td style="padding: 0.65rem 0.4rem; text-align: right; color: #334155; border-right: 1px solid #f1f5f9;">${halfAmt > 0 ? halfAmt.toFixed(2) : '—'}</td>
+                                <td style="padding: 0.65rem 0.75rem; text-align: right; font-weight: 700; color: #000000;">${itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
                             `;
                         }).join('')}
@@ -3225,63 +3287,80 @@ window.renderInvoicePreviewWorkstation = function(payload) {
                 </table>
             </div>
 
-            <!-- Bottom Breakdown Grid: Notes & Terms (Left) vs Totals (Right) -->
-            <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 3rem; margin-top: 1.5rem; align-items: flex-start;">
+            <!-- Bottom Breakdown Grid: Total in words, Terms, Bank Details (Left) vs Totals (Right) -->
+            <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 2.5rem; margin-top: 1.5rem; align-items: flex-start;">
                 
-                <!-- Left: Customer Notes & Terms -->
-                <div style="font-size: 0.8rem; color: #475569; line-height: 1.5;">
-                    <div style="margin-bottom: 1.5rem;">
-                        <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">Customer Notes</div>
-                        <div style="color: #64748b;">${inv.notes || 'Thanks for doing business with us.'}</div>
+                <!-- Left: In Words, Delivery, Bank Details -->
+                <div style="font-size: 0.78rem; color: #334155; line-height: 1.5;">
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total in Words</div>
+                        <div style="font-style: italic; font-weight: 700; color: #000000; margin-top: 2px;">
+                            ${amountInWords}
+                        </div>
                     </div>
 
-                    <div>
-                        <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">Terms & Conditions</div>
-                        <div style="color: #64748b; font-size: 0.75rem; line-height: 1.45; white-space: pre-line;">${inv.terms || '1. Goods once sold will not be taken back or exchanged.\n2. Payment must be made within the due date mentioned on the invoice.\n3. Late payment may attract additional charges or interest as applicable.\n4. Subject to Koppa Jurisdiction.'}</div>
+                    ${termsOfDelivery ? `
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Terms of Delivery</div>
+                        <div style="color: #334155;">${termsOfDelivery}</div>
+                    </div>
+                    ` : ''}
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="color: #475569;">${inv.notes || 'Thanks for doing business with us.'}</div>
+                    </div>
+
+                    <!-- Official Bank Details (1:1 Zoho Books) -->
+                    <div style="border-top: 1px solid #e2e8f0; padding-top: 0.75rem; color: #334155; font-size: 0.75rem;">
+                        <div style="font-weight: 700; color: #000000; margin-bottom: 2px;">Bank Details</div>
+                        <div>Bank Name: <strong>State Bank of India</strong></div>
+                        <div>Account No.: <strong>00000039342203072</strong></div>
+                        <div>IFSC: <strong>SBIN0000860</strong></div>
+                        <div>Branch: <strong>Koppa</strong></div>
                     </div>
                 </div>
 
-                <!-- Right: Calculations Breakdown (Sub Total, Shipping, Taxes, Total, Payment Made, Balance) -->
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; font-size: 0.82rem;">
+                <!-- Right: Calculations Breakdown (1:1 Zoho Books Format) -->
+                <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1rem 1.25rem; font-size: 0.82rem;">
                     
-                    <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; color: #475569;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569;">
                         <span>Sub Total</span>
-                        <span style="font-weight: 700; color: #0f172a;">₹${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style="font-weight: 700; color: #000000;">${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
 
                     ${shippingCharge > 0 ? `
-                    <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; color: #475569;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569;">
                         <span>Shipping Charges</span>
-                        <span style="font-weight: 600; color: #0f172a;">₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style="font-weight: 600; color: #000000;">${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     ` : ''}
 
                     <!-- Taxes Breakdown -->
                     ${taxes.map(t => `
-                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569; font-size: 0.8rem;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.3rem 0; color: #475569; font-size: 0.8rem;">
                         <span>${t.tax_name}</span>
-                        <span style="font-weight: 600; color: #0f172a;">₹${parseFloat(t.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style="font-weight: 600; color: #000000;">${parseFloat(t.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     `).join('')}
 
                     ${roundOff !== 0 ? `
-                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #475569; font-size: 0.8rem;">
-                        <span>Round Off</span>
-                        <span style="color: #64748b;">${roundOff > 0 ? '+' : ''}₹${roundOff.toFixed(2)}</span>
+                    <div style="display: flex; justify-content: space-between; padding: 0.3rem 0; color: #475569; font-size: 0.8rem;">
+                        <span>Round off</span>
+                        <span style="color: #64748b;">${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span>
                     </div>
                     ` : ''}
 
-                    <div style="display: flex; justify-content: space-between; padding: 0.75rem 0 0.5rem 0; border-top: 2px solid #e2e8f0; margin-top: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #0f172a;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.6rem 0 0.4rem 0; border-top: 1px solid #cbd5e1; margin-top: 0.4rem; font-size: 0.95rem; font-weight: 800; color: #000000;">
                         <span>Total</span>
                         <span>₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; padding: 0.4rem 0; color: #16a34a; font-weight: 700;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #dc2626; font-weight: 700;">
                         <span>Payment Made</span>
-                        <span>(-) ₹${paymentMade.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>(-) ${paymentMade.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; padding: 0.6rem 0 0.2rem 0; border-top: 1px dashed #cbd5e1; margin-top: 0.4rem; font-size: 1rem; font-weight: 800; color: ${balance > 0 ? '#dc2626' : '#16a34a'};">
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0 0.2rem 0; border-top: 1px dashed #cbd5e1; margin-top: 0.35rem; font-size: 0.92rem; font-weight: 800; color: ${balance > 0 ? '#000000' : '#16a34a'};">
                         <span>Balance Due</span>
                         <span>₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>

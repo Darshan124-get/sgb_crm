@@ -1459,6 +1459,18 @@ const getZohoInvoicePdf = async (req, res) => {
     }
 };
 
+const getZohoInvoiceHtml = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const html = await zohoInvoiceService.getInvoiceHtml(id);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(html);
+    } catch (err) {
+        console.error('Error in getZohoInvoiceHtml:', err);
+        res.status(500).send('<div style="padding:2rem;text-align:center;color:#ef4444;">Error fetching invoice HTML: ' + err.message + '</div>');
+    }
+};
+
 const getZohoInvoiceDetails = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1862,6 +1874,7 @@ module.exports = {
     prepareInvoiceFromSalesOrder,
     createZohoInvoice,
     getZohoInvoicePdf,
+    getZohoInvoiceHtml,
     getZohoInvoiceDetails,
     cancelPendingOrder,
     hardDeletePendingOrder,

@@ -2772,12 +2772,12 @@ async function loadInvoices() {
                 let statusBadge = '<span class="status-badge" style="background:#f1f5f9; color:#475569; font-weight:700;">' + st.toUpperCase() + '</span>';
                 if (st === 'paid') {
                     statusBadge = '<span class="status-badge" style="background:#dcfce7; color:#15803d; font-weight:700;">PAID</span>';
+                } else if (st === 'overdue' || (inv.due_days && inv.due_days.toLowerCase().includes('overdue'))) {
+                    statusBadge = '<span class="status-badge" style="background:#ffedd5; color:#ea580c; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
+                } else if (st === 'sent' || (inv.due_days && inv.due_days.toLowerCase().includes('due in'))) {
+                    statusBadge = '<span class="status-badge" style="background:#eff6ff; color:#2563eb; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
                 } else if (st === 'partially_paid') {
                     statusBadge = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">PARTIALLY PAID</span>';
-                } else if (st === 'overdue') {
-                    statusBadge = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
-                } else if (st === 'sent') {
-                    statusBadge = '<span class="status-badge" style="background:#eff6ff; color:#2563eb; font-weight:700;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
                 } else if (st === 'draft') {
                     statusBadge = '<span class="status-badge" style="background:#fef3c7; color:#b45309; font-weight:700;">DRAFT</span>';
                 }
@@ -2848,17 +2848,18 @@ function renderSidebarInvoices(list) {
         const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : (inv.created_time ? new Date(inv.created_time).toLocaleDateString('en-GB') : '—');
         const totalAmt = parseFloat(inv.total || inv.total_amount || 0);
 
-        // Status badge styling
+        // Status badge styling matching Zoho Books exactly:
+        // DUE in blue, OVERDUE in orange, PAID in green, DRAFT in amber
         const st = (inv.status || inv.invoice_status || 'draft').toLowerCase();
         let statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase;">' + st.toUpperCase() + '</span>';
         if (st === 'paid') {
             statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#16a34a; text-transform:uppercase;">PAID</span>';
+        } else if (st === 'overdue' || (inv.due_days && inv.due_days.toLowerCase().includes('overdue'))) {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#ea580c; text-transform:uppercase;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
+        } else if (st === 'sent' || (inv.due_days && inv.due_days.toLowerCase().includes('due in'))) {
+            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#2563eb; text-transform:uppercase;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
         } else if (st === 'partially_paid') {
             statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#0284c7; text-transform:uppercase;">PARTIALLY PAID</span>';
-        } else if (st === 'overdue') {
-            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#dc2626; text-transform:uppercase;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'OVERDUE') + '</span>';
-        } else if (st === 'sent') {
-            statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#2563eb; text-transform:uppercase;">' + (inv.due_days ? inv.due_days.toUpperCase() : 'SENT') + '</span>';
         } else if (st === 'draft') {
             statusBadge = '<span style="font-size:0.68rem; font-weight:700; color:#d97706; text-transform:uppercase;">DRAFT</span>';
         }
@@ -2987,37 +2988,34 @@ window.selectInvoiceForPreview = async function(invId) {
                 if (headerStatusBadge) {
                     if (st === 'paid') {
                         headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#dcfce7; color:#15803d;">PAID</span>';
+                    } else if (st === 'overdue' || (inv.due_days && inv.due_days.toLowerCase().includes('overdue'))) {
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#ffedd5; color:#ea580c;">OVERDUE</span>';
+                    } else if (st === 'sent' || (inv.due_days && inv.due_days.toLowerCase().includes('due in'))) {
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#eff6ff; color:#2563eb;">' + (inv.status || 'SENT').toUpperCase() + '</span>';
                     } else if (st === 'partially_paid') {
                         headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1;">PARTIALLY PAID</span>';
-                    } else if (st === 'overdue') {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c;">OVERDUE</span>';
                     } else {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#eff6ff; color:#2563eb;">' + (inv.status || 'DRAFT').toUpperCase() + '</span>';
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#fef3c7; color:#b45309;">' + (inv.status || 'DRAFT').toUpperCase() + '</span>';
                     }
                 }
             }
         }).catch(() => {});
 
-        // 2. Fetch the exact official PDF directly from Zoho Books API
-        const pdfRes = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/zoho-pdf`, {
+        // 2. Fetch the exact official HTML directly from Zoho Books API
+        const htmlRes = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/zoho-html`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!pdfRes.ok) {
-            throw new Error('Failed to fetch invoice PDF from Zoho Books');
+        if (!htmlRes.ok) {
+            throw new Error('Failed to fetch invoice template from Zoho Books');
         }
 
-        const pdfBlob = await pdfRes.blob();
-        currentInvoicePdfUrl = URL.createObjectURL(pdfBlob);
+        const zohoHtml = await htmlRes.text();
 
-        // 3. Render the official Zoho Books PDF right inside the preview viewport
+        // 3. Render the official Zoho Books invoice directly on clean white background (no black viewer bars)
         content.innerHTML = `
-            <div style="width: 100%; height: calc(100vh - 200px); min-height: 750px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; overflow: hidden; display: flex; flex-direction: column;">
-                <iframe 
-                    src="${currentInvoicePdfUrl}#toolbar=0&navpanes=0&scrollbar=1" 
-                    style="width: 100%; height: 100%; border: none;"
-                    title="Official Zoho Books Invoice PDF">
-                </iframe>
+            <div style="background: white; max-width: 900px; margin: 0 auto 3rem auto; border: 1px solid #cbd5e1; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 1.5rem 2rem; position: relative;">
+                ${zohoHtml}
             </div>
         `;
     } catch (err) {

@@ -621,6 +621,48 @@ class ZohoInvoiceService {
     }
 
     /**
+     * Download or stream Zoho Invoice HTML (exact Zoho Books rendered template)
+     * @param {string|number} invoiceId 
+     */
+    async getInvoiceHtml(invoiceId) {
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        if (!orgId) throw new Error('ZOHO_ORGANIZATION_ID is not configured');
+
+        let zohoInvId = invoiceId;
+        const [rows] = await pool.query('SELECT zoho_invoice_id FROM invoices WHERE invoice_id = ? OR invoice_number = ?', [invoiceId, invoiceId]);
+        if (rows.length > 0 && rows[0].zoho_invoice_id) {
+            zohoInvId = rows[0].zoho_invoice_id;
+        }
+
+        const headers = await zohoAuth.getAuthHeaders();
+
+        if (isNaN(zohoInvId)) {
+            try {
+                const searchRes = await axios.get(
+                    `${zohoAuth.apiDomain}/invoices?invoice_number=${encodeURIComponent(invoiceId)}&organization_id=${orgId}`,
+                    { headers }
+                );
+                const list = searchRes.data?.invoices || [];
+                if (list.length > 0 && list[0].invoice_id) {
+                    zohoInvId = list[0].invoice_id;
+                }
+            } catch (err) {
+                console.warn('Could not search invoice by number in getInvoiceHtml:', err.message);
+            }
+        }
+
+        const response = await axios.get(
+            `${zohoAuth.apiDomain}/invoices/${zohoInvId}?organization_id=${orgId}&accept=html`,
+            {
+                headers,
+                responseType: 'text'
+            }
+        );
+
+        return response.data;
+    }
+
+    /**
      * Get complete details of a single invoice from Zoho Books and CRM
      * @param {string|number} invoiceId
      */

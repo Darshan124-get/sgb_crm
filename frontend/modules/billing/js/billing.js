@@ -2973,49 +2973,158 @@ window.selectInvoiceForPreview = async function(invId) {
     try {
         const token = localStorage.getItem('token');
         
-        // 1. Fetch metadata details for top bar (invoice number & status)
-        fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/details`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        }).then(res => res.json()).then(data => {
-            if (data && data.success && data.invoice) {
-                currentSelectedInvoiceData = data;
-                const inv = data.invoice;
-                const invNumEl = document.getElementById('previewInvoiceNum');
-                if (invNumEl) invNumEl.textContent = inv.invoice_number || '—';
+        // 1. Fetch metadata details & official HTML in parallel
+        const [detailsRes, htmlRes] = await Promise.all([
+            fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/details`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }).catch(e => null),
+            fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/zoho-html`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+        ]);
 
-                const headerStatusBadge = document.getElementById('previewHeaderStatusBadge');
-                const st = (inv.status || 'draft').toLowerCase();
-                if (headerStatusBadge) {
-                    if (st === 'paid') {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#dcfce7; color:#15803d;">PAID</span>';
-                    } else if (st === 'overdue' || (inv.due_days && inv.due_days.toLowerCase().includes('overdue'))) {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#ffedd5; color:#ea580c;">OVERDUE</span>';
-                    } else if (st === 'sent' || (inv.due_days && inv.due_days.toLowerCase().includes('due in'))) {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#eff6ff; color:#2563eb;">' + (inv.status || 'SENT').toUpperCase() + '</span>';
-                    } else if (st === 'partially_paid') {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1;">PARTIALLY PAID</span>';
-                    } else {
-                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#fef3c7; color:#b45309;">' + (inv.status || 'DRAFT').toUpperCase() + '</span>';
-                    }
+        let detailsData = null;
+        if (detailsRes && detailsRes.ok) {
+            try {
+                detailsData = await detailsRes.json();
+            } catch(e) {}
+        }
+
+        if (detailsData && detailsData.success && detailsData.invoice) {
+            currentSelectedInvoiceData = detailsData;
+            const inv = detailsData.invoice;
+            const invNumEl = document.getElementById('previewInvoiceNum');
+            if (invNumEl) invNumEl.textContent = inv.invoice_number || '—';
+
+            const headerStatusBadge = document.getElementById('previewHeaderStatusBadge');
+            const st = (inv.status || 'draft').toLowerCase();
+            if (headerStatusBadge) {
+                if (st === 'paid') {
+                    headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#dcfce7; color:#15803d;">PAID</span>';
+                } else if (st === 'overdue' || (inv.due_days && inv.due_days.toLowerCase().includes('overdue'))) {
+                    headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#ffedd5; color:#ea580c;">OVERDUE</span>';
+                } else if (st === 'sent' || (inv.due_days && inv.due_days.toLowerCase().includes('due in'))) {
+                    headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#eff6ff; color:#2563eb;">' + (inv.status || 'SENT').toUpperCase() + '</span>';
+                } else if (st === 'partially_paid') {
+                    headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1;">PARTIALLY PAID</span>';
+                } else {
+                    headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#fef3c7; color:#b45309;">' + (inv.status || 'DRAFT').toUpperCase() + '</span>';
                 }
             }
-        }).catch(() => {});
+        }
 
-        // 2. Fetch the exact official HTML directly from Zoho Books API
-        const htmlRes = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/zoho-html`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!htmlRes.ok) {
+        if (!htmlRes || !htmlRes.ok) {
             throw new Error('Failed to fetch invoice template from Zoho Books');
         }
 
         const zohoHtml = await htmlRes.text();
 
-        // 3. Render the official Zoho Books invoice directly on clean white background (no black viewer bars)
+        // Build Payments Received & Credits Applied section if present
+        let transactionsHtml = '';
+        const payments = (detailsData && detailsData.payments) || [];
+        const credits = (detailsData && detailsData.credits) || [];
+
+        if (payments.length > 0 || credits.length > 0) {
+            const hasPayments = payments.length > 0;
+            const hasCredits = credits.length > 0;
+            const activeTab = hasPayments ? 'payments' : 'credits';
+
+            let paymentsRows = '';
+            payments.forEach(p => {
+                const pDate = p.date ? new Date(p.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+                const pAmt = parseFloat(p.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                paymentsRows += `
+                    <tr style="border-bottom: 1px solid #f1f5f9; height: 38px;">
+                        <td style="padding: 6px 12px; color: #475569;">${pDate}</td>
+                        <td style="padding: 6px 12px; color: #475569;">${pDate}</td>
+                        <td style="padding: 6px 12px; color: #2563eb; font-weight: 500;">${p.payment_number || '—'}</td>
+                        <td style="padding: 6px 12px; color: #475569;">${p.reference_number || (p.description ? p.description.slice(0, 30) : '—')}</td>
+                        <td style="padding: 6px 12px;"><span style="color: #16a34a; font-weight: 600;">Paid</span></td>
+                        <td style="padding: 6px 12px; color: #475569;">${p.payment_mode || 'Bank'}</td>
+                        <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #0f172a;">₹${pAmt}</td>
+                    </tr>
+                `;
+            });
+
+            let creditsRows = '';
+            credits.forEach(c => {
+                const cDate = c.applied_date ? new Date(c.applied_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : (c.date ? new Date(c.date).toLocaleDateString('en-GB') : '—');
+                const cAmt = parseFloat(c.amount_applied || c.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                creditsRows += `
+                    <tr style="border-bottom: 1px solid #f1f5f9; height: 38px;">
+                        <td style="padding: 6px 12px; color: #475569;">${cDate}</td>
+                        <td style="padding: 6px 12px; color: #2563eb; font-weight: 500;">${c.transaction_number || c.creditnote_number || '—'}</td>
+                        <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #0f172a;">₹${cAmt}</td>
+                    </tr>
+                `;
+            });
+
+            transactionsHtml = `
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); overflow: hidden;">
+                    <!-- Tab Header -->
+                    <div style="display: flex; gap: 1.5rem; padding: 0.75rem 1.25rem 0 1.25rem; border-bottom: 1px solid #e2e8f0; background: #fafafa;">
+                        ${hasPayments ? `
+                            <button type="button" id="tabBtnPayments" onclick="switchPreviewPaymentTab('payments')" style="background: none; border: none; border-bottom: 2px solid ${activeTab === 'payments' ? '#2563eb' : 'transparent'}; color: ${activeTab === 'payments' ? '#2563eb' : '#64748b'}; font-weight: 600; font-size: 0.85rem; padding-bottom: 0.6rem; cursor: pointer;">
+                                Payments Received ${payments.length > 0 ? `<span style="background: #eff6ff; color: #2563eb; padding: 1px 6px; border-radius: 10px; font-size: 0.75rem; margin-left: 4px;">${payments.length}</span>` : ''}
+                            </button>
+                        ` : ''}
+                        ${hasCredits ? `
+                            <button type="button" id="tabBtnCredits" onclick="switchPreviewPaymentTab('credits')" style="background: none; border: none; border-bottom: 2px solid ${activeTab === 'credits' ? '#2563eb' : 'transparent'}; color: ${activeTab === 'credits' ? '#2563eb' : '#64748b'}; font-weight: 600; font-size: 0.85rem; padding-bottom: 0.6rem; cursor: pointer;">
+                                Credits Applied ${credits.length > 0 ? `<span style="background: #eff6ff; color: #2563eb; padding: 1px 6px; border-radius: 10px; font-size: 0.75rem; margin-left: 4px;">${credits.length}</span>` : ''}
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <!-- Payments Table View -->
+                    ${hasPayments ? `
+                        <div id="tabContentPayments" style="display: ${activeTab === 'payments' ? 'block' : 'none'}; overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: left;">
+                                <thead>
+                                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px;">
+                                        <th style="padding: 8px 12px;">Date</th>
+                                        <th style="padding: 8px 12px;">Applied On</th>
+                                        <th style="padding: 8px 12px;">Payment #</th>
+                                        <th style="padding: 8px 12px;">Reference#</th>
+                                        <th style="padding: 8px 12px;">Status</th>
+                                        <th style="padding: 8px 12px;">Payment Mode</th>
+                                        <th style="padding: 8px 12px; text-align: right;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${paymentsRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+
+                    <!-- Credits Table View -->
+                    ${hasCredits ? `
+                        <div id="tabContentCredits" style="display: ${activeTab === 'credits' ? 'block' : 'none'}; overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: left;">
+                                <thead>
+                                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px;">
+                                        <th style="padding: 8px 12px;">Applied Date</th>
+                                        <th style="padding: 8px 12px;">Transaction#</th>
+                                        <th style="padding: 8px 12px; text-align: right;">Credits Applied</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${creditsRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // 3. Render the official Zoho Books invoice directly on clean white background
         content.innerHTML = `
-            <div style="background: white; max-width: 900px; margin: 0 auto 3rem auto; border: 1px solid #cbd5e1; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 1.5rem 2rem; position: relative;">
-                ${zohoHtml}
+            <div style="max-width: 900px; margin: 0 auto 3rem auto;">
+                ${transactionsHtml}
+                <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 1.5rem 2rem; position: relative;">
+                    ${zohoHtml}
+                </div>
             </div>
         `;
     } catch (err) {
@@ -3030,6 +3139,37 @@ window.selectInvoiceForPreview = async function(invId) {
                 </button>
             </div>
         `;
+    }
+};
+
+window.switchPreviewPaymentTab = function(tab) {
+    const tabPayments = document.getElementById('tabContentPayments');
+    const tabCredits = document.getElementById('tabContentCredits');
+    const btnPayments = document.getElementById('tabBtnPayments');
+    const btnCredits = document.getElementById('tabBtnCredits');
+
+    if (tab === 'payments') {
+        if (tabPayments) tabPayments.style.display = 'block';
+        if (tabCredits) tabCredits.style.display = 'none';
+        if (btnPayments) {
+            btnPayments.style.borderBottom = '2px solid #2563eb';
+            btnPayments.style.color = '#2563eb';
+        }
+        if (btnCredits) {
+            btnCredits.style.borderBottom = '2px solid transparent';
+            btnCredits.style.color = '#64748b';
+        }
+    } else {
+        if (tabPayments) tabPayments.style.display = 'none';
+        if (tabCredits) tabCredits.style.display = 'block';
+        if (btnPayments) {
+            btnPayments.style.borderBottom = '2px solid transparent';
+            btnPayments.style.color = '#64748b';
+        }
+        if (btnCredits) {
+            btnCredits.style.borderBottom = '2px solid #2563eb';
+            btnCredits.style.color = '#2563eb';
+        }
     }
 };
 

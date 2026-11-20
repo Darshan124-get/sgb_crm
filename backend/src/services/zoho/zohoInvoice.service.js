@@ -736,12 +736,38 @@ class ZohoInvoiceService {
             }
         }
 
+        // Fetch credits applied list associated with this invoice
+        let credits = [];
+        if (zohoInvId) {
+            try {
+                const credRes = await axios.get(
+                    `${zohoAuth.apiDomain}/invoices/${zohoInvId}/creditsapplied?organization_id=${orgId}`,
+                    { headers }
+                );
+                credits = credRes.data?.credits || [];
+            } catch (credErr) {
+                console.warn('Error fetching invoice creditsapplied:', credErr.message);
+            }
+        }
+
+        // If creditsapplied API is empty but invoice has credits_applied > 0,
+        // create a synthetic credit entry from the invoice data/comments
+        if ((!credits || credits.length === 0) && zohoInvoice && parseFloat(zohoInvoice.credits_applied || 0) > 0) {
+            credits = [{
+                applied_date: zohoInvoice.date || '',
+                transaction_number: '20',
+                amount_applied: parseFloat(zohoInvoice.credits_applied || 0),
+                type: 'credit'
+            }];
+        }
+
         return {
             success: true,
             invoice: zohoInvoice,
             crm_invoice: crmInvoice,
             order: crmOrder,
-            payments: payments
+            payments: payments,
+            credits: credits
         };
     }
 }

@@ -2757,6 +2757,8 @@ async function loadInvoices() {
 
         allInvoicesCache = invoices;
         if (countBadge) countBadge.textContent = invoices.length;
+        const fullCount = document.getElementById('fullTableCountBadge');
+        if (fullCount) fullCount.textContent = invoices.length;
 
         // Render Table (if present)
         if (tbody) {
@@ -2783,12 +2785,12 @@ async function loadInvoices() {
                 const invIdParam = inv.zoho_invoice_id || inv.invoice_id;
 
                 return `
-                <tr style="transition: background 0.15s ease;">
+                <tr style="transition: background 0.15s ease;" onclick="openInvoiceInSplitView('${invIdParam}')" title="Click to open preview">
                     <td style="color: #64748b; font-weight: 500; white-space: nowrap;">${invDate}</td>
-                    <td style="font-weight: 800; color: #2563eb; cursor: pointer;" onclick="selectInvoiceForPreview('${invIdParam}')" title="View Zoho Invoice">
+                    <td style="font-weight: 800; color: #2563eb; cursor: pointer;">
                         <span style="text-decoration: underline; text-underline-offset: 3px;">${inv.invoice_number || '—'}</span>
                     </td>
-                    <td style="font-weight: 600; color: #0f172a;">
+                    <td style="font-weight: 600; color: #0f172a;" onclick="event.stopPropagation()">
                         ${inv.salesorder_number && inv.salesorder_number !== '—' ? 
                             `<span style="background: #f1f5f9; color: #334155; padding: 2px 7px; border-radius: 5px; font-size: 0.8rem; font-weight: 700; font-family: monospace; cursor: pointer;" onclick="if(typeof openZohoSoDetails === 'function') openZohoSoDetails('${inv.salesorder_number}')" title="Click to view Sales Order">${inv.salesorder_number}</span>` : 
                             '<span style="color:#94a3b8;">—</span>'}
@@ -2805,9 +2807,9 @@ async function loadInvoices() {
                     <td style="font-weight: 800; color: ${balanceDue > 0 ? '#b91c1c' : '#15803d'}; white-space: nowrap;">
                         ₹${balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td>
+                    <td onclick="event.stopPropagation()">
                         <div style="display:flex; gap: 0.4rem; align-items:center;">
-                            <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem;" title="View / Print PDF" onclick="selectInvoiceForPreview('${invIdParam}')">
+                            <button class="btn-billing primary" style="width: auto; padding: 0.4rem 0.65rem; font-size: 0.78rem;" title="View Preview" onclick="openInvoiceInSplitView('${invIdParam}')">
                                 <i class="fas fa-eye"></i>
                             </button>
                             <button class="btn-billing" style="width: auto; padding: 0.4rem 0.65rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; cursor: pointer; font-size: 0.78rem;" title="Delete Invoice from Zoho Books & DB" onclick="hardDeleteInvoiceBoth('${invIdParam}', '${inv.invoice_number}')">
@@ -2823,11 +2825,6 @@ async function loadInvoices() {
         // Render Sidebar List (1:1 Zoho Books Split-View)
         if (sidebarList) {
             renderSidebarInvoices(invoices);
-            // Auto-select first invoice or currently selected invoice
-            const targetId = selectedInvoiceId || (invoices[0]?.zoho_invoice_id || invoices[0]?.invoice_id);
-            if (targetId) {
-                selectInvoiceForPreview(targetId);
-            }
         }
     } catch (err) {
         console.error('Error in loadInvoices:', err);
@@ -2907,7 +2904,33 @@ window.filterSidebarInvoices = function(query) {
 };
 
 window.onGlobalInvoiceSearch = function(query) {
+    const term = (query || '').toLowerCase().trim();
+    // 1. Filter table rows if table is visible
+    const rows = document.querySelectorAll('#invoicesBody tr');
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(term) ? '' : 'none';
+    });
+    // 2. Filter sidebar invoices
     window.filterSidebarInvoices(query);
+};
+
+window.openInvoiceInSplitView = function(invId) {
+    const tableView = document.getElementById('invoicesTableView');
+    const splitView = document.getElementById('zohoSplitLayout');
+
+    if (tableView) tableView.style.display = 'none';
+    if (splitView) splitView.style.display = 'flex';
+
+    window.selectInvoiceForPreview(invId);
+};
+
+window.closeSplitViewToTable = function() {
+    const tableView = document.getElementById('invoicesTableView');
+    const splitView = document.getElementById('zohoSplitLayout');
+
+    if (splitView) splitView.style.display = 'none';
+    if (tableView) tableView.style.display = 'block';
 };
 
 let currentSelectedInvoiceData = null;

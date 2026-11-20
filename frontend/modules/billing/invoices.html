@@ -33,12 +33,13 @@
             min-height: 100vh;
         }
 
+        /* Full Table Styles (Zoho 1:1) */
         .billing-table {
             width: 100%;
             border-collapse: collapse;
             text-align: left;
             background: white;
-            min-width: 850px;
+            min-width: 900px;
         }
 
         .billing-table th {
@@ -61,7 +62,14 @@
             vertical-align: middle;
         }
 
-        .billing-table tr:hover { background-color: #f8fafc; }
+        .billing-table tbody tr {
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .billing-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
 
         .premium-card {
             background: white;
@@ -150,7 +158,7 @@
         /* 1:1 Zoho Books Split-View Layout */
         .zoho-split-wrapper {
             display: flex;
-            height: calc(100vh - 110px);
+            height: calc(100vh - 120px);
             background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
@@ -159,9 +167,9 @@
         }
 
         .zoho-sidebar {
-            width: 330px;
-            min-width: 300px;
-            max-width: 360px;
+            width: 340px;
+            min-width: 310px;
+            max-width: 380px;
             border-right: 1px solid #e2e8f0;
             background: #ffffff;
             display: flex;
@@ -310,13 +318,61 @@
                 </div>
             </header>
 
-            <!-- 1:1 ZOHO BOOKS SPLIT VIEW CONTAINER -->
-            <div id="zohoSplitLayout" class="zoho-split-wrapper">
+            <!-- 1. FULL TABLE VIEW (DEFAULT INITIALLY) -->
+            <div id="invoicesTableView" style="display: block;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h1 style="font-size: 1.65rem; color: #0f172a; font-weight: 800; margin: 0; font-family: 'Outfit', sans-serif;">
+                                Invoices
+                            </h1>
+                            <span id="fullTableCountBadge" style="background: #e2e8f0; color: #475569; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; font-weight: 700;">—</span>
+                        </div>
+                        <p style="color: #64748b; font-size: 0.85rem; margin-top: 3px;">Official GST Tax Invoices generated & reconciled with Zoho Books.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button class="btn-billing primary" onclick="loadInvoices()">
+                            <i class="fa-solid fa-rotate"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="premium-card" style="padding: 0; overflow-x: auto;">
+                    <table class="billing-table">
+                        <thead>
+                            <tr>
+                                <th>DATE</th>
+                                <th>INVOICE#</th>
+                                <th>ORDER NUMBER</th>
+                                <th>CUSTOMER NAME</th>
+                                <th>STATUS</th>
+                                <th>DUE DATE</th>
+                                <th>AMOUNT</th>
+                                <th>BALANCE DUE</th>
+                                <th>ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoicesBody">
+                            <tr>
+                                <td colspan="9" style="text-align:center; padding: 3rem;">
+                                    <div class="loader"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. 1:1 ZOHO BOOKS SPLIT VIEW CONTAINER (OPENS WHEN AN INVOICE RECORD IS CLICKED) -->
+            <div id="zohoSplitLayout" class="zoho-split-wrapper" style="display: none;">
                 
                 <!-- LEFT COLUMN: All Invoices Sub Side Menu (Zoho 1:1) -->
                 <div class="zoho-sidebar">
                     <div class="zoho-sidebar-header">
                         <div style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" class="btn-billing secondary" onclick="closeSplitViewToTable()" title="Back to All Invoices Table" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; margin-right: 2px;">
+                                <i class="fa-solid fa-arrow-left"></i> Table
+                            </button>
                             <span style="font-size: 0.95rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">All Invoices</span>
                             <span id="invoicesCountBadge" style="background: #f1f5f9; color: #64748b; font-size: 0.72rem; padding: 2px 6px; border-radius: 10px; font-weight: 700;">—</span>
                         </div>
@@ -346,6 +402,9 @@
                     <div id="previewTopBar" class="zoho-preview-topbar" style="display: none;">
                         <!-- Left: Invoice Number -->
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button type="button" class="btn-billing secondary" onclick="closeSplitViewToTable()" title="Close Split View" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;">
+                                <i class="fa-solid fa-table-list"></i> Table View
+                            </button>
                             <h2 id="previewInvoiceNum" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a; font-family: 'Outfit', sans-serif;">
                                 —
                             </h2>
@@ -362,6 +421,11 @@
                             <!-- Delete -->
                             <button type="button" class="btn-billing" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;" onclick="deleteSelectedInvoice()" title="Delete Invoice">
                                 <i class="fa-solid fa-trash-alt"></i>
+                            </button>
+
+                            <!-- Close / Back to Table -->
+                            <button type="button" onclick="closeSplitViewToTable()" title="Back to Table View" style="background: transparent; border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer; padding: 0 0.5rem; line-height: 1;">
+                                &times;
                             </button>
                         </div>
                     </div>

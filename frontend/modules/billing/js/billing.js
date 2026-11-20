@@ -2934,9 +2934,16 @@ window.closeSplitViewToTable = function() {
 };
 
 let currentSelectedInvoiceData = null;
+let currentInvoicePdfUrl = null;
 
 window.selectInvoiceForPreview = async function(invId) {
     selectedInvoiceId = invId;
+
+    // Clean up previous blob URL if any
+    if (currentInvoicePdfUrl) {
+        URL.revokeObjectURL(currentInvoicePdfUrl);
+        currentInvoicePdfUrl = null;
+    }
 
     // Update active highlight on sidebar items
     document.querySelectorAll('.zoho-sidebar-item').forEach(el => el.classList.remove('active'));
@@ -2953,38 +2960,76 @@ window.selectInvoiceForPreview = async function(invId) {
     if (topBar) topBar.style.display = 'flex';
     content.style.display = 'block';
 
+    // Show initial loading state
     content.innerHTML = `
         <div style="text-align: center; padding: 6rem 2rem; color: #64748b;">
             <div class="loader" style="margin: 0 auto 1.5rem auto; width: 36px; height: 36px;"></div>
-            <div style="font-weight: 700; font-size: 1.1rem; color: #0f172a;">Loading Invoice Preview...</div>
-            <div style="font-size: 0.85rem; margin-top: 4px;">Fetching 1:1 Zoho Books record, payments, and GST breakdowns</div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: #0f172a;">Fetching Official Zoho Books PDF...</div>
+            <div style="font-size: 0.85rem; margin-top: 4px;">Loading exact invoice template directly from Zoho Books</div>
         </div>
     `;
 
     try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/details`, {
+        
+        // 1. Fetch metadata details for top bar (invoice number & status)
+        fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/details`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => res.json()).then(data => {
+            if (data && data.success && data.invoice) {
+                currentSelectedInvoiceData = data;
+                const inv = data.invoice;
+                const invNumEl = document.getElementById('previewInvoiceNum');
+                if (invNumEl) invNumEl.textContent = inv.invoice_number || '—';
+
+                const headerStatusBadge = document.getElementById('previewHeaderStatusBadge');
+                const st = (inv.status || 'draft').toLowerCase();
+                if (headerStatusBadge) {
+                    if (st === 'paid') {
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#dcfce7; color:#15803d;">PAID</span>';
+                    } else if (st === 'partially_paid') {
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#e0f2fe; color:#0369a1;">PARTIALLY PAID</span>';
+                    } else if (st === 'overdue') {
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#fee2e2; color:#b91c1c;">OVERDUE</span>';
+                    } else {
+                        headerStatusBadge.innerHTML = '<span class="status-badge" style="background:#eff6ff; color:#2563eb;">' + (inv.status || 'DRAFT').toUpperCase() + '</span>';
+                    }
+                }
+            }
+        }).catch(() => {});
+
+        // 2. Fetch the exact official PDF directly from Zoho Books API
+        const pdfRes = await fetch(`${BILLING_API_URL}/invoices/${encodeURIComponent(invId)}/zoho-pdf`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        const data = await res.json();
 
-        if (!res.ok || !data.success || !data.invoice) {
-            content.innerHTML = `
-                <div style="padding: 4rem 2rem; text-align: center;">
-                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;"></i>
-                    <h3 style="margin: 0; color: #0f172a;">Unable to load Invoice details</h3>
-                    <p style="color: #64748b; font-size: 0.9rem; margin-top: 6px;">${data.message || 'Invoice record not found in Zoho Books'}</p>
-                </div>
-            `;
-            return;
+        if (!pdfRes.ok) {
+            throw new Error('Failed to fetch invoice PDF from Zoho Books');
         }
 
-        currentSelectedInvoiceData = data;
-        renderInvoicePreviewWorkstation(data);
+        const pdfBlob = await pdfRes.blob();
+        currentInvoicePdfUrl = URL.createObjectURL(pdfBlob);
+
+        // 3. Render the official Zoho Books PDF right inside the preview viewport
+        content.innerHTML = `
+            <div style="width: 100%; height: calc(100vh - 200px); min-height: 750px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; overflow: hidden; display: flex; flex-direction: column;">
+                <iframe 
+                    src="${currentInvoicePdfUrl}#toolbar=0&navpanes=0&scrollbar=1" 
+                    style="width: 100%; height: 100%; border: none;"
+                    title="Official Zoho Books Invoice PDF">
+                </iframe>
+            </div>
+        `;
     } catch (err) {
+        console.error('Error fetching Zoho invoice PDF:', err);
         content.innerHTML = `
             <div style="padding: 4rem 2rem; text-align: center;">
-                <p style="color: #ef4444;">Error connecting to server: ${err.message}</p>
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;"></i>
+                <h3 style="margin: 0; color: #0f172a;">Failed to load Zoho Books PDF</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-top: 6px;">${err.message || 'Error communicating with Zoho Books'}</p>
+                <button type="button" class="btn-billing primary" onclick="selectInvoiceForPreview('${invId}')" style="margin-top: 1rem;">
+                    <i class="fa-solid fa-rotate"></i> Retry
+                </button>
             </div>
         `;
     }
